@@ -34,3 +34,80 @@ The result is **equivalence over these tests and observations**. It is not a bla
 Tests are generated in a separate transient directory. Users can retain them or choose to incorporate them into their application repository, using a framework that may differ from the application's existing tests.
 
 **Status: an initial Rust workload comparator is implemented; full language adapters and automatic test generation remain planned.** Start with [running the comparator and the otelc task example](docs/workload-comparison.md). Read the [design](docs/design.md), [language plan](docs/languages.md) and [delivery roadmap](docs/roadmap.md), or start with the [documentation index](docs/README.md).
+
+## Usage
+
+### Build and use the workload comparator today
+
+The repository provides an initial Rust comparator alongside the broader design and example policies. With Git, Make, Rust 1.98.1+, Python 3.12+, Node.js 24+ and npm installed:
+
+```sh
+git clone https://github.com/quuxio/oteleq.git
+cd oteleq
+make setup
+cargo build --locked
+./target/debug/quux-oteleq --help
+./target/debug/quux-oteleq compare-workload /path/to/bundle.json > /path/to/comparison.json
+make check
+```
+
+`make check` validates documents and example syntax, Rust formatting, Clippy, comparator regressions and at least 80% product line coverage. Coverage needs pinned `cargo-llvm-cov` 0.8.7 and matching LLVM tools; see [repository quality](docs/quality.md). The comparator consumes repeated captured observations and does not generate or execute arbitrary tests. See the [actual otelc example](docs/workload-comparison.md#use-it-with-otelc-now).
+
+### Planned application workflow
+
+**The commands below are proposed interfaces and are not available on the published `main` branch yet.** Installation instructions will accompany an implementation release.
+
+Start with the [example equivalence policy](examples/equivalence.toml). Set the languages and observations you need, point it at your external otelc policy, and supply the application build recipes and fixtures described in the [configuration guide](docs/cli-and-configuration.md#configuration). Paths below are examples; replace them with your own.
+
+Inspect capabilities, then create an inventory and generation plan in a new directory outside your application repository:
+
+```sh
+quux-oteleq doctor --source /path/to/application \
+  --config /path/to/equivalence.toml
+
+quux-oteleq plan --source /path/to/application \
+  --config /path/to/equivalence.toml \
+  --workspace-parent /path/to/temporary-runs
+```
+
+`plan` prints the unique workspace path. Use that actual path for `OTELEQ_WORKSPACE`; choose a durable report directory outside the workspace for `OTELEQ_REPORT_DIR`:
+
+```sh
+OTELEQ_WORKSPACE=/path/to/temporary-runs/oteleq-run-1234
+OTELEQ_REPORT_DIR=/path/to/reports/run-1234
+
+quux-oteleq generate --workspace "$OTELEQ_WORKSPACE"
+
+quux-oteleq run --workspace "$OTELEQ_WORKSPACE" \
+  --report-dir "$OTELEQ_REPORT_DIR" --keep-workspace
+```
+
+The planned run compares an uninstrumented baseline with the required instrumented lanes using the same concrete inputs and independently prepared initial state. Reports describe matching observations, differences, instrumentation evidence and any functions or state that could not be tested. Missing required evidence prevents a successful equivalence verdict.
+
+`--keep-workspace` retains the generated tests and replay artefacts. Omit it to remove a successful run's transient workspace after durable report export; failed or incomplete runs are retained by default.
+
+### Optionally incorporate generated tests
+
+Review the proposed destination files and framework dependencies before explicitly copying tests into your application repository:
+
+```sh
+quux-oteleq promote --workspace "$OTELEQ_WORKSPACE" \
+  --destination /path/to/application/tests/oteleq --dry-run
+
+quux-oteleq promote --workspace "$OTELEQ_WORKSPACE" \
+  --destination /path/to/application/tests/oteleq --apply
+```
+
+The generated framework may differ from your existing framework. Promotion refuses conflicting files and includes runner/dependency instructions; see [test retention and incorporation](docs/test-generation.md#optional-incorporation-into-a-repository).
+
+### Replay a difference and clean up
+
+Use a case ID from the report to replay a retained difference. When the retained workspace is no longer needed, remove it with the workspace cleanup command:
+
+```sh
+quux-oteleq replay --bundle "$OTELEQ_REPORT_DIR/replay" --case case-0042
+
+quux-oteleq clean --workspace "$OTELEQ_WORKSPACE"
+```
+
+See the [full CLI contract](docs/cli-and-configuration.md) for planned reports, exit codes and capability checks.
