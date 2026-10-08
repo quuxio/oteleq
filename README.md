@@ -6,7 +6,7 @@
 
 **Behavioural equivalence evidence for instrumented applications. A [quux](https://quux.io) project.**
 
-[![CI](https://github.com/quuxio/oteleq/actions/workflows/ci.yml/badge.svg)](https://github.com/quuxio/oteleq/actions/workflows/ci.yml)
+[![CI](https://github.com/quuxio/oteleq/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/quuxio/oteleq/actions/workflows/ci.yml)
 [![Status](https://img.shields.io/badge/status-design-blue)](docs/roadmap.md)
 [![License](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 
