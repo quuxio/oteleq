@@ -21,9 +21,11 @@ All quality-analysis badges currently say **not analysed** and link here. They a
 
 ## Traffic badge
 
-The traffic badge is a dated snapshot of GitHub's authenticated repository views endpoint, published in `.badges/traffic.json`. It is initialised during this delivery using the verified quuxio identity. An unsuccessful API read cannot publish a zero-value substitute. The date in the badge identifies the snapshot; counts cover GitHub's rolling 14-day window at that time.
+The traffic workflow updates `.badges/traffic.json` from GitHub's authenticated repository views endpoint hourly and on manual dispatch. It runs only on `main` in `quuxio/oteleq`. Counts cover GitHub's rolling 14-day window; failed API reads fail the workflow and cannot publish a zero-value substitute.
 
-Refresh the snapshot through an authorised quuxio API read when needed. No account credential is stored in GitHub Actions and no traffic-refresh workflow is configured. Automated refresh would require a separately authorised token with suitably limited repository/traffic scope. Traffic counts are unrelated to product adoption or behavioural equivalence.
+`TRAFFIC_TOKEN` stores the saved quuxio credential, explicitly authorised for persistence in this repository's Actions secrets on 8 October 2026. It is exposed only to the traffic-read step in this workflow. The badge commit uses the separate automatic `GITHUB_TOKEN` with `contents: write`. Actions are pinned to a full commit, and traffic maintenance commits do not rerun documentation CI.
+
+This credential retains its original GitHub permissions; storing it as `TRAFFIC_TOKEN` does not narrow those permissions. Its value is absent from source, badge output and workflow logs. Traffic counts are unrelated to product adoption or behavioural equivalence.
 
 ## Implementation quality
 
