@@ -7,7 +7,7 @@
 **Behavioural equivalence evidence for instrumented applications. A [quux](https://quux.io) project.**
 
 [![CI](https://github.com/quuxio/oteleq/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/quuxio/oteleq/actions/workflows/ci.yml)
-[![Status](https://img.shields.io/badge/status-design-blue)](docs/roadmap.md)
+[![Status](https://img.shields.io/badge/status-initial%20comparator-blue)](docs/roadmap.md)
 [![License](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 
 ---
@@ -33,4 +33,4 @@ The result is **equivalence over these tests and observations**. It is not a bla
 
 Tests are generated in a separate transient directory. Users can retain them or choose to incorporate them into their application repository, using a framework that may differ from the application's existing tests.
 
-**Status: application design; no executable or implemented language adapters yet.** Read the [design](docs/design.md), [language plan](docs/languages.md) and [delivery roadmap](docs/roadmap.md), or start with the [documentation index](docs/README.md).
+**Status: an initial Rust workload comparator is implemented; full language adapters and automatic test generation remain planned.** Start with [running the comparator and the otelc task example](docs/workload-comparison.md). Read the [design](docs/design.md), [language plan](docs/languages.md) and [delivery roadmap](docs/roadmap.md), or start with the [documentation index](docs/README.md).

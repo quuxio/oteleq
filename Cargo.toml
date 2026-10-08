@@ -1,0 +1,14 @@
+[package]
+name = "quux-oteleq"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.98"
+license = "AGPL-3.0-only"
+description = "Bounded comparison of repeated workload observations"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[dev-dependencies]
+tempfile = "3"

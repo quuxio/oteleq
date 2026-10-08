@@ -101,3 +101,7 @@ Framework routes are design choices based on their documented capabilities. Pin 
 - [JUnit](https://junit.org/) and [jqwik](https://jqwik.net/docs/current/user-guide.html) provide Java runners and properties.
 - [Node's test runner](https://nodejs.org/api/test.html) and [fast-check](https://fast-check.dev/docs/introduction/) provide JavaScript/TypeScript runners, generated values and shrinking.
 - [Go fuzzing](https://go.dev/doc/security/fuzz/) documents primitive input types and state-reset requirements; [Go build flags](https://pkg.go.dev/cmd/go#hdr-Build_flags) describe build/overlay controls.
+
+## Current workload comparator
+
+The implemented [byte-channel comparator](workload-comparison.md) accepts all eight language IDs. Only the diagnostic otelc Python task capture example is integrated now. No semantic discovery, generated harness or state observer is implied for any language; the adapter requirements above remain outstanding.

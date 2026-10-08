@@ -4,7 +4,7 @@
 
 oteleq generates repeatable tests and compares an application's behaviour with and without otelc instrumentation. Its claim is **equivalence over these tests and observations**, bounded by the recorded inputs, build identities, execution environment and observation coverage.
 
-This is a proposed application design as of 8 October 2026. Repository CI validates documents and examples. The Rust application, test generation, execution and language adapters are not implemented.
+This is the broader application design as of 8 October 2026. The initial [Rust workload comparator](workload-comparison.md) is implemented and CI checks its product coverage. The proposed executor, semantic discovery, test generation, typed graph comparator and language adapters are not implemented.
 
 ## Requirements
 
