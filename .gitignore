@@ -1,0 +1,7 @@
+ci/markdownlint/node_modules/
+target/
+build/
+.venv/
+.DS_Store
+*.pyc
+__pycache__/

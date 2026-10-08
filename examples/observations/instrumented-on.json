@@ -1,0 +1,21 @@
+{
+  "protocol_version": 1,
+  "case_id": "example-counter-001",
+  "function_id": "example:python:Counter.increment",
+  "lane": "instrumented-on",
+  "artefact_class": "unit_harness",
+  "capture": {
+    "mode": "boundary_snapshots",
+    "complete_roots": ["receiver"],
+    "gaps": ["globals not observed", "effects not observed"]
+  },
+  "before": {
+    "roots": {"receiver": {"kind": "reference", "node_id": "n7"}},
+    "nodes": [{"id": "n7", "type": "Counter", "fields": {"calls": {"kind": "integer", "type": "python.int", "value": "3"}}}]
+  },
+  "outcome": {"kind": "return", "value": {"kind": "integer", "type": "python.int", "value": "4"}},
+  "after": {
+    "roots": {"receiver": {"kind": "reference", "node_id": "n7"}},
+    "nodes": [{"id": "n7", "type": "Counter", "fields": {"calls": {"kind": "integer", "type": "python.int", "value": "5"}}}]
+  }
+}
