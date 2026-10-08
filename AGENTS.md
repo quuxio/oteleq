@@ -1,7 +1,7 @@
 # Repository guidance
 
 - If `~/.agents/AGENTS.md` exists, read it and follow the relevant guidance.
-- This repository currently contains an application design and documentation validation. Keep proposed interfaces distinct from implemented behaviour; no application executable or language adapter exists yet.
+- The Rust `compare-workload` command compares captured repeated byte-channel evidence. Semantic discovery, generators, typed graph comparison and full language adapters remain design only. Keep proposed interfaces distinct from implemented behaviour.
 - Use the `quuxio` GitHub account and credentials for all remote operations. Verify the API identity before each operation. Never use `stephenlclarke` credentials. Use `/opt/homebrew/bin/gh` directly on Stephen's Mac because other wrappers may override explicitly supplied credentials.
 - The intended implementation uses a Rust core and language-specific adapters. Cover all eight current otelc language IDs: `c`, `cpp`, `rust`, `python`, `java`, `javascript`, `typescript`, `go`.
 - Preserve application and dependency sources, build manifests and lockfiles. Generate tests, access helpers and private build copies in a new directory outside the target repository. Copying tests into the repository is an explicit user choice.

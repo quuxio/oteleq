@@ -7,7 +7,7 @@
 **Behavioural equivalence evidence for instrumented applications. A [quux](https://quux.io) project.**
 
 [![CI](https://github.com/quuxio/oteleq/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/quuxio/oteleq/actions/workflows/ci.yml)
-[![Status](https://img.shields.io/badge/status-design-blue)](docs/roadmap.md)
+[![Status](https://img.shields.io/badge/status-initial%20comparator-blue)](docs/roadmap.md)
 [![License](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 
 ---
@@ -33,22 +33,25 @@ The result is **equivalence over these tests and observations**. It is not a bla
 
 Tests are generated in a separate transient directory. Users can retain them or choose to incorporate them into their application repository, using a framework that may differ from the application's existing tests.
 
-**Status: application design; no executable or implemented language adapters yet.** Read the [design](docs/design.md), [language plan](docs/languages.md) and [delivery roadmap](docs/roadmap.md), or start with the [documentation index](docs/README.md).
+**Status: an initial Rust workload comparator is implemented; full language adapters and automatic test generation remain planned.** Start with [running the comparator and the otelc task example](docs/workload-comparison.md). Read the [design](docs/design.md), [language plan](docs/languages.md) and [delivery roadmap](docs/roadmap.md), or start with the [documentation index](docs/README.md).
 
 ## Usage
 
-### Review and validate the design today
+### Build and use the workload comparator today
 
-The published repository currently provides design documents and example policies. With Git, Make, Python 3.12+, Node.js 24+ and npm installed:
+The repository provides an initial Rust comparator alongside the broader design and example policies. With Git, Make, Rust 1.98.1+, Python 3.12+, Node.js 24+ and npm installed:
 
 ```sh
 git clone https://github.com/quuxio/oteleq.git
 cd oteleq
 make setup
+cargo build --locked
+./target/debug/quux-oteleq --help
+./target/debug/quux-oteleq compare-workload /path/to/bundle.json > /path/to/comparison.json
 make check
 ```
 
-`make check` validates Markdown and the syntax of the JSON/TOML examples. It does not generate tests or compare an application yet.
+`make check` validates documents and example syntax, Rust formatting, Clippy, comparator regressions and at least 80% product line coverage. Coverage needs pinned `cargo-llvm-cov` 0.8.7 and matching LLVM tools; see [repository quality](docs/quality.md). The comparator consumes repeated captured observations and does not generate or execute arbitrary tests. See the [actual otelc example](docs/workload-comparison.md#use-it-with-otelc-now).
 
 ### Planned application workflow
 

@@ -1,9 +1,10 @@
 # oteleq documentation
 
-This is the application design, dated 8 October 2026. The executable names, commands, protocols and configuration below are proposed interfaces; they do not run yet.
+As of 8 October 2026, `quux-oteleq compare-workload` runs the initial Rust comparator. The broader execution, discovery, generation and graph protocols remain proposed interfaces.
 
 | Document | Use it to |
 | --- | --- |
+| [Workload comparison](workload-comparison.md) | Run the implemented comparator and capture the actual otelc task example |
 | [System design](design.md) | Understand the Rust core, isolated execution and evidence boundary |
 | [Languages](languages.md) | See discovery, generation, build integration and limits for all eight languages |
 | [Test generation](test-generation.md) | Understand automatic inputs, fixtures, sequences and optional incorporation |

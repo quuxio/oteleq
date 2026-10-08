@@ -30,4 +30,17 @@ jobs:
       - name: Install locked documentation tools
         run: make setup
       - name: Validate documents and example syntax
-        run: make check
+        run: make docs-check
+
+  core:
+    name: Rust comparator and 80% product coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - name: Install pinned Rust and coverage tools
+        run: |
+          rustup toolchain install 1.98.1 --profile minimal --component rustfmt --component clippy --component llvm-tools-preview
+          rustup default 1.98.1
+          cargo install cargo-llvm-cov --version 0.8.7 --locked
+      - name: Validate comparator and coverage
+        run: make core-check coverage
