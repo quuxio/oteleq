@@ -15,11 +15,22 @@ import sys
 import tempfile
 import threading
 
-from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceRequest
-
-
 def digest(data):
     return hashlib.sha256(data).hexdigest()
+
+
+def artefact_identities(root, interpreter):
+    identities = {str(path.relative_to(root)): digest(path.read_bytes())
+                  for path in sorted((root / "adapters/python/quux_otelc_python").rglob("*.py"))}
+    for relative in ("target/debug/quux-otelc", "adapters/python/requirements.txt"):
+        identities[relative] = digest((root / relative).read_bytes())
+    identities["python_executable"] = digest(interpreter.read_bytes())
+    return identities
+
+
+def require_same_artefacts(root, interpreter, expected):
+    if artefact_identities(root, interpreter) != expected:
+        raise ValueError("launcher, interpreter or adapter artefacts changed during capture")
 
 
 def main():
@@ -39,11 +50,8 @@ def main():
     originals = {path: path.read_bytes() for path in (source, policy)}
     source_hash = digest(originals[source])
     # Record concrete artefacts, including the adapter used by this CLI.
-    identities = {str(path.relative_to(root)): digest(path.read_bytes())
-                  for path in sorted((root / "adapters/python/quux_otelc_python").glob("*.py"))}
-    identities["target/debug/quux-otelc"] = digest(cli.read_bytes())
-    identities["adapters/python/requirements.txt"] = digest((root / "adapters/python/requirements.txt").read_bytes())
-    identities["python_executable"] = digest(Path(sys.executable).read_bytes())
+    interpreter = Path(sys.executable)
+    identities = artefact_identities(root, interpreter)
     baseline_hash = digest((source_hash + identities["python_executable"]).encode())
     instrumented_hash = digest(json.dumps(identities, sort_keys=True).encode())
     corpus = {"case_id": "python-tasks-example", "arguments": [], "stdin": "closed", "fixture": "fresh process and private source copy"}
@@ -65,6 +73,7 @@ def main():
                          "baseline": [], "instrumented_on": []}]}
     for lane in ("baseline", "instrumented_on"):
         for repeat in range(2):
+            require_same_artefacts(root, interpreter, identities)
             attempt_dir = destination / f"{lane}-{repeat}"
             attempt_dir.mkdir(mode=0o700)
             with tempfile.TemporaryDirectory(prefix="oteleq-task-") as temporary:
@@ -111,6 +120,7 @@ def main():
                     server.shutdown()
                     server.server_close()
                     worker.join(timeout=3)
+                require_same_artefacts(root, interpreter, identities)
                 attempt = {"source_sha256_before": source_hash, "source_sha256_after": digest(app.read_bytes()),
                            "termination": {"kind": "exit", "code": result.returncode} if result.returncode >= 0
                                           else {"kind": "signal", "number": -result.returncode},
@@ -123,6 +133,7 @@ def main():
                 for channel in ("stdout", "stderr"):
                     (attempt_dir / channel).write_bytes(getattr(result, channel))
                 if lane == "instrumented_on":
+                    from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceRequest
                     raw = []
                     names = Counter()
                     for index, (path, body) in enumerate(bodies):

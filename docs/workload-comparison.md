@@ -44,7 +44,7 @@ cargo build --locked
 
 The report directory must be new and outside both repositories. Reports retain concrete corpus, artefact hashes, raw stdout/stderr, runtime reports and received OTLP protobuf bytes. Every instrumented attempt must contain eight spans: two `group`, one `detached` and five `leaf` observations, with no runtime/export losses or pending contexts. Telemetry timing and IDs are retained separately; they are not expected to match across executions. This is a **diagnostic example workload**, not a shipping application qualification or complete Python adapter.
 
-The observer records adapter/interpreter/launcher content identities. Its fixed trusted example is limited to 30 seconds per attempt and 1 MiB per OTLP request, with at most 16 requests. General process memory/output limits, sandboxed execution, typed state observers and hostile targets are outside this example's qualification. Failed capture raises an error and leaves its partial report directory; it does not emit a successful complete bundle.
+The observer records adapter/interpreter/launcher content identities and verifies them before and after every execution. A concurrent rebuild, changed adapter/lock/interpreter or missing artefact aborts capture; observations from different tool builds cannot share a complete bundle. Its fixed trusted example is limited to 30 seconds per attempt and 1 MiB per OTLP request, with at most 16 requests. General process memory/output limits, sandboxed execution, typed state observers and hostile targets are outside this example's qualification. Failed capture raises an error and leaves its partial report directory; it does not emit a successful complete bundle.
 
 ## Evidence contract
 
