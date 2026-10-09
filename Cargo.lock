@@ -93,8 +93,11 @@ dependencies = [
 name = "quux-oteleq"
 version = "0.1.0"
 dependencies = [
+ "proc-macro2",
+ "quote",
  "serde",
  "serde_json",
+ "syn",
  "tempfile",
 ]
 

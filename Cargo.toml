@@ -9,6 +9,7 @@ description = "Bounded comparison of repeated workload observations"
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-
-[dev-dependencies]
 tempfile = "3"
+syn = { version = "=3.0.6", features = ["full", "visit"] }
+quote = "=1.0.47"
+proc-macro2 = { version = "=1.0.107", features = ["span-locations"] }

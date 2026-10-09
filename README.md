@@ -7,7 +7,7 @@
 **Behavioural equivalence evidence for instrumented applications. A [quux](https://quux.io) project.**
 
 [![CI](https://github.com/quuxio/oteleq/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/quuxio/oteleq/actions/workflows/ci.yml)
-[![Status](https://img.shields.io/badge/status-initial%20comparator-blue)](docs/roadmap.md)
+[![Status](https://img.shields.io/badge/status-scalar%20test%20generation-blue)](docs/roadmap.md)
 [![License](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 
 ---
@@ -31,11 +31,11 @@ oteleq aims to generate tests that compare application behaviour with and withou
 
 The result is **equivalence over these tests and observations**. It is not a blanket proof that every function is identical.
 
-The planned application generates tests in a separate transient directory. Users can retain them or choose to incorporate them into their application repository, using a framework that may differ from the application's existing tests.
+Generated tests live in a new private directory outside the application repository. Users can retain or explicitly export them, using Python's standard `unittest` suite independently of the application's existing framework.
 
-**Status: the Rust workload comparator and diagnostic otelc capture integrations for all eight languages are implemented; full language adapters and automatic test generation remain planned.** Start with [comparing all eight languages](docs/eight-language-capture.md) or [the comparator and Python task example](docs/workload-comparison.md). Read the [design](docs/design.md), [language plan](docs/languages.md) and [delivery roadmap](docs/roadmap.md), or start with the [documentation index](docs/README.md).
+**Status: automatic scalar test generation, AST inventory and repeated actual otelc execution are implemented for all eight languages.** Supported functions receive frozen concrete inputs; unsupported callables and state remain visible blockers. Python and Node capture supported object graphs; other adapters capture scalar results and accessible scalar globals. Generated access/entrypoint helpers produce diagnostic evidence. Shipping-artefact qualification and application-specific fixtures remain future work.
 
-Today, oteleq is useful for instrumentation regression checks over independently captured, repeatable workloads. The bundled observers cover fixed otelc examples across all eight languages, a Python task example and a [Python worker corpus](docs/eight-language-capture.md#python-worker-workload). Global and instance mutations require explicit captured channels; automatic state inspection and qualification of shipping artefacts are still planned. See [usefulness and adoption priorities](docs/adoption.md).
+Start with [automatic generation](docs/automatic-generation.md), [fixed eight-language workloads](docs/eight-language-capture.md) or [workload comparison](docs/workload-comparison.md). See [usefulness and limits](docs/adoption.md), the [design](docs/design.md) and [roadmap](docs/roadmap.md).
 
 ## Usage
 
@@ -55,63 +55,38 @@ python3 -m venv .venv
 make check PYTHON=.venv/bin/python
 ```
 
-`make check` validates documents and example syntax, Rust formatting, Clippy, comparator/capture regressions and at least 80% product line coverage. Coverage needs Python `coverage` 7.16.2, pinned `cargo-llvm-cov` 0.8.7 and matching LLVM tools; see [repository quality](docs/quality.md). The comparator consumes repeated captured observations and does not generate arbitrary tests. The [eight-language capture integration](docs/eight-language-capture.md) executes fixed ordinary otelc workloads with its qualified adapters.
+`make check` validates documents and example syntax, Rust formatting, Clippy, comparator/capture regressions and at least 80% product line coverage. Coverage needs Python `coverage` 7.16.2, pinned `cargo-llvm-cov` 0.8.7 and matching LLVM tools; see [repository quality](docs/quality.md). The `compare-workload` command consumes repeated captured observations; separate generation commands create bounded scalar tests. The [eight-language capture integration](docs/eight-language-capture.md) executes fixed ordinary otelc workloads with its qualified adapters.
 
-### Planned application workflow
+### Generate and run tests
 
-**The commands below are proposed interfaces and are not available on the published `main` branch yet.** Installation instructions will accompany an implementation release.
-
-Start with the [example equivalence policy](examples/equivalence.toml). Set the languages and observations you need, point it at your external otelc policy, and supply the application build recipes and fixtures described in the [configuration guide](docs/cli-and-configuration.md#configuration). Paths below are examples; replace them with your own.
-
-Inspect capabilities, then create an inventory and generation plan in a new directory outside your application repository:
+Build otelc's qualified adapters first. Use its locked Python environment, then create an external plan and use the workspace path printed by `plan`:
 
 ```sh
-quux-oteleq doctor --source /path/to/application \
-  --config /path/to/equivalence.toml
+export OTELEQ_PYTHON=/absolute/path/to/otelc/.venv/bin/python
+OTELEQ_CLI=/absolute/path/to/oteleq/target/debug/quux-oteleq
+"$OTELEQ_CLI" plan --source /absolute/path/to/application \
+  --otelc-root /absolute/path/to/otelc --workspace-parent /tmp
 
-quux-oteleq plan --source /path/to/application \
-  --config /path/to/equivalence.toml \
-  --workspace-parent /path/to/temporary-runs
+OTELEQ_WORKSPACE=/tmp/oteleq-run-actual-id
+"$OTELEQ_CLI" generate --workspace "$OTELEQ_WORKSPACE"
+"$OTELEQ_CLI" run --workspace "$OTELEQ_WORKSPACE" \
+  --report-dir /absolute/path/to/new-report
+"$OTELEQ_PYTHON" "$OTELEQ_WORKSPACE/tests/test_equivalence.py"
 ```
 
-`plan` prints the unique workspace path. Use that actual path for `OTELEQ_WORKSPACE`; choose a durable report directory outside the workspace for `OTELEQ_REPORT_DIR`:
+The default generates up to three distinct scalar cases per function and compares two plain with two instrumented runs per case. Missing instrumentation, changed source, unstable observations, failed builds and selected blockers fail the gate. The report records tested inputs, state coverage, telemetry and gaps. Syntax discovery and scalar samples do not establish business preconditions.
+
+### Replay, retain or incorporate
 
 ```sh
-OTELEQ_WORKSPACE=/path/to/temporary-runs/oteleq-run-1234
-OTELEQ_REPORT_DIR=/path/to/reports/run-1234
+"$OTELEQ_CLI" replay --workspace "$OTELEQ_WORKSPACE" --case case-id-from-corpus
 
-quux-oteleq generate --workspace "$OTELEQ_WORKSPACE"
+"$OTELEQ_CLI" export-tests --workspace "$OTELEQ_WORKSPACE" \
+  --destination /absolute/path/to/new-tests
+"$OTELEQ_CLI" export-tests --workspace "$OTELEQ_WORKSPACE" \
+  --destination /absolute/path/to/new-tests --apply
 
-quux-oteleq run --workspace "$OTELEQ_WORKSPACE" \
-  --report-dir "$OTELEQ_REPORT_DIR" --keep-workspace
+"$OTELEQ_CLI" clean --workspace "$OTELEQ_WORKSPACE"
 ```
 
-The planned run compares an uninstrumented baseline with the required instrumented lanes using the same concrete inputs and independently prepared initial state. Reports describe matching observations, differences, instrumentation evidence and any functions or state that could not be tested. Missing required evidence prevents a successful equivalence verdict.
-
-`--keep-workspace` retains the generated tests and replay artefacts. Omit it to remove a successful run's transient workspace after durable report export; failed or incomplete runs are retained by default.
-
-### Optionally incorporate generated tests
-
-Review the proposed destination files and framework dependencies before explicitly copying tests into your application repository:
-
-```sh
-quux-oteleq promote --workspace "$OTELEQ_WORKSPACE" \
-  --destination /path/to/application/tests/oteleq --dry-run
-
-quux-oteleq promote --workspace "$OTELEQ_WORKSPACE" \
-  --destination /path/to/application/tests/oteleq --apply
-```
-
-The generated framework may differ from your existing framework. Promotion refuses conflicting files and includes runner/dependency instructions; see [test retention and incorporation](docs/test-generation.md#optional-incorporation-into-a-repository).
-
-### Replay a difference and clean up
-
-Use a case ID from the report to replay a retained difference. When the retained workspace is no longer needed, remove it with the workspace cleanup command:
-
-```sh
-quux-oteleq replay --bundle "$OTELEQ_REPORT_DIR/replay" --case case-0042
-
-quux-oteleq clean --workspace "$OTELEQ_WORKSPACE"
-```
-
-See the [full CLI contract](docs/cli-and-configuration.md) for planned reports, exit codes and capability checks.
+Export includes a frozen application snapshot and runnable suite. It refuses existing destinations and may be placed in the application only by that explicit choice. Generated boilerplate is MIT licensed; application code retains its licence. Retained suites test their frozen snapshot; create a new plan for changed application code. See [capabilities, limits and complete usage](docs/automatic-generation.md). The broader [configuration/adapter protocol](docs/cli-and-configuration.md) and [example policy](examples/equivalence.toml) remain proposed interfaces.

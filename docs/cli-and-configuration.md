@@ -2,7 +2,7 @@
 
 ## Status
 
-The broader commands and contracts on this page remain design interfaces. The implemented `quux-oteleq compare-workload BUNDLE.json` command uses a separate byte-channel schema documented in [workload comparison](workload-comparison.md). The proposed executable is `quux-oteleq`. Configuration has its own version-1 schema and references otelc's schema-2 policy; it does not duplicate otelc selection/export rules.
+The [actual scalar workflow](automatic-generation.md) implements `plan`, `generate`, `run`, `replay`, `export-tests` and `clean` with a smaller CLI and frozen JSON workspace contract. Commands, flags and TOML/worker protocols on this page describe the broader proposed interface; they are not interchangeable with the implemented commands. The implemented `quux-oteleq compare-workload BUNDLE.json` command uses a separate byte-channel schema documented in [workload comparison](workload-comparison.md). The proposed executable is `quux-oteleq`. Configuration has its own version-1 schema and references otelc's schema-2 policy; it does not duplicate otelc selection/export rules.
 
 ## Workflow
 

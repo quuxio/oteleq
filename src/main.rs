@@ -7,8 +7,18 @@ use std::{
 };
 const MAX_BYTES: u64 = 16 * 1024 * 1024;
 fn run(args: &[String]) -> Result<i32, String> {
+    if args.len() == 2 && args[0] == "inventory-rust" {
+        let inventory = quux_oteleq::generation::inventory(std::path::Path::new(&args[1]))?;
+        println!("{inventory}");
+        return Ok(0);
+    }
+    if args.first().is_some_and(|arg| {
+        ["plan", "generate", "run", "replay", "clean", "export-tests"].contains(&arg.as_str())
+    }) {
+        return quux_oteleq::generation::launch(args);
+    }
     if args == ["--help"] {
-        println!("quux-oteleq compare-workload BUNDLE.json\nCompare repeated captured byte channels; JSON report on stdout. Exit: 0 equivalent, 1 different, 2 invalid/source changed, 3 incomplete, 4 IO/codec error. No execution or test generation.");
+        println!("quux-oteleq compare-workload BUNDLE.json\nquux-oteleq plan|generate|run|replay|clean|export-tests --help\nGenerate external paired unit harnesses for all eight otelc languages. Set OTELEQ_PYTHON to a Python 3.12+ environment with opentelemetry-proto for execution. Exit: 0 equivalent, 1 different, 2 invalid/source changed, 3 incomplete, 4 IO/codec error.");
         return Ok(0);
     }
     if args.len() != 2 || args[0] != "compare-workload" {

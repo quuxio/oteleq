@@ -326,7 +326,7 @@ fn cli_reports_outcomes_and_never_accepts_missing_malformed_or_oversized_bundle(
     assert!(help.status.success());
     assert!(String::from_utf8(help.stdout)
         .unwrap()
-        .contains("No execution or test generation"));
+        .contains("Generate external paired unit harnesses"));
 }
 #[test]
 fn schema_is_strict_and_untyped_numeric_bytes_cannot_overflow() {

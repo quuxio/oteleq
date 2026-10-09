@@ -1,7 +1,7 @@
 # Repository guidance
 
 - If `~/.agents/AGENTS.md` exists, read it and follow the relevant guidance.
-- The Rust `compare-workload` command compares captured repeated byte-channel evidence. Semantic discovery, generators, typed graph comparison and full language adapters remain design only. Keep proposed interfaces distinct from implemented behaviour.
+- Rust `compare-workload` compares repeated byte channels. The embedded scalar generator implements plan/generate/run/replay/export-tests/clean with AST inventories for all eight languages, private paired execution and explicit blockers. Full semantic/build-aware adapters and the broader configuration/graph protocol remain proposed. Keep actual capabilities and design interfaces distinct.
 - Use the `quuxio` GitHub account and credentials for all remote operations. Verify the API identity before each operation. Never use `stephenlclarke` credentials. Use `/opt/homebrew/bin/gh` directly on Stephen's Mac because other wrappers may override explicitly supplied credentials.
 - The intended implementation uses a Rust core and language-specific adapters. Cover all eight current otelc language IDs: `c`, `cpp`, `rust`, `python`, `java`, `javascript`, `typescript`, `go`.
 - Preserve application and dependency sources, build manifests and lockfiles. Generate tests, access helpers and private build copies in a new directory outside the target repository. Copying tests into the repository is an explicit user choice.
