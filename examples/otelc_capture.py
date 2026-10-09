@@ -2,6 +2,7 @@
 from collections import Counter
 from contextlib import contextmanager
 import hashlib
+from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
 import os
 from pathlib import Path
@@ -9,9 +10,89 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import threading
+import time
 
-from capture_otelc_tasks import CaptureServer, strict_json
+
+MAX_REQUEST_BYTES = 1024 * 1024
+MAX_REQUESTS = 32
+REQUEST_TIMEOUT = 2
+
+
+class Receiver(BaseHTTPRequestHandler):
+    def do_POST(self):
+        self.server.requests += 1
+        lengths = self.headers.get_all("Content-Length", [])
+        if (len(lengths) != 1 or not lengths[0].isascii() or not lengths[0].isdecimal()
+                or self.headers.get("Transfer-Encoding") is not None
+                or self.headers.get("Content-Encoding", "identity") != "identity"
+                or self.path not in ("/v1/traces", "/v1/metrics")):
+            self.send_error(400)
+            return
+        size = int(lengths[0])
+        if size > MAX_REQUEST_BYTES or self.server.requests > self.server.max_requests:
+            self.send_error(413)
+            return
+        deadline = time.monotonic() + REQUEST_TIMEOUT
+        body = bytearray()
+        try:
+            while len(body) < size:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise TimeoutError
+                self.connection.settimeout(remaining)
+                chunk = self.rfile.read1(min(65536, size - len(body)))
+                if not chunk:
+                    self.send_error(400)
+                    return
+                body.extend(chunk)
+        except (TimeoutError, OSError):
+            self.send_error(408)
+            return
+        self.server.bodies.append((self.path, bytes(body)))
+        self.send_response(200)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def log_message(self, *_):
+        # Request failures are retained in the capture status, not application stderr.
+        pass
+
+    def log_error(self, *_):
+        self.server.errors.append("HTTP capture protocol or connection error")
+
+
+class CaptureServer(HTTPServer):
+    def __init__(self, max_requests=MAX_REQUESTS):
+        self.max_requests = max_requests
+        self.bodies = []
+        self.errors = []
+        self.requests = 0
+        super().__init__(("127.0.0.1", 0), Receiver)
+
+    def get_request(self):
+        connection, address = super().get_request()
+        connection.settimeout(REQUEST_TIMEOUT)
+        return connection, address
+
+    def handle_error(self, *_):
+        self.errors.append("HTTP capture connection failed")
+
+    def require_complete(self):
+        if self.errors:
+            raise ValueError("incomplete HTTP capture: " + "; ".join(self.errors))
+
+
+def strict_json(data):
+    def unique_object(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("duplicate runtime report key")
+            result[key] = value
+        return result
+    return json.loads(data, object_pairs_hook=unique_object)
 
 
 def digest(data):
@@ -21,6 +102,30 @@ def digest(data):
 def file_digest(path):
     with path.open("rb") as stream:
         return hashlib.file_digest(stream, "sha256").hexdigest()
+
+
+def temporary_parent(*source_roots):
+    source_roots = tuple(root.resolve() for root in source_roots)
+    # Reject configured source paths before tempfile probes them for writability.
+    for variable in ("TMPDIR", "TEMP", "TMP"):
+        if value := os.environ.get(variable):
+            candidate = Path(value).resolve()
+            if any(candidate.is_relative_to(root) for root in source_roots):
+                raise ValueError("temporary directory must be outside both repositories; correct TMPDIR")
+    parent = Path(tempfile.gettempdir()).resolve()
+    if any(parent.is_relative_to(root) for root in source_roots):
+        raise ValueError("temporary directory must be outside both repositories; correct TMPDIR")
+    return parent
+
+
+def retain_http(folder, bodies, errors, requests=None):
+    for index, (_, body) in enumerate(bodies):
+        (folder / f"otlp-{index}.protobuf").write_bytes(body)
+    manifest = {"errors": errors, "bodies": [{"path": path, "file": f"otlp-{index}.protobuf"}
+                                            for index, (path, _) in enumerate(bodies)]}
+    if requests is not None:
+        manifest["requests"] = requests
+    (folder / "http-capture.json").write_text(json.dumps(manifest, indent=2) + "\n")
 
 
 def tool_path(name):
@@ -62,9 +167,9 @@ def artefacts(root, language, tools):
         paths += [p for p in sorted(tree.rglob("*")) if p.is_file() and p.suffix in suffixes
                   and "tests" not in p.relative_to(tree).parts]
     identities = {str(p.relative_to(root)): file_digest(p) for p in paths}
-    for name in ("otelc_capture.py", "capture_otelc_languages.py", "capture_otelc_tasks.py"):
-        identities["observer:" + name] = file_digest(Path(__file__).with_name(name))
     identities.update({"tool:" + name: file_digest(path) for name, path in tools.items()})
+    for name in ("otelc_capture.py", "capture_otelc_languages.py", "otelc-workloads.json"):
+        identities["observer:" + name] = file_digest(Path(__file__).with_name(name))
     return identities
 
 
@@ -110,8 +215,8 @@ def commands(root, workspace, language, source, policy, tools, environment, evid
 
 @contextmanager
 def receiver():
-    """Never acknowledge truncated, unknown or over-budget telemetry."""
-    server = CaptureServer(max_requests=32)
+    """Expose exact received bytes and every transport failure to the observer."""
+    server = CaptureServer()
     worker = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True)
     worker.start()
     try:
@@ -153,47 +258,63 @@ def decode(bodies, service, decoder):
                     nodes[key] = (span.trace_id, span.parent_span_id) if span.parent_span_id else None
                     names[span.name] += 1
                     errors += int(span.status.code == 2)
-    for key, parent in nodes.items():
-        seen = {key}
-        while parent is not None:
-            if parent not in nodes or parent in seen:
+    resolved = set()
+    for key in nodes:
+        current, seen = key, set()
+        while current is not None and current not in resolved:
+            if current not in nodes or current in seen:
                 raise ValueError("missing parent or causal cycle")
-            seen.add(parent)
-            parent = nodes[parent]
+            seen.add(current)
+            current = nodes[current]
+        resolved.update(seen)
     roots = sum(parent is None for parent in nodes.values())
     if len({key[0] for key in nodes}) != roots:
         raise ValueError("local trace must have one root")
     return dict(names), raw, roots, errors
 
 
-def witness(bodies, report, spec, service, decoder):
+def witness(bodies, report, spec, service, decoder, language):
+    if language in ("c", "cpp"):
+        if report.get("drained") is not True:
+            raise ValueError("missing or unfinished native drain status")
+    elif (type(report.get("schema_version")) is not int or report["schema_version"] != 1
+          or report.get("language") != language):
+        raise ValueError("unsupported or mismatched runtime report")
     names, raw, roots, errors = decode(bodies, service, decoder)
     if names != spec["functions"] or roots != spec["trees"] or errors != spec["errors"]:
         raise ValueError("decoded telemetry does not match independent fixture expectations")
     traces = report["traces"]
-    trace_losses, runtime_losses = traces["losses"], report["losses"]
+    runtime_losses = report["losses"]
     required = {"active_call_capacity", "incomplete"}
-    if "export_dropped_batches" in report:
+    if language in ("c", "cpp"):
         required |= {"invalid_exit", "object_capacity", "object_incomplete", "queue", "stack", "thread_admission"}
+        export_key = "export_dropped_batches"
     else:
         required |= {"function_capacity", "invalid"}
-    if (not isinstance(trace_losses, dict) or not isinstance(runtime_losses, dict)
+        export_key = "export_loss"
+    if (not isinstance(runtime_losses, dict)
             or not required.issubset(runtime_losses)
-            or any(not isinstance(key, str) or not key.strip() for key in (*trace_losses, *runtime_losses))):
+            or not isinstance(traces["losses"], dict)
+            or any(not isinstance(key, str) or not key.strip() for key in (*traces["losses"], *runtime_losses))):
         raise ValueError("missing or invalid runtime loss diagnostics")
-    losses = {"traces." + key: value for key, value in trace_losses.items()}
+    losses = {"traces." + key: value for key, value in traces["losses"].items()}
     losses.update({"runtime." + key: value for key, value in runtime_losses.items()})
     export = [report[key] for key in ("export_loss", "export_dropped_batches") if key in report]
-    counters = [traces[key] for key in ("active_trees", "queued_trees", "completed_trees")]
-    counters += [traces.get("pending_contexts", 0), report["function_calls"]]
-    if any(type(value) is not int or value < 0 for value in (*losses.values(), *export, *counters)):
-        raise ValueError("invalid runtime loss or pending counter")
-    if not export or report.get("export_finished") is not True or report.get("drained", True) is not True:
+    if export_key not in report or report.get("export_finished") is not True or report.get("drained", True) is not True:
         raise ValueError("missing or unfinished export status")
+    try:
+        pending_counters = [traces[key] for key in ("active_trees", "queued_trees")]
+        if language == "python" or "pending_contexts" in traces:
+            pending_counters.append(traces["pending_contexts"])
+        counters = [*export, *losses.values(), *pending_counters, traces["completed_trees"], report["function_calls"]]
+    except KeyError as error:
+        raise ValueError("missing runtime counter") from error
+    if any(type(value) is not int or value < 0 for value in counters):
+        raise ValueError("invalid runtime counter")
     losses["transport.export"] = sum(export)
-    pending = sum(traces.get(key, 0) for key in ("pending_contexts", "active_trees", "queued_trees"))
-    if (any(losses.values()) or pending or traces["completed_trees"] != roots
-            or report["function_calls"] != sum(names.values())):
+    pending = sum(pending_counters)
+    if (any(losses.values()) or pending or traces.get("completed_trees") != roots
+            or report.get("function_calls") != sum(names.values())):
         raise ValueError("lossy, incomplete or mismatched runtime report")
     raw_digest = hashlib.sha256()
     for body in raw:
@@ -201,7 +322,6 @@ def witness(bodies, report, spec, service, decoder):
     return {"decoder": "opentelemetry-proto ExportTraceServiceRequest",
             "raw_otlp_sha256": raw_digest.hexdigest(), "functions": names,
             "spans": sum(names.values()), "losses": losses, "pending": pending}
-
 
 
 def environment(workspace, tools, service, root):

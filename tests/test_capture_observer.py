@@ -14,6 +14,9 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "examples"))
+import otelc_capture as capture
+
 OBSERVER = runpy.run_path(str(Path(__file__).resolve().parents[1] / "examples/capture_otelc_tasks.py"))
 
 
@@ -145,15 +148,15 @@ class ReceiverTests(unittest.TestCase):
             self.server.require_complete()
 
     def test_size_and_request_limits_cannot_silently_drop_telemetry(self):
-        self.assertEqual(self.request(b"x", {"Content-Length": str(OBSERVER["MAX_REQUEST_BYTES"] + 1)}), 413)
-        for _ in range(OBSERVER["MAX_REQUESTS"] - 1):
+        self.assertEqual(self.request(b"x", {"Content-Length": str(capture.MAX_REQUEST_BYTES + 1)}), 413)
+        for _ in range(self.server.max_requests - 1):
             self.assertEqual(self.request(), 200)
         self.assertEqual(self.request(), 413)
         with self.assertRaises(ValueError):
             self.server.require_complete()
 
     def test_body_timeout_is_a_capture_failure(self):
-        with patch.dict(OBSERVER["Receiver"].do_POST.__globals__, {"REQUEST_TIMEOUT": 0.05}):
+        with patch.dict(self.server.RequestHandlerClass.do_POST.__globals__, {"REQUEST_TIMEOUT": 0.05}):
             with socket.create_connection(("127.0.0.1", self.server.server_port), timeout=3) as connection:
                 connection.sendall(b"POST /v1/traces HTTP/1.0\r\nContent-Length: 3\r\n\r\n")
                 self.assertIn(b"408", connection.recv(4096).split(b"\r\n")[0])
@@ -190,7 +193,7 @@ class ArtefactStabilityTests(unittest.TestCase):
 
     def test_unchanged_tools_qualify_without_importing_the_target(self):
         OBSERVER["require_same_artefacts"](self.root, self.interpreter, self.identities)
-        self.assertEqual(len(self.identities), 5)
+        self.assertEqual(len(self.identities), 6)
 
     def test_rebuilt_launcher_changed_adapter_lock_or_interpreter_cannot_qualify(self):
         for relative in ["target/debug/quux-otelc", "adapters/python/quux_otelc_python/monitor.py",
@@ -232,6 +235,26 @@ class ArtefactStabilityTests(unittest.TestCase):
                     self.assertIn(b"temporary directory must be outside both repositories", result.stderr)
                     self.assertFalse(reports.exists())
 
+
+    def test_baseline_telemetry_aborts_before_recording_success(self):
+        app = self.root / "examples/apps/python_tasks_app.py"
+        app.parent.mkdir(parents=True)
+        app.write_text("print('same output')\n")
+        (self.root / "examples/python-task-context.toml").write_text("schema_version=2\n")
+        with tempfile.TemporaryDirectory() as parent:
+            reports = Path(parent) / "reports"
+            server = SimpleNamespace(bodies=[("/v1/traces", b"unexpected telemetry")], errors=[], requests=1,
+                                     server_port=12345, serve_forever=lambda **_: None,
+                                     shutdown=lambda: None, server_close=lambda: None,
+                                     require_complete=lambda: None)
+            main = OBSERVER["main"]
+            with patch.dict(main.__globals__, {"CaptureServer": lambda **_: server}), \
+                 patch.object(sys, "argv", ["capture", "--otelc-root", str(self.root), "--report-dir", str(reports)]):
+                with self.assertRaisesRegex(ValueError, "baseline unexpectedly exported"):
+                    main()
+            self.assertTrue((reports / "baseline-0/http-capture.json").is_file())
+            self.assertFalse((reports / "baseline-0/attempt.json").exists())
+            self.assertFalse((reports / "bundle.json").exists())
 
     def test_actual_capture_aborts_before_recording_success_when_a_run_rebuilds_the_launcher(self):
         app = self.root / "examples/apps/python_tasks_app.py"

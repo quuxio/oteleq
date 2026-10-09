@@ -29,7 +29,7 @@ def decoder(spans, service="expected", scope="quux.otelc"):
 def report():
     return {"traces": {"losses": {}, "pending_contexts": 0, "active_trees": 0,
                        "queued_trees": 0, "completed_trees": 1},
-            "function_calls": 1, "losses": {"function_capacity": 0, "active_call_capacity": 0, "incomplete": 0, "invalid": 0}, "export_loss": 0, "export_finished": True}
+            "function_calls": 1, "losses": {"function_capacity": 0, "active_call_capacity": 0, "incomplete": 0, "invalid": 0}, "schema_version": 1, "language": "python", "export_loss": 0, "export_finished": True}
 
 
 class TelemetryWitnessTests(unittest.TestCase):
@@ -38,7 +38,7 @@ class TelemetryWitnessTests(unittest.TestCase):
         self.bodies = [("/v1/metrics", b"metrics"), ("/v1/traces", b"trace bytes")]
 
     def test_valid_witness_has_exact_names_raw_identity_and_no_pending(self):
-        witness = capture.witness(self.bodies, report(), self.spec, "expected", decoder([span()]))
+        witness = capture.witness(self.bodies, report(), self.spec, "expected", decoder([span()]), "python")
         self.assertEqual(witness["functions"], {"selected": 1})
         self.assertEqual(witness["raw_otlp_sha256"], capture.digest(b"trace bytes"))
         self.assertEqual(witness["pending"], 0)
@@ -46,7 +46,7 @@ class TelemetryWitnessTests(unittest.TestCase):
     def test_missing_extra_or_wrong_function_never_qualifies(self):
         for spans in ([], [span("other")], [span(), span(identity=b"x" * 8)]):
             with self.subTest(spans=spans), self.assertRaises(ValueError):
-                capture.witness(self.bodies, report(), self.spec, "expected", decoder(spans))
+                capture.witness(self.bodies, report(), self.spec, "expected", decoder(spans), "python")
 
     def test_service_and_scope_must_match_the_launched_instance(self):
         for service, scope in (("wrong", "quux.otelc"), ("expected", "wrong")):
@@ -87,21 +87,27 @@ class TelemetryWitnessTests(unittest.TestCase):
             status = report()
             change(status)
             with self.subTest(status=status), self.assertRaises(ValueError):
-                capture.witness(self.bodies, status, self.spec, "expected", decoder([span()]))
+                capture.witness(self.bodies, status, self.spec, "expected", decoder([span()]), "python")
 
     def test_native_export_counter_and_error_span_are_independently_checked(self):
         status = report()
         status["export_dropped_batches"] = status.pop("export_loss")
         status["losses"] = {key: 0 for key in ("active_call_capacity", "incomplete", "invalid_exit", "object_capacity", "object_incomplete", "queue", "stack", "thread_admission")}
+        status.pop("schema_version")
+        status.pop("language")
+        status["drained"] = True
         node = span()
         node.status.code = 2
         spec = {**self.spec, "errors": 1}
-        capture.witness(self.bodies, status, spec, "expected", decoder([node]))
+        capture.witness(self.bodies, status, spec, "expected", decoder([node]), "c")
         with self.assertRaises(ValueError):
-            capture.witness(self.bodies, status, self.spec, "expected", decoder([node]))
+            capture.witness(self.bodies, status, self.spec, "expected", decoder([node]), "c")
 
     def test_malformed_or_missing_diagnostics_never_pass_as_zero(self):
         changes = [lambda r: r.update(losses={}), lambda r: r["traces"].pop("queued_trees"),
+                   lambda r: r["traces"].pop("pending_contexts"),
+                   lambda r: r.update(export_loss=-1, export_dropped_batches=1),
+                   lambda r: r["traces"].update(active_trees=-1, queued_trees=1),
                    lambda r: r.update(export_loss=False), lambda r: r.update(export_loss=-1),
                    lambda r: r["traces"].update(pending_contexts=0.0),
                    lambda r: r["traces"].update(losses={"capacity": False}),
@@ -111,11 +117,30 @@ class TelemetryWitnessTests(unittest.TestCase):
             status = report()
             change(status)
             with self.subTest(status=status), self.assertRaises((ValueError, KeyError)):
-                capture.witness(self.bodies, status, self.spec, "expected", decoder([span()]))
+                capture.witness(self.bodies, status, self.spec, "expected", decoder([span()]), "python")
 
     def test_duplicate_report_keys_cannot_hide_a_loss(self):
         with self.assertRaisesRegex(ValueError, "duplicate"):
             capture.strict_json('{"export_loss":1,"export_loss":0}')
+
+    def test_runtime_language_schema_and_native_drain_status_are_required(self):
+        changes = [lambda r: r.pop("schema_version"), lambda r: r.update(schema_version=True),
+                   lambda r: r.update(schema_version=2), lambda r: r.update(language="java"),
+                   lambda r: (r.pop("language"), r["traces"].pop("pending_contexts"))]
+        for change in changes:
+            status = report()
+            change(status)
+            with self.subTest(status=status), self.assertRaises(ValueError):
+                capture.witness(self.bodies, status, self.spec, "expected", decoder([span()]), "python")
+        with self.assertRaisesRegex(ValueError, "native drain status"):
+            capture.witness(self.bodies, report(), self.spec, "expected", decoder([span()]), "c")
+
+    def test_long_parent_chain_remains_valid(self):
+        nodes = [span(identity=index.to_bytes(8, "big"),
+                      parent=(index - 1).to_bytes(8, "big") if index > 1 else b"") for index in range(1, 513)]
+        names, _, roots, _ = capture.decode(self.bodies, "expected", decoder(nodes))
+        self.assertEqual(names, {"selected": 512})
+        self.assertEqual(roots, 1)
 
 
 class CaptureBoundaryTests(unittest.TestCase):
@@ -157,6 +182,15 @@ class CaptureBoundaryTests(unittest.TestCase):
                     connection.shutdown(socket.SHUT_WR)
                     self.assertNotIn(b"200", connection.recv(4096).split(b"\r\n")[0])
             self.assertEqual((len(bodies), len(errors)), (0, 3))
+
+    def test_source_contained_temporary_parent_is_rejected_before_probing_or_copying(self):
+        with patch.dict(os.environ, {"TMPDIR": "/source/tmp"}), patch.object(capture.tempfile, "gettempdir") as lookup:
+            with self.assertRaisesRegex(ValueError, "outside both repositories"):
+                capture.temporary_parent(Path("/source"), Path("/checker"))
+            lookup.assert_not_called()
+        with patch.dict(os.environ, {}, clear=True), patch.object(capture.tempfile, "gettempdir", return_value="/checker/tmp"):
+            with self.assertRaises(ValueError):
+                capture.temporary_parent(Path("/source"), Path("/checker"))
 
     def test_environment_isolated_from_ambient_agents_headers_and_wrappers(self):
         with patch.dict(os.environ, {"NODE_OPTIONS": "injected", "OTEL_EXPORTER_OTLP_HEADERS": "secret",

@@ -6,7 +6,6 @@ Run with otelc's locked Python environment (contains the OTLP protobuf decoder).
 import argparse
 from collections import Counter
 import hashlib
-from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
 import os
 from pathlib import Path
@@ -14,75 +13,8 @@ import subprocess
 import sys
 import tempfile
 import threading
-import time
 
-MAX_REQUEST_BYTES = 1024 * 1024
-MAX_REQUESTS = 16
-REQUEST_TIMEOUT = 2
-
-
-class Receiver(BaseHTTPRequestHandler):
-    def do_POST(self):
-        self.server.requests += 1
-        lengths = self.headers.get_all("Content-Length", [])
-        if (len(lengths) != 1 or not lengths[0].isascii() or not lengths[0].isdecimal()
-                or self.headers.get("Transfer-Encoding") is not None
-                or self.headers.get("Content-Encoding", "identity") != "identity"
-                or self.path not in ("/v1/traces", "/v1/metrics")):
-            self.send_error(400)
-            return
-        size = int(lengths[0])
-        if size > MAX_REQUEST_BYTES or self.server.requests > self.server.max_requests:
-            self.send_error(413)
-            return
-        deadline = time.monotonic() + REQUEST_TIMEOUT
-        body = bytearray()
-        try:
-            while len(body) < size:
-                remaining = deadline - time.monotonic()
-                if remaining <= 0:
-                    raise TimeoutError
-                self.connection.settimeout(remaining)
-                chunk = self.rfile.read1(min(65536, size - len(body)))
-                if not chunk:
-                    self.send_error(400)
-                    return
-                body.extend(chunk)
-        except (TimeoutError, OSError):
-            self.send_error(408)
-            return
-        self.server.bodies.append((self.path, bytes(body)))
-        self.send_response(200)
-        self.send_header("Content-Length", "0")
-        self.end_headers()
-
-    def log_message(self, *_):
-        # Request failures are retained in the capture status, not application stderr.
-        pass
-
-    def log_error(self, *_):
-        self.server.errors.append("HTTP capture protocol or connection error")
-
-
-class CaptureServer(HTTPServer):
-    def __init__(self, max_requests=MAX_REQUESTS):
-        self.max_requests = max_requests
-        self.bodies = []
-        self.errors = []
-        self.requests = 0
-        super().__init__(("127.0.0.1", 0), Receiver)
-
-    def get_request(self):
-        connection, address = super().get_request()
-        connection.settimeout(REQUEST_TIMEOUT)
-        return connection, address
-
-    def handle_error(self, *_):
-        self.errors.append("HTTP capture connection failed")
-
-    def require_complete(self):
-        if self.errors:
-            raise ValueError("incomplete HTTP capture: " + "; ".join(self.errors))
+from otelc_capture import CaptureServer, retain_http, strict_json, temporary_parent
 
 
 def digest(data):
@@ -101,23 +33,13 @@ def artefact_identities(root, interpreter):
         identities[relative] = file_digest(root / relative)
     identities["python_executable"] = file_digest(interpreter)
     identities["capture_observer"] = file_digest(Path(__file__))
+    identities["capture_support"] = file_digest(Path(__file__).with_name("otelc_capture.py"))
     return identities
 
 
 def require_same_artefacts(root, interpreter, expected):
     if artefact_identities(root, interpreter) != expected:
         raise ValueError("launcher, interpreter, adapter or observer artefacts changed during capture")
-
-
-def strict_json(data):
-    def unique_object(pairs):
-        result = {}
-        for key, value in pairs:
-            if key in result:
-                raise ValueError("duplicate runtime report key")
-            result[key] = value
-        return result
-    return json.loads(data, object_pairs_hook=unique_object)
 
 
 def runtime_witness(status):
@@ -178,9 +100,10 @@ def main():
     checker_root = Path(__file__).resolve().parents[1]
     if any(destination.is_relative_to(path) for path in (root, checker_root)):
         parser.error("report directory must be outside both repositories")
-    temporary_parent = Path(tempfile.gettempdir()).resolve()
-    if any(temporary_parent.is_relative_to(path) for path in (root, checker_root)):
-        parser.error("temporary directory must be outside both repositories; correct TMPDIR")
+    try:
+        temporary_directory = temporary_parent(root, checker_root)
+    except ValueError as error:
+        parser.error(str(error))
     destination.mkdir(mode=0o700, parents=False, exist_ok=False)
     source = root / "examples/apps/python_tasks_app.py"
     policy = root / "examples/python-task-context.toml"
@@ -216,7 +139,7 @@ def main():
             require_same_artefacts(root, interpreter, identities)
             attempt_dir = destination / f"{lane}-{repeat}"
             attempt_dir.mkdir(mode=0o700)
-            with tempfile.TemporaryDirectory(prefix="oteleq-task-") as temporary:
+            with tempfile.TemporaryDirectory(prefix="oteleq-task-", dir=temporary_directory) as temporary:
                 workspace = Path(temporary).resolve()
                 if any(workspace.is_relative_to(path) for path in (root, checker_root)):
                     raise ValueError("temporary workspace is inside a source repository")
@@ -228,7 +151,7 @@ def main():
                 env = {"PATH": os.environ.get("PATH", ""), "HOME": str(workspace),
                        "TMPDIR": str(workspace), "LANG": "C.UTF-8",
                        "PYTHONDONTWRITEBYTECODE": "1", "OTELC_PYTHON": sys.executable}
-                server = CaptureServer()
+                server = CaptureServer(max_requests=16)
                 worker = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True)
                 worker.start()
                 command = [sys.executable, str(app)]
@@ -244,12 +167,9 @@ def main():
                     server.shutdown()
                     server.server_close()
                     worker.join(timeout=3)
-                for index, (_, body) in enumerate(server.bodies):
-                    (attempt_dir / f"otlp-{index}.protobuf").write_bytes(body)
-                (attempt_dir / "http-capture.json").write_text(json.dumps({
-                    "requests": server.requests, "errors": server.errors,
-                    "bodies": [{"path": path, "file": f"otlp-{index}.protobuf"}
-                               for index, (path, _) in enumerate(server.bodies)]}, indent=2) + "\n")
+                retain_http(attempt_dir, server.bodies, server.errors, server.requests)
+                for channel in ("stdout", "stderr"):
+                    (attempt_dir / channel).write_bytes(getattr(result, channel))
                 server.require_complete()
                 require_same_artefacts(root, interpreter, identities)
                 attempt = {"source_sha256_before": source_hash, "source_sha256_after": digest(app.read_bytes()),
@@ -261,8 +181,6 @@ def main():
                     raise ValueError("original target source or policy changed")
                 if local_policy.read_bytes() != originals[policy]:
                     raise ValueError("private policy changed")
-                for channel in ("stdout", "stderr"):
-                    (attempt_dir / channel).write_bytes(getattr(result, channel))
                 if lane == "instrumented_on":
                     from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceRequest
                     raw_hash, names = decode_traces(server.bodies, ExportTraceServiceRequest.FromString)
@@ -273,6 +191,8 @@ def main():
                                           "raw_otlp_sha256": raw_hash, "functions": names,
                                           "spans": sum(names.values()), "losses": losses,
                                           "pending": pending}
+                elif server.bodies:
+                    raise ValueError("uninstrumented baseline unexpectedly exported telemetry")
                 bundle["cases"][0][lane].append(attempt)
                 (attempt_dir / "attempt.json").write_text(json.dumps(attempt, indent=2) + "\n")
     (destination / "source.py").write_bytes(originals[source])

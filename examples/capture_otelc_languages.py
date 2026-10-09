@@ -13,7 +13,8 @@ def attempt(root, spec, language, destination, lane, repeat, originals, tools, i
     capture.stable(root, language, tools, identities)
     folder = destination / f"{lane}-{repeat}"
     folder.mkdir(mode=0o700)
-    with tempfile.TemporaryDirectory(prefix="oteleq-" + language + "-") as temporary:
+    temporary_directory = capture.temporary_parent(root, Path(__file__).resolve().parents[1])
+    with tempfile.TemporaryDirectory(prefix="oteleq-" + language + "-", dir=temporary_directory) as temporary:
         workspace = Path(temporary).resolve() / "project"
         workspace.mkdir()
         source = workspace / spec["source"]
@@ -31,18 +32,14 @@ def attempt(root, spec, language, destination, lane, repeat, originals, tools, i
                 env["OTELC_REPORT_PATH"] = str(report_path)
             command = baseline if lane == "baseline" else instrumented
             result = capture.execute(command, workspace, env)
+        capture.retain_http(folder, bodies, errors)
+        for channel in ("stdout", "stderr"):
+            (folder / channel).write_bytes(getattr(result, channel))
         capture.stable(root, language, tools, identities)
         if source.read_bytes() != originals["source"] or policy.read_bytes() != configured:
             raise ValueError("private source or policy changed during execution")
         if (root / spec["source"]).read_bytes() != originals["source"] or (root / spec["policy"]).read_bytes() != originals["policy"]:
             raise ValueError("original source or policy changed during execution")
-        for channel in ("stdout", "stderr"):
-            (folder / channel).write_bytes(getattr(result, channel))
-        for index, (path, body) in enumerate(bodies):
-            (folder / f"otlp-{index}.protobuf").write_bytes(body)
-        (folder / "http-capture.json").write_text(json.dumps({
-            "errors": errors, "bodies": [{"path": path, "file": f"otlp-{index}.protobuf"}
-                                         for index, (path, _) in enumerate(bodies)]}, indent=2) + "\n")
         if errors:
             raise ValueError("OTLP capture failed: " + "; ".join(errors))
         observed = {"source_sha256_before": capture.digest(originals["source"]),
@@ -56,7 +53,7 @@ def attempt(root, spec, language, destination, lane, repeat, originals, tools, i
                 raise ValueError(f"runtime report missing; inspect {folder / 'stderr'}")
             report = capture.strict_json(report_path.read_text())
             (folder / "runtime.json").write_text(json.dumps(report, indent=2) + "\n")
-            observed["witness"] = capture.witness(bodies, report, spec, service, decoder)
+            observed["witness"] = capture.witness(bodies, report, spec, service, decoder, language)
         elif bodies:
             raise ValueError("uninstrumented baseline unexpectedly exported telemetry")
         (folder / "attempt.json").write_text(json.dumps(observed, indent=2) + "\n")
@@ -100,16 +97,17 @@ def main():
     parser.add_argument("--otelc-root", required=True, type=Path)
     parser.add_argument("--report-dir", required=True, type=Path)
     parser.add_argument("--comparator", type=Path, default=Path(__file__).resolve().parents[1] / "target/debug/quux-oteleq")
-    manifest = json.loads(Path(__file__).with_name("otelc-workloads.json").read_text())
+    manifest = capture.strict_json(Path(__file__).with_name("otelc-workloads.json").read_text())
     parser.add_argument("--language", action="append", choices=list(manifest))
     args = parser.parse_args()
     root = args.otelc_root.resolve(strict=True)
     destination = args.report_dir.resolve()
     if any(destination.is_relative_to(p) for p in (root, Path(__file__).resolve().parents[1])):
         parser.error("report directory must be outside both repositories")
-    temporary_parent = Path(tempfile.gettempdir()).resolve()
-    if any(temporary_parent.is_relative_to(p) for p in (root, Path(__file__).resolve().parents[1])):
-        parser.error("temporary directory must be outside both repositories; correct TMPDIR")
+    try:
+        capture.temporary_parent(root, Path(__file__).resolve().parents[1])
+    except ValueError as error:
+        parser.error(str(error))
     comparator = args.comparator.resolve(strict=True)
     # The locked otelc Python environment supplies the protobuf decoder.
     from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceRequest
