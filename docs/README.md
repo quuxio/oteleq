@@ -5,6 +5,7 @@ As of 8 October 2026, `quux-oteleq compare-workload` runs the initial Rust compa
 | Document | Use it to |
 | --- | --- |
 | [Workload comparison](workload-comparison.md) | Run the implemented comparator and capture the actual otelc task example |
+| [Usefulness and adoption](adoption.md) | Assess current value, remaining adoption gaps and measured comparator optimisations |
 | [System design](design.md) | Understand the Rust core, isolated execution and evidence boundary |
 | [Languages](languages.md) | See discovery, generation, build integration and limits for all eight languages |
 | [Test generation](test-generation.md) | Understand automatic inputs, fixtures, sequences and optional incorporation |

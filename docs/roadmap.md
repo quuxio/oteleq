@@ -2,7 +2,7 @@
 
 ## Current status
 
-Design baseline: 8 October 2026. The repository contains the aim, Rust application design, eight-language adapter plan, observation/generation contracts, example policies and documentation CI. An initial [Rust byte-channel workload comparator](workload-comparison.md) is implemented, with repeated-lane, source-identity, incomplete-evidence and telemetry-witness checks. A diagnostic Python example captures actual otelc executions. Stage 1 and Stage 2 remain incomplete: there is no semantic discovery, generator, general executor, typed graph comparator or full language adapter.
+Design baseline: 8 October 2026; implementation review: 9 October 2026. The repository contains the aim, Rust application design, eight-language adapter plan, observation/generation contracts, example policies and documentation CI. An initial [Rust byte-channel workload comparator](workload-comparison.md) is implemented, with repeated-lane, source-identity, incomplete-evidence and telemetry-witness checks. A diagnostic Python example captures actual otelc executions. Evidence checks reject duplicate keys, absent loss diagnostics, incomplete HTTP capture and invalid/duplicate span identities. Stage 1 and Stage 2 remain incomplete: there is no semantic discovery, generator, general executor, typed graph comparator or full language adapter. See [adoption priorities](adoption.md) for the practical next increments.
 
 The application targets equivalence over tested inputs and recorded observations. Each stage is complete only when its concrete acceptance evidence is published against the exact implementation revision. An early slice does not imply complete language coverage.
 
