@@ -82,7 +82,7 @@ def kwonly(*, x:int):pass
             source.write_text("def sample():return 1")
             base = {"functions": [], "globals": []}
             calls = []
-            def execute(command, cwd):
+            def execute(command, cwd, input_data=None):
                 calls.append(command)
                 return subprocess.CompletedProcess(command, 0, json.dumps(base).encode(), b"")
             with patch.dict(os.environ, {"OTELEQ_EXECUTABLE": "/chosen/cli"}):
@@ -137,8 +137,9 @@ class HarnessTests(unittest.TestCase):
         self.assertIsNone(harness.values("Database", "python"))
         self.assertEqual(harness.corpus(self.entry("python"),3), [[0],[1],[-1]])
         self.assertEqual(harness.corpus(self.entry("python",parameters=[]),3), [[]])
+        opaque_entry=self.entry("python",parameters=["Database"])
         with self.assertRaisesRegex(ValueError,"fixture"):
-            harness.corpus(self.entry("python",parameters=["Database"]),3)
+            harness.corpus(opaque_entry,3)
         self.assertEqual(harness.literal(True,"bool","rust"),"true")
         self.assertEqual(harness.literal(1,"f32","rust"),"1.0f32")
         self.assertEqual(harness.literal(1,"int","go"),"int(1)")
@@ -175,8 +176,9 @@ class HarnessTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             project=Path(temporary);(project/"source.java").write_text("class Source {}")
             (project/"OteleqDriver.java").write_text("user file")
+            java_entry=self.entry("java",path="source.java")
             with self.assertRaisesRegex(ValueError,"overwrite"):
-                harness.materialise(project,self.entry("java",path="source.java"),[])
+                harness.materialise(project,java_entry,[])
 
     def test_main_renaming_is_checked_against_ast_ranges(self):
         self.assertEqual(harness.rename_main("fn main(){}",[{"name":"main","line":1,"column":3}],"rust"),"fn __oteleq_original_main(){}")
@@ -229,10 +231,13 @@ class WorkflowTests(unittest.TestCase):
             gen.export_tests(args("export-tests",workspace=self.workspace,destination=destination,apply=True))
         exported,data=gen.load_workspace(destination,generated=True)
         self.assertEqual(data["source"],str(exported/"snapshot"))
-        with self.assertRaises(ValueError):gen.export_tests(args("export-tests",workspace=self.workspace,destination=destination,apply=True))
-        with self.assertRaises(ValueError):gen.export_tests(args("export-tests",workspace=self.workspace,destination=self.workspace/"copy",apply=True))
+        conflicting=args("export-tests",workspace=self.workspace,destination=destination,apply=True)
+        recursive=args("export-tests",workspace=self.workspace,destination=self.workspace/"copy",apply=True)
+        with self.assertRaises(ValueError):gen.export_tests(conflicting)
+        with self.assertRaises(ValueError):gen.export_tests(recursive)
         (destination/"unrelated.txt").write_text("user work")
-        with self.assertRaisesRegex(ValueError,"unowned"):gen.clean(args("clean",workspace=destination))
+        cleanup=args("clean",workspace=destination)
+        with self.assertRaisesRegex(ValueError,"unowned"):gen.clean(cleanup)
         (destination/"unrelated.txt").unlink()
         gen.clean(args("clean",workspace=destination));self.assertFalse(destination.exists())
 
@@ -259,12 +264,12 @@ class WorkflowTests(unittest.TestCase):
         entry=next(e for e in data["inventory"] if e["status"]=="ready")
         case=gen.read(self.workspace/"tests/corpus.json")[1]
         with patch.object(gen.capture,"stable"),patch.object(gen.capture,"commands",side_effect=lambda root,project,lang,driver,*rest:([sys.executable,driver],[sys.executable,driver])):
-            result=gen.attempt(self.workspace,data,entry,case,"baseline",0,self.base/"baseline",None)
+            result=gen.attempt(self.workspace,data,entry,case,"baseline",self.base/"baseline",None)
             self.assertEqual(result["termination"],{"kind":"exit","code":0})
             self.assertIsNone(result["witness"])
             state=json.loads(bytes(result["channels"]["state-and-outcome"]))
             self.assertNotEqual(state["before"],state["after"])
-            with self.assertRaises(OSError):gen.attempt(self.workspace,data,entry,case,"instrumented_on",0,self.base/"on",None)
+            with self.assertRaises(OSError):gen.attempt(self.workspace,data,entry,case,"instrumented_on",self.base/"on",None)
         self.assertEqual(gen.manifest(self.source),data["source_manifest"])
 
     def test_run_retains_mixed_results_and_blockers_are_failures(self):
@@ -285,10 +290,12 @@ class WorkflowTests(unittest.TestCase):
         case=gen.read(self.workspace/"tests/corpus.json")[0]
         with patch.object(gen,"compare_case",return_value={"exit_code":0}),redirect_stdout(io.StringIO()):
             self.assertEqual(gen.run(args("replay",workspace=self.workspace,case=case["id"])),0)
+        missing=args("replay",workspace=self.workspace,case="missing")
+        internal_report=args("run",workspace=self.workspace,report_dir=self.source/"report")
         with self.assertRaisesRegex(ValueError,"unknown case"):
-            gen.run(args("replay",workspace=self.workspace,case="missing"))
+            gen.run(missing)
         with self.assertRaisesRegex(ValueError,"outside"):
-            gen.run(args("run",workspace=self.workspace,report_dir=self.source/"report"))
+            gen.run(internal_report)
 
     def test_bounds_symlinks_inventory_errors_and_zero_cases_are_explicit(self):
         with patch.object(gen,"MAX_FILE",1):
@@ -300,8 +307,9 @@ class WorkflowTests(unittest.TestCase):
             gen.plan(args("plan",source=self.source,otelc_root=self.root,workspace_parent=self.base,language=["python"],exclude=[],cases=3))
             second=Path(output.getvalue().strip())
         data=gen.read(second/"plan.json");self.assertEqual(data["inventory"][0]["status"],"blocked")
+        internal_workspace=args("plan",source=self.source,otelc_root=self.root,workspace_parent=self.source,language=None,exclude=[],cases=3)
         with self.assertRaisesRegex(ValueError,"outside"):
-            gen.plan(args("plan",source=self.source,otelc_root=self.root,workspace_parent=self.source,language=None,exclude=[],cases=3))
+            gen.plan(internal_workspace)
         _,data=gen.load_workspace(self.workspace);data["inventory"]=[];self.reseal(data)
         self.generate()
         with patch.object(gen,"compare_case"),redirect_stdout(io.StringIO()):
@@ -365,7 +373,7 @@ class WorkflowTests(unittest.TestCase):
         self.assertIn("state-and-outcome",bundle["scope"]["channels"])
         with patch.object(gen.capture,"stable"),patch.object(gen.capture,"commands",side_effect=lambda root,project,lang,driver,*rest:([sys.executable,driver],[sys.executable,driver])),patch.object(gen,"MAX_CHANNEL_BYTES",1):
             with self.assertRaisesRegex(ValueError,"channel budget"):
-                gen.attempt(self.workspace,data,entry,case,"baseline",0,self.base/"overflow",None)
+                gen.attempt(self.workspace,data,entry,case,"baseline",self.base/"overflow",None)
 
 
 if __name__=="__main__":unittest.main()

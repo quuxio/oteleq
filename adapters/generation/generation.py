@@ -22,6 +22,10 @@ MAX_FILE = 8 * 1024 * 1024
 MAX_TREE = 256 * 1024 * 1024
 MAX_OUTPUT = 4 * 1024 * 1024
 MAX_CHANNEL_BYTES = 256 * 1024
+OWNED_MARKER = '.oteleq-owned.json'
+PLAN_FILE = 'plan.json'
+GENERATED_MANIFEST = 'generated-manifest.json'
+README_FILE = 'README.txt'
 COMMANDS = ("plan", "generate", "run", "replay", "clean", "export-tests")
 
 
@@ -59,16 +63,23 @@ def identity(document):
     return capture.digest(json.dumps(document, sort_keys=True).encode())
 
 
-def execute(command, cwd, env=None, folder=None, timeout=60):
+def execute(command, cwd, env=None, folder=None, timeout=60, input_data=None):
     """Trusted local execution with wall time/output limits and process-group cleanup."""
     if folder is None:
         with tempfile.TemporaryDirectory(prefix="oteleq-discover-") as directory:
-            return execute(command, cwd, env, Path(directory), timeout)
+            return execute(command, cwd, env, Path(directory), timeout, input_data)
     folder.mkdir(parents=True, exist_ok=True)
     out, err = folder / "stdout", folder / "stderr"
-    with out.open("wb") as stdout, err.open("wb") as stderr:
+    input_path = folder / "worker-input.json"
+    if input_data is not None:
+        if len(input_data) > MAX_FILE * 2:
+            raise ValueError("worker input exceeds limit")
+        input_path.write_bytes(input_data)
+    else:
+        input_path = Path(os.devnull)
+    with out.open("wb") as stdout, err.open("wb") as stderr, input_path.open("rb") as stdin:
         process = subprocess.Popen([str(p) for p in command], cwd=cwd, env=env,
-                                   stdin=subprocess.DEVNULL, stdout=stdout, stderr=stderr, start_new_session=True)
+                                   stdin=stdin, stdout=stdout, stderr=stderr, start_new_session=True)
         deadline = time.monotonic() + timeout
         failure = None
         try:
@@ -113,20 +124,7 @@ def entry_identity(entry):
     return prefix + "." + entry["name"]
 
 
-def plan(args):
-    if sys.version_info < (3, 12):
-        raise ValueError("generation requires Python 3.12+")
-    source = args.source.resolve(strict=True)
-    root = args.otelc_root.resolve(strict=True)
-    if not source.is_dir() or not root.is_dir():
-        raise ValueError("source and otelc root must be directories")
-    parent = source_outside(args.workspace_parent, source, root)
-    capture.temporary_parent(source, root)
-    contents = manifest(source)
-    if not contents:
-        raise ValueError("empty source tree")
-    workspace = Path(tempfile.mkdtemp(prefix="oteleq-run-", dir=parent))
-    write(workspace / ".oteleq-owned.json", {"schema_version": VERSION, "id": uuid.uuid4().hex})
+def snapshot_source(source, workspace, contents):
     snapshot = workspace / "snapshot"
     snapshot.mkdir()
     for name, sha in contents.items():
@@ -135,51 +133,87 @@ def plan(args):
         shutil.copyfile(source / name, path)
         if capture.file_digest(path) != sha:
             raise ValueError("source changed while taking snapshot")
+    return snapshot
+
+
+def discover_file(name, language, root, snapshot, workspace, tools, artefacts):
+    try:
+        if language not in tools:
+            selected = capture.selected_tools(root, language)
+            if language == "java":
+                selected["javac"] = capture.tool_path(str(selected["java"].parent / "javac"))
+            qualified = capture.artefacts(root, language, selected)
+            tools[language], artefacts[language] = selected, qualified
+        def discover_execute(command, cwd, input_data=None):
+            environment = capture.environment(snapshot, tools[language], "oteleq-discovery", root)
+            environment.update({"GOCACHE": str(workspace / "go-cache"), "GOTOOLCHAIN": "local",
+                                "OTELEQ_EXECUTABLE": os.environ["OTELEQ_EXECUTABLE"]})
+            return execute(command, cwd, environment, input_data=input_data)
+        return discovery.discover(snapshot / name, language, root, tools[language], discover_execute)
+    except (ValueError, OSError, KeyError, SyntaxError, RecursionError) as error:
+        return {"functions": [{"name": "<parse-or-tool-gap>", "line": 1, "parameters": [], "output": "unknown", "reason": str(error)}], "globals": []}
+
+
+def qualify_entry(entry, snapshot, count):
+    if entry["reason"]:
+        return "blocked"
+    try:
+        harness.corpus(entry, count)
+        outputs = harness.INTEGERS | harness.FLOATS | harness.BOOLS | harness.VOIDS | harness.STRINGS
+        if entry["language"] not in ("python", "javascript", "typescript") and harness.scalar_type(entry["output"]) not in outputs:
+            raise ValueError("result type requires an observation fixture")
+        gaps = harness.global_gaps(entry)
+        if gaps:
+            raise ValueError("unobserved globals require state fixtures: " + ", ".join(gaps))
+        if "__oteleq" in (snapshot / entry["path"]).read_text() or (snapshot / "_oteleq_generated").exists():
+            raise ValueError("generated observer name collides with application source")
+    except ValueError as error:
+        entry["reason"] = str(error)
+        return "blocked"
+    return "ready"
+
+
+def inventory_entry(function, discovered, name, language, source_hash, snapshot, args):
+    entry = {**function, "path": name, "language": language, "globals": discovered["globals"],
+             "parser": discovered.get("parser", "unavailable"), "package": discovered.get("package", ""),
+             "package_end": discovered.get("package_end"), "file_functions": discovered["functions"],
+             "source_sha256": source_hash, "column": function.get("column", 0)}
+    entry["id"] = identity({k: entry[k] for k in ("language", "path", "name", "line", "column", "parameters", "source_sha256")})[:20]
+    entry["otelc_function"] = entry_identity(entry)
+    excluded = function["name"].split(".")[-1] == "main" or bool(function.get("declaration_only"))
+    excluded |= any(fnmatch.fnmatchcase(entry["otelc_function"], pattern) for pattern in args.exclude)
+    entry["status"] = "excluded" if excluded else qualify_entry(entry, snapshot, args.cases)
+    return entry
+
+
+def inventory_tree(contents, root, snapshot, workspace, args):
     tools, artefacts, inventory = {}, {}, []
-    for name in contents:
-        path = Path(name)
-        language = discovery.LANGUAGES.get(path.suffix)
+    for name, sha in contents.items():
+        language = discovery.LANGUAGES.get(Path(name).suffix)
         if not language or args.language and language not in args.language:
             continue
-        try:
-            if language not in tools:
-                tools[language] = capture.selected_tools(root, language)
-                if language == "java":
-                    tools[language]["javac"] = capture.tool_path(str(tools[language]["java"].parent / "javac"))
-                artefacts[language] = capture.artefacts(root, language, tools[language])
-            def discover_execute(command, cwd):
-                environment = capture.environment(snapshot, tools[language], "oteleq-discovery", root)
-                environment.update({"GOCACHE": str(workspace / "go-cache"), "GOTOOLCHAIN": "local",
-                                    "OTELEQ_EXECUTABLE": os.environ["OTELEQ_EXECUTABLE"]})
-                return execute(command, cwd, environment)
-            discovered = discovery.discover(snapshot / name, language, root, tools[language], discover_execute)
-        except (ValueError, OSError, KeyError, json.JSONDecodeError) as error:
-            discovered = {"functions": [{"name": "<parse-or-tool-gap>", "line": 1, "parameters": [], "output": "unknown", "reason": str(error)}], "globals": []}
-        for function in discovered["functions"]:
-            entry = {**function, "path": name, "language": language, "globals": discovered["globals"],
-                     "parser": discovered.get("parser", "unavailable"), "package": discovered.get("package", ""),
-                     "package_end": discovered.get("package_end"), "file_functions": discovered["functions"]}
-            entry["source_sha256"] = contents[name]
-            entry["column"] = function.get("column", 0)
-            entry["id"] = identity({k: entry[k] for k in ("language", "path", "name", "line", "column", "parameters", "source_sha256")})[:20]
-            entry["otelc_function"] = entry_identity(entry)
-            main = function["name"].split(".")[-1] == "main"
-            entry["status"] = "excluded" if main or function.get("declaration_only") or any(fnmatch.fnmatchcase(entry["otelc_function"], pattern) for pattern in args.exclude) else "candidate"
-            if entry["status"] == "candidate":
-                if not entry["reason"]:
-                    try:
-                        harness.corpus(entry, args.cases)
-                        if language not in ("python", "javascript", "typescript") and harness.scalar_type(entry["output"]) not in harness.INTEGERS | harness.FLOATS | harness.BOOLS | harness.VOIDS | harness.STRINGS:
-                            raise ValueError("result type requires an observation fixture")
-                        gaps = harness.global_gaps(entry)
-                        if gaps:
-                            raise ValueError("unobserved globals require state fixtures: " + ", ".join(gaps))
-                        if "__oteleq" in (snapshot / name).read_text() or (snapshot / "_oteleq_generated").exists():
-                            raise ValueError("generated observer name collides with application source")
-                    except ValueError as error:
-                        entry["reason"] = str(error)
-                entry["status"] = "blocked" if entry["reason"] else "ready"
-            inventory.append(entry)
+        discovered = discover_file(name, language, root, snapshot, workspace, tools, artefacts)
+        inventory.extend(inventory_entry(function, discovered, name, language, sha, snapshot, args)
+                         for function in discovered["functions"])
+    return tools, artefacts, inventory
+
+
+def plan(args):
+    if sys.version_info < (3, 12):
+        raise ValueError("generation requires Python 3.12+")
+    source = args.source.resolve(strict=True)
+    root = args.otelc_root.resolve(strict=True)
+    if not source.is_dir() or not root.is_dir():
+        raise ValueError("source and otelc root must be directories")
+    temporary = capture.temporary_parent(source, root)
+    parent = source_outside(args.workspace_parent or temporary, source, root)
+    contents = manifest(source)
+    if not contents:
+        raise ValueError("empty source tree")
+    workspace = Path(tempfile.mkdtemp(prefix="oteleq-run-", dir=parent))
+    write(workspace / OWNED_MARKER, {"schema_version": VERSION, "id": uuid.uuid4().hex})
+    snapshot = snapshot_source(source, workspace, contents)
+    tools, artefacts, inventory = inventory_tree(contents, root, snapshot, workspace, args)
     if manifest(source) != contents or manifest(snapshot) != contents:
         raise ValueError("source changed during discovery")
     data = {"schema_version": VERSION, "source": str(source), "otelc_root": str(root), "source_manifest": contents,
@@ -187,20 +221,16 @@ def plan(args):
             "artefacts": artefacts, "inventory": inventory, "cases_per_function": args.cases,
             "excluded_directories": sorted(discovery.IGNORED), "excluded_languages": sorted(set(discovery.LANGUAGES.values()) - set(args.language or discovery.LANGUAGES.values())),
             "generator_sha256": generator_identity(), "cli_sha256": capture.file_digest(Path(os.environ["OTELEQ_EXECUTABLE"]))}
-    write(workspace / "plan.json", data)
-    marker = read(workspace / ".oteleq-owned.json")
+    write(workspace / PLAN_FILE, data)
+    marker = read(workspace / OWNED_MARKER)
     marker["plan_sha256"] = identity(data)
-    write(workspace / ".oteleq-owned.json", marker)
+    write(workspace / OWNED_MARKER, marker)
     print(workspace, flush=True)
     return 0
 
 
-def generator_identity():
-    here = Path(__file__).parent
-    names = ("generation.py", "discovery.py", "harness.py", "observe.py", "discover.mjs", "discover.go", "Discover.java")
-    files = {name: capture.file_digest(here / name) for name in names}
-    files["host-python"] = capture.file_digest(Path(sys.executable))
-    files["host-version"] = sys.version
+def decoder_files():
+    files = {}
     for package in ("google.protobuf", "opentelemetry.proto"):
         try:
             spec = importlib.util.find_spec(package)
@@ -214,21 +244,31 @@ def generator_identity():
             for path in sorted(base.rglob("*")):
                 if path.is_file() and path.suffix in (".py", ".so", ".pyd"):
                     files[package + ":" + path.relative_to(base).as_posix()] = capture.file_digest(path)
+    return files
+
+
+def generator_identity():
+    here = Path(__file__).parent
+    names = ("generation.py", "discovery.py", "harness.py", "observe.py", "discover.mjs", "discover.go", "Discover.java")
+    files = {name: capture.file_digest(here / name) for name in names}
+    files["host-python"] = capture.file_digest(Path(sys.executable))
+    files["host-version"] = sys.version
+    files.update(decoder_files())
     return identity(files)
 
 
 def load_workspace(path, generated=False):
     workspace = path.resolve(strict=True)
-    if path.is_symlink() or not workspace.is_dir() or read(workspace / ".oteleq-owned.json")["schema_version"] != VERSION:
+    if path.is_symlink() or not workspace.is_dir() or read(workspace / OWNED_MARKER)["schema_version"] != VERSION:
         raise ValueError("workspace is not an owned oteleq directory")
-    data = read(workspace / "plan.json")
-    if read(workspace / ".oteleq-owned.json").get("plan_sha256") != identity(data):
+    data = read(workspace / PLAN_FILE)
+    if read(workspace / OWNED_MARKER).get("plan_sha256") != identity(data):
         raise ValueError("plan identity changed")
     if data["schema_version"] != VERSION or data["generator_sha256"] != generator_identity() or data["cli_sha256"] != capture.file_digest(Path(os.environ["OTELEQ_EXECUTABLE"])):
         raise ValueError("generator or CLI identity changed; create a new plan")
     if manifest(Path(data["source"])) != data["source_manifest"] or manifest(workspace / "snapshot") != data["source_manifest"]:
         raise ValueError("application source or immutable snapshot changed")
-    if generated and manifest(workspace / "tests") != read(workspace / "generated-manifest.json"):
+    if generated and manifest(workspace / "tests") != read(workspace / GENERATED_MANIFEST):
         raise ValueError("generated suite or corpus changed; create a new plan")
     return workspace, data
 
@@ -280,8 +320,8 @@ if __name__=="__main__":unittest.main()
         target.parent.mkdir(parents=True)
         shutil.copyfile(workspace / "snapshot" / entry["path"], target)
         harness.materialise(preview, entry, case["arguments"])
-    write(workspace / "generated-manifest.json", manifest(destination))
-    (workspace / "README.txt").write_text("Generated scalar diagnostic suite. Boilerplate: MIT; application snapshot retains its original licence.\nRun: OTELEQ_PYTHON=/path/to/otelc/.venv/bin/python python3 tests/test_equivalence.py\nOr: quux-oteleq run --workspace . --report-dir /new/external/report\nEvery blocked selected callable fails the generated strict suite. No shipping-artefact or universal equivalence claim.\nKeep this whole workspace, or export-tests to a new destination.\n")
+    write(workspace / GENERATED_MANIFEST, manifest(destination))
+    (workspace / README_FILE).write_text("Generated scalar diagnostic suite. Boilerplate: MIT; application snapshot retains its original licence.\nRun: OTELEQ_PYTHON=/path/to/otelc/.venv/bin/python python3 tests/test_equivalence.py\nOr: quux-oteleq run --workspace . --report-dir /new/external/report\nEvery blocked selected callable fails the generated strict suite. No shipping-artefact or universal equivalence claim.\nKeep this whole workspace, or export-tests to a new destination.\n")
     print(json.dumps({"workspace": str(workspace), "cases": len(cases), "ready_functions": sum(e["status"] == "ready" for e in data["inventory"]), "blocked_functions": sum(e["status"] == "blocked" for e in data["inventory"])}))
     return 0
 
@@ -317,48 +357,38 @@ def telemetry(bodies, report, entry, service, decoder):
     return capture.witness(bodies, report, spec, service, decoder, entry["language"])
 
 
-def attempt(workspace, data, entry, case, lane, repeat, folder, decoder):
-    root, language = Path(data["otelc_root"]), entry["language"]
-    tools = {k: Path(v) for k, v in data["tools"][language].items()}
-    capture.stable(root, language, tools, data["artefacts"][language])
-    folder.mkdir(parents=True)
-    project = folder / "project"
-    shutil.copytree(workspace / "snapshot", project)
-    shutil.copytree(workspace / "tests/harnesses" / case["id"], project, dirs_exist_ok=True)
-    driver = project / ("_oteleq_generated/driver.py" if language == "python" else
-                        "_oteleq_driver.c" if language == "c" else "_oteleq_driver.cpp" if language == "cpp" else
-                        str(Path(entry["path"]).parent / "OteleqDriver.java") if language == "java" else entry["path"])
-    service = "oteleq-gen-" + uuid.uuid4().hex
-    env = capture.environment(project, tools, service, root)
-    scratch = folder / "scratch"
-    scratch.mkdir()
-    env.update({"TMPDIR": str(scratch), "HOME": str(scratch), "GOCACHE": str(workspace / "go-cache"), "GOTOOLCHAIN": "local",
-                "OTELEQ_OBSERVATION": str(folder / "observation"), "OTELC_REPORT_PATH": str(folder / "runtime.json")})
-    immutable = manifest(project)
-    with capture.receiver() as (endpoint, bodies, errors):
-        config = folder / "policy.toml"
-        config.write_text(policy(entry, endpoint))
-        prefix = [root / "target/debug/quux-otelc", "--config", config, "--language", language]
-        if language == "java":
-            classes = scratch / "classes"
-            classes.mkdir()
-            build = execute([tools["javac"], "-d", classes, project / entry["path"], driver], project, env, folder / "build")
-            if build.returncode:
-                raise ValueError("generated Java build failed; inspect build/stderr")
-            main = (entry["package"] + "." if entry["package"] else "") + "OteleqDriver"
-            command = [tools["java"], "-Xshare:off", "-cp", classes, main] if lane == "baseline" else prefix + ["java", "-Xshare:off", "-cp", classes, main]
-        else:
-            # Use the proven build recipes, with bounded execution for every build and launch.
-            old_execute = capture.execute
-            capture.execute = lambda command, cwd, environment, timeout=180: execute(command, cwd, environment, folder / ("build-" + uuid.uuid4().hex), timeout)
-            try:
-                plain, on = capture.commands(root, project, language, driver, config, tools, env, folder)
-            finally:
-                capture.execute = old_execute
-            command = plain if lane == "baseline" else on
-        write(folder / "command.json", [str(p) for p in command])
-        result = execute(command, project, env, folder, timeout=60)
-    capture.retain_http(folder, bodies, errors)
+def driver_path(project, entry):
+    language = entry["language"]
+    relative = {"python": "_oteleq_generated/driver.py", "c": "_oteleq_driver.c", "cpp": "_oteleq_driver.cpp"}.get(language)
+    if language == "java":
+        relative = str(Path(entry["path"]).parent / "OteleqDriver.java")
+    return project / (relative or entry["path"])
+
+
+def build_command(root, project, entry, driver, config, tools, env, folder, scratch, lane):
+    language = entry["language"]
+    prefix = [root / "target/debug/quux-otelc", "--config", config, "--language", language]
+    if language == "java":
+        classes = scratch / "classes"
+        classes.mkdir()
+        build = execute([tools["javac"], "-d", classes, project / entry["path"], driver], project, env, folder / "build")
+        if build.returncode:
+            raise ValueError("generated Java build failed; inspect build/stderr")
+        main = (entry["package"] + "." if entry["package"] else "") + "OteleqDriver"
+        command = [tools["java"], "-Xshare:off", "-cp", classes, main] if lane == "baseline" else prefix + ["java", "-Xshare:off", "-cp", classes, main]
+    else:
+        # Use the proven build recipes, with bounded execution for every build and launch.
+        old_execute = capture.execute
+        capture.execute = lambda command, cwd, environment, timeout=180: execute(command, cwd, environment, folder / ("build-" + uuid.uuid4().hex), timeout)
+        try:
+            plain, on = capture.commands(root, project, language, driver, config, tools, env, folder)
+        finally:
+            capture.execute = old_execute
+        command = plain if lane == "baseline" else on
+    return command
+
+
+def validate_private_sources(project, immutable, folder):
     # Generated native binaries are build outputs, not source snapshot members.
     if any(not (project / name).is_file() or capture.file_digest(project / name) != digest for name, digest in immutable.items()):
         raise ValueError("private application/harness source changed")
@@ -367,7 +397,9 @@ def attempt(workspace, data, entry, case, lane, repeat, folder, decoder):
             raise ValueError("unexpected source or symlink appeared in the private project")
     write(folder / "build-identities.json", {name: capture.file_digest(project / name)
           for name in ("plain", "instrumented") if (project / name).is_file()})
-    capture.stable(root, language, tools, data["artefacts"][language])
+
+
+def qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, decoder):
     if errors or result.returncode:
         raise ValueError("application exit or OTLP capture failed; inspect retained stdout/stderr")
     observation = folder / "observation"
@@ -386,12 +418,40 @@ def attempt(workspace, data, entry, case, lane, repeat, folder, decoder):
             "channels": {"stdout": list(result.stdout), "stderr": list(result.stderr), "state-and-outcome": list(observation.read_bytes())}, "witness": witness}
 
 
+
+def attempt(workspace, data, entry, case, lane, folder, decoder):
+    root, language = Path(data["otelc_root"]), entry["language"]
+    tools = {k: Path(v) for k, v in data["tools"][language].items()}
+    capture.stable(root, language, tools, data["artefacts"][language])
+    folder.mkdir(parents=True)
+    project = folder / "project"
+    shutil.copytree(workspace / "snapshot", project)
+    shutil.copytree(workspace / "tests/harnesses" / case["id"], project, dirs_exist_ok=True)
+    driver = driver_path(project, entry)
+    service = "oteleq-gen-" + uuid.uuid4().hex
+    env = capture.environment(project, tools, service, root)
+    scratch = folder / "scratch"
+    scratch.mkdir()
+    env.update({"TMPDIR": str(scratch), "HOME": str(scratch), "GOCACHE": str(workspace / "go-cache"), "GOTOOLCHAIN": "local",
+                "OTELEQ_OBSERVATION": str(folder / "observation"), "OTELC_REPORT_PATH": str(folder / "runtime.json")})
+    immutable = manifest(project)
+    with capture.receiver() as (endpoint, bodies, errors):
+        config = folder / "policy.toml"
+        config.write_text(policy(entry, endpoint))
+        command = build_command(root, project, entry, driver, config, tools, env, folder, scratch, lane)
+        write(folder / "command.json", [str(p) for p in command])
+        result = execute(command, project, env, folder, timeout=60)
+    capture.retain_http(folder, bodies, errors)
+    validate_private_sources(project, immutable, folder)
+    capture.stable(root, language, tools, data["artefacts"][language])
+    return qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, decoder)
+
 def compare_case(workspace, data, entry, case, destination, decoder):
     write(destination / "corpus.json", case)
     observed = {"baseline": [], "instrumented_on": []}
     for lane in observed:
         for repeat in range(2):
-            observed[lane].append(attempt(workspace, data, entry, case, lane, repeat, destination / f"{lane}-{repeat}", decoder))
+            observed[lane].append(attempt(workspace, data, entry, case, lane, destination / f"{lane}-{repeat}", decoder))
     selected = observed["instrumented_on"][0]["witness"]["functions"]
     scope = {"language": entry["language"], "artefact_class": "diagnostic", "source_sha256": data["source_sha256"],
              "baseline_artefact_sha256": identity(data["tools"][entry["language"]]), "instrumented_artefact_sha256": identity(data["artefacts"][entry["language"]]),
@@ -437,7 +497,7 @@ def run(args):
         case_path.mkdir()
         try:
             result = compare_case(workspace, data, entry, case, case_path, message_decoder)
-        except (ValueError, OSError, KeyError, json.JSONDecodeError) as error:
+        except (ValueError, OSError, KeyError) as error:
             result = {"case": case["id"], "function": entry["otelc_function"], "arguments": case["arguments"], "exit_code": 4, "error": str(error)}
         results.append(result)
         write(destination / "partial-results.json", results)
@@ -459,19 +519,19 @@ def export_tests(args):
     if destination.exists() or destination.is_relative_to(workspace) or workspace.is_relative_to(destination):
         raise ValueError("export destination must be new and independent of the workspace")
     if not args.apply:
-        print(json.dumps({"destination": str(destination), "copy": ["snapshot", "tests", "plan.json", "README.txt"], "mode": "dry-run"}))
+        print(json.dumps({"destination": str(destination), "copy": ["snapshot", "tests", PLAN_FILE, README_FILE], "mode": "dry-run"}))
         return 0
     destination.mkdir(mode=0o700)
     for name in ("snapshot", "tests"):
         shutil.copytree(workspace / name, destination / name)
-    for name in (".oteleq-owned.json", "generated-manifest.json", "README.txt"):
+    for name in (OWNED_MARKER, GENERATED_MANIFEST, README_FILE):
         shutil.copyfile(workspace / name, destination / name)
     data["original_source"] = data["source"]
     data["source"] = str(destination / "snapshot")
-    write(destination / "plan.json", data)
-    marker = read(destination / ".oteleq-owned.json")
+    write(destination / PLAN_FILE, data)
+    marker = read(destination / OWNED_MARKER)
     marker["plan_sha256"] = identity(data)
-    write(destination / ".oteleq-owned.json", marker)
+    write(destination / OWNED_MARKER, marker)
     print(destination)
     return 0
 
@@ -479,16 +539,16 @@ def export_tests(args):
 def clean(args):
     # Cleanup does not require the original application/toolchain still to exist.
     workspace = args.workspace.resolve(strict=True)
-    if args.workspace.is_symlink() or workspace.parent == workspace or read(workspace / ".oteleq-owned.json")["schema_version"] != VERSION:
+    if args.workspace.is_symlink() or workspace.parent == workspace or read(workspace / OWNED_MARKER)["schema_version"] != VERSION:
         raise ValueError("refusing to remove an unowned workspace")
-    allowed = {".oteleq-owned.json", "plan.json", "snapshot", "tests", "generated-manifest.json", "README.txt", "runs", "go-cache"}
+    allowed = {OWNED_MARKER, PLAN_FILE, "snapshot", "tests", GENERATED_MANIFEST, README_FILE, "runs", "go-cache"}
     if any(p.name not in allowed for p in workspace.iterdir()):
         raise ValueError("workspace contains unowned files; retain and inspect it")
-    if (workspace / "plan.json").exists():
-        data = read(workspace / "plan.json")
+    if (workspace / PLAN_FILE).exists():
+        data = read(workspace / PLAN_FILE)
         if manifest(workspace / "snapshot") != data["source_manifest"]:
             raise ValueError("snapshot was edited; retain and inspect it")
-    if (workspace / "generated-manifest.json").exists() and manifest(workspace / "tests") != read(workspace / "generated-manifest.json"):
+    if (workspace / GENERATED_MANIFEST).exists() and manifest(workspace / "tests") != read(workspace / GENERATED_MANIFEST):
         raise ValueError("generated suite was edited; retain and inspect it")
     shutil.rmtree(workspace)
     return 0
@@ -500,7 +560,7 @@ def main(argv=None):
     planning = commands.add_parser("plan", help="AST inventory and external immutable snapshot")
     planning.add_argument("--source", type=Path, required=True)
     planning.add_argument("--otelc-root", type=Path, required=True)
-    planning.add_argument("--workspace-parent", type=Path, default=Path("/tmp"))
+    planning.add_argument("--workspace-parent", type=Path)
     planning.add_argument("--language", action="append", choices=sorted(set(discovery.LANGUAGES.values())))
     planning.add_argument("--exclude", action="append", default=[])
     planning.add_argument("--cases", type=int, default=3, choices=range(1, 17))
@@ -517,7 +577,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
     try:
         return {"plan": plan, "generate": generate, "run": run, "replay": run, "clean": clean, "export-tests": export_tests}[args.command](args)
-    except (ValueError, OSError, KeyError, ImportError, json.JSONDecodeError) as error:
+    except (ValueError, OSError, KeyError, ImportError) as error:
         print("oteleq: " + str(error), file=sys.stderr)
         return 4
 
