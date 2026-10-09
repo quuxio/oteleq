@@ -53,6 +53,10 @@ const RESOURCES: &[(&str, &str)] = &[
         "otelc-worker-workloads.json",
         include_str!("../examples/otelc-worker-workloads.json"),
     ),
+    (
+        "otelc-typescript-native-workloads.json",
+        include_str!("../examples/otelc-typescript-native-workloads.json"),
+    ),
 ];
 
 pub fn launch(args: &[String]) -> Result<i32, String> {

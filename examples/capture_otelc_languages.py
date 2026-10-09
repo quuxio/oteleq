@@ -25,6 +25,9 @@ def attempt(root, spec, language, destination, lane, repeat, originals, tools, i
         source.write_bytes(originals["source"])
         service = "oteleq-" + language + "-" + uuid.uuid4().hex
         env = capture.environment(workspace, tools, service, root)
+        backend = capture.typescript_backend(root, language, spec, originals["policy"])
+        if backend is not None:
+            env["OTELC_TYPESCRIPT_BACKEND"] = backend
         report_path = workspace / "runtime.json"
         with capture.receiver() as (endpoint, bodies, errors):
             policy = workspace / "policy.toml"
@@ -60,13 +63,15 @@ def attempt(root, spec, language, destination, lane, repeat, originals, tools, i
         elif bodies:
             raise ValueError("uninstrumented baseline unexpectedly exported telemetry")
         (folder / "attempt.json").write_text(json.dumps(observed, indent=2) + "\n")
-        (folder / "commands.json").write_text(json.dumps({"executed": [str(p) for p in command], "service": service}, indent=2) + "\n")
+        (folder / "commands.json").write_text(json.dumps({"executed": [str(p) for p in command], "service": service,
+                                                          "working_directory": str(workspace), "typescript_backend": backend}, indent=2) + "\n")
         return observed
 
 
 def run(root, destination, language, spec, decoder):
     destination.mkdir(mode=0o700)
     originals = {key: (root / spec[key]).read_bytes() for key in ("source", "policy")}
+    capture.typescript_backend(root, language, spec, originals["policy"])
     tools = capture.selected_tools(root, language)
     identities = capture.artefacts(root, language, tools)
     source_hash = capture.digest(originals["source"])
@@ -100,10 +105,11 @@ def main():
     parser.add_argument("--otelc-root", required=True, type=Path)
     parser.add_argument("--report-dir", required=True, type=Path)
     parser.add_argument("--comparator", type=Path, default=Path(__file__).resolve().parents[1] / "target/debug/quux-oteleq")
-    parser.add_argument("--workload", choices=("functions", "python-workers", "java-workers"), default="functions")
+    parser.add_argument("--workload", choices=("functions", "python-workers", "java-workers", "typescript-native"), default="functions")
     parser.add_argument("--language", action="append", choices=("c", "cpp", "rust", "python", "java", "javascript", "typescript", "go"))
     args = parser.parse_args()
-    filename = "otelc-workloads.json" if args.workload == "functions" else "otelc-worker-workloads.json"
+    filenames = {"functions": "otelc-workloads.json", "typescript-native": "otelc-typescript-native-workloads.json"}
+    filename = filenames.get(args.workload, "otelc-worker-workloads.json")
     manifest = capture.strict_json(Path(__file__).with_name(filename).read_text())
     if args.workload != "functions":
         selected = args.workload.split("-")[0]

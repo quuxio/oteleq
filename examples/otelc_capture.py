@@ -5,6 +5,7 @@ import hashlib
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
 import os
+import platform
 from pathlib import Path
 import re
 import shutil
@@ -13,6 +14,7 @@ import sys
 import tempfile
 import threading
 import time
+import tomllib
 
 
 MAX_REQUEST_BYTES = 1024 * 1024
@@ -135,6 +137,28 @@ def tool_path(name):
     return Path(path).absolute()
 
 
+def native_typescript_executables(root):
+    return sorted(path for path in (root / "adapters/node/node_modules/@typescript").glob("typescript-*/lib/tsc*")
+                  if path.is_file() and path.name in ("tsc", "tsc.exe"))
+
+
+def typescript_backend(root, language, spec, policy):
+    if language != "typescript":
+        return None
+    selected = spec.get("typescript_backend", "source")
+    configured = tomllib.loads(policy.decode()).get("adapters", {}).get("typescript", {}).get("backend", "source")
+    if selected not in ("source", "native") or configured != selected:
+        raise ValueError("TypeScript compiler backend differs between baseline and instrumented policy")
+    if selected == "native":
+        operating_system = {"darwin": "darwin", "linux": "linux", "win32": "win32"}.get(sys.platform)
+        architecture = {"arm64": "arm64", "aarch64": "arm64", "x86_64": "x64", "amd64": "x64"}.get(platform.machine().lower())
+        executable = "tsc.exe" if sys.platform == "win32" else "tsc"
+        compiler = root / "adapters/node/node_modules/@typescript" / f"typescript-{operating_system}-{architecture}" / "lib" / executable
+        if compiler not in native_typescript_executables(root):
+            raise ValueError("native TypeScript requires the installed host compiler executable")
+    return selected
+
+
 def artefacts(root, language, tools):
     """Re-enumerate executable adapter inputs so additions/removals are visible."""
     paths = [root / "target/debug/quux-otelc"]
@@ -154,6 +178,7 @@ def artefacts(root, language, tools):
         trees += [(root / "adapters/go/runtime", {".go"})]
     elif language in ("javascript", "typescript"):
         paths += [root / "target/debug/otelc_node_observer.node", root / "adapters/node/package-lock.json"]
+        paths += native_typescript_executables(root)
         trees += [(root / "adapters/node", {".mjs", ".js", ".cjs", ".json", ".node"})]
     elif language == "python":
         paths += [root / "adapters/python/requirements.txt"]
@@ -168,7 +193,7 @@ def artefacts(root, language, tools):
                   and "tests" not in p.relative_to(tree).parts]
     identities = {str(p.relative_to(root)): file_digest(p) for p in paths}
     identities.update({"tool:" + name: file_digest(path) for name, path in tools.items()})
-    for name in ("otelc_capture.py", "capture_otelc_languages.py", "otelc-workloads.json", "otelc-worker-workloads.json"):
+    for name in ("otelc_capture.py", "capture_otelc_languages.py", "otelc-workloads.json", "otelc-worker-workloads.json", "otelc-typescript-native-workloads.json"):
         identities["observer:" + name] = file_digest(Path(__file__).with_name(name))
     return identities
 

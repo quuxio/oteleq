@@ -1,0 +1,19 @@
+{
+  "typescript": {
+    "case_id": "typescript-native-trace-example",
+    "typescript_backend": "native",
+    "source": "examples/apps/typescript_trace_app.mts",
+    "policy": "examples/typescript-native-traces.toml",
+    "trees": 5,
+    "errors": 1,
+    "functions": {
+      "examples.apps.typescript_trace_app.recursive": 4,
+      "examples.apps.typescript_trace_app.child": 2,
+      "examples.apps.typescript_trace_app.parent": 1,
+      "examples.apps.typescript_trace_app.asyncChild": 1,
+      "examples.apps.typescript_trace_app.asyncParent": 1,
+      "examples.apps.typescript_trace_app.returned": 1,
+      "examples.apps.typescript_trace_app.escaping": 1
+    }
+  }
+}

@@ -299,6 +299,42 @@ class CaptureBoundaryTests(unittest.TestCase):
 
 
 class LanguageArtefactTests(unittest.TestCase):
+    def test_native_compiler_extensionless_and_windows_executables_detect_content_drift(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary)
+            files=("target/debug/quux-otelc", "target/debug/otelc_node_observer.node", "adapters/node/package-lock.json",
+                   "adapters/node/node_modules/@typescript/typescript-darwin-arm64/lib/tsc",
+                   "adapters/node/node_modules/@typescript/typescript-win32-x64/lib/tsc.exe")
+            for name in files:
+                path=root/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(b"original")
+            identities=capture.artefacts(root,"typescript",{})
+            for name in files[-2:]:
+                self.assertIn(name,identities)
+                compiler=root/name;compiler.write_bytes(b"replaced at the same path")
+                with self.assertRaisesRegex(ValueError,"changed"):
+                    capture.stable(root,"typescript",{},identities)
+                compiler.write_bytes(b"original")
+            (root/files[-1]).unlink()
+            with self.assertRaisesRegex(ValueError,"changed"):
+                capture.stable(root,"typescript",{},identities)
+
+    def test_native_backend_requires_matched_policy_and_installed_host_compiler(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary)
+            spec={"typescript_backend":"native"}
+            native=b'[adapters]\ntypescript={backend="native"}\n'
+            with self.assertRaisesRegex(ValueError,"differs"):
+                capture.typescript_backend(root,"typescript",spec,b"schema_version=2")
+            with self.assertRaisesRegex(ValueError,"differs"):
+                capture.typescript_backend(root,"typescript",{},native)
+            with patch.object(capture.sys,"platform","darwin"),patch.object(capture.platform,"machine",return_value="arm64"):
+                with self.assertRaisesRegex(ValueError,"installed host"):
+                    capture.typescript_backend(root,"typescript",spec,native)
+                compiler=root/"adapters/node/node_modules/@typescript/typescript-darwin-arm64/lib/tsc"
+                compiler.parent.mkdir(parents=True);compiler.write_bytes(b"native compiler")
+                self.assertEqual(capture.typescript_backend(root,"typescript",spec,native),"native")
+            self.assertEqual(capture.typescript_backend(root,"typescript",{},b"schema_version=2"),"source")
+            self.assertIsNone(capture.typescript_backend(root,"javascript",{},b"not parsed"))
     def test_all_languages_detect_changed_added_or_deleted_adapter_inputs(self):
         configurations = {
             "c": ("target/debug/libquux_otelc_runtime.a", "target/debug/otelc-llvm-toolchain.json", "target/debug/libotelc_pass.dylib"),
@@ -345,9 +381,37 @@ class LanguageArtefactTests(unittest.TestCase):
 
 
 class PrivateExecutionTests(unittest.TestCase):
+    def test_native_attempts_override_ambient_backend_identically_in_both_lanes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary)/"otelc"
+            source=root/"examples/apps/test.mts";source.parent.mkdir(parents=True);source.write_text("function selected() {}")
+            policy=root/"examples/native.toml";policy.write_text('[export]\nendpoint="http://localhost:4318"\n[adapters.typescript]\nbackend="native"\n')
+            compiler=root/"adapters/node/node_modules/@typescript/typescript-darwin-arm64/lib/tsc"
+            compiler.parent.mkdir(parents=True);compiler.write_bytes(b"pinned compiler")
+            spec={"source":"examples/apps/test.mts","policy":"examples/native.toml","typescript_backend":"native"}
+            originals={"source":source.read_bytes(),"policy":policy.read_bytes()}
+            destination=Path(temporary)/"evidence";destination.mkdir()
+            environments=[]
+            def execute(command,workspace,environment):
+                environments.append(environment.copy())
+                if "OTELC_REPORT_PATH" in environment:
+                    Path(environment["OTELC_REPORT_PATH"]).write_text("{}")
+                return NS(returncode=0,stdout=b"matched",stderr=b"")
+            with patch.object(capture.sys,"platform","darwin"),patch.object(capture.platform,"machine",return_value="arm64"), \
+                 patch.dict(os.environ,{"OTELC_TYPESCRIPT_BACKEND":"source"}),patch.object(capture,"stable"), \
+                 patch.object(capture,"commands",return_value=(["plain"],["on"])),patch.object(capture,"execute",side_effect=execute), \
+                 patch.object(capture,"witness",return_value={"functions":{"selected":1}}):
+                for lane in ("baseline","instrumented_on"):
+                    observer.attempt(root,spec,"typescript",destination,lane,0,originals,{}, {},None)
+            self.assertEqual([env["OTELC_TYPESCRIPT_BACKEND"] for env in environments],["native","native"])
+            for lane in ("baseline","instrumented_on"):
+                command=json.loads((destination/(lane+"-0")/"commands.json").read_text())
+                self.assertEqual(command["typescript_backend"],"native")
+
     def test_worker_workloads_select_only_requested_language_and_reject_unavailable_languages(self):
-        expectations = {"python": ("python-executor-context-example", 10, 5, 1),
-                        "java": ("java-executor-context-example", 8, 5, 2)}
+        expectations = {"python-workers": ("python", ("python-executor-context-example", 10, 5, 1)),
+                        "java-workers": ("java", ("java-executor-context-example", 8, 5, 2)),
+                        "typescript-native": ("typescript", ("typescript-native-trace-example", 11, 5, 1))}
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary) / "otelc"
             root.mkdir()
@@ -357,9 +421,9 @@ class PrivateExecutionTests(unittest.TestCase):
                 destination.mkdir()
             module_name = "opentelemetry.proto.collector.trace.v1.trace_service_pb2"
             module = NS(ExportTraceServiceRequest=object())
-            for selected, expected in expectations.items():
+            for workload, (selected, expected) in expectations.items():
                 argv = ["capture", "--otelc-root", str(root), "--report-dir", str(Path(temporary) / selected),
-                        "--comparator", str(comparator), "--workload", selected + "-workers"]
+                        "--comparator", str(comparator), "--workload", workload]
                 with patch.dict(sys.modules, {module_name: module}), patch.object(observer, "run", side_effect=run) as runner, \
                      patch.object(observer.subprocess, "run", return_value=NS(returncode=0, stdout=b'equivalent_observed')):
                     with patch.object(sys, "argv", argv):

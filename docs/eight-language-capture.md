@@ -31,7 +31,7 @@ Any failed build, missing report, unexpected telemetry, timeout or changed artef
 
 The claim is **equivalence over these tests and observations**. This is fixed trusted diagnostic workload coverage for every language, not automatic test generation, semantic function discovery or a complete language adapter. It compares exact stdout/stderr and successful exits; selected fixtures also assert results, exception identity and existing cleanup in application code. It does not compare hidden receiver/global/argument state, filesystem/network side effects or typed alias graphs. Internal fixture success does not qualify an arbitrary application.
 
-Build identity describes the diagnostic source, recipe, adapter/SDK inputs and tool drivers, not a shipping binary. Compiler sysroots, OS libraries, hostile-process containment and general output/memory limits are outside this qualification. TypeScript uses otelc's existing 6.0.3 compiler API and Node runtime; this integration does not establish TypeScript 7 or browser support. Exact telemetry IDs, timestamps and natural GC times are not compared across runs.
+Build identity describes the diagnostic source, recipe, adapter/SDK inputs and tool drivers, not a shipping binary. Compiler sysroots, OS libraries, hostile-process containment and general output/memory limits are outside this qualification. The default TypeScript workload uses otelc's 6.0.3 compiler API and Node runtime; the separate native workload below selects its pinned executable compiler. Neither establishes browser support. Exact telemetry IDs, timestamps and natural GC times are not compared across runs.
 
 The separate [Python task example](workload-comparison.md#use-it-with-otelc-now) qualifies the implemented asyncio propagation fixture. Future task/service/lifetime milestones must add their own independently declared corpus, state/effect channels and expected telemetry. Passing the current function fixtures is insufficient evidence for those features.
 
@@ -64,6 +64,24 @@ make capture-otelc PYTHON=../otelc/.venv/bin/python \
 This requires `JavaWorkerApp.java` and `java-worker-context.toml` from [otelc PR #46](https://github.com/quuxio/otelc/pull/46). The exact qualified otelc head is `6bfbb1441cfa3f2b1b861d665ef6a04fb49c4f45`. Two baseline and two instrumented JVMs use matching `-Xshare:off`; original source/policy/CLI/agent identities must remain unchanged. Each instrumented attempt independently requires five `JavaWorkerApp.root(java.util.concurrent.ThreadPoolExecutor,int)` spans, three `JavaWorkerApp.child(int)` spans, five complete roots and two escaping errors, with no losses or pending contexts.
 
 All four attempts must produce exactly `results=11,21; original-error=true; cancelled=true; future-identity=true; rejection-identity=true` plus newline and empty stderr. The fixture checks original FutureTask, worker exception and rejection identity, results and queued cancellation. Running cancellation and shutdown edge cases have separate otelc tests; this corpus does not claim to exercise every executor or schedule. Choosing `python-workers` still selects Python only, and choosing `java-workers` selects Java only; unavailable language requests fail before capture.
+
+## Optional native TypeScript workload
+
+The default function workload continues to use the source TypeScript compiler. To qualify otelc's optional native executable emitter separately:
+
+```sh
+make capture-otelc PYTHON=../otelc/.venv/bin/python \
+  OTELC_ROOT=../otelc REPORT_DIR=/tmp/oteleq-typescript-native \
+  CAPTURE_ARGS="--workload typescript-native"
+```
+
+This requires `examples/typescript-native-traces.toml` and the installed host executable from the pinned TypeScript 7.0.2 platform package. The identity parser remains TypeScript 6.0.3. The independently declared [native corpus](../examples/otelc-typescript-native-workloads.json) requires eleven spans, five roots and one escaping error from the original trace fixture. The case has its own identity; selecting another language fails before capture.
+
+Both lanes explicitly set `OTELC_TYPESCRIPT_BACKEND=native`. The observer checks that the common instrumented policy selects the same backend, and records the selection beside each launch vector. It rejects a backend mismatch or missing host compiler. Both attempts use independent copies with the same source-relative path and default private project settings; this fixture does not qualify arbitrary application tsconfig/build graphs.
+
+Content identity includes installed `@typescript/typescript-*/lib/tsc` and `tsc.exe` executables, in addition to the lockfile, parser and adapter files. Replacement at the same path, addition or deletion prevents qualification. Including an exposed Windows executable in that inventory does not qualify Windows execution. Automatic scalar generation currently uses the classic compiler; this opt-in workload supplies separate native diagnostic evidence.
+
+The macOS ARM64 provider qualified here is otelc `cb45e8cbcbd9893a4048b0039864c754b9a8f075`, using Node 24.21.0. Two baseline and two native-instrumented runs matched exact stdout/stderr and successful exits; each on run contained the independently expected eleven spans, five roots and one error with complete zero-loss export. CLI, native compiler, adapter, source and policy hashes matched the frozen provider manifest before and after capture. This qualifies that fixture and private project context.
 
 ## Checks
 
