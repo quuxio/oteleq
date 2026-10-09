@@ -47,7 +47,7 @@ class Receiver(BaseHTTPRequestHandler):
                     self.send_error(400)
                     return
                 body.extend(chunk)
-        except (TimeoutError, OSError):
+        except OSError:
             self.send_error(408)
             return
         self.server.bodies.append((self.path, bytes(body)))
@@ -179,8 +179,9 @@ def stable(root, language, tools, expected):
 
 
 def execute(command, workspace, environment, timeout=180):
+    """Run trusted selected artefacts; this diagnostic executor is not a sandbox."""
     return subprocess.run([str(p) for p in command], cwd=workspace, env=environment,
-                          stdin=subprocess.DEVNULL, capture_output=True, timeout=timeout, check=False)
+                          stdin=subprocess.DEVNULL, capture_output=True, timeout=timeout, check=False, shell=False)
 
 
 def build(command, workspace, environment, output):
@@ -234,30 +235,27 @@ def configure(policy, endpoint):
     return text.encode()
 
 
-def decode(bodies, service, decoder):
-    """Validate the full local causal graph, without comparing random IDs."""
-    names, nodes, raw, errors = Counter(), {}, [], 0
-    for path, body in bodies:
-        if path != "/v1/traces":
-            continue
-        raw.append(body)
-        message = decoder.FromString(body)
-        for resource in message.resource_spans:
-            if not any(a.key == "service.name" and a.value.string_value == service for a in resource.resource.attributes):
-                raise ValueError("telemetry service identity differs")
-            for scope in resource.scope_spans:
-                if scope.scope.name != "quux.otelc":
-                    raise ValueError("unexpected instrumentation scope")
-                for span in scope.spans:
-                    key = (span.trace_id, span.span_id)
-                    if (len(span.trace_id) != 16 or not any(span.trace_id) or len(span.span_id) != 8
-                            or not any(span.span_id) or key in nodes or not span.name.strip()
-                            or span.start_time_unix_nano <= 0 or span.end_time_unix_nano < span.start_time_unix_nano
-                            or (span.parent_span_id and (len(span.parent_span_id) != 8 or not any(span.parent_span_id)))):
-                        raise ValueError("invalid or duplicate span")
-                    nodes[key] = (span.trace_id, span.parent_span_id) if span.parent_span_id else None
-                    names[span.name] += 1
-                    errors += int(span.status.code == 2)
+def span_identity(span):
+    if (len(span.trace_id) != 16 or not any(span.trace_id)
+            or len(span.span_id) != 8 or not any(span.span_id)
+            or not span.name.strip() or span.start_time_unix_nano <= 0
+            or span.end_time_unix_nano < span.start_time_unix_nano
+            or (span.parent_span_id and (len(span.parent_span_id) != 8 or not any(span.parent_span_id)))):
+        raise ValueError("invalid or duplicate OTLP span")
+    return span.trace_id, span.span_id
+
+
+def service_spans(message, service):
+    for resource in message.resource_spans:
+        if not any(a.key == "service.name" and a.value.string_value == service for a in resource.resource.attributes):
+            raise ValueError("telemetry service identity differs")
+        for scope in resource.scope_spans:
+            if scope.scope.name != "quux.otelc":
+                raise ValueError("unexpected instrumentation scope")
+            yield from scope.spans
+
+
+def trace_roots(nodes):
     resolved = set()
     for key in nodes:
         current, seen = key, set()
@@ -270,19 +268,37 @@ def decode(bodies, service, decoder):
     roots = sum(parent is None for parent in nodes.values())
     if len({key[0] for key in nodes}) != roots:
         raise ValueError("local trace must have one root")
+    return roots
+
+
+def decode(bodies, service, decoder):
+    """Validate the full local causal graph, without comparing random IDs."""
+    names, nodes, raw, errors = Counter(), {}, [], 0
+    for path, body in bodies:
+        if path != "/v1/traces":
+            continue
+        raw.append(body)
+        for span in service_spans(decoder.FromString(body), service):
+            key = span_identity(span)
+            if key in nodes:
+                raise ValueError("invalid or duplicate span")
+            nodes[key] = (span.trace_id, span.parent_span_id) if span.parent_span_id else None
+            names[span.name] += 1
+            errors += int(span.status.code == 2)
+    roots = trace_roots(nodes)
     return dict(names), raw, roots, errors
 
 
-def witness(bodies, report, spec, service, decoder, language):
+def require_runtime_identity(report, language):
     if language in ("c", "cpp"):
         if report.get("drained") is not True:
             raise ValueError("missing or unfinished native drain status")
     elif (type(report.get("schema_version")) is not int or report["schema_version"] != 1
           or report.get("language") != language):
         raise ValueError("unsupported or mismatched runtime report")
-    names, raw, roots, errors = decode(bodies, service, decoder)
-    if names != spec["functions"] or roots != spec["trees"] or errors != spec["errors"]:
-        raise ValueError("decoded telemetry does not match independent fixture expectations")
+
+
+def loss_diagnostics(report, language):
     traces = report["traces"]
     runtime_losses = report["losses"]
     required = {"active_call_capacity", "incomplete"}
@@ -300,17 +316,34 @@ def witness(bodies, report, spec, service, decoder, language):
     losses = {"traces." + key: value for key, value in traces["losses"].items()}
     losses.update({"runtime." + key: value for key, value in runtime_losses.items()})
     export = [report[key] for key in ("export_loss", "export_dropped_batches") if key in report]
-    if export_key not in report or report.get("export_finished") is not True or report.get("drained", True) is not True:
+    if export_key not in report:
+        raise ValueError("missing export status")
+    require_counters([*losses.values(), *export])
+    return losses, export
+
+
+def require_counters(values):
+    if any(type(value) is not int or value < 0 for value in values):
+        raise ValueError("invalid runtime counter")
+
+
+def witness(bodies, report, spec, service, decoder, language):
+    require_runtime_identity(report, language)
+    names, raw, roots, errors = decode(bodies, service, decoder)
+    if names != spec["functions"] or roots != spec["trees"] or errors != spec["errors"]:
+        raise ValueError("decoded telemetry does not match independent fixture expectations")
+    losses, export = loss_diagnostics(report, language)
+    if report.get("export_finished") is not True or report.get("drained", True) is not True:
         raise ValueError("missing or unfinished export status")
+    traces = report["traces"]
     try:
         pending_counters = [traces[key] for key in ("active_trees", "queued_trees")]
         if language == "python" or "pending_contexts" in traces:
             pending_counters.append(traces["pending_contexts"])
-        counters = [*export, *losses.values(), *pending_counters, traces["completed_trees"], report["function_calls"]]
+        counters = [*pending_counters, traces["completed_trees"], report["function_calls"]]
     except KeyError as error:
         raise ValueError("missing runtime counter") from error
-    if any(type(value) is not int or value < 0 for value in counters):
-        raise ValueError("invalid runtime counter")
+    require_counters(counters)
     losses["transport.export"] = sum(export)
     pending = sum(pending_counters)
     if (any(losses.values()) or pending or traces.get("completed_trees") != roots

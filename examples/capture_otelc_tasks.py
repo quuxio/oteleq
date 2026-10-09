@@ -14,7 +14,9 @@ import sys
 import tempfile
 import threading
 
-from otelc_capture import CaptureServer, retain_http, strict_json, temporary_parent
+from otelc_capture import (CaptureServer, loss_diagnostics, require_counters,
+                           require_runtime_identity, retain_http, span_identity,
+                           strict_json, temporary_parent)
 
 
 def digest(data):
@@ -43,25 +45,14 @@ def require_same_artefacts(root, interpreter, expected):
 
 
 def runtime_witness(status):
-    if (status["schema_version"] != 1 or type(status["schema_version"]) is not int
-            or status["language"] != "python" or type(status["export_finished"]) is not bool):
+    require_runtime_identity(status, "python")
+    if type(status["export_finished"]) is not bool:
         raise ValueError("unsupported or incomplete runtime report")
     traces = status["traces"]
-    runtime_losses = status["losses"]
-    trace_losses = traces["losses"]
-    required = {"function_capacity", "active_call_capacity", "incomplete", "invalid"}
-    if not isinstance(runtime_losses, dict) or not required.issubset(runtime_losses):
-        raise ValueError("missing runtime loss diagnostics")
-    if (not isinstance(trace_losses, dict)
-            or any(not key.strip() for key in (*trace_losses, *runtime_losses))):
-        raise ValueError("invalid runtime loss diagnostics")
-    losses = {"traces." + key: value for key, value in trace_losses.items()}
-    losses["export"] = status["export_loss"]
-    losses.update({"runtime." + key: value for key, value in runtime_losses.items()})
+    losses, export = loss_diagnostics(status, "python")
+    losses["export"] = sum(export)
     counters = [traces[key] for key in ("pending_contexts", "active_trees", "queued_trees")]
-    if (any(type(value) is not int or value < 0 for value in (*losses.values(), *counters))
-            or any(not isinstance(key, str) or not key.strip() for key in losses)):
-        raise ValueError("invalid runtime loss or pending counter")
+    require_counters(counters)
     return losses, sum(counters) + int(not status["export_finished"])
 
 
@@ -74,20 +65,81 @@ def decode_traces(bodies, decode_request):
             continue
         raw_digest.update(body)
         message = decode_request(body)
-        for resource in message.resource_spans:
-            for scope in resource.scope_spans:
-                for span in scope.spans:
-                    identity = (span.trace_id, span.span_id)
-                    if (len(span.trace_id) != 16 or not any(span.trace_id)
-                            or len(span.span_id) != 8 or not any(span.span_id)
-                            or span.parent_span_id and (len(span.parent_span_id) != 8 or not any(span.parent_span_id))
-                            or not span.name.strip() or span.start_time_unix_nano <= 0
-                            or span.end_time_unix_nano < span.start_time_unix_nano
-                            or identity in identities):
-                        raise ValueError("invalid or duplicate OTLP span")
-                    identities.add(identity)
-                    names[span.name] += 1
+        spans = (span for resource in message.resource_spans for scope in resource.scope_spans for span in scope.spans)
+        for span in spans:
+            identity = span_identity(span)
+            if identity in identities:
+                raise ValueError("invalid or duplicate OTLP span")
+            identities.add(identity)
+            names[span.name] += 1
     return raw_digest.hexdigest(), dict(names)
+
+
+def capture_attempt(root, lane, attempt_dir, originals, identities, temporary_directory):
+    source = root / "examples/apps/python_tasks_app.py"
+    policy = root / "examples/python-task-context.toml"
+    cli = root / "target/debug/quux-otelc"
+    checker_root = Path(__file__).resolve().parents[1]
+    interpreter = Path(sys.executable)
+    source_hash = digest(originals[source])
+    require_same_artefacts(root, interpreter, identities)
+    attempt_dir.mkdir(mode=0o700)
+    with tempfile.TemporaryDirectory(prefix="oteleq-task-", dir=temporary_directory) as temporary:
+        workspace = Path(temporary).resolve()
+        if any(workspace.is_relative_to(path) for path in (root, checker_root)):
+            raise ValueError("temporary workspace is inside a source repository")
+        app = workspace / "examples/apps/python_tasks_app.py"
+        app.parent.mkdir(parents=True)
+        app.write_bytes(originals[source])
+        local_policy = workspace / "policy.toml"
+        local_policy.write_bytes(originals[policy])
+        env = {"PATH": os.environ.get("PATH", ""), "HOME": str(workspace),
+               "TMPDIR": str(workspace), "LANG": "C.UTF-8",
+               "PYTHONDONTWRITEBYTECODE": "1", "OTELC_PYTHON": sys.executable}
+        server = CaptureServer(max_requests=16)
+        worker = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True)
+        worker.start()
+        command = [sys.executable, str(app)]
+        runtime_report = workspace / "runtime.json"
+        if lane == "instrumented_on":
+            command = [str(cli), "--config", str(local_policy), "python", str(app)]
+            env.update(OTEL_EXPORTER_OTLP_ENDPOINT=f"http://127.0.0.1:{server.server_port}",
+                       OTELC_REPORT_PATH=str(runtime_report))
+        try:
+            result = subprocess.run(command, cwd=workspace, env=env, stdin=subprocess.DEVNULL,
+                                    capture_output=True, timeout=30, check=False)
+        finally:
+            server.shutdown()
+            server.server_close()
+            worker.join(timeout=3)
+        retain_http(attempt_dir, server.bodies, server.errors, server.requests)
+        for channel in ("stdout", "stderr"):
+            (attempt_dir / channel).write_bytes(getattr(result, channel))
+        server.require_complete()
+        require_same_artefacts(root, interpreter, identities)
+        attempt = {"source_sha256_before": source_hash, "source_sha256_after": digest(app.read_bytes()),
+                   "termination": {"kind": "exit", "code": result.returncode} if result.returncode >= 0
+                                  else {"kind": "signal", "number": -result.returncode},
+                   "channels": {"stdout": list(result.stdout), "stderr": list(result.stderr)},
+                   "capture_complete": True, "witness": None}
+        if any(path.read_bytes() != content for path, content in originals.items()):
+            raise ValueError("original target source or policy changed")
+        if local_policy.read_bytes() != originals[policy]:
+            raise ValueError("private policy changed")
+        if lane == "instrumented_on":
+            from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceRequest
+            raw_hash, names = decode_traces(server.bodies, ExportTraceServiceRequest.FromString)
+            status = strict_json(runtime_report.read_text())
+            (attempt_dir / "runtime.json").write_text(json.dumps(status, indent=2) + "\n")
+            losses, pending = runtime_witness(status)
+            attempt["witness"] = {"decoder": "opentelemetry-proto ExportTraceServiceRequest",
+                                  "raw_otlp_sha256": raw_hash, "functions": names,
+                                  "spans": sum(names.values()), "losses": losses,
+                                  "pending": pending}
+        elif server.bodies:
+            raise ValueError("uninstrumented baseline unexpectedly exported telemetry")
+        (attempt_dir / "attempt.json").write_text(json.dumps(attempt, indent=2) + "\n")
+        return attempt
 
 
 def main():
@@ -107,7 +159,6 @@ def main():
     destination.mkdir(mode=0o700, parents=False, exist_ok=False)
     source = root / "examples/apps/python_tasks_app.py"
     policy = root / "examples/python-task-context.toml"
-    cli = root / "target/debug/quux-otelc"
     originals = {path: path.read_bytes() for path in (source, policy)}
     source_hash = digest(originals[source])
     # Record concrete artefacts, including the adapter used by this CLI.
@@ -136,65 +187,8 @@ def main():
                          "baseline": [], "instrumented_on": []}]}
     for lane in ("baseline", "instrumented_on"):
         for repeat in range(2):
-            require_same_artefacts(root, interpreter, identities)
             attempt_dir = destination / f"{lane}-{repeat}"
-            attempt_dir.mkdir(mode=0o700)
-            with tempfile.TemporaryDirectory(prefix="oteleq-task-", dir=temporary_directory) as temporary:
-                workspace = Path(temporary).resolve()
-                if any(workspace.is_relative_to(path) for path in (root, checker_root)):
-                    raise ValueError("temporary workspace is inside a source repository")
-                app = workspace / "examples/apps/python_tasks_app.py"
-                app.parent.mkdir(parents=True)
-                app.write_bytes(originals[source])
-                local_policy = workspace / "policy.toml"
-                local_policy.write_bytes(originals[policy])
-                env = {"PATH": os.environ.get("PATH", ""), "HOME": str(workspace),
-                       "TMPDIR": str(workspace), "LANG": "C.UTF-8",
-                       "PYTHONDONTWRITEBYTECODE": "1", "OTELC_PYTHON": sys.executable}
-                server = CaptureServer(max_requests=16)
-                worker = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True)
-                worker.start()
-                command = [sys.executable, str(app)]
-                runtime_report = workspace / "runtime.json"
-                if lane == "instrumented_on":
-                    command = [str(cli), "--config", str(local_policy), "python", str(app)]
-                    env.update(OTEL_EXPORTER_OTLP_ENDPOINT=f"http://127.0.0.1:{server.server_port}",
-                               OTELC_REPORT_PATH=str(runtime_report))
-                try:
-                    result = subprocess.run(command, cwd=workspace, env=env, stdin=subprocess.DEVNULL,
-                                            capture_output=True, timeout=30, check=False)
-                finally:
-                    server.shutdown()
-                    server.server_close()
-                    worker.join(timeout=3)
-                retain_http(attempt_dir, server.bodies, server.errors, server.requests)
-                for channel in ("stdout", "stderr"):
-                    (attempt_dir / channel).write_bytes(getattr(result, channel))
-                server.require_complete()
-                require_same_artefacts(root, interpreter, identities)
-                attempt = {"source_sha256_before": source_hash, "source_sha256_after": digest(app.read_bytes()),
-                           "termination": {"kind": "exit", "code": result.returncode} if result.returncode >= 0
-                                          else {"kind": "signal", "number": -result.returncode},
-                           "channels": {"stdout": list(result.stdout), "stderr": list(result.stderr)},
-                           "capture_complete": True, "witness": None}
-                if any(path.read_bytes() != content for path, content in originals.items()):
-                    raise ValueError("original target source or policy changed")
-                if local_policy.read_bytes() != originals[policy]:
-                    raise ValueError("private policy changed")
-                if lane == "instrumented_on":
-                    from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceRequest
-                    raw_hash, names = decode_traces(server.bodies, ExportTraceServiceRequest.FromString)
-                    status = strict_json(runtime_report.read_text())
-                    (attempt_dir / "runtime.json").write_text(json.dumps(status, indent=2) + "\n")
-                    losses, pending = runtime_witness(status)
-                    attempt["witness"] = {"decoder": "opentelemetry-proto ExportTraceServiceRequest",
-                                          "raw_otlp_sha256": raw_hash, "functions": names,
-                                          "spans": sum(names.values()), "losses": losses,
-                                          "pending": pending}
-                elif server.bodies:
-                    raise ValueError("uninstrumented baseline unexpectedly exported telemetry")
-                bundle["cases"][0][lane].append(attempt)
-                (attempt_dir / "attempt.json").write_text(json.dumps(attempt, indent=2) + "\n")
+            bundle["cases"][0][lane].append(capture_attempt(root, lane, attempt_dir, originals, identities, temporary_directory))
     (destination / "source.py").write_bytes(originals[source])
     (destination / "policy.toml").write_bytes(originals[policy])
     (destination / "bundle.json").write_text(json.dumps(bundle, indent=2) + "\n")

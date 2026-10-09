@@ -45,13 +45,15 @@ class TelemetryWitnessTests(unittest.TestCase):
 
     def test_missing_extra_or_wrong_function_never_qualifies(self):
         for spans in ([], [span("other")], [span(), span(identity=b"x" * 8)]):
+            status, decoded = report(), decoder(spans)
             with self.subTest(spans=spans), self.assertRaises(ValueError):
-                capture.witness(self.bodies, report(), self.spec, "expected", decoder(spans), "python")
+                capture.witness(self.bodies, status, self.spec, "expected", decoded, "python")
 
     def test_service_and_scope_must_match_the_launched_instance(self):
         for service, scope in (("wrong", "quux.otelc"), ("expected", "wrong")):
+            decoded = decoder([span()], service, scope)
             with self.subTest(service=service, scope=scope), self.assertRaises(ValueError):
-                capture.decode(self.bodies, "expected", decoder([span()], service, scope))
+                capture.decode(self.bodies, "expected", decoded)
 
     def test_bad_ids_timestamps_duplicate_missing_parent_and_cycle_fail(self):
         cases = []
@@ -65,8 +67,9 @@ class TelemetryWitnessTests(unittest.TestCase):
                   [span(parent=b"x" * 8), span(parent=b"s" * 8, identity=b"x" * 8)],
                   [span(), span(identity=b"x" * 8)]]
         for nodes in cases:
+            decoded = decoder(nodes)
             with self.subTest(nodes=nodes), self.assertRaises(ValueError):
-                capture.decode(self.bodies, "expected", decoder(nodes))
+                capture.decode(self.bodies, "expected", decoded)
 
     def test_late_children_are_valid_without_stretching_parent_duration(self):
         parent, child = span(), span("child", b"s" * 8, b"x" * 8)
@@ -86,8 +89,9 @@ class TelemetryWitnessTests(unittest.TestCase):
         for change in changes:
             status = report()
             change(status)
+            decoded = decoder([span()])
             with self.subTest(status=status), self.assertRaises(ValueError):
-                capture.witness(self.bodies, status, self.spec, "expected", decoder([span()]), "python")
+                capture.witness(self.bodies, status, self.spec, "expected", decoded, "python")
 
     def test_native_export_counter_and_error_span_are_independently_checked(self):
         status = report()
@@ -100,8 +104,9 @@ class TelemetryWitnessTests(unittest.TestCase):
         node.status.code = 2
         spec = {**self.spec, "errors": 1}
         capture.witness(self.bodies, status, spec, "expected", decoder([node]), "c")
+        decoded = decoder([node])
         with self.assertRaises(ValueError):
-            capture.witness(self.bodies, status, self.spec, "expected", decoder([node]), "c")
+            capture.witness(self.bodies, status, self.spec, "expected", decoded, "c")
 
     def test_malformed_or_missing_diagnostics_never_pass_as_zero(self):
         changes = [lambda r: r.update(losses={}), lambda r: r["traces"].pop("queued_trees"),
@@ -116,8 +121,9 @@ class TelemetryWitnessTests(unittest.TestCase):
         for change in changes:
             status = report()
             change(status)
+            decoded = decoder([span()])
             with self.subTest(status=status), self.assertRaises((ValueError, KeyError)):
-                capture.witness(self.bodies, status, self.spec, "expected", decoder([span()]), "python")
+                capture.witness(self.bodies, status, self.spec, "expected", decoded, "python")
 
     def test_duplicate_report_keys_cannot_hide_a_loss(self):
         with self.assertRaisesRegex(ValueError, "duplicate"):
@@ -130,10 +136,12 @@ class TelemetryWitnessTests(unittest.TestCase):
         for change in changes:
             status = report()
             change(status)
+            decoded = decoder([span()])
             with self.subTest(status=status), self.assertRaises(ValueError):
-                capture.witness(self.bodies, status, self.spec, "expected", decoder([span()]), "python")
+                capture.witness(self.bodies, status, self.spec, "expected", decoded, "python")
+        status, decoded = report(), decoder([span()])
         with self.assertRaisesRegex(ValueError, "native drain status"):
-            capture.witness(self.bodies, report(), self.spec, "expected", decoder([span()]), "c")
+            capture.witness(self.bodies, status, self.spec, "expected", decoded, "c")
 
     def test_long_parent_chain_remains_valid(self):
         nodes = [span(identity=index.to_bytes(8, "big"),

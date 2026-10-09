@@ -9,6 +9,9 @@ import subprocess
 import otelc_capture as capture
 
 
+BUNDLE_FILENAME = "bundle.json"
+
+
 def attempt(root, spec, language, destination, lane, repeat, originals, tools, identities, decoder):
     capture.stable(root, language, tools, identities)
     folder = destination / f"{lane}-{repeat}"
@@ -88,7 +91,7 @@ def run(root, destination, language, spec, decoder):
     for key, content in originals.items():
         (destination / ("source" + Path(spec["source"]).suffix if key == "source" else "policy.toml")).write_bytes(content)
     for filename, document in (("artefacts.json", identities), ("corpus.json", corpus),
-                               ("bundle.json", {"workload_schema_version": 1, "scope": scope, "cases": [case]})):
+                               (BUNDLE_FILENAME, {"workload_schema_version": 1, "scope": scope, "cases": [case]})):
         (destination / filename).write_text(json.dumps(document, indent=2) + "\n")
 
 
@@ -114,12 +117,12 @@ def main():
     destination.mkdir(mode=0o700, parents=False, exist_ok=False)
     for language in dict.fromkeys(args.language or manifest):
         run(root, destination / language, language, manifest[language], ExportTraceServiceRequest)
-        result = subprocess.run([str(comparator), "compare-workload", str(destination / language / "bundle.json")],
+        result = subprocess.run([str(comparator), "compare-workload", str(destination / language / BUNDLE_FILENAME)],
                                 capture_output=True, timeout=30, check=False)
         (destination / language / "comparison.json").write_bytes(result.stdout)
         if result.returncode:
             raise ValueError(f"{language} comparison failed; inspect comparison.json")
-        print(destination / language / "bundle.json", flush=True)
+        print(destination / language / BUNDLE_FILENAME, flush=True)
 
 
 if __name__ == "__main__":
