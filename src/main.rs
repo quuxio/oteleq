@@ -18,11 +18,11 @@ fn run(args: &[String]) -> Result<i32, String> {
         return quux_oteleq::generation::launch(args);
     }
     if args == ["--help"] {
-        println!("quux-oteleq compare-workload BUNDLE.json\nquux-oteleq plan|generate|run|replay|clean|export-tests --help\nGenerate external paired unit harnesses for all eight otelc languages. Set OTELEQ_PYTHON to a Python 3.12+ environment with opentelemetry-proto for execution. Exit: 0 equivalent, 1 different, 2 invalid/source changed, 3 incomplete, 4 IO/codec error.");
+        println!("quux-oteleq compare-workload BUNDLE.json\nquux-oteleq plan|generate|run|replay|clean|export-tests --help\nGenerate external paired unit harnesses for all eight otelc languages. Set OTELEQ_PYTHON to a Python 3.12+ environment with opentelemetry-proto for execution.\nComparator exits: 0 equivalent, 1 different, 2 invalid/source changed, 3 incomplete, 4 IO/codec error.\nGeneration exits: 0 complete, 1 different, 2 argument error, 3 incomplete/blocked, 4 tool/build/identity error.");
         return Ok(0);
     }
     if args.len() != 2 || args[0] != "compare-workload" {
-        eprintln!("usage: quux-oteleq compare-workload BUNDLE.json (or --help)");
+        eprintln!("usage: quux-oteleq --help for comparison and generation commands");
         return Ok(2);
     }
     let file = File::open(&args[1]).map_err(|e| format!("open bundle: {e}"))?;
