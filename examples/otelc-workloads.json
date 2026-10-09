@@ -1,0 +1,113 @@
+{
+  "c": {
+    "source": "examples/apps/c-traces.c",
+    "policy": "examples/c-traces.toml",
+    "trees": 3,
+    "errors": 0,
+    "functions": {
+      "child_order": 2,
+      "parent_order": 1,
+      "recursive_order": 4
+    }
+  },
+  "cpp": {
+    "source": "examples/apps/cpp-traces.cpp",
+    "policy": "examples/cpp-traces.toml",
+    "trees": 4,
+    "errors": 3,
+    "functions": {
+      "Base::Base()": 4,
+      "Base::~Base()": 4,
+      "Order::Order()": 1,
+      "Order::Order(int) [linkage=_ZN5OrderC1Ei]": 4,
+      "Order::Order(int) [linkage=_ZN5OrderC2Ei]": 4,
+      "Order::~Order() [linkage=_ZN5OrderD1Ev]": 3,
+      "Order::~Order() [linkage=_ZN5OrderD2Ev]": 3,
+      "build_order(int)": 4,
+      "choose_value(int)": 4
+    }
+  },
+  "rust": {
+    "source": "examples/apps/rust_trace_app.rs",
+    "policy": "examples/rust-traces.toml",
+    "trees": 4,
+    "errors": 2,
+    "functions": {
+      "examples.apps.rust_trace_app.recursive": 4,
+      "examples.apps.rust_trace_app.parent": 1,
+      "examples.apps.rust_trace_app.child": 1,
+      "examples.apps.rust_trace_app.cancelled": 1,
+      "examples.apps.rust_trace_app.escaping": 1
+    }
+  },
+  "python": {
+    "source": "examples/apps/python_trace_app.py",
+    "policy": "examples/python-traces.toml",
+    "trees": 5,
+    "errors": 3,
+    "functions": {
+      "examples.apps.python_trace_app.recursive": 4,
+      "examples.apps.python_trace_app.parent": 1,
+      "examples.apps.python_trace_app.child": 1,
+      "examples.apps.python_trace_app.cancelled": 1,
+      "examples.apps.python_trace_app.generator": 1,
+      "examples.apps.python_trace_app.escaping": 1
+    }
+  },
+  "java": {
+    "source": "examples/apps/JavaTraceApp.java",
+    "policy": "examples/java-traces.toml",
+    "trees": 6,
+    "errors": 2,
+    "functions": {
+      "examples.apps.JavaTraceApp.<init>(int)": 2,
+      "examples.apps.JavaTraceApp.child()": 2,
+      "examples.apps.JavaTraceApp.escaping(java.lang.Exception)": 1,
+      "examples.apps.JavaTraceApp.parent()": 1,
+      "examples.apps.JavaTraceApp.recursive(int)": 4
+    }
+  },
+  "javascript": {
+    "source": "examples/apps/javascript_trace_app.mjs",
+    "policy": "examples/javascript-traces.toml",
+    "trees": 5,
+    "errors": 1,
+    "functions": {
+      "examples.apps.javascript_trace_app.recursive": 4,
+      "examples.apps.javascript_trace_app.child": 2,
+      "examples.apps.javascript_trace_app.parent": 1,
+      "examples.apps.javascript_trace_app.asyncChild": 1,
+      "examples.apps.javascript_trace_app.asyncParent": 1,
+      "examples.apps.javascript_trace_app.returned": 1,
+      "examples.apps.javascript_trace_app.escaping": 1
+    }
+  },
+  "typescript": {
+    "source": "examples/apps/typescript_trace_app.mts",
+    "policy": "examples/typescript-traces.toml",
+    "trees": 5,
+    "errors": 1,
+    "functions": {
+      "examples.apps.typescript_trace_app.recursive": 4,
+      "examples.apps.typescript_trace_app.child": 2,
+      "examples.apps.typescript_trace_app.parent": 1,
+      "examples.apps.typescript_trace_app.asyncChild": 1,
+      "examples.apps.typescript_trace_app.asyncParent": 1,
+      "examples.apps.typescript_trace_app.returned": 1,
+      "examples.apps.typescript_trace_app.escaping": 1
+    }
+  },
+  "go": {
+    "source": "examples/apps/go_app.go",
+    "policy": "examples/go-traces.toml",
+    "trees": 7,
+    "errors": 1,
+    "functions": {
+      "examples.apps.go_app.Order.calculate": 1,
+      "examples.apps.go_app.caught": 1,
+      "examples.apps.go_app.escaping": 1,
+      "examples.apps.go_app.process_order": 3,
+      "examples.apps.go_app.recursive": 4
+    }
+  }
+}

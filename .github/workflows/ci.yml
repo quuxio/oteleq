@@ -29,6 +29,8 @@ jobs:
           node-version: '24'
       - name: Install locked documentation tools
         run: make setup
+      - name: Install pinned observer coverage tool
+        run: python -m pip install coverage==7.16.2
       - name: Validate documents and example syntax
         run: make docs-check
 

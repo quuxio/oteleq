@@ -2,13 +2,15 @@
 
 ## Current scope
 
-CI validates Markdown, illustrative JSON/TOML syntax and the Rust comparator. The required Rust job runs formatting, Clippy, regression tests and a minimum 80% line-coverage gate over product `src/` files; integration-test code is excluded from that measurement. Passing comparator CI does not qualify language discovery, generation or unobserved application state.
+CI validates Markdown, illustrative JSON/TOML syntax, diagnostic capture observers and the Rust comparator. The required Rust job runs formatting, Clippy, regression tests and a minimum 80% line-coverage gate over product `src/` files; integration-test code is excluded from that measurement. The documentation job tests the capture observers and enforces at least 80% line coverage separately for each new eight-language capture module. CI uses fake witness fixtures and private subprocesses; actual otelc toolchain qualification uses the separate eight-language integration run. Passing these gates does not qualify language discovery, generation or unobserved application state.
 
 Install the locked documentation tools and run:
 
 ```sh
 make setup
-make check
+python3 -m venv .venv
+.venv/bin/python -m pip install coverage==7.16.2
+make check PYTHON=.venv/bin/python
 ```
 
 The validation dependencies follow otelc's locked Markdown tooling. `npm ci` disables package lifecycle scripts. GitHub Actions are pinned to the same full action commits as otelc's published workflow. Document prose is kept on logical lines and relative documentation links are checked during delivery.

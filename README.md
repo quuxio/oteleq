@@ -33,7 +33,7 @@ The result is **equivalence over these tests and observations**. It is not a bla
 
 Tests are generated in a separate transient directory. Users can retain them or choose to incorporate them into their application repository, using a framework that may differ from the application's existing tests.
 
-**Status: an initial Rust workload comparator is implemented; full language adapters and automatic test generation remain planned.** Start with [running the comparator and the otelc task example](docs/workload-comparison.md). Read the [design](docs/design.md), [language plan](docs/languages.md) and [delivery roadmap](docs/roadmap.md), or start with the [documentation index](docs/README.md).
+**Status: the Rust workload comparator and diagnostic otelc capture integrations for all eight languages are implemented; full language adapters and automatic test generation remain planned.** Start with [comparing all eight languages](docs/eight-language-capture.md) or [the comparator and Python task example](docs/workload-comparison.md). Read the [design](docs/design.md), [language plan](docs/languages.md) and [delivery roadmap](docs/roadmap.md), or start with the [documentation index](docs/README.md).
 
 ## Usage
 
@@ -48,10 +48,12 @@ make setup
 cargo build --locked
 ./target/debug/quux-oteleq --help
 ./target/debug/quux-oteleq compare-workload /path/to/bundle.json > /path/to/comparison.json
-make check
+python3 -m venv .venv
+.venv/bin/python -m pip install coverage==7.16.2
+make check PYTHON=.venv/bin/python
 ```
 
-`make check` validates documents and example syntax, Rust formatting, Clippy, comparator regressions and at least 80% product line coverage. Coverage needs pinned `cargo-llvm-cov` 0.8.7 and matching LLVM tools; see [repository quality](docs/quality.md). The comparator consumes repeated captured observations and does not generate or execute arbitrary tests. See the [actual otelc example](docs/workload-comparison.md#use-it-with-otelc-now).
+`make check` validates documents and example syntax, Rust formatting, Clippy, comparator/capture regressions and at least 80% product line coverage. Coverage needs Python `coverage` 7.16.2, pinned `cargo-llvm-cov` 0.8.7 and matching LLVM tools; see [repository quality](docs/quality.md). The comparator consumes repeated captured observations and does not generate arbitrary tests. The [eight-language capture integration](docs/eight-language-capture.md) executes fixed ordinary otelc workloads with its qualified adapters.
 
 ### Planned application workflow
 
