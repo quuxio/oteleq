@@ -29,7 +29,7 @@
 
 oteleq aims to generate tests that compare application behaviour with and without [otelc](https://github.com/quuxio/otelc) instrumentation across C, C++, Rust, Python, Java, JavaScript, TypeScript and Go. It compares results, errors, observable global and instance state, and declared side effects, while accounting for emitted OpenTelemetry telemetry separately.
 
-Fixed diagnostic corpora also qualify [Python and Java executor context](docs/eight-language-capture.md) against the actual otelc adapters.
+Fixed diagnostic corpora also qualify [Python and Java executor context](docs/eight-language-capture.md) and the [optional native TypeScript emitter](docs/eight-language-capture.md#optional-native-typescript-workload) against the actual otelc adapters.
 
 The result is **equivalence over these tests and observations**. It is not a blanket proof that every function is identical.
 

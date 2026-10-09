@@ -60,6 +60,11 @@ fn cli_embeds_generation_workers_and_exposes_subcommand_help() {
         String::from_utf8_lossy(&help.stderr)
     );
     assert!(String::from_utf8_lossy(&help.stdout).contains("--otelc-root"));
+    let missing_value = Command::new(exe)
+        .args(["plan", "--source"])
+        .output()
+        .unwrap();
+    assert_eq!(missing_value.status.code(), Some(2));
     let missing = Command::new(exe)
         .args([
             "generate",
@@ -74,6 +79,12 @@ fn cli_embeds_generation_workers_and_exposes_subcommand_help() {
         .output()
         .unwrap();
     assert!(!unsafe_root.status.success());
+    for option in ["--source=/tmp", "--otelc-root=/tmp", "--workspace=/tmp"] {
+        let unsafe_root = Command::new(exe).args(["plan", option]).output().unwrap();
+        assert_eq!(unsafe_root.status.code(), Some(4));
+        assert!(String::from_utf8_lossy(&unsafe_root.stderr)
+            .contains("adapter directory must be outside input repositories"));
+    }
     let dir = tempfile::tempdir().unwrap();
     let file = dir.path().join("source.rs");
     fs::write(&file, "fn sample(){}").unwrap();

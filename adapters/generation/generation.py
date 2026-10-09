@@ -593,9 +593,9 @@ def clean(args):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=__doc__, allow_abbrev=False)
     commands = parser.add_subparsers(dest="command", required=True)
-    planning = commands.add_parser("plan", help="AST inventory and external immutable snapshot")
+    planning = commands.add_parser("plan", help="AST inventory and external immutable snapshot", allow_abbrev=False)
     planning.add_argument("--source", type=Path, required=True)
     planning.add_argument("--otelc-root", type=Path, required=True)
     planning.add_argument("--workspace-parent", type=Path)
@@ -603,7 +603,7 @@ def main(argv=None):
     planning.add_argument("--exclude", action="append", default=[])
     planning.add_argument("--cases", type=int, default=3, choices=range(1, 17))
     for command in COMMANDS[1:]:
-        sub = commands.add_parser(command)
+        sub = commands.add_parser(command, allow_abbrev=False)
         sub.add_argument("--workspace", type=Path, required=True)
         if command == "run":
             sub.add_argument("--report-dir", type=Path, required=True)
