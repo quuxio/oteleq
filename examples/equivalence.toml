@@ -1,4 +1,5 @@
-# Proposed schema. Paths are placeholders; no oteleq executable exists yet.
+# Proposed schema; the implemented CLI does not consume this policy.
+# Paths are placeholders. See docs/automatic-generation.md for current usage.
 schema_version = 1
 languages = ["c", "cpp", "rust", "python", "java", "javascript", "typescript", "go"]
 

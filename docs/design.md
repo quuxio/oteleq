@@ -4,7 +4,9 @@
 
 oteleq generates repeatable tests and compares an application's behaviour with and without otelc instrumentation. Its claim is **equivalence over these tests and observations**, bounded by the recorded inputs, build identities, execution environment and observation coverage.
 
-This is the broader application design as of 8 October 2026. The initial [Rust workload comparator](workload-comparison.md) is implemented and CI checks its product coverage. The [scalar generator](automatic-generation.md) now implements external planning, syntax discovery, deterministic inputs, bounded paired execution, state observers and retention across all eight languages. Rust owns the CLI, syntax inventory and final comparator; an embedded Python adapter host currently coordinates materialisation/execution. Full semantic/build-aware adapters, the broader typed graph protocol and production qualification remain proposed.
+Updated 9 October 2026. The [Rust workload comparator](workload-comparison.md) and [scalar generator](automatic-generation.md) are implemented. Rust owns the CLI, Rust syntax inventory and final byte-channel comparator; an embedded Python adapter host coordinates language-specific syntax discovery, harness materialisation, state capture and execution. Generated tests use standard `unittest` for all eight languages. The implementation retains workspaces until explicit cleanup and exports frozen snapshots through `export-tests`.
+
+The remaining sections describe the broader design. Full semantic/build-aware adapters, arbitrary receiver factories, stateful sequences, the versioned graph protocol, off/fault lanes, shrinking and production qualification remain proposed. Use the [implemented CLI reference](cli-and-configuration.md#implemented-commands) for runnable commands.
 
 ## Requirements
 
@@ -14,22 +16,22 @@ This is the broader application design as of 8 October 2026. The initial [Rust w
 | Generate tests across a source tree | Inventory every discovered callable and generate runnable cases where types and fixtures permit; retain explicit reasons for every gap |
 | Leave original source unchanged | Read the target tree; put tests, tooling dependencies, generated helpers and build copies in a private external workspace |
 | Allow an independent test framework | Each adapter supplies its own runner and dependency environment without changing the target's test setup |
-| Allow users to keep the tests | Retain the workspace or explicitly promote generated tests, fixtures and dependency instructions into a chosen repository directory |
+| Allow users to keep the tests | Retain the workspace or explicitly export a frozen suite and source snapshot into a chosen directory |
 | Compare global and instance mutations | Compare declared globals, receiver state and input-reachable object graphs before and after identical action sequences |
 | Account for telemetry | Identify telemetry through its dedicated transport/runtime identities; compare application observations independently |
 | Produce reviewable evidence | Retain corpus, fixtures, artefact hashes, instrumentation witness, normalisation rules, gaps and reproducible differences |
 
 ## Core implementation choice
 
-Use Rust for the orchestrator, versioned data contracts, input-corpus coordinator, comparator and reporting. This aligns with otelc and allows a distributable CLI with bounded resource management and strong types for incomplete or invalid evidence. The project name is `oteleq`; the proposed executable is `quux-oteleq`.
+Use Rust for the core CLI, versioned data contracts, comparator and reporting. This aligns with otelc and allows a distributable CLI with strong types for incomplete or invalid evidence. The project name is `oteleq`; the implemented executable is `quux-oteleq`. The current embedded Python host owns scalar corpus materialisation and bounded process execution; moving those responsibilities into Rust is a later architecture choice.
 
 Language adapters own semantic discovery, harness generation and observation. They use the target language's established compiler/runtime tooling where necessary and communicate through subprocesses. There is no requirement to implement a Python AST analyser or Java class inspector entirely in Rust. Target code never executes inside the orchestrator's process, so a target crash cannot corrupt the comparison service.
 
 Use typed ASTs, semantic compiler data and declared build context rather than regular expressions to recognise functions. Prefer official toolchain APIs. A syntax parser can produce an inventory candidate but cannot certify types, build inclusion, visibility or safe invocation alone.
 
-Initial core boundaries are `cli`, `plan`, `workspace`, `corpus`, `executor`, `compare`, `report` and `otelc-provider`. Keep these as modules until a real packaging boundary warrants separate crates. Each language adapter implements the same versioned subprocess contract.
+The implemented Rust modules are `generation`, `protocol` and `compare`, with CLI dispatch in `main`. The proposed full application boundaries are `cli`, `plan`, `workspace`, `corpus`, `executor`, `compare`, `report` and `otelc-provider`. Keep these as modules until a real packaging boundary warrants separate crates. A shared versioned adapter subprocess contract remains proposed.
 
-## Execution flow
+## Proposed full execution flow
 
 ```mermaid
 flowchart TB

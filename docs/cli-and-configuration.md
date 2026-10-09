@@ -1,52 +1,36 @@
-# Proposed CLI, configuration and adapter protocol
+# CLI reference and proposed adapter protocol
 
 ## Status
 
-The [actual scalar workflow](automatic-generation.md) implements `plan`, `generate`, `run`, `replay`, `export-tests` and `clean` with a smaller CLI and frozen JSON workspace contract. Commands, flags and TOML/worker protocols on this page describe the broader proposed interface; they are not interchangeable with the implemented commands. The implemented `quux-oteleq compare-workload BUNDLE.json` command uses a separate byte-channel schema documented in [workload comparison](workload-comparison.md). The proposed executable is `quux-oteleq`. Configuration has its own version-1 schema and references otelc's schema-2 policy; it does not duplicate otelc selection/export rules.
+Updated 9 October 2026. `quux-oteleq` implements the commands below. The scalar workflow uses embedded workers and a frozen JSON workspace contract. The later configuration and adapter sections describe proposed interfaces; the implemented commands do not consume `equivalence.toml` or the illustrative graph records.
 
-## Workflow
+## Implemented commands
 
-```sh
-# Inspect build/language capabilities without generating or executing tests.
-quux-oteleq doctor --source /path/to/application \
-  --config /path/to/equivalence.toml
+| Command | Required arguments | Optional arguments | Result |
+| --- | --- | --- | --- |
+| `plan` | `--source PATH --otelc-root PATH` | `--workspace-parent PATH`, repeated `--language ID`, repeated `--exclude PATTERN`, `--cases N` | New private workspace path on stdout; snapshot, tool identities and syntax inventory in `plan.json` |
+| `generate` | `--workspace PATH` | None | Frozen concrete corpus, diagnostic harness previews and `tests/test_equivalence.py` |
+| `run` | `--workspace PATH --report-dir PATH` | None | All generated cases, complete inventory and JSON report in a new external directory |
+| `replay` | `--workspace PATH --case ID` | None | One frozen case in a new `runs/replay-*` directory inside the workspace |
+| `export-tests` | `--workspace PATH --destination PATH` | `--apply` | Copy plan by default; with `--apply`, a new runnable frozen source/suite bundle |
+| `clean` | `--workspace PATH` | None | Removes an owned workspace after checking its snapshot/suite and top-level contents |
+| `compare-workload` | `BUNDLE.json` positional path | None | Byte-channel comparison JSON on stdout |
 
-# Create an external workspace, inventory and reviewable generation plan.
-quux-oteleq plan --source /path/to/application \
-  --config /path/to/equivalence.toml \
-  --workspace-parent /path/to/temporary-runs
+The generation commands accept `--help`. `quux-oteleq --help` lists both workflows and their exit contracts. Use full option names; abbreviations are rejected. Paths accept both `--source PATH` and `--source=PATH` forms. `--cases` accepts 1 through 16 and defaults to 3 distinct scalar cases per function. Language IDs are `c`, `cpp`, `rust`, `python`, `java`, `javascript`, `typescript`, `go`; repeated language selectors form a subset, and exclusions match qualified function identities.
 
-# Each plan prints its unique workspace path. Use that path below.
-quux-oteleq generate --workspace /path/to/temporary-runs/oteleq-run-<id>
+Set `OTELEQ_PYTHON` to otelc's qualified Python 3.12+ environment with the OTLP protobuf decoder. The selected language tools and built otelc adapters must already exist. `plan` performs syntax discovery using those tools, without executing target functions. It does not establish arbitrary build graphs or valid business preconditions. `generate` creates the suite once; a changed source, corpus, CLI or tool identity requires a new plan. Dependencies are not installed into the application.
 
-# Export durable reports before successful transient cleanup.
-quux-oteleq run --workspace /path/to/temporary-runs/oteleq-run-<id> \
-  --report-dir /path/to/reports/run-<id> --keep-workspace
+Use the actual path printed by `plan` for subsequent commands. Workspace and temporary parents resolve outside both application and otelc repositories. `run` requires a new report directory outside those repositories and the workspace. Workspaces remain available after success or failure until explicit `clean`. Export refuses existing destinations and rebinds the suite to its copied immutable application snapshot; it retains the original source provenance. See [complete runnable usage](automatic-generation.md) and [workspace retention](test-generation.md).
 
-# Reproduce a retained difference without generating new inputs.
-quux-oteleq replay --bundle /path/to/reports/run-<id>/replay --case case-0042
+Generation execution exits are `0` complete, `1` observed difference, `2` argument error, `3` incomplete/blocked and `4` tool/build/protocol/identity failure. A run with no completed cases or any selected blocker cannot return success. Mixed case results give precedence to `4`, `2`, `1`, then `3`; the report retains each result. `replay` qualifies only the named case. The generated `unittest` suite includes failing tests for all selected blockers. `compare-workload` has its own [exit-code contract](workload-comparison.md#build-and-compare).
 
-# Review which generated files and dependencies would be incorporated.
-quux-oteleq promote --workspace /path/to/temporary-runs/oteleq-run-<id> \
-  --destination /path/to/application/tests/oteleq --dry-run
+## Proposed extensions
 
-# Explicitly apply the copy plan; conflicting files remain an error.
-quux-oteleq promote --workspace /path/to/temporary-runs/oteleq-run-<id> \
-  --destination /path/to/application/tests/oteleq --apply
+The broader design adds a `doctor` capability command, policy-driven build/fixture configuration, richer promotion planning, stateful inputs, HTML/JUnit reports and a versioned graph/worker protocol. `doctor`, `promote`, `--config`, `--keep-workspace`, `--dry-run` and replay `--bundle` are proposal names, not available CLI options. Current retention uses `export-tests` and explicit `clean`.
 
-# Remove a retained owned workspace.
-quux-oteleq clean --workspace /path/to/temporary-runs/oteleq-run-<id>
-```
+## Proposed configuration
 
-The angle-bracket path token denotes the workspace ID printed by `plan`; replace the full placeholder before running a command. `--workspace-parent` is optional and defaults to the operating-system temporary directory. All generation/build paths resolve outside the application repository. `--report-dir` is required for a transient run and must be durable and outside the owned workspace; copying tests into the source tree only occurs through explicit promotion.
-
-`plan` validates configuration and build/discovery capabilities; it does not execute target functions. Semantic discovery can still require compiler/build tooling. `generate` creates runner projects, dependency locks, fixture requests and a corpus. It may execute configured fixture/discovery workers only in the declared execution environment. `run` validates the unchanged plan/source identities before building and executing.
-
-Reports are JSON plus a standalone HTML view and JUnit XML for CI. The HTML view presents selected/excluded functions, tests actually executed, required lanes, observation scope, differences, gaps and source/build identity. JUnit maps incomplete/blocked selected work to a failing strict gate; it cannot represent them as passing tests. There is no application report renderer yet.
-
-## Configuration
-
-The [example policy](../examples/equivalence.toml) expresses all eight languages and the default strict evidence requirement. `/path/...` values are placeholders. This repository validates TOML syntax, not application-schema execution.
+The [example policy](../examples/equivalence.toml) illustrates all eight languages and a proposed strict evidence requirement. `/path/...` values are placeholders. This repository validates TOML syntax, not application-schema execution. Its settings, including 100 cases and stateful sequences, do not change the current scalar CLI defaults.
 
 | Section | Contract |
 | --- | --- |
@@ -67,7 +51,7 @@ Original application dependencies and toolchains are pinned according to their b
 
 OTLP credentials remain external to resolved plans, command logs and replay bundles. Functional policy hashes cover non-secret settings and record credential references, not credential material. Optional float/path/ordering rules require field-scoped entries and are shown in reports; the example leaves them exact.
 
-## Adapter protocol
+## Proposed adapter protocol
 
 Use bounded UTF-8 JSON Lines over dedicated worker channels. Every message includes `protocol_version = 1`, `request_id`, `run_id` and a method/event discriminator. Validate message size and schema before deserialisation; reject mismatched versions, duplicate case completion and undeclared outputs. Application stdout/stderr are captured on separate pipes and cannot be interpreted as control messages.
 
