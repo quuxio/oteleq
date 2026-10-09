@@ -63,9 +63,16 @@ pub fn launch(args: &[String]) -> Result<i32, String> {
     let parent = Path::new("/tmp")
         .canonicalize()
         .map_err(|e| format!("adapter temporary parent: {e}"))?;
-    for pair in args.windows(2) {
-        if ["--source", "--otelc-root", "--workspace"].contains(&pair[0].as_str()) {
-            let root = Path::new(&pair[1])
+    for (index, argument) in args.iter().enumerate() {
+        let (option, assigned) = argument
+            .split_once('=')
+            .map(|(option, value)| (option, Some(value)))
+            .unwrap_or((argument.as_str(), None));
+        if ["--source", "--otelc-root", "--workspace"].contains(&option) {
+            let Some(value) = assigned.or_else(|| args.get(index + 1).map(String::as_str)) else {
+                continue;
+            };
+            let root = Path::new(value)
                 .canonicalize()
                 .map_err(|e| format!("input path: {e}"))?;
             if parent.starts_with(root) {

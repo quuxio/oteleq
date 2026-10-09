@@ -31,6 +31,8 @@ The report directory must be new and outside the application, otelc and workspac
 
 The CLI embeds its adapter sources, so an installed binary does not depend on an oteleq source checkout. It still needs the selected Python environment, otelc build and language tools. Keep the same CLI and tool contents for replay; changing them requires a new plan. `cargo install --path . --locked` installs the CLI locally.
 
+Path flags accept both `--source PATH` and `--source=PATH` forms. Use full option names; abbreviated options are rejected. Input repository boundaries are checked before extracting embedded workers.
+
 ## Selection and inputs
 
 All recognised files are inventoried by default. Use repeated `--language ID` to select a subset; the report records that selection. `--exclude 'qualified.pattern'` explicitly excludes matching function identities. Free entrypoints named `main`, Java static `void main(String[])` methods and native declarations without a source body are inventoried as excluded callers/declarations. Nested or instance methods named `main` remain blockers. Exclusions remain visible. No selected unsupported function becomes a passing skipped test.

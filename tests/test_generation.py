@@ -383,6 +383,10 @@ class WorkflowTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,"document"):gen.read(self.workspace/"plan.json")
 
     def test_cli_routes_use_actual_flags_and_fail_closed(self):
+        with patch.object(gen,"plan") as planning,patch.object(sys,"stderr",io.StringIO()),self.assertRaises(SystemExit) as abbreviated:
+            gen.main(["plan","--source",str(self.source),"--otelc-ro",str(self.root)])
+        self.assertEqual(abbreviated.exception.code,2)
+        planning.assert_not_called()
         with redirect_stdout(io.StringIO()),self.assertRaises(SystemExit) as help_result:
             gen.main(["plan","--help"])
         self.assertEqual(help_result.exception.code,0)
