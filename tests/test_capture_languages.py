@@ -240,7 +240,7 @@ class CaptureBoundaryTests(unittest.TestCase):
             metadata.parent.mkdir(parents=True)
             metadata.write_text(json.dumps({"bindir": "/qualified/llvm"}))
             with patch.object(capture, "tool_path", side_effect=lambda name: Path(name)), \
-                 patch.dict(os.environ, {"OTELC_NODE": "/qualified/node", "OTELC_JAVA": "/qualified/java", "OTELC_RUSTC": "/qualified/rustc", "OTELC_GO": "/qualified/go"}):
+                 patch.dict(os.environ, {"OTELC_NODE": "/qualified/node", "OTELC_JAVA": "/qualified/java", "OTELC_RUSTC": "/qualified/rustc", "OTELC_GO": "/qualified/go", "OTELC_CLANG": "/qualified/llvm/clang", "OTELC_CLANGXX": "/qualified/llvm/clang++"}):
                 self.assertEqual(capture.selected_tools(root, "c"), {"clang": Path("/qualified/llvm/clang")})
                 self.assertEqual(capture.selected_tools(root, "cpp"), {"clang++": Path("/qualified/llvm/clang++")})
                 self.assertEqual(capture.selected_tools(root, "rust"), {"rustc": Path("/qualified/rustc")})
@@ -248,6 +248,20 @@ class CaptureBoundaryTests(unittest.TestCase):
                     tools = capture.selected_tools(root, language)
                     self.assertIn(language, tools)
                 self.assertEqual(capture.selected_tools(root, "typescript")["javascript"], Path("/qualified/node"))
+
+    def test_native_metadata_cannot_redirect_execution_to_an_unselected_tool(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            metadata = root / "target/debug/otelc-llvm-toolchain.json"
+            metadata.parent.mkdir(parents=True)
+            metadata.write_text(json.dumps({"bindir": "/untrusted/toolchain"}))
+            with patch.object(capture, "tool_path", return_value=Path("/qualified/llvm/clang")) as selected:
+                with self.assertRaisesRegex(ValueError, "does not match"):
+                    capture.selected_tools(root, "c")
+                self.assertNotIn("untrusted", str(selected.call_args.args))
+            metadata.write_text('{"bindir":"/qualified/llvm","bindir":"/untrusted/toolchain"}')
+            with self.assertRaisesRegex(ValueError, "duplicate"):
+                capture.selected_tools(root, "c")
 
     def test_native_plain_and_instrumented_builds_keep_exceptions_and_same_flags(self):
         workspace, root, policy, source = map(Path, ("/tmp/work", "/tmp/otelc", "/tmp/policy", "/tmp/source"))

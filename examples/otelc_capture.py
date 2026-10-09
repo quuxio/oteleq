@@ -376,9 +376,16 @@ def environment(workspace, tools, service, root):
 
 def selected_tools(root, language):
     if language in ("c", "cpp"):
-        llvm = json.loads((root / "target/debug/otelc-llvm-toolchain.json").read_text())
+        llvm = strict_json((root / "target/debug/otelc-llvm-toolchain.json").read_text())
         compiler = "clang++" if language == "cpp" else "clang"
-        return {compiler: Path(llvm["bindir"]) / compiler}
+        variable = "OTELC_CLANGXX" if language == "cpp" else "OTELC_CLANG"
+        # Metadata qualifies an explicitly selected compiler; it cannot select code to execute.
+        directory = "/opt/homebrew/opt/llvm@22/bin" if sys.platform == "darwin" else "/usr/lib/llvm-22/bin"
+        selected = tool_path(os.environ.get(variable, directory + "/" + compiler))
+        configured = llvm["bindir"]
+        if not isinstance(configured, str) or str(selected.parent.resolve()) != configured:
+            raise ValueError("selected compiler does not match otelc LLVM metadata; set " + variable)
+        return {compiler: selected}
     if language == "rust":
         return {"rustc": tool_path(os.environ.get("OTELC_RUSTC", "rustc"))}
     names = {"python": sys.executable, "java": os.environ.get("OTELC_JAVA", "java"),
