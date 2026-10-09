@@ -4,7 +4,7 @@
 
 oteleq generates repeatable tests and compares an application's behaviour with and without otelc instrumentation. Its claim is **equivalence over these tests and observations**, bounded by the recorded inputs, build identities, execution environment and observation coverage.
 
-This is the broader application design as of 8 October 2026. The initial [Rust workload comparator](workload-comparison.md) is implemented and CI checks its product coverage. The proposed executor, semantic discovery, test generation, typed graph comparator and language adapters are not implemented.
+This is the broader application design as of 8 October 2026. The initial [Rust workload comparator](workload-comparison.md) is implemented and CI checks its product coverage. The [scalar generator](automatic-generation.md) now implements external planning, syntax discovery, deterministic inputs, bounded paired execution, state observers and retention across all eight languages. Rust owns the CLI, syntax inventory and final comparator; an embedded Python adapter host currently coordinates materialisation/execution. Full semantic/build-aware adapters, the broader typed graph protocol and production qualification remain proposed.
 
 ## Requirements
 

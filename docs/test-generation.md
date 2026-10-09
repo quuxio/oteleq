@@ -1,5 +1,11 @@
 # Test generation and retention
 
+## Implemented slice
+
+[Automatic generation](automatic-generation.md) now creates deterministic scalar cases, diagnostic callers and a retained independent `unittest` suite for all eight languages. It implements explicit inventory gaps, two plain/two instrumented repetitions, supported state observations, replay and portable export. Factories, domain preconditions, property frameworks, action sequences and shrinking described below remain future work.
+
+## Broader design
+
 ## Generation contract
 
 Plan a test entry for every discovered function in the selected source/build context. A runnable test requires a valid caller, valid input strategy, independent fixture initialisation and an observation contract. Where any of these is missing, generate a visible inventory/gap entry and an actionable fixture request. Never manufacture a passing empty assertion or count a generated file as executed coverage.

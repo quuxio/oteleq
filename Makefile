@@ -2,10 +2,10 @@ PYTHON ?= python3
 COVERAGE_ENV ?=
 MARKDOWNLINT ?= ./ci/markdownlint/node_modules/.bin/markdownlint
 
-.PHONY: help setup lint examples docs-check observer-check capture-otelc core-check coverage check
+.PHONY: help setup lint examples docs-check observer-check generation-check generation-otelc capture-otelc core-check coverage check
 
 help:
-	@printf '%s\n' 'setup     Install locked documentation tools' 'lint      Validate repository Markdown' 'examples  Parse illustrative JSON and TOML' 'observer-check Test diagnostic capture and enforce 80% per new observer module' 'capture-otelc Compare all eight real otelc diagnostic workloads (OTELC_ROOT, REPORT_DIR)' 'core-check Rust formatting, Clippy and comparator tests' 'coverage  Enforce 80% Rust product line coverage' 'check     Run all documentation and product gates'
+	@printf '%s\n' 'setup     Install locked documentation tools' 'lint      Validate repository Markdown' 'examples  Parse illustrative JSON and TOML' 'observer-check Test diagnostic capture and enforce 80% per observer module' 'generation-check Test inventory, generators, state and workspace contracts' 'generation-otelc Qualify generated tests and mutation detection (OTELC_ROOT, REPORT_DIR)' 'capture-otelc Compare all eight real otelc diagnostic workloads (OTELC_ROOT, REPORT_DIR)' 'core-check Rust formatting, Clippy and comparator tests' 'coverage  Enforce 80% Rust product line coverage' 'check     Run all documentation and product gates'
 
 setup:
 	npm ci --ignore-scripts --prefix ci/markdownlint
@@ -18,6 +18,20 @@ examples:
 
 docs-check: lint examples
 	$(MAKE) observer-check
+	$(MAKE) generation-check
+
+generation-check:
+	$(PYTHON) -m coverage run --data-file=.generation.coverage --source=adapters/generation -m unittest discover -s tests -p 'test_generation.py' -v
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/generation.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/discovery.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/harness.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/observe.py' --fail-under=80
+
+generation-otelc:
+	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
+	cargo build --locked
+	$(PYTHON) tests/qualify_generation.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" $(GENERATION_ARGS)
 
 observer-check:
 	$(PYTHON) -m coverage run --data-file=.observer.coverage --source=examples -m unittest discover -s tests -p 'test_capture_*.py' -v
