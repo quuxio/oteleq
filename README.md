@@ -27,7 +27,7 @@
 
 ---
 
-oteleq aims to generate tests that compare application behaviour with and without [otelc](https://github.com/quuxio/otelc) instrumentation across C, C++, Rust, Python, Java, JavaScript, TypeScript and Go. It compares results, errors, observable global and instance state, and declared side effects, while accounting for emitted OpenTelemetry telemetry separately.
+oteleq generates diagnostic tests that compare application behaviour with and without [otelc](https://github.com/quuxio/otelc) instrumentation across C, C++, Rust, Python, Java, JavaScript, TypeScript and Go. It compares results, errors, stdout/stderr and supported global/object state, while accounting for emitted OpenTelemetry telemetry separately.
 
 Fixed diagnostic corpora also qualify [Python and Java executor context](docs/eight-language-capture.md) and the [optional native TypeScript emitter](docs/eight-language-capture.md#optional-native-typescript-workload) against the actual otelc adapters.
 
@@ -41,23 +41,18 @@ Start with [automatic generation](docs/automatic-generation.md), [fixed eight-la
 
 ## Usage
 
-### Build and use the workload comparator today
+### Build
 
-The repository provides an initial Rust comparator alongside the broader design and example policies. With Git, Make, Rust 1.98.1+, Python 3.12+, Node.js 24+ and npm installed:
+With Git and Rust 1.98.1 or newer installed:
 
 ```sh
 git clone https://github.com/quuxio/oteleq.git
 cd oteleq
-make setup
 cargo build --locked
 ./target/debug/quux-oteleq --help
-./target/debug/quux-oteleq compare-workload /path/to/bundle.json > /path/to/comparison.json
-python3 -m venv .venv
-.venv/bin/python -m pip install --only-binary=:all: coverage==7.16.2
-make check PYTHON=.venv/bin/python
 ```
 
-`make check` validates documents and example syntax, Rust formatting, Clippy, comparator/capture regressions and at least 80% product line coverage. Coverage needs Python `coverage` 7.16.2, pinned `cargo-llvm-cov` 0.8.7 and matching LLVM tools; see [repository quality](docs/quality.md). The `compare-workload` command consumes repeated captured observations; separate generation commands create bounded scalar tests. The [eight-language capture integration](docs/eight-language-capture.md) executes fixed ordinary otelc workloads with its qualified adapters.
+`cargo install --path . --locked` installs `quux-oteleq` locally. The CLI embeds its generation workers. Generation and capture additionally require Python 3.12+, otelc's locked OTLP decoder environment and the qualified tools/adapters for the selected languages; see [setup and capabilities](docs/automatic-generation.md). Contributor tooling and CI coverage instructions are in [repository quality](docs/quality.md).
 
 ### Generate and run tests
 
@@ -78,6 +73,8 @@ OTELEQ_WORKSPACE=/tmp/oteleq-run-actual-id
 
 The default generates up to three distinct scalar cases per function and compares two plain with two instrumented runs per case. Missing instrumentation, changed source, unstable observations, failed builds and selected blockers fail the gate. The report records tested inputs, state coverage, telemetry and gaps. Syntax discovery and scalar samples do not establish business preconditions.
 
+Use repeated `--language ID`, `--exclude 'qualified.pattern'` and `--cases 1` through `--cases 16` on `plan` to select a supported scope. [The CLI reference](docs/cli-and-configuration.md#implemented-commands) lists every public command and flag.
+
 ### Replay, retain or incorporate
 
 ```sh
@@ -92,3 +89,11 @@ The default generates up to three distinct scalar cases per function and compare
 ```
 
 Export includes a frozen application snapshot and runnable suite. It refuses existing destinations and may be placed in the application only by that explicit choice. Generated boilerplate is MIT licensed; application code retains its licence. Retained suites test their frozen snapshot; create a new plan for changed application code. See [capabilities, limits and complete usage](docs/automatic-generation.md). The broader [configuration/adapter protocol](docs/cli-and-configuration.md) and [example policy](examples/equivalence.toml) remain proposed interfaces.
+
+### Compare an existing workload bundle
+
+```sh
+./target/debug/quux-oteleq compare-workload /path/to/bundle.json > /path/to/comparison.json
+```
+
+This command consumes repeated captured observations from a qualified observer. The [fixed eight-language integration](docs/eight-language-capture.md) creates such bundles using actual otelc workloads. See [the evidence schema and exit codes](docs/workload-comparison.md).

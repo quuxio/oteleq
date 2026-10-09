@@ -1,5 +1,13 @@
 # Observation and comparison contract
 
+## Implemented observations
+
+The [scalar generator](automatic-generation.md#what-is-compared) records typed return/error and before/after state as exact declared byte channels, alongside application stdout/stderr. Python observes supported objects, sequences, dictionaries, exception graphs and declared module globals; Node observes supported plain objects/arrays, Error fields and declared globals. Their codecs preserve supported aliases/cycles, large integers and float bits. C/C++, Rust, Java and Go observe supported scalar results/errors and accessible scalar globals. Python/Node graph capture is bounded at 512 nodes and depth 32; opaque or oversized observations cannot pass.
+
+Receiver construction, imported-module state, hidden fields, mutation-and-reversion between boundaries, filesystem/network observation and arbitrary action sequences remain outside this slice. The fixed diagnostic captures compare stdout/stderr and successful exits with independently declared telemetry expectations; they do not supply these generated state channels. Scope and gaps are retained in each report.
+
+The remaining sections describe the broader proposed observation/graph protocol. Its record shape and typed tags are illustrative; they are not the scalar worker's wire format. The Rust workload comparator currently compares the generated canonical bytes and does not implement arbitrary structural graph matching or field-path difference reporting.
+
 ## Application observations
 
 Return values alone are insufficient. A function can return the same number while changing a cache, argument object or global counter differently. Each case compares the following configured dimensions.
@@ -84,4 +92,4 @@ Record capture completion independently for every root/channel. Optional unobser
 
 The [baseline example](../examples/observations/baseline.json) and [instrumented example](../examples/observations/instrumented-on.json) describe the same valid fixture and return value. Their receiver counters differ. They are hand-written protocol examples, not evidence from an executed application.
 
-A future comparator must report `different_observed` at `receiver.calls`, with baseline `3 -> 4` and instrumented `3 -> 5`. It must also state that only the receiver root was captured and globals/effects were not observed. This example is intended as the first comparator acceptance fixture.
+The proposed graph comparator must report `different_observed` at `receiver.calls`, with baseline `3 -> 4` and instrumented `3 -> 5`. It must also state that only the receiver root was captured and globals/effects were not observed. These records are acceptance fixtures for that richer protocol. The implemented scalar qualification separately demonstrates a same-return/different-global-object mutation through actual paired execution.

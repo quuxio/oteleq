@@ -2,17 +2,63 @@
 
 ## Implemented slice
 
-[Automatic generation](automatic-generation.md) now creates deterministic scalar cases, diagnostic callers and a retained independent `unittest` suite for all eight languages. It implements explicit inventory gaps, two plain/two instrumented repetitions, supported state observations, replay and portable export. Factories, domain preconditions, property frameworks, action sequences and shrinking described below remain future work.
+[Automatic generation](automatic-generation.md) creates deterministic scalar cases, diagnostic callers and a retained independent `unittest` suite for all eight languages. It implements explicit inventory gaps, two plain/two instrumented repetitions, supported state observations, replay and portable export. Factories, domain preconditions, property frameworks, action sequences and shrinking remain future work.
 
-## Broader design
+## Current workspace
 
-## Generation contract
+`plan` creates a new private `oteleq-run-*` directory outside the application and otelc repositories. `--workspace-parent` selects its parent; the default uses a qualified operating-system temporary parent. Use the actual path printed by `plan`. The selected original source is copied, without writable hard links, into an immutable snapshot. Discovery, helpers and builds operate on private copies, and source identities are checked again.
+
+```text
+oteleq-run-<id>/
+  .oteleq-owned.json
+  plan.json                 # source/tool identities and full inventory
+  snapshot/                 # selected immutable application contents
+  generated-manifest.json   # generated suite/corpus content hashes
+  README.txt
+  tests/
+    GENERATED-LICENSE.txt
+    test_equivalence.py
+    corpus.json
+    harnesses/<case-id>/
+  runs/replay-<id>/          # created by replay and the generated suite
+  go-cache/                 # created when needed by the Go adapter
+```
+
+`generate` creates `tests/` once. Each runnable case receives frozen arguments and a diagnostic caller preview; every selected blocker becomes a failing generated test. Zero selected cases cannot yield a passing empty suite. `run` writes attempts and `report.json` into the requested new external report directory. `replay` and the generated suite retain attempts inside `runs/`; a replay result applies only to that named case, while the complete suite includes all selected blockers.
+
+Builds use fresh per-attempt private project copies. Reports retain outputs, build logs, available native binary hashes, raw observations, runtime reports, OTLP captures and comparison bundles. The broader versioned graph protocol and per-language runner projects below are proposals; the current layout above is the implemented contract.
+
+## Retention and cleanup
+
+| User choice | Current result |
+| --- | --- |
+| Default successful or failed run | Workspace remains available; external reports remain at the selected path |
+| `replay` or generated suite | A new retained case run under `runs/` |
+| `export-tests` | Prints the copy plan without copying |
+| `export-tests --apply` | Copies the frozen snapshot, suite, corpus, instructions and sealed plan into a new destination |
+| `clean` | Explicitly removes the owned workspace after preservation checks |
+
+There is no automatic successful-run deletion or `--keep-workspace` flag. Keep reports or export the suite before `clean`. Cleanup requires `.oteleq-owned.json`, rejects unknown top-level files and edited snapshots/suites, and does not require the original application or toolchain still to exist. It removes the owned workspace, including its internal replay evidence; independently stored external reports remain available.
+
+## Optional incorporation into a repository
+
+Use `export-tests --workspace PATH --destination PATH` to inspect the copy plan, then add `--apply` to perform it. The destination must be new and independent of the workspace. Choosing a new subdirectory in the application's repository explicitly incorporates the copied bundle; it does not edit existing tests, dependencies, manifests or locks.
+
+The exported plan points at its copied immutable application snapshot and retains the original source provenance. Retained tests therefore continue testing that snapshot. Create a new plan for changed application code. Replay still requires the same qualified oteleq CLI, otelc adapters, Python environment and language tools; changed content identities fail. It is portable evidence with external toolchain requirements, rather than a standalone test of future source edits.
+
+Generated boilerplate carries the MIT licence. Copied application source retains its licence; oteleq's maintained implementation is AGPL-3.0. See [repository quality](quality.md#implementation-quality). A richer promotion plan with fixture/dependency integration and baseline-only regression export remains proposed; `promote` is not implemented.
+
+## Broader generation design
+
+The following contracts describe future capabilities beyond scalar generation. They do not provide current configuration keys or extra CLI flags.
+
+### Generation contract
 
 Plan a test entry for every discovered function in the selected source/build context. A runnable test requires a valid caller, valid input strategy, independent fixture initialisation and an observation contract. Where any of these is missing, generate a visible inventory/gap entry and an actionable fixture request. Never manufacture a passing empty assertion or count a generated file as executed coverage.
 
 Types are useful for generating primitive values, but they do not establish business preconditions. A string might represent an account identifier; an integer might be a port or a buffer length. The generator needs explicit contracts or factories for those meanings. Invalid baseline executions remain recorded and do not count as equivalence evidence.
 
-## Input sources
+### Input sources
 
 | Source | Use |
 | --- | --- |
@@ -25,7 +71,7 @@ Types are useful for generating primitive values, but they do not establish busi
 
 Generate edge cases deterministically before seeded exploration. Prefer local deterministic generation. AI-assisted fixture proposals can be an optional later feature, but they require compilation, baseline validity and review like any other generated case; they cannot establish expected results or a proof.
 
-## One corpus for all lanes
+### One corpus for all lanes
 
 Materialise generated inputs and action sequences once, including concrete generic instantiations and fixture specifications. Every lane consumes the same case IDs and values. Do not run independent random property loops against each build and compare their aggregate pass counts.
 
@@ -35,53 +81,7 @@ A property asserts that baseline and required instrumented observations match. I
 
 Build dependencies through fixture factories, then reconstruct the same specification independently for each worker. A fixture can supply a fake database or clock when configured; the report states that dependency was simulated and does not imply real-service equivalence.
 
-## Generated workspace
-
-Create a new private directory outside the target source tree. The default is a unique operating-system temporary directory with owner-only access. If the user supplies a directory, create a new owned run subdirectory; refuse an existing non-owned workspace and resolve symlinks before deciding that paths are outside the source tree.
-
-```text
-oteleq-run-<id>/
-  owner.json
-  plan.json
-  inventory.json
-  source-snapshot/
-  generated/
-    c/ cpp/ rust/ python/ java/ javascript/ typescript/ go/
-  fixtures/
-  corpus/
-  dependencies/
-  builds/
-    baseline/ instrumented-off/ instrumented-on/
-  observations/
-  telemetry/
-  reports/
-  replay/
-```
-
-`owner.json` identifies the run and workspace format. Cleanup is limited to that owned workspace and never follows arbitrary symlinks or deletes a parent/source directory. Tests, dependency caches, coverage output and compiler writes stay there. The snapshot records selected original contents and build-relevant assets; no hard-linked writable source copies.
-
-Some build systems require generated helper files inside a package/module. Put those files into a private copy under `source-snapshot/` or into an explicitly qualified overlay, never the original checkout. The report records any helper/access/manifest delta. Run builds against the snapshot to avoid mutation by build scripts; original source hashes are still verified at completion.
-
-## Retention choices
-
-| User choice | Result |
-| --- | --- |
-| Default transient run | Export a durable evidence report to the requested report directory, then remove successful-run workspaces |
-| Failure/incomplete run | Preserve workspace and replay artefacts by default and print their path |
-| `--keep-workspace` | Preserve generated tests and all configured replay/build evidence even after success |
-| Explicit promotion | Copy the chosen tests, fixtures, corpus and runner instructions into a destination selected by the user |
-
-Transient cleanup happens only after the durable report/export succeeds. Source/build identities and concrete test cases needed to interpret the report remain in that bundle according to its stated retention scope. `clean` is an explicit operation for retained workspaces.
-
-## Optional incorporation into a repository
-
-`promote` first creates a copy plan listing destination paths, runner/dependency requirements, fixture changes and any unresolved private-access requirements. The user applies that plan explicitly. Refuse conflicting destination files by default; do not overwrite existing tests or edit the application's manifests/lockfiles automatically.
-
-Promoted files include a self-contained README, pinned dependency declarations for their test environment, seed corpus, fixture contracts, generated test provenance and replay instructions. Standalone equivalence tests require the oteleq executor and both build recipes. An optional exported baseline regression form stores typed expected observations and clearly identifies its source/build origin; it cannot compare instrumentation on its own.
-
-A private generated helper may not be directly portable into an existing repository's test directory. Promotion must say so and provide the external/private-build instructions, rather than insert an uncompilable test or silently change visibility. Users can retain an independent test project beside their existing framework.
-
-## Difference reduction
+### Difference reduction
 
 When a stable difference is found, shrink values and action sequences while preserving preconditions, fixture independence and the same required lanes. Confirm each reduced case with the stability controls. If reduction changes the build/observation contract, it is a different experiment and does not replace the original evidence.
 

@@ -31,6 +31,8 @@ The report directory must be new and outside the application, otelc and workspac
 
 The CLI embeds its adapter sources, so an installed binary does not depend on an oteleq source checkout. It still needs the selected Python environment, otelc build and language tools. Keep the same CLI and tool contents for replay; changing them requires a new plan. `cargo install --path . --locked` installs the CLI locally.
 
+The generated suite remembers the CLI path used during generation. If the same binary is moved, export `OTELEQ_CLI=/new/path/to/quux-oteleq` before running the suite; its content identity must still match the plan. `OTELEQ_PYTHON` selects the qualified adapter-host environment. See the [command/flag reference](cli-and-configuration.md#implemented-commands) and [actual workspace layout](test-generation.md#current-workspace).
+
 Path flags accept both `--source PATH` and `--source=PATH` forms. Use full option names; abbreviated options are rejected. Input repository boundaries are checked before extracting embedded workers.
 
 ## Selection and inputs
@@ -70,7 +72,7 @@ Global roots are source-declared top-level assignments/variables. Imported-modul
 
 Telemetry is decoded separately. Each instrumented invocation must contain exactly the selected function identity and one complete root tree, with valid IDs/parent graphs, matching service/scope, zero loss/pending counters and finished export. Recursive span counts and escaping-error counts are runtime observations, not independently predicted call counts. Repeated counts must agree. A baseline that exports telemetry, missing instrumentation, missing observations, crashes, timeouts, output overflow, unstable repeats or source changes cannot pass.
 
-Source snapshots are capped at 10,000 files, 8 MiB per file and 256 MiB in total. Symlinks and non-regular files are rejected. `.git`, `target`, `node_modules`, `.venv`, `__pycache__`, `build` and `dist` are excluded and recorded; functions in those directories are outside the inventory. `.h` defaults to C; C++ headers use `.hpp`, `.hh` or `.hxx`. Recognised JSX/TSX can still require unsupported runtime/build context. Generation is capped at 1,024 cases. Workers have a wall-time limit and captured-output limit, and their process group is killed on completion/failure. Application channels have a smaller comparator budget. This is trusted local execution, not a hostile-code sandbox.
+Source snapshots are capped at 10,000 files, 8 MiB per file and 256 MiB in total. Symlinks and non-regular files in the selected snapshot are rejected. `.git`, `target`, `node_modules`, `.venv`, `__pycache__`, `build` and `dist` are excluded and recorded; functions in those directories are outside the inventory. `.h` defaults to C; C++ headers use `.hpp`, `.hh` or `.hxx`. Recognised JSX/TSX can still require unsupported runtime/build context. Generation is capped at 1,024 cases. Workers have a wall-time limit and a 4 MiB combined captured stdout/stderr limit, and their process group is killed on completion/failure. Application stdout/stderr plus the state/outcome observation must fit within 256 KiB per attempt. Python/Node graphs are bounded at 512 nodes and depth 32. This is trusted local execution, not a hostile-code sandbox.
 
 ## Reproduce the qualification
 
@@ -88,6 +90,8 @@ The fixture covers 24 matching cases/96 paired-control launches, eight generated
 `report.json` retains every case result, the complete selected/excluded/blocked inventory, source identity, observation scope and source-preservation result. Case directories retain the concrete corpus, generated source, build logs and hashes, launch vectors, raw application observations, runtime reports, OTLP protobuf/HTTP records, comparator bundle and JSON comparison. Partial results remain available if a later case fails.
 
 Exit `0` requires nonzero completed cases and no selected blockers. `1` reports a reproducible difference; `3` reports incomplete evidence or a blocked strict gate; `4` reports a tool/build/protocol/identity failure. Argument errors use `2`. The existing workload comparator retains its documented exit-code contract. The generated `unittest` suite turns every selected blocker into a failing test.
+
+`run` qualifies the complete selected inventory. `replay` qualifies only the requested frozen case and writes its new report under `workspace/runs/replay-*`. The generated suite replays each runnable case and separately fails selected blockers. Neither invocation consumes the illustrative `equivalence.toml` policy, and there is no `--keep-workspace` flag: workspaces are always retained until explicit cleanup.
 
 ```sh
 "$OTELEQ_CLI" replay --workspace "$OTELEQ_WORKSPACE" --case case-id-from-corpus

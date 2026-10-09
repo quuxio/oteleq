@@ -2,11 +2,13 @@
 
 ## Required language set
 
-All eight current otelc targets are required: `c`, `cpp`, `rust`, `python`, `java`, `javascript`, `typescript`, `go`. This list is taken from otelc's published [language documentation](https://github.com/quuxio/otelc/blob/3d5b2d7c9167d9cc6fb1be876a05f83a9d6c6e5a/docs/languages.md), checked on 8 October 2026.
+All eight current otelc targets are required and have implemented scalar adapters: `c`, `cpp`, `rust`, `python`, `java`, `javascript`, `typescript`, `go`. The published [language documentation](https://github.com/quuxio/otelc/blob/3d5b2d7c9167d9cc6fb1be876a05f83a9d6c6e5a/docs/languages.md) is the original design baseline. The [current discovery/execution matrix](automatic-generation.md#discovery-and-build-boundary) and [qualification record](quality.md#published-qualification) describe the implemented scope as of 9 October 2026.
 
 The [implemented scalar generator](automatic-generation.md) supports bounded syntax inventory, private harnesses and actual paired otelc execution for all eight IDs. The rows below describe the broader proposed adapters, frameworks and build-aware capabilities beyond that slice. Toolchain/runtime versions and executable capabilities are pinned when each adapter is qualified against otelc. Objective-C, Swift, Fortran, Zig and .NET appear as later or exploratory otelc routes; they are outside its current eight-language set and are not silently advertised as supported here.
 
-## Framework and integration choices
+## Proposed framework and integration choices
+
+The implemented suite uses Python's standard `unittest` for every language. The language-native runners and property frameworks below are proposed extensions; no current command installs or selects them.
 
 | Language ID | Semantic discovery | Generated tests and input generation | otelc execution route |
 | --- | --- | --- | --- |
@@ -104,4 +106,4 @@ Framework routes are design choices based on their documented capabilities. Pin 
 
 ## Current workload comparator
 
-The implemented [byte-channel comparator](workload-comparison.md) accepts all eight language IDs. Only the diagnostic otelc Python task capture example is integrated now. No semantic discovery, generated harness or state observer is implied for any language; the adapter requirements above remain outstanding.
+The implemented [byte-channel comparator](workload-comparison.md) accepts all eight language IDs. [Fixed diagnostic captures](eight-language-capture.md) execute all eight ordinary function workloads, Python tasks, Python/Java worker context and optional native TypeScript emission. [Automatic scalar generation](automatic-generation.md) separately provides syntax inventories, diagnostic harnesses, supported state observers, replay and export for every language. The broader semantic/build-aware, receiver/factory and production requirements above remain outstanding.
