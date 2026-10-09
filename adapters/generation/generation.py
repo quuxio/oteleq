@@ -63,6 +63,16 @@ def identity(document):
     return capture.digest(json.dumps(document, sort_keys=True).encode())
 
 
+def worker_input(folder, input_data):
+    if input_data is None:
+        return Path(os.devnull)
+    if len(input_data) > MAX_FILE * 2:
+        raise ValueError("worker input exceeds limit")
+    path = folder / "worker-input.json"
+    path.write_bytes(input_data)
+    return path
+
+
 def execute(command, cwd, env=None, folder=None, timeout=60, input_data=None):
     """Trusted local execution with wall time/output limits and process-group cleanup."""
     if folder is None:
@@ -70,13 +80,7 @@ def execute(command, cwd, env=None, folder=None, timeout=60, input_data=None):
             return execute(command, cwd, env, Path(directory), timeout, input_data)
     folder.mkdir(parents=True, exist_ok=True)
     out, err = folder / "stdout", folder / "stderr"
-    input_path = folder / "worker-input.json"
-    if input_data is not None:
-        if len(input_data) > MAX_FILE * 2:
-            raise ValueError("worker input exceeds limit")
-        input_path.write_bytes(input_data)
-    else:
-        input_path = Path(os.devnull)
+    input_path = worker_input(folder, input_data)
     with out.open("wb") as stdout, err.open("wb") as stderr, input_path.open("rb") as stdin:
         process = subprocess.Popen([str(p) for p in command], cwd=cwd, env=env,
                                    stdin=stdin, stdout=stdout, stderr=stderr, start_new_session=True)
@@ -229,6 +233,16 @@ def plan(args):
     return 0
 
 
+def package_files(package, spec):
+    files = {}
+    for directory in spec.submodule_search_locations or []:
+        base = Path(directory)
+        for path in sorted(base.rglob("*")):
+            if path.is_file() and path.suffix in (".py", ".so", ".pyd"):
+                files[package + ":" + path.relative_to(base).as_posix()] = capture.file_digest(path)
+    return files
+
+
 def decoder_files():
     files = {}
     for package in ("google.protobuf", "opentelemetry.proto"):
@@ -239,11 +253,7 @@ def decoder_files():
         if spec is None:
             files[package] = "unavailable"
             continue
-        for directory in spec.submodule_search_locations or []:
-            base = Path(directory)
-            for path in sorted(base.rglob("*")):
-                if path.is_file() and path.suffix in (".py", ".so", ".pyd"):
-                    files[package + ":" + path.relative_to(base).as_posix()] = capture.file_digest(path)
+        files.update(package_files(package, spec))
     return files
 
 

@@ -68,6 +68,17 @@ Telemetry is decoded separately. Each instrumented invocation must contain exact
 
 Source snapshots are capped at 10,000 files, 8 MiB per file and 256 MiB in total. Symlinks and non-regular files are rejected. `.git`, `target`, `node_modules`, `.venv`, `__pycache__`, `build` and `dist` are excluded and recorded; functions in those directories are outside the inventory. `.h` defaults to C; C++ headers use `.hpp`, `.hh` or `.hxx`. Recognised JSX/TSX can still require unsupported runtime/build context. Generation is capped at 1,024 cases. Workers have a wall-time limit and captured-output limit, and their process group is killed on completion/failure. Application channels have a smaller comparator budget. This is trusted local execution, not a hostile-code sandbox.
 
+## Reproduce the qualification
+
+With all qualified otelc tools available, this runs the maintained eight-language scalar fixture, exercises the generated framework and exported replay, then checks that a changed global object is detected while the function return remains identical:
+
+```sh
+make generation-otelc PYTHON=/absolute/path/to/otelc/.venv/bin/python \
+  OTELC_ROOT=/absolute/path/to/otelc REPORT_DIR=/tmp/new-generation-qualification
+```
+
+The fixture covers 24 matching cases/96 paired-control launches, eight generated framework cases, exported replay and three deliberately different state cases. It is diagnostic evidence with the declared observation scope. No original application/source tree is modified.
+
 ## Reports, replay and retention
 
 `report.json` retains every case result, the complete selected/excluded/blocked inventory, source identity, observation scope and source-preservation result. Case directories retain the concrete corpus, generated source, build logs and hashes, launch vectors, raw application observations, runtime reports, OTLP protobuf/HTTP records, comparator bundle and JSON comparison. Partial results remain available if a later case fails.

@@ -31,14 +31,14 @@ func parameters(list *ast.FieldList, fset *token.FileSet) []string {
 	}
 	return params
 }
-func result(type_ *ast.FuncType, fset *token.FileSet) (string, string) {
-	if type_.Results == nil {
+func result(signature *ast.FuncType, fset *token.FileSet) (string, string) {
+	if signature.Results == nil {
 		return "void", ""
 	}
-	if len(type_.Results.List) != 1 || len(type_.Results.List[0].Names) > 1 {
+	if len(signature.Results.List) != 1 || len(signature.Results.List[0].Names) > 1 {
 		return "void", "multiple results need a result fixture"
 	}
-	return text(type_.Results.List[0].Type, fset), ""
+	return text(signature.Results.List[0].Type, fset), ""
 }
 func function(node *ast.FuncDecl, fset *token.FileSet) map[string]any {
 	output, reason := result(node.Type, fset)

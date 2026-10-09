@@ -8,6 +8,7 @@ LANGUAGES = {".c": "c", ".h": "c", ".cc": "cpp", ".cpp": "cpp", ".cxx": "cpp", "
              ".py": "python", ".java": "java", ".js": "javascript", ".mjs": "javascript",
              ".cjs": "javascript", ".jsx": "javascript", ".ts": "typescript", ".mts": "typescript", ".cts": "typescript", ".tsx": "typescript", ".go": "go"}
 IGNORED = {".git", "target", "node_modules", ".venv", "__pycache__", "build", "dist"}
+ANONYMOUS = "<anonymous>"
 
 
 def contains_yield(node):
@@ -82,7 +83,7 @@ def native_origin(location, path):
 
 
 def native_function(node, scope, inside):
-    kind, name = node["kind"], node.get("name", "<anonymous>")
+    kind, name = node["kind"], node.get("name", ANONYMOUS)
     location = node.get("loc", {})
     params = [n["type"]["qualType"] for n in node.get("inner", []) if n["kind"] == "ParmVarDecl"]
     body = any(n["kind"] in ("CompoundStmt", "CXXTryStmt") for n in node.get("inner", []))
@@ -100,9 +101,9 @@ def native_inventory(document, path):
     callable_kinds = {"FunctionDecl", "CXXMethodDecl", "CXXConstructorDecl", "CXXDestructorDecl", "LambdaExpr"}
 
     def visit(node, scope=(), inside=False):
-        kind, name = node.get("kind"), node.get("name", "<anonymous>")
+        kind, name = node.get("kind"), node.get("name", ANONYMOUS)
         original = native_origin(node.get("loc", {}), path)
-        if kind in ("NamespaceDecl", "CXXRecordDecl") and name != "<anonymous>":
+        if kind in ("NamespaceDecl", "CXXRecordDecl") and name != ANONYMOUS:
             scope = (*scope, name)
         if kind == "FunctionTemplateDecl":
             inside = True
