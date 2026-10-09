@@ -136,6 +136,8 @@ class HarnessTests(unittest.TestCase):
             self.assertEqual(harness.values(type_, "java")[0], "")
         self.assertIsNone(harness.values("Database", "python"))
         self.assertEqual(harness.corpus(self.entry("python"),3), [[0],[1],[-1]])
+        self.assertEqual(harness.corpus(self.entry("python"),16), [[0],[1],[-1]])
+        self.assertEqual(harness.corpus(self.entry("python",parameters=["bool"]),3), [[False],[True]])
         self.assertEqual(harness.corpus(self.entry("python",parameters=[]),3), [[]])
         opaque_entry=self.entry("python",parameters=["Database"])
         with self.assertRaisesRegex(ValueError,"fixture"):
@@ -211,6 +213,45 @@ class WorkflowTests(unittest.TestCase):
 
     def generate(self):
         with redirect_stdout(io.StringIO()):gen.generate(args("generate",workspace=self.workspace))
+
+    def test_nested_and_instance_main_remain_blockers_and_entrypoint_metadata_is_small(self):
+        for language in ("rust", "go", "javascript", "python"):
+            nested={"name":"main", "parameters":[], "output":"void", "reason":"needs access fixture", "entrypoint":False}
+            self.assertFalse(gen.is_entrypoint(nested,language))
+        instance={"name":"Example.main", "parameters":["String[]"], "output":"void", "reason":"instance method needs a fixture"}
+        self.assertFalse(gen.is_entrypoint(instance,"java"))
+        self.assertTrue(gen.is_entrypoint(dict(instance,reason=""),"java"))
+        self.assertFalse(gen.is_entrypoint(dict(instance,reason="",parameters=["int"]),"java"))
+        (self.source/"source.py").write_text("def outer():\n def main():pass\n return 1\ndef main():pass\n")
+        output=io.StringIO()
+        with redirect_stdout(output):
+            gen.plan(args("plan",source=self.source,otelc_root=self.root,workspace_parent=self.base,language=None,exclude=[],cases=3))
+        inventory=gen.read(Path(output.getvalue().strip())/"plan.json")["inventory"]
+        self.assertEqual(next(e for e in inventory if e["name"]=="outer.main")["status"],"blocked")
+        for entry in inventory:
+            self.assertEqual([f["name"] for f in entry["file_functions"]],["main"])
+
+    def test_native_builds_only_the_selected_lane_and_retains_actual_binary_identity(self):
+        for language,compiler in (("c","clang"),("cpp","clang++")):
+            for lane in ("baseline","instrumented_on"):
+                folder=self.base/(language+lane);folder.mkdir();scratch=folder/"scratch";scratch.mkdir()
+                binary=scratch/"application"
+                binary.write_bytes((language+lane).encode())
+                driver=self.source/("driver.c" if language=="c" else "driver.cpp")
+                tools={compiler:Path("/selected")/compiler}
+                with patch.object(gen,"execute",return_value=subprocess.CompletedProcess([],0,b"",b"")) as execute:
+                    command=gen.build_command(self.root,self.source,{"language":language},driver,self.base/"policy",tools,{},folder,scratch,lane)
+                execute.assert_called_once()
+                built=execute.call_args.args[0]
+                self.assertEqual(built[0],tools[compiler] if lane=="baseline" else self.root/"target/debug/quux-otelc")
+                self.assertIn("-O2" if language=="cpp" else "-O1",built)
+                self.assertEqual(command[-1],binary)
+                self.assertEqual(gen.read(folder/"build-identities.json"),{"application":gen.capture.file_digest(binary)})
+                gen.validate_private_sources(self.source,gen.manifest(self.source),folder)
+                self.assertEqual(gen.read(folder/"build-identities.json"),{"application":gen.capture.file_digest(binary)})
+        with patch.object(gen,"execute",return_value=subprocess.CompletedProcess([],1,b"",b"compiler failure")):
+            with self.assertRaisesRegex(ValueError,"native build failed"):
+                gen.native_command([],self.source,"c",driver,{"clang":"/selected/clang"},{},folder,scratch,"baseline")
 
     def reseal(self,data):
         gen.write(self.workspace/"plan.json",data)

@@ -124,7 +124,8 @@ impl Inventory {
         let span = sig.ident.span();
         self.entries.push(
             json!({"name":sig.ident.to_string(), "line":span.start().line,
-            "column":span.start().column, "parameters":parameters,"output":output,"reason":reason}),
+            "column":span.start().column, "parameters":parameters,"output":output,"reason":reason,
+            "entrypoint": !method && self.depth == 0 && sig.ident == "main"}),
         );
     }
 }

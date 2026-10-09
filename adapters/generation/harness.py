@@ -38,7 +38,11 @@ def corpus(entry, count):
     if not pools:
         return [[]]
     # Bounded diagonal plus shifted columns: deterministic, not exhaustive Cartesian coverage.
-    return [[pool[(index + column) % len(pool)] for column, pool in enumerate(pools)] for index in range(count)]
+    candidates = [[pool[(index + column) % len(pool)] for column, pool in enumerate(pools)] for index in range(count)]
+    unique = {}
+    for candidate in candidates:
+        unique.setdefault(json.dumps(candidate), candidate)
+    return list(unique.values())
 
 
 def literal(value, type_, language):

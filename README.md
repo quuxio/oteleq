@@ -74,7 +74,7 @@ OTELEQ_WORKSPACE=/tmp/oteleq-run-actual-id
 "$OTELEQ_PYTHON" "$OTELEQ_WORKSPACE/tests/test_equivalence.py"
 ```
 
-The default generates three scalar cases per function and compares two plain with two instrumented runs per case. Missing instrumentation, changed source, unstable observations, failed builds and selected blockers fail the gate. The report records tested inputs, state coverage, telemetry and gaps. Syntax discovery and scalar samples do not establish business preconditions.
+The default generates up to three distinct scalar cases per function and compares two plain with two instrumented runs per case. Missing instrumentation, changed source, unstable observations, failed builds and selected blockers fail the gate. The report records tested inputs, state coverage, telemetry and gaps. Syntax discovery and scalar samples do not establish business preconditions.
 
 ### Replay, retain or incorporate
 

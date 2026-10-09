@@ -5,9 +5,14 @@ use std::{fs, process::Command};
 fn rust_inventory_keeps_nested_methods_closures_macros_and_generics_as_gaps() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("source.rs");
-    fs::write(&path, "static mut STATE:i32=0; fn main(){} fn plain(x:i32)->i32{x} fn nested(){fn inner(){} let _=|x:i32|x;} fn generic<T>(x:T)->T{x} async fn asynchronous(){} unsafe fn dangerous(){} mod outside; mod inside{fn member(){}} struct S; impl S{fn method(&self){}} trait Trait{fn abstracted(&self);fn provided(&self){}} example!();").unwrap();
+    fs::write(&path, "static mut STATE:i32=0; fn main(){} fn plain(x:i32)->i32{x} fn nested(){fn main(){} fn inner(){} let _=|x:i32|x;} fn generic<T>(x:T)->T{x} async fn asynchronous(){} unsafe fn dangerous(){} mod outside; mod inside{fn member(){}} struct S; impl S{fn method(&self){} fn main(){}} trait Trait{fn abstracted(&self);fn provided(&self){}} example!();").unwrap();
     let result = inventory(&path).unwrap();
     let entries = result["functions"].as_array().unwrap();
+    let mains: Vec<_> = entries.iter().filter(|e| e["name"] == "main").collect();
+    assert_eq!(mains.len(), 3);
+    assert_eq!(mains[0]["entrypoint"], true);
+    assert_eq!(mains[1]["entrypoint"], false);
+    assert_eq!(mains[2]["entrypoint"], false);
     assert!(entries.iter().any(|e| e["name"] == "plain"
         && e["reason"] == ""
         && e["parameters"][0] == "i32"

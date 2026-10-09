@@ -50,7 +50,8 @@ func function(node *ast.FuncDecl, fset *token.FileSet) map[string]any {
 	}
 	position := fset.Position(node.Pos())
 	return map[string]any{"name": node.Name.Name, "line": position.Line, "column": position.Column,
-		"parameters": parameters(node.Type.Params, fset), "output": output, "reason": reason, "name_offset": fset.Position(node.Name.Pos()).Offset}
+		"parameters": parameters(node.Type.Params, fset), "output": output, "reason": reason,
+		"entrypoint": node.Recv == nil && node.Name.Name == "main", "name_offset": fset.Position(node.Name.Pos()).Offset}
 }
 func globals(file *ast.File, fset *token.FileSet) []any {
 	values := []any{}

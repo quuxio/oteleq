@@ -177,14 +177,21 @@ def qualify_entry(entry, snapshot, count):
     return "ready"
 
 
+def is_entrypoint(function, language):
+    if language == "java":
+        return (function["name"].endswith(".main") and function["parameters"] in (["String[]"], ["java.lang.String[]"])
+                and function["output"] == "void" and not function["reason"])
+    return function.get("entrypoint", function["name"] == "main" and not function["reason"])
+
+
 def inventory_entry(function, discovered, name, language, source_hash, snapshot, args):
     entry = {**function, "path": name, "language": language, "globals": discovered["globals"],
              "parser": discovered.get("parser", "unavailable"), "package": discovered.get("package", ""),
-             "package_end": discovered.get("package_end"), "file_functions": discovered["functions"],
+             "package_end": discovered.get("package_end"), "file_functions": discovered["entrypoints"],
              "source_sha256": source_hash, "column": function.get("column", 0)}
     entry["id"] = identity({k: entry[k] for k in ("language", "path", "name", "line", "column", "parameters", "source_sha256")})[:20]
     entry["otelc_function"] = entry_identity(entry)
-    excluded = function["name"].split(".")[-1] == "main" or bool(function.get("declaration_only"))
+    excluded = is_entrypoint(function, language) or bool(function.get("declaration_only"))
     excluded |= any(fnmatch.fnmatchcase(entry["otelc_function"], pattern) for pattern in args.exclude)
     entry["status"] = "excluded" if excluded else qualify_entry(entry, snapshot, args.cases)
     return entry
@@ -197,6 +204,7 @@ def inventory_tree(contents, root, snapshot, workspace, args):
         if not language or args.language and language not in args.language:
             continue
         discovered = discover_file(name, language, root, snapshot, workspace, tools, artefacts)
+        discovered["entrypoints"] = [function for function in discovered["functions"] if is_entrypoint(function, language)]
         inventory.extend(inventory_entry(function, discovered, name, language, sha, snapshot, args)
                          for function in discovered["functions"])
     return tools, artefacts, inventory
@@ -378,6 +386,8 @@ def driver_path(project, entry):
 def build_command(root, project, entry, driver, config, tools, env, folder, scratch, lane):
     language = entry["language"]
     prefix = [root / "target/debug/quux-otelc", "--config", config, "--language", language]
+    if language in ("c", "cpp"):
+        return native_command(prefix, project, language, driver, tools, env, folder, scratch, lane)
     if language == "java":
         classes = scratch / "classes"
         classes.mkdir()
@@ -398,6 +408,20 @@ def build_command(root, project, entry, driver, config, tools, env, folder, scra
     return command
 
 
+def native_command(prefix, project, language, driver, tools, env, folder, scratch, lane):
+    compiler = "clang++" if language == "cpp" else "clang"
+    flags = ["-O2", "-pthread", "-std=c++17"] if language == "cpp" else ["-O1", "-pthread"]
+    output = scratch / "application"
+    command = [tools[compiler], *flags, driver, "-o", output]
+    if lane == "instrumented_on":
+        command = prefix + [compiler, *flags, driver, "-o", output]
+    result = execute(command, project, env, folder / "build")
+    if result.returncode:
+        raise ValueError("generated native build failed; inspect build/stderr")
+    write(folder / "build-identities.json", {"application": capture.file_digest(output)})
+    return [output] if lane == "baseline" else prefix + ["run", output]
+
+
 def validate_private_sources(project, immutable, folder):
     # Generated native binaries are build outputs, not source snapshot members.
     if any(not (project / name).is_file() or capture.file_digest(project / name) != digest for name, digest in immutable.items()):
@@ -405,8 +429,9 @@ def validate_private_sources(project, immutable, folder):
     for candidate in project.rglob("*"):
         if candidate.is_symlink() or (candidate.suffix in discovery.LANGUAGES and candidate.relative_to(project).as_posix() not in immutable):
             raise ValueError("unexpected source or symlink appeared in the private project")
-    write(folder / "build-identities.json", {name: capture.file_digest(project / name)
-          for name in ("plain", "instrumented") if (project / name).is_file()})
+    if not (folder / "build-identities.json").exists():
+        write(folder / "build-identities.json", {name: capture.file_digest(project / name)
+              for name in ("plain", "instrumented") if (project / name).is_file()})
 
 
 def qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, decoder):
