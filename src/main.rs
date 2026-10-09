@@ -2,7 +2,7 @@ use quux_oteleq::{compare, Bundle};
 use std::{
     env,
     fs::File,
-    io::{Read, Write},
+    io::{BufWriter, Read, Write},
     process::ExitCode,
 };
 const MAX_BYTES: u64 = 16 * 1024 * 1024;
@@ -28,10 +28,13 @@ fn run(args: &[String]) -> Result<i32, String> {
     match compare(bundle) {
         Ok(report) => {
             let code = report.verdict.exit_code();
-            serde_json::to_writer_pretty(std::io::stdout().lock(), &report)
+            let stdout = std::io::stdout();
+            let mut output = BufWriter::new(stdout.lock());
+            serde_json::to_writer_pretty(&mut output, &report)
                 .map_err(|e| format!("write report: {e}"))?;
-            std::io::stdout()
+            output
                 .write_all(b"\n")
+                .and_then(|_| output.flush())
                 .map_err(|e| format!("write report: {e}"))?;
             Ok(code)
         }

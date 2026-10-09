@@ -2,6 +2,7 @@
 from http.client import HTTPConnection
 import json
 import os
+import socket
 from pathlib import Path
 import sys
 import tempfile
@@ -28,7 +29,7 @@ def decoder(spans, service="expected", scope="quux.otelc"):
 def report():
     return {"traces": {"losses": {}, "pending_contexts": 0, "active_trees": 0,
                        "queued_trees": 0, "completed_trees": 1},
-            "function_calls": 1, "losses": {}, "export_loss": 0, "export_finished": True}
+            "function_calls": 1, "losses": {"function_capacity": 0, "active_call_capacity": 0, "incomplete": 0, "invalid": 0}, "export_loss": 0, "export_finished": True}
 
 
 class TelemetryWitnessTests(unittest.TestCase):
@@ -91,12 +92,30 @@ class TelemetryWitnessTests(unittest.TestCase):
     def test_native_export_counter_and_error_span_are_independently_checked(self):
         status = report()
         status["export_dropped_batches"] = status.pop("export_loss")
+        status["losses"] = {key: 0 for key in ("active_call_capacity", "incomplete", "invalid_exit", "object_capacity", "object_incomplete", "queue", "stack", "thread_admission")}
         node = span()
         node.status.code = 2
         spec = {**self.spec, "errors": 1}
         capture.witness(self.bodies, status, spec, "expected", decoder([node]))
         with self.assertRaises(ValueError):
             capture.witness(self.bodies, status, self.spec, "expected", decoder([node]))
+
+    def test_malformed_or_missing_diagnostics_never_pass_as_zero(self):
+        changes = [lambda r: r.update(losses={}), lambda r: r["traces"].pop("queued_trees"),
+                   lambda r: r.update(export_loss=False), lambda r: r.update(export_loss=-1),
+                   lambda r: r["traces"].update(pending_contexts=0.0),
+                   lambda r: r["traces"].update(losses={"capacity": False}),
+                   lambda r: r.update(function_calls=True),
+                   lambda r: r["traces"].update(losses={" ": 0})]
+        for change in changes:
+            status = report()
+            change(status)
+            with self.subTest(status=status), self.assertRaises((ValueError, KeyError)):
+                capture.witness(self.bodies, status, self.spec, "expected", decoder([span()]))
+
+    def test_duplicate_report_keys_cannot_hide_a_loss(self):
+        with self.assertRaisesRegex(ValueError, "duplicate"):
+            capture.strict_json('{"export_loss":1,"export_loss":0}')
 
 
 class CaptureBoundaryTests(unittest.TestCase):
@@ -110,9 +129,10 @@ class CaptureBoundaryTests(unittest.TestCase):
                                         ("/v1/traces", {"Content-Length": "1048577"}, b""),
                                         ("/v1/traces", {"Content-Length": "oops"}, b""),
                                         ("/v1/traces", {"Content-Length": "2"}, b"x")):
+                expected = 413 if headers.get("Content-Length") == "1048577" else 408 if headers.get("Content-Length") == "2" else 400
                 connection = HTTPConnection(endpoint.removeprefix("http://"), timeout=5)
                 connection.request("POST", path, body, headers)
-                self.assertEqual(connection.getresponse().status, 400)
+                self.assertEqual(connection.getresponse().status, expected)
                 connection.close()
             self.assertEqual(bodies, [("/v1/traces", b"\xff\0\n")])
             self.assertEqual(len(errors), 4)
@@ -122,9 +142,21 @@ class CaptureBoundaryTests(unittest.TestCase):
             for index in range(33):
                 connection = HTTPConnection(endpoint.removeprefix("http://"), timeout=5)
                 connection.request("POST", "/v1/metrics", b"x")
-                self.assertEqual(connection.getresponse().status, 200 if index < 32 else 400)
+                self.assertEqual(connection.getresponse().status, 200 if index < 32 else 413)
                 connection.close()
             self.assertEqual((len(bodies), len(errors)), (32, 1))
+
+    def test_shared_receiver_rejects_duplicate_framing_compression_and_unknown_methods(self):
+        with capture.receiver() as (endpoint, bodies, errors):
+            host, port = endpoint.removeprefix("http://").split(":")
+            for request in (b"POST /v1/traces HTTP/1.0\r\nContent-Length: 1\r\nContent-Length: 1\r\n\r\nx",
+                            b"POST /v1/traces HTTP/1.0\r\nContent-Length: 1\r\nContent-Encoding: gzip\r\n\r\nx",
+                            b"GET /v1/traces HTTP/1.0\r\n\r\n"):
+                with socket.create_connection((host, int(port)), timeout=5) as connection:
+                    connection.sendall(request)
+                    connection.shutdown(socket.SHUT_WR)
+                    self.assertNotIn(b"200", connection.recv(4096).split(b"\r\n")[0])
+            self.assertEqual((len(bodies), len(errors)), (0, 3))
 
     def test_environment_isolated_from_ambient_agents_headers_and_wrappers(self):
         with patch.dict(os.environ, {"NODE_OPTIONS": "injected", "OTEL_EXPORTER_OTLP_HEADERS": "secret",
@@ -279,6 +311,17 @@ class PrivateExecutionTests(unittest.TestCase):
             argv[4] = str(root / "forbidden")
             with patch.object(sys, "argv", argv), self.assertRaises(SystemExit):
                 observer.main()
+
+    def test_source_contained_tmpdir_is_rejected_before_any_capture(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "otelc"
+            root.mkdir()
+            destination = Path(temporary) / "report"
+            for unsafe in (root, Path(observer.__file__).resolve().parents[1]):
+                argv = ["capture", "--otelc-root", str(root), "--report-dir", str(destination)]
+                with patch.object(sys, "argv", argv), patch.object(observer.tempfile, "gettempdir", return_value=str(unsafe)), self.assertRaises(SystemExit):
+                    observer.main()
+                self.assertFalse(destination.exists())
 
     def test_repeated_real_process_capture_preserves_source_and_requires_witness(self):
         with tempfile.TemporaryDirectory() as temporary:

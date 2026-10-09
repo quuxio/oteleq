@@ -2,7 +2,6 @@
 from collections import Counter
 from contextlib import contextmanager
 import hashlib
-from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
 import os
 from pathlib import Path
@@ -11,6 +10,8 @@ import shutil
 import subprocess
 import sys
 import threading
+
+from capture_otelc_tasks import CaptureServer, strict_json
 
 
 def digest(data):
@@ -61,6 +62,8 @@ def artefacts(root, language, tools):
         paths += [p for p in sorted(tree.rglob("*")) if p.is_file() and p.suffix in suffixes
                   and "tests" not in p.relative_to(tree).parts]
     identities = {str(p.relative_to(root)): file_digest(p) for p in paths}
+    for name in ("otelc_capture.py", "capture_otelc_languages.py", "capture_otelc_tasks.py"):
+        identities["observer:" + name] = file_digest(Path(__file__).with_name(name))
     identities.update({"tool:" + name: file_digest(path) for name, path in tools.items()})
     return identities
 
@@ -108,34 +111,11 @@ def commands(root, workspace, language, source, policy, tools, environment, evid
 @contextmanager
 def receiver():
     """Never acknowledge truncated, unknown or over-budget telemetry."""
-    bodies, errors = [], []
-
-    class Handler(BaseHTTPRequestHandler):
-        def do_POST(self):
-            self.connection.settimeout(2)
-            try:
-                size = int(self.headers.get("Content-Length", "-1"))
-                if self.path not in ("/v1/traces", "/v1/metrics") or not 0 <= size <= 1024 * 1024 or len(bodies) >= 32:
-                    raise ValueError("unexpected path or telemetry budget exceeded")
-                body = self.rfile.read(size)
-                if len(body) != size:
-                    raise ValueError("truncated telemetry body")
-                bodies.append((self.path, body))
-                self.send_response(200)
-                self.send_header("Content-Length", "0")
-                self.end_headers()
-            except (ValueError, TimeoutError, OSError) as error:
-                errors.append(str(error))
-                self.send_error(400)
-
-        def log_message(self, *_):
-            pass
-
-    server = HTTPServer(("127.0.0.1", 0), Handler)
-    worker = threading.Thread(target=server.serve_forever, daemon=True)
+    server = CaptureServer(max_requests=32)
+    worker = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True)
     worker.start()
     try:
-        yield f"http://127.0.0.1:{server.server_port}", bodies, errors
+        yield f"http://127.0.0.1:{server.server_port}", server.bodies, server.errors
     finally:
         server.shutdown()
         server.server_close()
@@ -166,7 +146,7 @@ def decode(bodies, service, decoder):
                 for span in scope.spans:
                     key = (span.trace_id, span.span_id)
                     if (len(span.trace_id) != 16 or not any(span.trace_id) or len(span.span_id) != 8
-                            or not any(span.span_id) or key in nodes or not span.name
+                            or not any(span.span_id) or key in nodes or not span.name.strip()
                             or span.start_time_unix_nano <= 0 or span.end_time_unix_nano < span.start_time_unix_nano
                             or (span.parent_span_id and (len(span.parent_span_id) != 8 or not any(span.parent_span_id)))):
                         raise ValueError("invalid or duplicate span")
@@ -191,19 +171,37 @@ def witness(bodies, report, spec, service, decoder):
     if names != spec["functions"] or roots != spec["trees"] or errors != spec["errors"]:
         raise ValueError("decoded telemetry does not match independent fixture expectations")
     traces = report["traces"]
-    losses = {"traces." + key: value for key, value in traces["losses"].items()}
-    losses.update({"runtime." + key: value for key, value in report["losses"].items()})
+    trace_losses, runtime_losses = traces["losses"], report["losses"]
+    required = {"active_call_capacity", "incomplete"}
+    if "export_dropped_batches" in report:
+        required |= {"invalid_exit", "object_capacity", "object_incomplete", "queue", "stack", "thread_admission"}
+    else:
+        required |= {"function_capacity", "invalid"}
+    if (not isinstance(trace_losses, dict) or not isinstance(runtime_losses, dict)
+            or not required.issubset(runtime_losses)
+            or any(not isinstance(key, str) or not key.strip() for key in (*trace_losses, *runtime_losses))):
+        raise ValueError("missing or invalid runtime loss diagnostics")
+    losses = {"traces." + key: value for key, value in trace_losses.items()}
+    losses.update({"runtime." + key: value for key, value in runtime_losses.items()})
     export = [report[key] for key in ("export_loss", "export_dropped_batches") if key in report]
+    counters = [traces[key] for key in ("active_trees", "queued_trees", "completed_trees")]
+    counters += [traces.get("pending_contexts", 0), report["function_calls"]]
+    if any(type(value) is not int or value < 0 for value in (*losses.values(), *export, *counters)):
+        raise ValueError("invalid runtime loss or pending counter")
     if not export or report.get("export_finished") is not True or report.get("drained", True) is not True:
         raise ValueError("missing or unfinished export status")
     losses["transport.export"] = sum(export)
     pending = sum(traces.get(key, 0) for key in ("pending_contexts", "active_trees", "queued_trees"))
-    if (any(losses.values()) or pending or traces.get("completed_trees") != roots
-            or report.get("function_calls") != sum(names.values())):
+    if (any(losses.values()) or pending or traces["completed_trees"] != roots
+            or report["function_calls"] != sum(names.values())):
         raise ValueError("lossy, incomplete or mismatched runtime report")
+    raw_digest = hashlib.sha256()
+    for body in raw:
+        raw_digest.update(body)
     return {"decoder": "opentelemetry-proto ExportTraceServiceRequest",
-            "raw_otlp_sha256": digest(b"".join(raw)), "functions": names,
+            "raw_otlp_sha256": raw_digest.hexdigest(), "functions": names,
             "spans": sum(names.values()), "losses": losses, "pending": pending}
+
 
 
 def environment(workspace, tools, service, root):

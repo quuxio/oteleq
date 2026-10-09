@@ -1,6 +1,9 @@
 use quux_oteleq::{compare, Bundle, Verdict};
 use serde_json::{json, Value};
-use std::{fs, process::Command};
+use std::{
+    fs,
+    process::{Command, Stdio},
+};
 fn fixture() -> Value {
     let hash = "a".repeat(64);
     let attempt = json!({"source_sha256_before":hash,"source_sha256_after":hash,
@@ -8,7 +11,7 @@ fn fixture() -> Value {
         "capture_complete":true,"witness":null});
     let mut on = attempt.clone();
     on["witness"] = json!({"decoder":"otlp-protobuf-test-v1","raw_otlp_sha256":hash,
-        "functions":{"work":1},"spans":1,"losses":{},"pending":0});
+        "functions":{"work":1},"spans":1,"losses":{"export":0},"pending":0});
     json!({"workload_schema_version":1,"scope":{"language":"python","artefact_class":"diagnostic",
         "source_sha256":hash,"baseline_artefact_sha256":hash,"instrumented_artefact_sha256":hash,
         "policy_sha256":hash,"observer":"independent subprocess capture v1",
@@ -211,6 +214,8 @@ fn witness_missing_wrong_count_wrong_identity_loss_or_pending_is_incomplete() {
         ("functions", json!({"other":1})),
         ("spans", json!(2)),
         ("losses", json!({"export":1})),
+        ("losses", json!({})),
+        ("losses", json!({" ":0})),
         ("pending", json!(1)),
     ] {
         let mut f = fixture();
@@ -222,6 +227,37 @@ fn witness_missing_wrong_count_wrong_identity_loss_or_pending_is_incomplete() {
         f["cases"][0]["instrumented_on"][0]["witness"].clone();
     assert_eq!(evaluate(f).verdict, Verdict::Inconclusive);
     assert_eq!(Verdict::Inconclusive.exit_code(), 3);
+}
+#[test]
+fn duplicate_evidence_map_keys_are_rejected_before_comparison() {
+    let original = fixture().to_string();
+    for (needle, replacement) in [
+        ("\"export\":0", "\"export\":99,\"export\":0"),
+        (
+            "\"stdout\":[255,0,42]",
+            "\"stdout\":[13],\"stdout\":[255,0,42]",
+        ),
+        (
+            "\"expected_functions\":{\"work\":1}",
+            "\"expected_functions\":{\"work\":2,\"work\":1}",
+        ),
+        (
+            "\"functions\":{\"work\":1}",
+            "\"functions\":{\"work\":2,\"work\":1}",
+        ),
+    ] {
+        assert!(original.contains(needle));
+        let raw = original.replace(needle, replacement);
+        let error = serde_json::from_str::<Bundle>(&raw).unwrap_err();
+        assert!(error.to_string().contains("duplicate map key"));
+    }
+}
+
+#[test]
+fn declared_channel_order_does_not_change_exact_membership_checks() {
+    let mut f = fixture();
+    f["scope"]["channels"] = json!(["stderr", "stdout"]);
+    assert_eq!(evaluate(f).verdict, Verdict::EquivalentObserved);
 }
 #[test]
 fn mixed_cases_keep_all_results_and_completeness_precedes_difference() {
@@ -304,4 +340,26 @@ fn schema_is_strict_and_untyped_numeric_bytes_cannot_overflow() {
     f["cases"][0]["baseline"][0]["termination"]["ignored"] = json!(0);
     assert!(serde_json::from_value::<Bundle>(f).is_err());
     assert_eq!(Verdict::EquivalentObserved.exit_code(), 0);
+}
+
+#[test]
+fn cli_reports_output_failure_instead_of_losing_buffered_report_bytes() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("bundle.json");
+    let mut f = fixture();
+    for attempt in f["cases"][0]["instrumented_on"].as_array_mut().unwrap() {
+        attempt["channels"]["stdout"] = json!(vec![42; 100_000]);
+    }
+    fs::write(&path, f.to_string()).unwrap();
+    let mut child = Command::new(env!("CARGO_BIN_EXE_quux-oteleq"))
+        .arg("compare-workload")
+        .arg(&path)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    drop(child.stdout.take());
+    let result = child.wait_with_output().unwrap();
+    assert_eq!(result.status.code(), Some(4));
+    assert!(!result.stderr.is_empty());
 }

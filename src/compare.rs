@@ -48,11 +48,6 @@ pub struct Report {
 fn sha(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|c| c.is_ascii_hexdigit())
 }
-fn distinct_nonempty(values: &[String]) -> bool {
-    !values.is_empty()
-        && values.iter().all(|v| !v.trim().is_empty())
-        && values.iter().collect::<BTreeSet<_>>().len() == values.len()
-}
 /// Validate bounded structure before evaluating any evidence. The producer owns
 /// capture/decoding; this comparator cannot authenticate a hand-written bundle.
 pub fn compare(bundle: Bundle) -> Result<Report, String> {
@@ -60,6 +55,7 @@ pub fn compare(bundle: Bundle) -> Result<Report, String> {
         return Err("unsupported workload schema".into());
     }
     let s = &bundle.scope;
+    let channels: BTreeSet<_> = s.channels.iter().collect();
     if ![
         &s.source_sha256,
         &s.baseline_artefact_sha256,
@@ -69,7 +65,9 @@ pub fn compare(bundle: Bundle) -> Result<Report, String> {
     .iter()
     .all(|v| sha(v))
         || s.observer.trim().is_empty()
-        || !distinct_nonempty(&s.channels)
+        || channels.is_empty()
+        || channels.len() != s.channels.len()
+        || channels.iter().any(|channel| channel.trim().is_empty())
     {
         return Err("scope needs SHA-256 identities, observer and distinct byte channels".into());
     }
@@ -77,7 +75,7 @@ pub fn compare(bundle: Bundle) -> Result<Report, String> {
         return Err("require 1..10000 concrete cases".into());
     }
     let mut ids = BTreeSet::new();
-    let mut reports = Vec::new();
+    let mut reports = Vec::with_capacity(bundle.cases.len());
     for case in &bundle.cases {
         if case.case_id.trim().is_empty()
             || !ids.insert(&case.case_id)
@@ -100,7 +98,7 @@ pub fn compare(bundle: Bundle) -> Result<Report, String> {
                 "invalid/duplicate case, corpus, witness expectation or repeat limit".into(),
             );
         }
-        reports.push(compare_case(case, s));
+        reports.push(compare_case(case, s, &channels));
     }
     // Incomplete evidence takes precedence: a stable difference in another case
     // does not establish that a truncated or unstable experiment is valid.
@@ -120,7 +118,7 @@ pub fn compare(bundle: Bundle) -> Result<Report, String> {
     })
 }
 
-fn compare_case(case: &Case, scope: &Scope) -> CaseReport {
+fn compare_case(case: &Case, scope: &Scope, channels: &BTreeSet<&String>) -> CaseReport {
     let mut report = CaseReport {
         case_id: case.case_id.clone(),
         verdict: Verdict::EquivalentObserved,
@@ -152,10 +150,7 @@ fn compare_case(case: &Case, scope: &Scope) -> CaseReport {
             if attempt.termination != (Termination::Exit { code: 0 }) {
                 report.reasons.push(format!("{prefix}: target invalid or tool failure; only successful workload exits qualify"));
             }
-            if !attempt.capture_complete
-                || attempt.channels.keys().collect::<BTreeSet<_>>()
-                    != scope.channels.iter().collect::<BTreeSet<_>>()
-            {
+            if !attempt.capture_complete || !attempt.channels.keys().eq(channels.iter().copied()) {
                 report
                     .reasons
                     .push(format!("{prefix}: incomplete or undeclared byte channel"));
@@ -215,6 +210,9 @@ fn qualified_witness(attempt: &Attempt, case: &Case) -> bool {
             && w.spans == case.expected_spans
             && w.functions == case.expected_functions
             && w.pending == 0
-            && w.losses.values().all(|n| *n == 0)
+            && !w.losses.is_empty()
+            && w.losses
+                .iter()
+                .all(|(name, count)| !name.trim().is_empty() && *count == 0)
     })
 }

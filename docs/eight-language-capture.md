@@ -11,7 +11,7 @@ make capture-otelc PYTHON=../otelc/.venv/bin/python \
   OTELC_ROOT=../otelc REPORT_DIR=/tmp/oteleq-all-language-evidence
 ```
 
-The report directory must be new and outside both repositories. The default is all eight languages. To qualify one language, add `CAPTURE_ARGS="--language cpp"`; multiple `--language` arguments select a subset. Do not describe a subset run as an all-language pass.
+The report directory must be new and outside both repositories. TMPDIR must also resolve outside both repositories; an unsafe location is rejected before creating reports. The default is all eight languages. To qualify one language, add `CAPTURE_ARGS="--language cpp"`; multiple `--language` arguments select a subset. Do not describe a subset run as an all-language pass.
 
 If the default tools are unsuitable, set `OTELC_NODE`, `OTELC_JAVA`, `OTELC_GO` or `OTELC_RUSTC` to qualified executables before running. C/C++ use otelc's matched LLVM metadata, not an unrelated compiler on PATH. The current native manifest is qualified on macOS ARM64/LLVM 22; it fingerprints the macOS pass library. It does not establish Linux or Windows qualification.
 
@@ -19,9 +19,9 @@ The [independent fixture manifest](../examples/otelc-workloads.json) declares ex
 
 ## Evidence and failure behaviour
 
-Each language directory retains `bundle.json`, `comparison.json`, concrete corpus, source/policy and adapter/tool content identities. Attempt directories retain exact stdout/stderr bytes, build logs where applicable, launch commands, runtime reports and received OTLP protobuf bytes. The decoder validates service/scope identity, nonzero unique IDs, parent presence, acyclic local trees, exact function/root/error counts and complete zero-loss runtime/export status. A child may finish after its parent; causality does not require timestamp containment.
+Each language directory retains `bundle.json`, `comparison.json`, concrete corpus, source/policy and adapter/tool content identities. Attempt directories retain exact stdout/stderr bytes, build logs where applicable, launch commands, runtime reports, received OTLP protobuf bytes and HTTP capture manifests, including failures. The decoder validates service/scope identity, nonzero unique IDs, parent presence, acyclic local trees, exact function/root/error counts and complete zero-loss runtime/export status. A child may finish after its parent; causality does not require timestamp containment.
 
-All target source/configuration remains unchanged. Generated copies and reports are outside the target repository. SDK/adapter inputs and selected tool executables are re-enumerated and hashed before and after each execution, including added or removed dependency code. Private build temporary directories sit outside the copied project to avoid recursively mirroring compiler scratch directories. Ambient telemetry headers, agents and compiler wrappers are not inherited.
+All target source/configuration remains unchanged. Generated copies and reports are outside the target repository. Observer code, SDK/adapter inputs and selected tool executables are re-enumerated and hashed before and after each execution, including added or removed dependency code. Private build temporary directories sit outside the copied project to avoid recursively mirroring compiler scratch directories. Ambient telemetry headers, agents and compiler wrappers are not inherited.
 
 Any failed build, missing report, unexpected telemetry, timeout or changed artefact aborts capture and retains partial evidence. The failing language cannot acquire a complete bundle or successful comparison. Already completed language reports remain available; languages after the failure have not been qualified. Reuse a new report directory for the next attempt.
 
@@ -40,4 +40,4 @@ make observer-check
 make check
 ```
 
-The new capture modules each enforce at least 80% line coverage independently of the Rust comparator's 80% gate. Regression tests cover corrupted IDs/parents, late children, wrong service/scope/function counts, missing/unfinished exports, losses, changed/added/missing adapter inputs, ambient configuration isolation, byte preservation, bounded/truncated OTLP requests, source preservation and real private subprocess capture.
+The new capture modules each enforce at least 80% line coverage independently of the Rust comparator's 80% gate. Regression tests cover corrupted IDs/parents, late children, wrong service/scope/function counts, missing/unfinished exports, losses, changed/added/missing adapter inputs, ambient configuration isolation, byte preservation, bounded/truncated OTLP requests, duplicate JSON keys, ambiguous HTTP framing and malformed runtime counters, source preservation and real private subprocess capture.

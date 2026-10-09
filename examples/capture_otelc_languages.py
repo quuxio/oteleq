@@ -36,12 +36,15 @@ def attempt(root, spec, language, destination, lane, repeat, originals, tools, i
             raise ValueError("private source or policy changed during execution")
         if (root / spec["source"]).read_bytes() != originals["source"] or (root / spec["policy"]).read_bytes() != originals["policy"]:
             raise ValueError("original source or policy changed during execution")
-        if errors:
-            raise ValueError("OTLP capture failed: " + "; ".join(errors))
         for channel in ("stdout", "stderr"):
             (folder / channel).write_bytes(getattr(result, channel))
         for index, (path, body) in enumerate(bodies):
             (folder / f"otlp-{index}.protobuf").write_bytes(body)
+        (folder / "http-capture.json").write_text(json.dumps({
+            "errors": errors, "bodies": [{"path": path, "file": f"otlp-{index}.protobuf"}
+                                         for index, (path, _) in enumerate(bodies)]}, indent=2) + "\n")
+        if errors:
+            raise ValueError("OTLP capture failed: " + "; ".join(errors))
         observed = {"source_sha256_before": capture.digest(originals["source"]),
                     "source_sha256_after": capture.file_digest(source),
                     "termination": {"kind": "exit", "code": result.returncode} if result.returncode >= 0
@@ -51,7 +54,7 @@ def attempt(root, spec, language, destination, lane, repeat, originals, tools, i
         if lane == "instrumented_on":
             if not report_path.is_file():
                 raise ValueError(f"runtime report missing; inspect {folder / 'stderr'}")
-            report = json.loads(report_path.read_text())
+            report = capture.strict_json(report_path.read_text())
             (folder / "runtime.json").write_text(json.dumps(report, indent=2) + "\n")
             observed["witness"] = capture.witness(bodies, report, spec, service, decoder)
         elif bodies:
@@ -75,7 +78,7 @@ def run(root, destination, language, spec, decoder):
     scope = {"language": language, "artefact_class": "diagnostic", "source_sha256": source_hash,
              "baseline_artefact_sha256": capture.digest(json.dumps({"source": source_hash, "tools": {k: str(v) for k, v in tools.items()}, "identities": identities}, sort_keys=True).encode()),
              "instrumented_artefact_sha256": capture.digest(json.dumps(identities, sort_keys=True).encode()),
-             "policy_sha256": capture.digest(originals["policy"]), "observer": "oteleq eight-language diagnostic observer v1",
+             "policy_sha256": capture.digest(originals["policy"]), "observer": "oteleq eight-language diagnostic observer v2; hashes in artefacts.json",
              "channels": ["stdout", "stderr"],
              "gaps": ["fixed trusted workload; no function discovery or generated inputs",
                       "no typed receiver/global/argument, filesystem or network state comparison",
@@ -104,6 +107,9 @@ def main():
     destination = args.report_dir.resolve()
     if any(destination.is_relative_to(p) for p in (root, Path(__file__).resolve().parents[1])):
         parser.error("report directory must be outside both repositories")
+    temporary_parent = Path(tempfile.gettempdir()).resolve()
+    if any(temporary_parent.is_relative_to(p) for p in (root, Path(__file__).resolve().parents[1])):
+        parser.error("temporary directory must be outside both repositories; correct TMPDIR")
     comparator = args.comparator.resolve(strict=True)
     # The locked otelc Python environment supplies the protobuf decoder.
     from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceRequest

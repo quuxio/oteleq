@@ -31,9 +31,11 @@ oteleq aims to generate tests that compare application behaviour with and withou
 
 The result is **equivalence over these tests and observations**. It is not a blanket proof that every function is identical.
 
-Tests are generated in a separate transient directory. Users can retain them or choose to incorporate them into their application repository, using a framework that may differ from the application's existing tests.
+The planned application generates tests in a separate transient directory. Users can retain them or choose to incorporate them into their application repository, using a framework that may differ from the application's existing tests.
 
 **Status: the Rust workload comparator and diagnostic otelc capture integrations for all eight languages are implemented; full language adapters and automatic test generation remain planned.** Start with [comparing all eight languages](docs/eight-language-capture.md) or [the comparator and Python task example](docs/workload-comparison.md). Read the [design](docs/design.md), [language plan](docs/languages.md) and [delivery roadmap](docs/roadmap.md), or start with the [documentation index](docs/README.md).
+
+Today, oteleq is useful for instrumentation regression checks over independently captured, repeatable workloads. The bundled observer covers one Python example. Global and instance mutations require explicit captured channels; automatic state inspection and qualification of shipping artefacts are still planned. See [usefulness and adoption priorities](docs/adoption.md).
 
 ## Usage
 
