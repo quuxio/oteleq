@@ -412,6 +412,10 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(bundle["scope"]["artefact_class"],"diagnostic")
         self.assertEqual(len(bundle["cases"][0]["baseline"]),2)
         self.assertIn("state-and-outcome",bundle["scope"]["channels"])
+        data["artefacts"]["python"]["tool:python"]="changed executable content at the same path"
+        with patch.object(gen,"attempt",return_value=attempt),patch.object(gen,"execute",return_value=subprocess.CompletedProcess([],1,b'{"verdict":"different_observed"}',b"")):
+            gen.compare_case(self.workspace,data,entry,case,destination,None)
+        self.assertNotEqual(bundle["scope"]["baseline_artefact_sha256"],gen.read(destination/"bundle.json")["scope"]["baseline_artefact_sha256"])
         with patch.object(gen.capture,"stable"),patch.object(gen.capture,"commands",side_effect=lambda root,project,lang,driver,*rest:([sys.executable,driver],[sys.executable,driver])),patch.object(gen,"MAX_CHANNEL_BYTES",1):
             with self.assertRaisesRegex(ValueError,"channel budget"):
                 gen.attempt(self.workspace,data,entry,case,"baseline",self.base/"overflow",None)

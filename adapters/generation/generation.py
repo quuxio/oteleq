@@ -25,6 +25,7 @@ MAX_CHANNEL_BYTES = 256 * 1024
 OWNED_MARKER = '.oteleq-owned.json'
 PLAN_FILE = 'plan.json'
 GENERATED_MANIFEST = 'generated-manifest.json'
+BUILD_IDENTITIES = 'build-identities.json'
 README_FILE = 'README.txt'
 COMMANDS = ("plan", "generate", "run", "replay", "clean", "export-tests")
 
@@ -418,7 +419,7 @@ def native_command(prefix, project, language, driver, tools, env, folder, scratc
     result = execute(command, project, env, folder / "build")
     if result.returncode:
         raise ValueError("generated native build failed; inspect build/stderr")
-    write(folder / "build-identities.json", {"application": capture.file_digest(output)})
+    write(folder / BUILD_IDENTITIES, {"application": capture.file_digest(output)})
     return [output] if lane == "baseline" else prefix + ["run", output]
 
 
@@ -429,8 +430,8 @@ def validate_private_sources(project, immutable, folder):
     for candidate in project.rglob("*"):
         if candidate.is_symlink() or (candidate.suffix in discovery.LANGUAGES and candidate.relative_to(project).as_posix() not in immutable):
             raise ValueError("unexpected source or symlink appeared in the private project")
-    if not (folder / "build-identities.json").exists():
-        write(folder / "build-identities.json", {name: capture.file_digest(project / name)
+    if not (folder / BUILD_IDENTITIES).exists():
+        write(folder / BUILD_IDENTITIES, {name: capture.file_digest(project / name)
               for name in ("plain", "instrumented") if (project / name).is_file()})
 
 
@@ -488,11 +489,13 @@ def compare_case(workspace, data, entry, case, destination, decoder):
         for repeat in range(2):
             observed[lane].append(attempt(workspace, data, entry, case, lane, destination / f"{lane}-{repeat}", decoder))
     selected = observed["instrumented_on"][0]["witness"]["functions"]
+    diagnostic = {"source": data["source_sha256"], "harness": manifest(workspace / "tests/harnesses" / case["id"]),
+                  "tools": {name: sha for name, sha in data["artefacts"][entry["language"]].items() if name.startswith("tool:")}}
     scope = {"language": entry["language"], "artefact_class": "diagnostic", "source_sha256": data["source_sha256"],
-             "baseline_artefact_sha256": identity(data["tools"][entry["language"]]), "instrumented_artefact_sha256": identity(data["artefacts"][entry["language"]]),
+             "baseline_artefact_sha256": identity(diagnostic), "instrumented_artefact_sha256": identity({**diagnostic, "adapter": data["artefacts"][entry["language"]]}),
              "policy_sha256": capture.digest(policy(entry, "receiver").encode()), "observer": "oteleq scalar generator v1; independently one selected root, recursive span counts observed",
              "channels": ["stdout", "stderr", "state-and-outcome"],
-             "gaps": ["scalar corpus; business preconditions and branch exhaustiveness not established", "diagnostic access/entrypoint helpers; not shipping artefact evidence", "no filesystem/network, imported-module globals, instrumented-off or concurrent-schedule qualification", "exception traceback/stack and Java/C++ extra exception fields are unobserved", "compiler sysroots and OS libraries are outside content identity", "trusted local execution; no hostile-code sandbox"]}
+             "gaps": ["scalar corpus; business preconditions and branch exhaustiveness not established", "diagnostic access/entrypoint helpers; not shipping artefact evidence", "artefact digests aggregate diagnostic inputs and qualified tools/adapters; emitted runtime compiler/loader outputs are outside those digests", "no filesystem/network, imported-module globals, instrumented-off or concurrent-schedule qualification", "exception traceback/stack and Java/C++ extra exception fields are unobserved", "compiler sysroots and OS libraries are outside content identity", "trusted local execution; no hostile-code sandbox"]}
     bundle = {"workload_schema_version": 1, "scope": scope, "cases": [{"case_id": case["id"], "corpus_sha256": identity(case),
               "expected_functions": selected, "expected_spans": sum(selected.values()), **observed}]}
     write(destination / "bundle.json", bundle)
