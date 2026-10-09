@@ -1,0 +1,14 @@
+{
+  "python": {
+    "case_id": "python-executor-context-example",
+    "source": "examples/apps/python_workers_app.py",
+    "policy": "examples/python-worker-context.toml",
+    "functions": {
+      "examples.apps.python_workers_app.root": 4,
+      "examples.apps.python_workers_app.async_root": 1,
+      "examples.apps.python_workers_app.child": 5
+    },
+    "trees": 5,
+    "errors": 1
+  }
+}

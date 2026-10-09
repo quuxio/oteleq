@@ -35,7 +35,7 @@ The planned application generates tests in a separate transient directory. Users
 
 **Status: the Rust workload comparator and diagnostic otelc capture integrations for all eight languages are implemented; full language adapters and automatic test generation remain planned.** Start with [comparing all eight languages](docs/eight-language-capture.md) or [the comparator and Python task example](docs/workload-comparison.md). Read the [design](docs/design.md), [language plan](docs/languages.md) and [delivery roadmap](docs/roadmap.md), or start with the [documentation index](docs/README.md).
 
-Today, oteleq is useful for instrumentation regression checks over independently captured, repeatable workloads. The bundled observers cover fixed otelc examples across all eight languages and a Python task example. Global and instance mutations require explicit captured channels; automatic state inspection and qualification of shipping artefacts are still planned. See [usefulness and adoption priorities](docs/adoption.md).
+Today, oteleq is useful for instrumentation regression checks over independently captured, repeatable workloads. The bundled observers cover fixed otelc examples across all eight languages, a Python task example and a [Python worker corpus](docs/eight-language-capture.md#python-worker-workload). Global and instance mutations require explicit captured channels; automatic state inspection and qualification of shipping artefacts are still planned. See [usefulness and adoption priorities](docs/adoption.md).
 
 ## Usage
 

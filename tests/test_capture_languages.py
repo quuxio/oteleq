@@ -301,6 +301,9 @@ class LanguageArtefactTests(unittest.TestCase):
                     path.write_bytes(b"original")
                 tools = {"tool": root / "tool"}
                 identities = capture.artefacts(root, language, tools)
+                for filename in ("otelc-workloads.json", "otelc-worker-workloads.json"):
+                    self.assertEqual(identities["observer:" + filename],
+                                     capture.file_digest(Path(observer.__file__).with_name(filename)))
                 capture.stable(root, language, tools, identities)
                 changed = root / files[-1]
                 changed.write_bytes(b"rebuilt")
@@ -325,6 +328,40 @@ class LanguageArtefactTests(unittest.TestCase):
 
 
 class PrivateExecutionTests(unittest.TestCase):
+    def test_worker_workload_selects_only_python_and_rejects_unavailable_languages(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "otelc"
+            root.mkdir()
+            comparator = Path(temporary) / "comparator"
+            comparator.write_bytes(b"fake comparator")
+            def run(_root, destination, _language, _spec, _decoder):
+                destination.mkdir()
+            module_name = "opentelemetry.proto.collector.trace.v1.trace_service_pb2"
+            module = NS(ExportTraceServiceRequest=object())
+            argv = ["capture", "--otelc-root", str(root), "--report-dir", str(Path(temporary) / "workers"),
+                    "--comparator", str(comparator), "--workload", "python-workers"]
+            with patch.dict(sys.modules, {module_name: module}), patch.object(observer, "run", side_effect=run) as runner, \
+                 patch.object(observer.subprocess, "run", return_value=NS(returncode=0, stdout=b'equivalent_observed')):
+                with patch.object(sys, "argv", argv):
+                    observer.main()
+                self.assertEqual(runner.call_count, 1)
+                _, _, language, spec, _ = runner.call_args.args
+                self.assertEqual(language, "python")
+                self.assertEqual((spec["case_id"], sum(spec["functions"].values()), spec["trees"], spec["errors"]),
+                                 ("python-executor-context-example", 10, 5, 1))
+            argv[4] = str(Path(temporary) / "unsupported")
+            with patch.object(sys, "argv", argv + ["--language", "java"]), self.assertRaises(SystemExit):
+                observer.main()
+            self.assertFalse((Path(temporary) / "unsupported").exists())
+
+    def test_selected_worker_manifest_rejects_duplicate_json_keys_before_capture(self):
+        argv = ["capture", "--otelc-root", "/unused", "--report-dir", "/unused-report", "--workload", "python-workers"]
+        with patch.object(sys, "argv", argv), patch.object(Path, "read_text", return_value='{"python":{},"python":{}}'), \
+             patch.object(observer, "run") as runner:
+            with self.assertRaisesRegex(ValueError, "duplicate"):
+                observer.main()
+            runner.assert_not_called()
+
     def test_cli_dispatches_all_languages_and_requires_comparison_success(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary) / "otelc"
@@ -382,7 +419,7 @@ class PrivateExecutionTests(unittest.TestCase):
                              "request = urllib.request.Request(endpoint+'/v1/traces', data=b'spans', method='POST')\n"
                              "urllib.request.urlopen(request).close()\n"
                              "Path(os.environ['OTELC_REPORT_PATH']).write_text(" + repr(json.dumps(report())) + ")\n")
-            spec = {"source": "examples/apps/test.py", "policy": "examples/python-traces.toml",
+            spec = {"case_id": "independent-case", "source": "examples/apps/test.py", "policy": "examples/python-traces.toml",
                     "functions": {"selected": 1}, "trees": 1, "errors": 0}
             def commands(_root, _workspace, _language, app, _policy, _tools, _environment, _evidence):
                 return [sys.executable, app], [sys.executable, probe, app]
@@ -402,6 +439,7 @@ class PrivateExecutionTests(unittest.TestCase):
                  patch.object(capture, "environment", side_effect=environment):
                 observer.run(root, destination, "python", spec, dynamic_decoder)
                 bundle = json.loads((destination / "bundle.json").read_text())
+                self.assertEqual(bundle["cases"][0]["case_id"], spec["case_id"])
                 self.assertEqual([len(bundle["cases"][0][lane]) for lane in ("baseline", "instrumented_on")], [2, 2])
                 self.assertEqual(bundle["cases"][0]["baseline"][0]["channels"], bundle["cases"][0]["instrumented_on"][0]["channels"])
                 self.assertEqual(source.read_text(), "print('result=42')\n")

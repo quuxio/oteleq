@@ -35,6 +35,22 @@ Build identity describes the diagnostic source, recipe, adapter/SDK inputs and t
 
 The separate [Python task example](workload-comparison.md#use-it-with-otelc-now) qualifies the implemented asyncio propagation fixture. Future task/service/lifetime milestones must add their own independently declared corpus, state/effect channels and expected telemetry. Passing the current function fixtures is insufficient evidence for those features.
 
+## Python worker workload
+
+The executor-context workload uses the same strict observer with an [independent corpus](../examples/otelc-worker-workloads.json):
+
+```sh
+make capture-otelc PYTHON=../otelc/.venv/bin/python \
+  OTELC_ROOT=../otelc REPORT_DIR=/tmp/oteleq-python-workers \
+  CAPTURE_ARGS="--workload python-workers"
+```
+
+This requires otelc's `examples/apps/python_workers_app.py` and `examples/python-worker-context.toml`, introduced in [otelc PR #45](https://github.com/quuxio/otelc/pull/45). The candidate qualified here is commit `750b0cb1ee71051b012df95c2a35155809f787ab`; an older checkout without those fixtures cannot run this workload. Build the launcher and Python adapter from the selected candidate before capturing it.
+
+Two plain and two instrumented attempts compare the standard `ThreadPoolExecutor` and `asyncio.to_thread` fixture. Each instrumented attempt must provide ten spans, five causal trees, one escaping worker error and zero reported losses or pending contexts. All attempts must produce identical stdout/stderr and successful exits; the fixture checks results `11,21,31,41` and original exception identity. The case has its own ID, distinct from the ordinary Python function example. Selecting another language with this workload fails before creating reports.
+
+This qualifies those concrete observations. Direct thread creation, arbitrary executors, other languages' propagation and hidden global/instance state remain outside this corpus. Both fixture manifests join the observer identity, so either changing during capture prevents qualification.
+
 ## Checks
 
 ```sh

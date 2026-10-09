@@ -168,7 +168,7 @@ def artefacts(root, language, tools):
                   and "tests" not in p.relative_to(tree).parts]
     identities = {str(p.relative_to(root)): file_digest(p) for p in paths}
     identities.update({"tool:" + name: file_digest(path) for name, path in tools.items()})
-    for name in ("otelc_capture.py", "capture_otelc_languages.py", "otelc-workloads.json"):
+    for name in ("otelc_capture.py", "capture_otelc_languages.py", "otelc-workloads.json", "otelc-worker-workloads.json"):
         identities["observer:" + name] = file_digest(Path(__file__).with_name(name))
     return identities
 

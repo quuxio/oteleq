@@ -72,7 +72,7 @@ def run(root, destination, language, spec, decoder):
     source_hash = capture.digest(originals["source"])
     corpus = {"language": language, "fixture": spec, "arguments": [], "stdin": "closed",
               "state": "fresh process/private source copy per attempt"}
-    case = {"case_id": language + "-trace-example", "corpus_sha256": capture.digest(json.dumps(corpus, sort_keys=True).encode()),
+    case = {"case_id": spec.get("case_id", language + "-trace-example"), "corpus_sha256": capture.digest(json.dumps(corpus, sort_keys=True).encode()),
             "expected_functions": spec["functions"], "expected_spans": sum(spec["functions"].values()),
             "baseline": [], "instrumented_on": []}
     scope = {"language": language, "artefact_class": "diagnostic", "source_sha256": source_hash,
@@ -100,9 +100,13 @@ def main():
     parser.add_argument("--otelc-root", required=True, type=Path)
     parser.add_argument("--report-dir", required=True, type=Path)
     parser.add_argument("--comparator", type=Path, default=Path(__file__).resolve().parents[1] / "target/debug/quux-oteleq")
-    manifest = capture.strict_json(Path(__file__).with_name("otelc-workloads.json").read_text())
-    parser.add_argument("--language", action="append", choices=list(manifest))
+    parser.add_argument("--workload", choices=("functions", "python-workers"), default="functions")
+    parser.add_argument("--language", action="append", choices=("c", "cpp", "rust", "python", "java", "javascript", "typescript", "go"))
     args = parser.parse_args()
+    filename = "otelc-worker-workloads.json" if args.workload == "python-workers" else "otelc-workloads.json"
+    manifest = capture.strict_json(Path(__file__).with_name(filename).read_text())
+    if any(language not in manifest for language in args.language or []):
+        parser.error("requested language is unavailable for the selected workload")
     root = args.otelc_root.resolve(strict=True)
     destination = args.report_dir.resolve()
     if any(destination.is_relative_to(p) for p in (root, Path(__file__).resolve().parents[1])):
