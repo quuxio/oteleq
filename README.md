@@ -12,7 +12,7 @@
 
 ---
 
-[![Quality Gate Status](https://img.shields.io/badge/quality%20gate-not%20computed-lightgrey)](docs/quality.md)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=quuxio_oteleq&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=quuxio_oteleq)
 [![Bugs](https://sonarcloud.io/api/project_badges/measure?project=quuxio_oteleq&metric=bugs)](https://sonarcloud.io/summary/new_code?id=quuxio_oteleq)
 [![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=quuxio_oteleq&metric=code_smells)](https://sonarcloud.io/summary/new_code?id=quuxio_oteleq)
 [![Coverage](https://img.shields.io/badge/coverage-not%20reported-lightgrey)](docs/quality.md)
@@ -51,7 +51,7 @@ cargo build --locked
 ./target/debug/quux-oteleq --help
 ./target/debug/quux-oteleq compare-workload /path/to/bundle.json > /path/to/comparison.json
 python3 -m venv .venv
-.venv/bin/python -m pip install coverage==7.16.2
+.venv/bin/python -m pip install --only-binary=:all: coverage==7.16.2
 make check PYTHON=.venv/bin/python
 ```
 
