@@ -100,11 +100,14 @@ def main():
     parser.add_argument("--otelc-root", required=True, type=Path)
     parser.add_argument("--report-dir", required=True, type=Path)
     parser.add_argument("--comparator", type=Path, default=Path(__file__).resolve().parents[1] / "target/debug/quux-oteleq")
-    parser.add_argument("--workload", choices=("functions", "python-workers"), default="functions")
+    parser.add_argument("--workload", choices=("functions", "python-workers", "java-workers"), default="functions")
     parser.add_argument("--language", action="append", choices=("c", "cpp", "rust", "python", "java", "javascript", "typescript", "go"))
     args = parser.parse_args()
-    filename = "otelc-worker-workloads.json" if args.workload == "python-workers" else "otelc-workloads.json"
+    filename = "otelc-workloads.json" if args.workload == "functions" else "otelc-worker-workloads.json"
     manifest = capture.strict_json(Path(__file__).with_name(filename).read_text())
+    if args.workload != "functions":
+        selected = args.workload.split("-")[0]
+        manifest = {selected: manifest[selected]}
     if any(language not in manifest for language in args.language or []):
         parser.error("requested language is unavailable for the selected workload")
     root = args.otelc_root.resolve(strict=True)

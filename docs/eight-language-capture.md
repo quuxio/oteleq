@@ -15,7 +15,7 @@ The report directory must be new and outside both repositories. TMPDIR must also
 
 If the default tools are unsuitable, set `OTELC_NODE`, `OTELC_JAVA`, `OTELC_GO` or `OTELC_RUSTC` to qualified executables before running. C/C++ select LLVM 22 from `/opt/homebrew/opt/llvm@22/bin` on macOS or `/usr/lib/llvm-22/bin` elsewhere; override with `OTELC_CLANG` and `OTELC_CLANGXX`. The selected compiler directory must match otelc's metadata. Metadata cannot redirect the executable. The Rust SDK must be built with the same compiler distribution as the selected `rustc`; matching the version number alone does not establish compatibility. The Node Promise observer must match the selected Node version and module ABI. The current native manifest is qualified on macOS ARM64/LLVM 22; it fingerprints the macOS pass library. It does not establish Linux or Windows qualification.
 
-The [independent fixture manifest](../examples/otelc-workloads.json) declares exact function counts, trace roots and escaping-error spans. C++ includes constructor/destructor ABI bodies and exceptions; these are function spans, not complete object lifetimes. Rust/Python/Node fixtures cover their qualified async/error boundaries. Java includes a virtual thread and failed constructor. Go includes goroutines and panic/recover. Generated baseline/instrumented native builds use equivalent flags and retain exceptions.
+The [independent fixture manifest](../examples/otelc-workloads.json) declares exact function counts, trace roots and escaping-error spans. C++ includes constructor/destructor ABI bodies and exceptions; these are function spans, not complete object lifetimes. Rust/Python/Node fixtures cover their qualified async/error boundaries. Java includes a virtual thread and failed constructor. Go includes goroutines and panic/recover. Generated baseline/instrumented native builds use equivalent flags and retain exceptions. Both Java lanes use `-Xshare:off` to align class-data-sharing behaviour when the task bridge is installed.
 
 ## Evidence and failure behaviour
 
@@ -50,6 +50,20 @@ This requires otelc's `examples/apps/python_workers_app.py` and `examples/python
 Two plain and two instrumented attempts compare the standard `ThreadPoolExecutor` and `asyncio.to_thread` fixture. Each instrumented attempt must provide ten spans, five causal trees, one escaping worker error and zero reported losses or pending contexts. All attempts must produce identical stdout/stderr and successful exits; the fixture checks results `11,21,31,41` and original exception identity. The case has its own ID, distinct from the ordinary Python function example. Selecting another language with this workload fails before creating reports.
 
 This qualifies those concrete observations. Direct thread creation, arbitrary executors, other languages' propagation and hidden global/instance state remain outside this corpus. Both fixture manifests join the observer identity, so either changing during capture prevents qualification.
+
+## Java worker workload
+
+The Java platform executor corpus uses the same independent observer:
+
+```sh
+make capture-otelc PYTHON=../otelc/.venv/bin/python \
+  OTELC_ROOT=../otelc REPORT_DIR=/tmp/oteleq-java-workers \
+  CAPTURE_ARGS="--workload java-workers"
+```
+
+This requires `JavaWorkerApp.java` and `java-worker-context.toml` from [otelc PR #46](https://github.com/quuxio/otelc/pull/46). The exact qualified otelc head is `6bfbb1441cfa3f2b1b861d665ef6a04fb49c4f45`. Two baseline and two instrumented JVMs use matching `-Xshare:off`; original source/policy/CLI/agent identities must remain unchanged. Each instrumented attempt independently requires five `JavaWorkerApp.root(java.util.concurrent.ThreadPoolExecutor,int)` spans, three `JavaWorkerApp.child(int)` spans, five complete roots and two escaping errors, with no losses or pending contexts.
+
+All four attempts must produce exactly `results=11,21; original-error=true; cancelled=true; future-identity=true; rejection-identity=true` plus newline and empty stderr. The fixture checks original FutureTask, worker exception and rejection identity, results and queued cancellation. Running cancellation and shutdown edge cases have separate otelc tests; this corpus does not claim to exercise every executor or schedule. Choosing `python-workers` still selects Python only, and choosing `java-workers` selects Java only; unavailable language requests fail before capture.
 
 ## Checks
 

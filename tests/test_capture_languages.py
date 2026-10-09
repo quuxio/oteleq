@@ -281,6 +281,9 @@ class CaptureBoundaryTests(unittest.TestCase):
                 plain, on = capture.commands(root, workspace, language, source, policy, tools, {}, workspace)
                 self.assertEqual(on[-1], source)
                 self.assertIn(str(source), [str(p) for p in plain] if language != "rust" else [str(source)])
+                if language == "java":
+                    self.assertEqual(plain[1], "-Xshare:off")
+                    self.assertEqual(on[-2], "-Xshare:off")
 
     def test_rustup_locations_are_preserved_without_a_compiler_wrapper(self):
         with patch.dict(os.environ, {"RUSTUP_HOME": "/qualified/rustup", "CARGO_HOME": "/qualified/cargo"}):
@@ -342,7 +345,9 @@ class LanguageArtefactTests(unittest.TestCase):
 
 
 class PrivateExecutionTests(unittest.TestCase):
-    def test_worker_workload_selects_only_python_and_rejects_unavailable_languages(self):
+    def test_worker_workloads_select_only_requested_language_and_reject_unavailable_languages(self):
+        expectations = {"python": ("python-executor-context-example", 10, 5, 1),
+                        "java": ("java-executor-context-example", 8, 5, 2)}
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary) / "otelc"
             root.mkdir()
@@ -352,21 +357,22 @@ class PrivateExecutionTests(unittest.TestCase):
                 destination.mkdir()
             module_name = "opentelemetry.proto.collector.trace.v1.trace_service_pb2"
             module = NS(ExportTraceServiceRequest=object())
-            argv = ["capture", "--otelc-root", str(root), "--report-dir", str(Path(temporary) / "workers"),
-                    "--comparator", str(comparator), "--workload", "python-workers"]
-            with patch.dict(sys.modules, {module_name: module}), patch.object(observer, "run", side_effect=run) as runner, \
-                 patch.object(observer.subprocess, "run", return_value=NS(returncode=0, stdout=b'equivalent_observed')):
-                with patch.object(sys, "argv", argv):
+            for selected, expected in expectations.items():
+                argv = ["capture", "--otelc-root", str(root), "--report-dir", str(Path(temporary) / selected),
+                        "--comparator", str(comparator), "--workload", selected + "-workers"]
+                with patch.dict(sys.modules, {module_name: module}), patch.object(observer, "run", side_effect=run) as runner, \
+                     patch.object(observer.subprocess, "run", return_value=NS(returncode=0, stdout=b'equivalent_observed')):
+                    with patch.object(sys, "argv", argv):
+                        observer.main()
+                    self.assertEqual(runner.call_count, 1)
+                    _, _, language, spec, _ = runner.call_args.args
+                    self.assertEqual(language, selected)
+                    self.assertEqual((spec["case_id"], sum(spec["functions"].values()), spec["trees"], spec["errors"]), expected)
+                unavailable = "java" if selected == "python" else "python"
+                argv[4] = str(Path(temporary) / ("unsupported-" + selected))
+                with patch.object(sys, "argv", argv + ["--language", unavailable]), self.assertRaises(SystemExit):
                     observer.main()
-                self.assertEqual(runner.call_count, 1)
-                _, _, language, spec, _ = runner.call_args.args
-                self.assertEqual(language, "python")
-                self.assertEqual((spec["case_id"], sum(spec["functions"].values()), spec["trees"], spec["errors"]),
-                                 ("python-executor-context-example", 10, 5, 1))
-            argv[4] = str(Path(temporary) / "unsupported")
-            with patch.object(sys, "argv", argv + ["--language", "java"]), self.assertRaises(SystemExit):
-                observer.main()
-            self.assertFalse((Path(temporary) / "unsupported").exists())
+                self.assertFalse(Path(argv[4]).exists())
 
     def test_selected_worker_manifest_rejects_duplicate_json_keys_before_capture(self):
         argv = ["capture", "--otelc-root", "/unused", "--report-dir", "/unused-report", "--workload", "python-workers"]
