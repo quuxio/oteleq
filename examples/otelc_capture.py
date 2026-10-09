@@ -382,8 +382,8 @@ def selected_tools(root, language):
         # Metadata qualifies an explicitly selected compiler; it cannot select code to execute.
         directory = "/opt/homebrew/opt/llvm@22/bin" if sys.platform == "darwin" else "/usr/lib/llvm-22/bin"
         selected = tool_path(os.environ.get(variable, directory + "/" + compiler))
-        configured = Path(llvm["bindir"])
-        if not configured.is_absolute() or selected.parent.resolve() != configured.resolve():
+        configured = llvm["bindir"]
+        if not isinstance(configured, str) or str(selected.parent.resolve()) != configured:
             raise ValueError("selected compiler does not match otelc LLVM metadata; set " + variable)
         return {compiler: selected}
     if language == "rust":
