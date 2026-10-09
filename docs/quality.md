@@ -9,7 +9,7 @@ Install the locked documentation tools and run:
 ```sh
 make setup
 python3 -m venv .venv
-.venv/bin/python -m pip install coverage==7.16.2
+.venv/bin/python -m pip install --only-binary=:all: coverage==7.16.2
 make check PYTHON=.venv/bin/python
 ```
 
@@ -19,7 +19,9 @@ The validation dependencies follow otelc's locked Markdown tooling. `npm ci` dis
 
 The README uses the quux brand mark, centred header, concise aim, blue CI/status/licence badges, separator lines and the full usual quality badge set from otelc: quality gate, bugs, code smells, coverage, duplication, lines of code, reliability, security, technical debt, maintainability and vulnerabilities.
 
-All quality-analysis badges currently say **not analysed** and link here. They are explicit design-stage status badges, not SonarQube measurements. A SonarQube project or application quality gate is not provisioned by this design delivery. Replace them with real project badge endpoints only after analysis is configured and its scope is documented. The status badge says **initial comparator**. Quality-analysis badges remain **not analysed**; the Rust coverage gate is not a SonarQube measurement.
+SonarCloud automatic analysis is active for [`quuxio_oteleq`](https://sonarcloud.io/summary/new_code?id=quuxio_oteleq). The verified main analysis on 9 October 2026 indexed Python and YAML. Supported measures use live project badge endpoints. The main quality gate is **not computed**, and automatic analysis does not ingest our Rust/Python coverage reports, so the coverage badge says **not reported**. These are separate from the required CI coverage gates; a PR quality-gate pass does not establish whole-product coverage or behavioural equivalence. The status badge says **initial comparator**.
+
+The review fixed the CI dependency-install finding by requiring a wheel for the pinned coverage tool, and simplified the reported validation/test complexity. SonarCloud also flags `pythonsecurity:S6350` on the diagnostic runner's command execution. This is intended execution of explicitly selected trusted local artefacts: commands are built as argument lists, source/output paths are absolute, and no shell is used. Content identities and private copies qualify this diagnostic comparison; they do not contain malicious application code. Untrusted repositories and tools remain outside the runner's qualification. This assessment is recorded in the PR review; the scanner finding remains visible pending SonarCloud maintainer triage. It has not been suppressed or represented as independent approval.
 
 ## Traffic badge
 

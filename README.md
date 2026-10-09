@@ -12,17 +12,17 @@
 
 ---
 
-[![Quality Gate Status](https://img.shields.io/badge/quality%20gate-not%20analysed-lightgrey)](docs/quality.md)
-[![Bugs](https://img.shields.io/badge/bugs-not%20analysed-lightgrey)](docs/quality.md)
-[![Code Smells](https://img.shields.io/badge/code%20smells-not%20analysed-lightgrey)](docs/quality.md)
-[![Coverage](https://img.shields.io/badge/coverage-not%20analysed-lightgrey)](docs/quality.md)
-[![Duplicated Lines (%)](https://img.shields.io/badge/duplication-not%20analysed-lightgrey)](docs/quality.md)
-[![Lines of Code](https://img.shields.io/badge/lines%20of%20code-not%20analysed-lightgrey)](docs/quality.md)
-[![Reliability Rating](https://img.shields.io/badge/reliability-not%20analysed-lightgrey)](docs/quality.md)
-[![Security Rating](https://img.shields.io/badge/security-not%20analysed-lightgrey)](docs/quality.md)
-[![Technical Debt](https://img.shields.io/badge/technical%20debt-not%20analysed-lightgrey)](docs/quality.md)
-[![Maintainability Rating](https://img.shields.io/badge/maintainability-not%20analysed-lightgrey)](docs/quality.md)
-[![Vulnerabilities](https://img.shields.io/badge/vulnerabilities-not%20analysed-lightgrey)](docs/quality.md)
+[![Quality Gate Status](https://img.shields.io/badge/quality%20gate-not%20computed-lightgrey)](docs/quality.md)
+[![Bugs](https://sonarcloud.io/api/project_badges/measure?project=quuxio_oteleq&metric=bugs)](https://sonarcloud.io/summary/new_code?id=quuxio_oteleq)
+[![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=quuxio_oteleq&metric=code_smells)](https://sonarcloud.io/summary/new_code?id=quuxio_oteleq)
+[![Coverage](https://img.shields.io/badge/coverage-not%20reported-lightgrey)](docs/quality.md)
+[![Duplicated Lines (%)](https://sonarcloud.io/api/project_badges/measure?project=quuxio_oteleq&metric=duplicated_lines_density)](https://sonarcloud.io/summary/new_code?id=quuxio_oteleq)
+[![Lines of Code](https://sonarcloud.io/api/project_badges/measure?project=quuxio_oteleq&metric=ncloc)](https://sonarcloud.io/summary/new_code?id=quuxio_oteleq)
+[![Reliability Rating](https://sonarcloud.io/api/project_badges/measure?project=quuxio_oteleq&metric=reliability_rating)](https://sonarcloud.io/summary/new_code?id=quuxio_oteleq)
+[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=quuxio_oteleq&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=quuxio_oteleq)
+[![Technical Debt](https://sonarcloud.io/api/project_badges/measure?project=quuxio_oteleq&metric=sqale_index)](https://sonarcloud.io/summary/new_code?id=quuxio_oteleq)
+[![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=quuxio_oteleq&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=quuxio_oteleq)
+[![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=quuxio_oteleq&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=quuxio_oteleq)
 [![Repo Traffic](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fquuxio%2Foteleq%2Fmain%2F.badges%2Ftraffic.json&cacheSeconds=3600)](https://github.com/quuxio/oteleq)
 
 ---
@@ -35,7 +35,7 @@ The planned application generates tests in a separate transient directory. Users
 
 **Status: the Rust workload comparator and diagnostic otelc capture integrations for all eight languages are implemented; full language adapters and automatic test generation remain planned.** Start with [comparing all eight languages](docs/eight-language-capture.md) or [the comparator and Python task example](docs/workload-comparison.md). Read the [design](docs/design.md), [language plan](docs/languages.md) and [delivery roadmap](docs/roadmap.md), or start with the [documentation index](docs/README.md).
 
-Today, oteleq is useful for instrumentation regression checks over independently captured, repeatable workloads. The bundled observer covers one Python example. Global and instance mutations require explicit captured channels; automatic state inspection and qualification of shipping artefacts are still planned. See [usefulness and adoption priorities](docs/adoption.md).
+Today, oteleq is useful for instrumentation regression checks over independently captured, repeatable workloads. The bundled observers cover fixed otelc examples across all eight languages and a Python task example. Global and instance mutations require explicit captured channels; automatic state inspection and qualification of shipping artefacts are still planned. See [usefulness and adoption priorities](docs/adoption.md).
 
 ## Usage
 
