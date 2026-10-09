@@ -367,7 +367,8 @@ class PrivateExecutionTests(unittest.TestCase):
                     self.assertEqual(runner.call_count, 1)
                     _, _, language, spec, _ = runner.call_args.args
                     self.assertEqual(language, selected)
-                    self.assertEqual((spec["case_id"], sum(spec["functions"].values()), spec["trees"], spec["errors"]), expected)
+                    observed = (spec["case_id"], sum(spec["functions"].values()), spec["trees"], spec["errors"])
+                    self.assertEqual(observed, expected)
                 unavailable = "java" if selected == "python" else "python"
                 argv[4] = str(Path(temporary) / ("unsupported-" + selected))
                 with patch.object(sys, "argv", argv + ["--language", unavailable]), self.assertRaises(SystemExit):
