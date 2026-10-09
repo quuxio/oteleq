@@ -47,6 +47,12 @@ fn rust_inventory_keeps_nested_methods_closures_macros_and_generics_as_gaps() {
 #[test]
 fn cli_embeds_generation_workers_and_exposes_subcommand_help() {
     let exe = env!("CARGO_BIN_EXE_quux-oteleq");
+    let overview = Command::new(exe).arg("--help").output().unwrap();
+    assert!(overview.status.success());
+    let overview = String::from_utf8(overview.stdout).unwrap();
+    assert!(overview.contains("Comparator exits: 0 equivalent"));
+    assert!(overview.contains("Generation exits: 0 complete"));
+    assert!(overview.contains("4 tool/build/identity error"));
     let help = Command::new(exe).args(["plan", "--help"]).output().unwrap();
     assert!(
         help.status.success(),
