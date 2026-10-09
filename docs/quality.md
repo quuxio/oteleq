@@ -25,11 +25,15 @@ The review fixed the CI dependency-install finding by requiring a wheel for the 
 
 ## Traffic badge
 
-The traffic workflow updates `.badges/traffic.json` from GitHub's authenticated repository views endpoint hourly and on manual dispatch. It runs only on `main` in `quuxio/oteleq`. Counts cover GitHub's rolling 14-day window; failed API reads fail the workflow and cannot publish a zero-value substitute.
+The traffic workflow runs from `main` in `quuxio/oteleq`, but checks out and updates `.badges/traffic.json` on the separate `traffic-badges` branch hourly and on manual dispatch. The README reads that branch's badge data. This keeps generated traffic commits outside protected application source. Counts cover GitHub's rolling 14-day window; failed API reads fail the workflow and cannot publish a zero-value substitute.
 
 `TRAFFIC_TOKEN` stores the saved quuxio credential, explicitly authorised for persistence in this repository's Actions secrets on 8 October 2026. It is exposed only to the traffic-read step in this workflow. The badge commit uses the separate automatic `GITHUB_TOKEN` with `contents: write`. Actions are pinned to a full commit, and traffic maintenance commits do not rerun documentation CI.
 
 This credential retains its original GitHub permissions; storing it as `TRAFFIC_TOKEN` does not narrow those permissions. Its value is absent from source, badge output and workflow logs. Traffic counts are unrelated to product adoption or behavioural equivalence.
+
+## Main branch protection
+
+The active `Protect main` repository ruleset blocks deletion and force pushes, requires pull requests, and requires current passing documentation/design, Rust comparator/coverage and SonarCloud checks from their configured GitHub Apps. There are no bypass actors. Pull requests must be up to date with main before merging; no second human approval is required for this personal repository. The separate `traffic-badges` data branch allows the existing badge updater to publish without bypassing main protection.
 
 ## Implementation quality
 

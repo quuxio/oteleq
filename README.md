@@ -23,7 +23,7 @@
 [![Technical Debt](https://sonarcloud.io/api/project_badges/measure?project=quuxio_oteleq&metric=sqale_index)](https://sonarcloud.io/summary/new_code?id=quuxio_oteleq)
 [![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=quuxio_oteleq&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=quuxio_oteleq)
 [![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=quuxio_oteleq&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=quuxio_oteleq)
-[![Repo Traffic](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fquuxio%2Foteleq%2Fmain%2F.badges%2Ftraffic.json&cacheSeconds=3600)](https://github.com/quuxio/oteleq)
+[![Repo Traffic](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fquuxio%2Foteleq%2Ftraffic-badges%2F.badges%2Ftraffic.json&cacheSeconds=3600)](https://github.com/quuxio/oteleq)
 
 ---
 
