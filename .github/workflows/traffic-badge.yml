@@ -19,6 +19,8 @@ jobs:
     if: github.repository_owner == 'quuxio' && github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          ref: traffic-badges
       - name: Fetch repository traffic
         env:
           GH_TOKEN: ${{ secrets.TRAFFIC_TOKEN }}
@@ -52,4 +54,4 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add .badges/traffic.json
           git commit -m 'chore: update traffic badge'
-          git push
+          git push origin HEAD:traffic-badges
