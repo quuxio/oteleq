@@ -12,7 +12,7 @@
 
 ---
 
-[![Quality Gate Status](https://img.shields.io/badge/quality%20gate-not%20computed-lightgrey)](docs/quality.md)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=quuxio_oteleq&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=quuxio_oteleq)
 [![Bugs](https://sonarcloud.io/api/project_badges/measure?project=quuxio_oteleq&metric=bugs)](https://sonarcloud.io/summary/new_code?id=quuxio_oteleq)
 [![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=quuxio_oteleq&metric=code_smells)](https://sonarcloud.io/summary/new_code?id=quuxio_oteleq)
 [![Coverage](https://img.shields.io/badge/coverage-not%20reported-lightgrey)](docs/quality.md)
@@ -35,7 +35,7 @@ The planned application generates tests in a separate transient directory. Users
 
 **Status: the Rust workload comparator and diagnostic otelc capture integrations for all eight languages are implemented; full language adapters and automatic test generation remain planned.** Start with [comparing all eight languages](docs/eight-language-capture.md) or [the comparator and Python task example](docs/workload-comparison.md). Read the [design](docs/design.md), [language plan](docs/languages.md) and [delivery roadmap](docs/roadmap.md), or start with the [documentation index](docs/README.md).
 
-Today, oteleq is useful for instrumentation regression checks over independently captured, repeatable workloads. The bundled observers cover fixed otelc examples across all eight languages and a Python task example. Global and instance mutations require explicit captured channels; automatic state inspection and qualification of shipping artefacts are still planned. See [usefulness and adoption priorities](docs/adoption.md).
+Today, oteleq is useful for instrumentation regression checks over independently captured, repeatable workloads. The bundled observers cover fixed otelc examples across all eight languages, a Python task example and a [Python worker corpus](docs/eight-language-capture.md#python-worker-workload). Global and instance mutations require explicit captured channels; automatic state inspection and qualification of shipping artefacts are still planned. See [usefulness and adoption priorities](docs/adoption.md).
 
 ## Usage
 
@@ -51,7 +51,7 @@ cargo build --locked
 ./target/debug/quux-oteleq --help
 ./target/debug/quux-oteleq compare-workload /path/to/bundle.json > /path/to/comparison.json
 python3 -m venv .venv
-.venv/bin/python -m pip install coverage==7.16.2
+.venv/bin/python -m pip install --only-binary=:all: coverage==7.16.2
 make check PYTHON=.venv/bin/python
 ```
 
