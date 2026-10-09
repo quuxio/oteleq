@@ -208,10 +208,13 @@ def commands(root, workspace, language, source, policy, tools, environment, evid
     plain = [interpreter, source]
     if language == "go":
         plain = [interpreter, "run", source]
+    elif language == "java":
+        plain = [interpreter, "-Xshare:off", source]
     elif language == "typescript":
         plain = [interpreter, "--import", root / "adapters/node/plain.mjs", source]
     adapter = {"javascript": "node", "typescript": "ts"}.get(language, language)
-    return plain, prefix + [adapter, source]
+    arguments = ["-Xshare:off", source] if language == "java" else [source]
+    return plain, prefix + [adapter, *arguments]
 
 
 @contextmanager

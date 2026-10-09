@@ -1,4 +1,15 @@
 {
+  "java": {
+    "case_id": "java-executor-context-example",
+    "source": "examples/apps/JavaWorkerApp.java",
+    "policy": "examples/java-worker-context.toml",
+    "functions": {
+      "JavaWorkerApp.root(java.util.concurrent.ThreadPoolExecutor,int)": 5,
+      "JavaWorkerApp.child(int)": 3
+    },
+    "trees": 5,
+    "errors": 2
+  },
   "python": {
     "case_id": "python-executor-context-example",
     "source": "examples/apps/python_workers_app.py",
