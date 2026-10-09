@@ -19,6 +19,9 @@ from otelc_capture import (CaptureServer, loss_diagnostics, require_counters,
                            strict_json, temporary_parent)
 
 
+TASK_SOURCE = Path("examples/apps/python_tasks_app.py")
+
+
 def digest(data):
     return hashlib.sha256(data).hexdigest()
 
@@ -76,7 +79,7 @@ def decode_traces(bodies, decode_request):
 
 
 def capture_attempt(root, lane, attempt_dir, originals, identities, temporary_directory):
-    source = root / "examples/apps/python_tasks_app.py"
+    source = root / TASK_SOURCE
     policy = root / "examples/python-task-context.toml"
     cli = root / "target/debug/quux-otelc"
     checker_root = Path(__file__).resolve().parents[1]
@@ -88,7 +91,7 @@ def capture_attempt(root, lane, attempt_dir, originals, identities, temporary_di
         workspace = Path(temporary).resolve()
         if any(workspace.is_relative_to(path) for path in (root, checker_root)):
             raise ValueError("temporary workspace is inside a source repository")
-        app = workspace / "examples/apps/python_tasks_app.py"
+        app = workspace / TASK_SOURCE
         app.parent.mkdir(parents=True)
         app.write_bytes(originals[source])
         local_policy = workspace / "policy.toml"
@@ -157,7 +160,7 @@ def main():
     except ValueError as error:
         parser.error(str(error))
     destination.mkdir(mode=0o700, parents=False, exist_ok=False)
-    source = root / "examples/apps/python_tasks_app.py"
+    source = root / TASK_SOURCE
     policy = root / "examples/python-task-context.toml"
     originals = {path: path.read_bytes() for path in (source, policy)}
     source_hash = digest(originals[source])
