@@ -5,3 +5,4 @@ build/
 .DS_Store
 *.pyc
 __pycache__/
+.observer.coverage

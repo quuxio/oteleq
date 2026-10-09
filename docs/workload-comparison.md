@@ -30,6 +30,8 @@ In a mixed report, blocked or incomplete evidence takes precedence over differen
 
 ## Use it with otelc now
 
+The [eight-language capture integration](eight-language-capture.md) applies this comparator to actual C, C++, Rust, Python, Java, JavaScript, TypeScript and Go trace examples. It independently checks function counts, causal graphs, zero losses and complete export. The Python task-specific example below supplements those function fixtures with asyncio propagation evidence.
+
 The [task-workload capture example](../examples/capture_otelc_tasks.py) runs the ordinary Python task example twice without instrumentation and twice with the actual otelc launcher. It uses fresh processes, independent private source copies and a local OTLP receiver. Original source and policy are checked for modification. Original repositories receive no generated tests, dependencies or source edits. The Python observer uses otelc's existing locked environment for its OTLP protobuf decoder.
 
 From an oteleq checkout, with the Python task-context milestone built in the sibling otelc checkout:
@@ -52,7 +54,7 @@ The fixed trusted example uses a 30-second subprocess timeout and accepts at mos
 
 Read [the Rust structs](../src/protocol.rs) for the strict initial schema. `scope` declares language, artefact class, source/build/policy SHA-256 identities, observer, exact channel names and unobserved gaps. Each concrete case declares its corpus digest, expected function counts and expected span count. Attempts carry before/after source digests, termination, byte arrays, capture completeness and optional telemetry witness. Instrumented witnesses include decoder identity, raw OTLP digest, decoded function counts, span total, losses and pending count.
 
-The comparator validates **provider-supplied evidence**; it cannot authenticate a fabricated JSON bundle or establish that an observer really launched the declared artefact. Capture observers need their own tests and qualification, including which loss counters cover their signal path; a non-empty map alone does not establish that every possible loss is observed. It does not independently decode OTLP; the diagnostic Python observer does. Raw evidence remains available for review. Full selected-function inventory, state graph/alias comparison, off controls, automatic test generation and shipping artefact validation remain [roadmap requirements](roadmap.md).
+The comparator validates **provider-supplied evidence**; it cannot authenticate a fabricated JSON bundle or establish that an observer really launched the declared artefact. Capture observers need their own tests and qualification, including which loss counters cover their signal path; a non-empty map alone does not establish that every possible loss is observed. It does not independently decode OTLP; the diagnostic observers do. Raw evidence remains available for review. Full selected-function inventory, state graph/alias comparison, off controls, automatic test generation and shipping artefact validation remain [roadmap requirements](roadmap.md).
 
 ## Apply it to context and lifetime milestones
 

@@ -4,19 +4,19 @@
 
 Review date: 9 October 2026. oteleq provides a useful foundation for an instrumentation regression gate. Its strongest adoption argument is a reproducible comparison tied to concrete workloads, observed effects, instrumented activity and explicit gaps. Repeated independent lanes and conservative incomplete verdicts support that argument.
 
-The current implementation is an early slice. One Python diagnostic observer supplies real executions; the Rust comparator accepts evidence labelled with all eight languages. There are no general language runners, automatically generated unit tests, function inventory, global/receiver graph observers or shipping-artefact qualification. A passing stdout/stderr comparison cannot establish unchanged hidden state. The process will provide stronger reassurance as those observations and real application workloads become available.
+The current implementation is an early slice. Diagnostic capture integrations execute real otelc examples for all eight languages; a separate Python observer qualifies its asyncio task fixture. There are no general language runners, automatically generated unit tests, function inventory, global/receiver graph observers or shipping-artefact qualification. A passing stdout/stderr comparison cannot establish unchanged hidden state. The process will provide stronger reassurance as those observations and real application workloads become available.
 
 | Use | Current value |
 | --- | --- |
 | Detect a stable change in captured application output or a declared effect channel | Implemented, with repeat and completeness checks |
-| Confirm expected function spans arrived without reported runtime/export loss | Implemented for the Python example; other producers need qualification |
+| Confirm expected function spans arrived without reported runtime/export loss | Implemented for the eight internal function-span examples and Python task example |
 | Protect an otelc change with a retained, reproducible example | Useful now within the diagnostic scope |
 | Automatically test every function or detect arbitrary global/instance mutation | Planned; no current evidence supports this claim |
 | Reassure a team about the exact binary or managed artefact it deploys | Requires production-workload provenance and observers that are still planned |
 
 ## Adoption priorities
 
-First make existing representative workloads easy to compare against the actual baseline and instrumented artefacts. Implement bounded external execution and qualified capture providers for all eight languages. Existing tests, CLI scenarios and fixture services can supply useful concrete cases while automatic generation is developed. Keep production-workload and unit-harness evidence visibly separate.
+First make existing representative workloads easy to compare against the actual baseline and instrumented artefacts. Extend the bounded diagnostic capture providers with representative application workloads for all eight languages. Existing tests, CLI scenarios and fixture services can supply useful concrete cases while automatic generation is developed. Keep production-workload and unit-harness evidence visibly separate.
 
 Next implement typed before/after receiver, argument and global state with explicit alias/cycle and unsupported-root handling. Seed cases with intentional instrumentation defects that change state while preserving return values, so the observer demonstrates that it can catch the relevant regression. Then add language-aware discovery and generation with reviewed factories, preconditions and visible inventory gaps.
 
@@ -24,9 +24,9 @@ Off/fault lanes and performance budgets strengthen the process when their actual
 
 ## Review fixes
 
-The review reproduced passing results for duplicate loss keys and an empty loss map. Those now fail. Channel/function/count maps also reject duplicate keys, preserving the strict input contract. The Python observer accounts for queued trees, retains receiver failures, rejects incomplete HTTP bodies and malformed runtime counters, and requires distinct valid span identities. Raw transport manifests remain available when later qualification fails.
+The review reproduced passing results for duplicate loss keys and an empty loss map. Those now fail. Channel/function/count maps also reject duplicate keys, preserving the strict input contract. The diagnostic observers account for queued trees, retain receiver failures, reject incomplete HTTP bodies and malformed runtime counters, and require distinct valid span identities. Raw transport manifests remain available when later qualification fails.
 
-Remaining limits are explicit: providers are trusted, dependency contents are not fully fingerprinted, the diagnostic launcher is not a sandbox or a general bounded process-tree executor, and parent graphs/resource semantics remain outside its witness. The broader [roadmap](roadmap.md) still applies.
+Remaining limits are explicit: providers are trusted, dependency contents are not fully fingerprinted, the diagnostic launcher is not a sandbox or a general bounded process-tree executor, and resource semantics remain outside their witnesses; the all-language observer validates local parent graphs. The broader [roadmap](roadmap.md) still applies.
 
 ## Comparator optimisation evidence
 

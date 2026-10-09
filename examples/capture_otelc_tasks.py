@@ -22,10 +22,6 @@ REQUEST_TIMEOUT = 2
 
 
 class Receiver(BaseHTTPRequestHandler):
-    def send_error(self, code, message=None, explain=None):
-        self.server.errors.append(f"HTTP capture rejected request: {code}")
-        super().send_error(code, message, explain)
-
     def do_POST(self):
         self.server.requests += 1
         lengths = self.headers.get_all("Content-Length", [])
@@ -36,7 +32,7 @@ class Receiver(BaseHTTPRequestHandler):
             self.send_error(400)
             return
         size = int(lengths[0])
-        if size > MAX_REQUEST_BYTES or self.server.requests > MAX_REQUESTS:
+        if size > MAX_REQUEST_BYTES or self.server.requests > self.server.max_requests:
             self.send_error(413)
             return
         deadline = time.monotonic() + REQUEST_TIMEOUT
@@ -69,7 +65,8 @@ class Receiver(BaseHTTPRequestHandler):
 
 
 class CaptureServer(HTTPServer):
-    def __init__(self):
+    def __init__(self, max_requests=MAX_REQUESTS):
+        self.max_requests = max_requests
         self.bodies = []
         self.errors = []
         self.requests = 0
