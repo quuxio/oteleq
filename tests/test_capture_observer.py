@@ -3,6 +3,7 @@ import runpy
 import copy
 from contextlib import closing
 import http.client
+import os
 import socket
 import subprocess
 import sys
@@ -216,6 +217,20 @@ class ArtefactStabilityTests(unittest.TestCase):
         (self.root / "target/debug/quux-otelc").unlink()
         with self.assertRaises(FileNotFoundError):
             OBSERVER["require_same_artefacts"](self.root, self.interpreter, self.identities)
+
+    def test_source_contained_temporary_parent_is_rejected_before_creating_any_workspace(self):
+        checker = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as parent:
+            for temporary_parent in (self.root, checker):
+                with self.subTest(temporary_parent=temporary_parent):
+                    reports = Path(parent) / "reports"
+                    env = dict(os.environ, TMPDIR=str(temporary_parent), TEMP=str(temporary_parent), TMP=str(temporary_parent))
+                    result = subprocess.run([sys.executable, str(checker / "examples/capture_otelc_tasks.py"),
+                                             "--otelc-root", str(self.root), "--report-dir", str(reports)],
+                                            env=env, capture_output=True, timeout=10)
+                    self.assertEqual(result.returncode, 2)
+                    self.assertIn(b"temporary directory must be outside both repositories", result.stderr)
+                    self.assertFalse(reports.exists())
 
 
     def test_actual_capture_aborts_before_recording_success_when_a_run_rebuilds_the_launcher(self):

@@ -87,6 +87,7 @@ class CaptureServer(HTTPServer):
         if self.errors:
             raise ValueError("incomplete HTTP capture: " + "; ".join(self.errors))
 
+
 def digest(data):
     return hashlib.sha256(data).hexdigest()
 
@@ -180,6 +181,9 @@ def main():
     checker_root = Path(__file__).resolve().parents[1]
     if any(destination.is_relative_to(path) for path in (root, checker_root)):
         parser.error("report directory must be outside both repositories")
+    temporary_parent = Path(tempfile.gettempdir()).resolve()
+    if any(temporary_parent.is_relative_to(path) for path in (root, checker_root)):
+        parser.error("temporary directory must be outside both repositories; correct TMPDIR")
     destination.mkdir(mode=0o700, parents=False, exist_ok=False)
     source = root / "examples/apps/python_tasks_app.py"
     policy = root / "examples/python-task-context.toml"
@@ -217,8 +221,8 @@ def main():
             attempt_dir.mkdir(mode=0o700)
             with tempfile.TemporaryDirectory(prefix="oteleq-task-") as temporary:
                 workspace = Path(temporary).resolve()
-                if workspace.is_relative_to(root):
-                    raise ValueError("temporary workspace is inside target repository")
+                if any(workspace.is_relative_to(path) for path in (root, checker_root)):
+                    raise ValueError("temporary workspace is inside a source repository")
                 app = workspace / "examples/apps/python_tasks_app.py"
                 app.parent.mkdir(parents=True)
                 app.write_bytes(originals[source])
