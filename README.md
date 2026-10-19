@@ -115,4 +115,4 @@ This command consumes repeated captured observations from a qualified observer. 
 ./target/debug/quux-oteleq compare-observations /path/to/typed-bundle.json > /path/to/typed-comparison.json
 ```
 
-The [typed comparator](docs/typed-comparison.md) reports field paths, alias/cycle changes, invalid initial fixtures and incomplete captures while retaining repeated execution and telemetry checks. Its shared format accepts all eight language IDs. The scalar generator does not yet emit that format; graph codec and generation integration remain incomplete.
+The [typed comparator](docs/typed-comparison.md) reports field paths, alias/cycle changes, invalid initial fixtures and incomplete captures while retaining repeated execution and telemetry checks. Its shared format accepts all eight language IDs. Generated scalar workers emit that format in `typed-bundle.json`, retaining raw capture separately. They validate declared initial roots and baseline outcome expectations. Richer receivers/factories and additional graph codecs remain incomplete.

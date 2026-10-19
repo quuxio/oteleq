@@ -213,7 +213,10 @@ fn all_typed_tags_are_observable_and_opaque_state_never_qualifies() {
         Value::Null,
         Value::Undefined,
         Value::Unbound,
-        Value::Boolean { value: true },
+        Value::Boolean {
+            r#type: None,
+            value: true,
+        },
         Value::Unit {
             r#type: "rust.()".into(),
         },
@@ -243,6 +246,22 @@ fn all_typed_tags_are_observable_and_opaque_state_never_qualifies() {
         .contains("provide an observer fixture"));
     right.nodes[0].fields.clear();
     assert!(!compare(&left, &right).unwrap().gaps.is_empty());
+}
+#[test]
+fn boolean_nominal_types_are_observable_and_validated() {
+    let value = |label: Option<&str>| {
+        scalar(Value::Boolean {
+            r#type: label.map(str::to_owned),
+            value: true,
+        })
+    };
+    let named = value(Some("go.main.Flag"));
+    assert!(compare(&named, &named).unwrap().equivalent());
+    assert!(!compare(&named, &value(Some("go.bool")))
+        .unwrap()
+        .equivalent());
+    assert!(!compare(&named, &value(None)).unwrap().equivalent());
+    assert!(compare(&value(Some("")), &named).is_err());
 }
 #[test]
 fn unknown_duplicate_dangling_and_unreachable_graph_records_are_rejected() {

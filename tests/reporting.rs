@@ -12,6 +12,72 @@ fn fixture() -> Value {
 fn rendered(data: &Value) -> quux_oteleq::reporting::RenderedReport {
     render(&serde_json::to_vec(data).unwrap()).unwrap()
 }
+fn typed_fixture() -> Value {
+    let mut data = fixture();
+    let original = data["cases"][0]["comparison"].clone();
+    let execution = original["cases"][0].clone();
+    let comparison = json!({"verdict":"equivalent_observed","reasons":[],"initial_differences":[],"differences":[]});
+    let pairs: Vec<_> = [(0,0),(0,1),(1,0)].into_iter().map(|(baseline,instrumented)|
+        json!({"baseline_attempt":baseline,"instrumented_attempt":instrumented,"comparison":comparison})).collect();
+    data["cases"][0]["comparison"] = json!({"typed_schema_version":1,"claim":original["claim"],
+        "comparison":"typed boundary graphs","verdict":"equivalent_observed","scope":original["scope"],
+        "cases":[{"case_id":execution["case_id"],"contract":{"observation_schema_version":1,"case_id":execution["case_id"],
+                   "function_id":"package.target.add","fixture_sha256":"f".repeat(64),"required_roots":[],"expected_baseline":{"kind":"return"}},
+                   "verdict":"equivalent_observed","execution":execution,"reasons":[],"pairs":pairs}]});
+    data
+}
+#[test]
+fn typed_reports_retain_field_paths_and_do_not_require_equal_raw_graph_json() {
+    let mut data = typed_fixture();
+    assert_eq!(rendered(&data).exit_code, 0);
+    data["exit_code"] = json!(1);
+    data["cases"][0]["exit_code"] = json!(1);
+    let comparison = &mut data["cases"][0]["comparison"];
+    comparison["verdict"] = json!("different_observed");
+    comparison["cases"][0]["verdict"] = json!("different_observed");
+    let pair = &mut comparison["cases"][0]["pairs"][0]["comparison"];
+    pair["verdict"] = json!("different_observed");
+    pair["differences"] = json!([{"path":"/after/global:state/property:calls","reason":"typed value differs",
+        "baseline":{"kind":"integer","type":"python.int","value":"0","bits":null,"signed":true},
+        "instrumented_on":{"kind":"integer","type":"python.int","value":"1","bits":null,"signed":true}}]);
+    let output = rendered(&data);
+    assert_eq!(output.exit_code, 1);
+    assert!(output.html.contains("/after/global:state/property:calls"));
+    assert!(output.junit.contains("failures=\"1\" errors=\"0\""));
+}
+#[test]
+fn typed_match_reports_reject_missing_pairs_invalid_identity_and_hidden_gaps() {
+    let mut invalid = Vec::new();
+    let base = typed_fixture();
+    let mut item = base.clone();
+    item["cases"][0]["comparison"]["cases"][0]["pairs"] = json!([]);
+    invalid.push(item);
+    let mut item = base.clone();
+    item["cases"][0]["comparison"]["cases"][0]["contract"]["function_id"] = json!("other");
+    invalid.push(item);
+    let mut item = base.clone();
+    item["cases"][0]["comparison"]["cases"][0]["contract"]["fixture_sha256"] = json!("bad");
+    invalid.push(item);
+    let mut item = base.clone();
+    item["cases"][0]["comparison"]["cases"][0]["reasons"] = json!(["missing root"]);
+    invalid.push(item);
+    let mut item = base.clone();
+    item["cases"][0]["comparison"]["cases"][0]["execution"]["verdict"] = json!("inconclusive");
+    invalid.push(item);
+    let mut item = base.clone();
+    item["cases"][0]["comparison"]["cases"][0]["execution"]["baseline_attempts"] = json!(u64::MAX);
+    invalid.push(item);
+    let mut item = base.clone();
+    item["cases"][0]["comparison"]["cases"][0]["pairs"][0]["comparison"]["reasons"] =
+        json!(["opaque state"]);
+    invalid.push(item);
+    let mut item = base.clone();
+    item["cases"][0]["comparison"]["cases"][0]["pairs"][0]["baseline_attempt"] = json!(1);
+    invalid.push(item);
+    for data in invalid {
+        assert!(render(&serde_json::to_vec(&data).unwrap()).is_err());
+    }
+}
 #[test]
 fn matching_report_retains_identity_scope_and_exact_large_arguments() {
     let data = fixture();

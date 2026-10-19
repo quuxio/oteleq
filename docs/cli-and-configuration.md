@@ -2,7 +2,7 @@
 
 ## Status
 
-Updated 19 October 2026. `quux-oteleq` implements the commands below. The scalar workflow uses embedded workers and a frozen JSON workspace contract. The generator consumes a validated TOML selection/input/budget policy through `plan --config`. The later build/observer configuration and adapter sections describe proposed interfaces; the typed graph comparator has its own versioned bundle, while generated-worker integration remains incomplete.
+Updated 19 October 2026. `quux-oteleq` implements the commands below. The scalar workflow uses embedded workers and a frozen JSON workspace contract. The generator consumes a validated TOML selection/input/budget policy through `plan --config`, including explicit expected baseline outcomes. Generated workers for all eight language IDs retain raw evidence and emit the versioned typed boundary graph bundle for `compare-observations`. The later build/observer configuration and adapter sections describe proposed interfaces; project build integration and richer object/factory codecs remain incomplete.
 
 ## Implemented commands
 
@@ -24,7 +24,7 @@ Set `OTELEQ_PYTHON` to otelc's qualified Python 3.12+ environment with the OTLP 
 
 Use the actual path printed by `plan` for subsequent commands. Workspace and temporary parents resolve outside both application and otelc repositories. `run` requires a new report directory outside those repositories and the workspace. Workspaces remain available after success or failure until explicit `clean`. Export refuses existing destinations and rebinds the suite to its copied immutable application snapshot; it retains the original source provenance. See [complete runnable usage](automatic-generation.md) and [workspace retention](test-generation.md).
 
-Generation execution exits are `0` complete, `1` observed difference, `2` argument error, `3` incomplete/blocked and `4` tool/build/protocol/identity failure. A run with no completed cases or any selected blocker cannot return success. Mixed case results give precedence to `4`, `2`, `1`, then `3`; the report retains each result. `replay` qualifies only the named case. The generated `unittest` suite includes failing tests for all selected blockers. `compare-workload` has its own [exit-code contract](workload-comparison.md#build-and-compare).
+Generation execution exits are `0` complete, `1` observed difference, `2` argument error or blocked fixture/initial-state contract, `3` incomplete inventory/evidence and `4` tool/build/protocol/identity failure. A run with no completed cases or any selected blocker cannot return success. Mixed case results give precedence to `4`, `2`, `3`, then `1`; the report retains each result. `replay` qualifies only the named case. The generated `unittest` suite includes failing tests for all selected blockers. The comparators have their own [byte-channel](workload-comparison.md#build-and-compare) and [typed observation](typed-comparison.md) contracts.
 
 The Rust-only [report renderer](reporting.md) needs no Python, provider or original workspace. It exits `0` for complete matches, `1` for differences, `2` for arguments, `3` for gaps and `4` for invalid input/output. It retains whole-inventory gaps from partial replay and refuses existing output directories.
 

@@ -23,7 +23,7 @@ The page shows the number of retained paired cases separately from the callable 
 | Retained result | HTML | JUnit |
 | --- | --- | --- |
 | `equivalent_observed` | One matched case | Successful test case |
-| `different_observed` | Observed difference, with declared channel bytes | `failure` |
+| `different_observed` | Observed difference, with byte or typed field details | `failure` |
 | Comparator blocked/inconclusive or tool/build error | Incomplete evidence | `error` |
 | Blocked inventory callable | Reason and missing capability | `error`, never skipped |
 | Ready callable with no retained case | Untested in this report | `error` |
@@ -40,6 +40,6 @@ The claim remains **equivalence over these tests and observations**. This is a p
 
 The renderer checks the supported schema, identity formats, unique inventory/case IDs, callable mapping and consistency of retained comparison verdicts. It refuses contradictory successful results, such as a matched case with differences or fewer than two repeats per lane. Reports are bounded to 16 MiB, 10,000 inventory entries and 1,024 concrete cases. `compare-workload` JSON is a different format and is not accepted by this command.
 
-HTML and XML escape application text. Invalid XML control characters are displayed as visible escapes. The HTML has no scripts, external assets or network requests and declares a restrictive content security policy. Scope gaps are preserved. Graph comparison, field-path explanations beyond existing channel differences, configured redaction and richer per-capability statuses remain on the [completion checklist](completion.md).
+HTML and XML escape application text. Invalid XML control characters are displayed as visible escapes. The HTML has no scripts, external assets or network requests and declares a restrictive content security policy. Scope gaps are preserved. Typed generated results retain their full fixture contract, execution checks and per-pair field differences. The renderer validates pair coverage and refuses a qualified result with hidden gaps or inconsistent differences. Configured redaction and richer per-capability statuses remain on the [completion checklist](completion.md).
 
 No redaction is applied. Arguments, policies, paths and observations can contain application data. Keep presentation files private and review their contents before publishing them or uploading them as CI artefacts. Redaction before durable capture is a separate unimplemented capability; removing values from a page cannot qualify the missing observations.

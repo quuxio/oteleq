@@ -16,11 +16,11 @@ import policy
 
 
 class StaticObserverTests(unittest.TestCase):
-    def execute(self, language, source, output="int", arguments=None, parameters=None):
+    def execute(self, language, source, output="int", arguments=None, parameters=None, globals_=None):
         """Compile a real generated worker, then retain only its bounded results."""
         candidate = {"language": language, "name": "App.selected" if language == "java" else "selected",
                      "path": {"java": "App.java", "rust": "app.rs", "go": "app.go"}[language],
-                     "parameters": parameters or [], "output": output, "globals": [],
+                     "parameters": parameters or [], "output": output, "globals": globals_ or [],
                      "file_functions": [], "package": "", "package_end": len("package main")}
         tool = {"java": "javac", "go": "go", "rust": "rustc"}[language]
         compiler = os.environ.get("OTELC_" + tool.upper()) or shutil.which(tool)
@@ -95,7 +95,7 @@ class StaticObserverTests(unittest.TestCase):
             ("fn selected()->f32{f32::from_bits(0x80000000)}", "f32", b"return:f32:80000000"),
             ("fn selected()->f64{f64::from_bits(0x7ff8000000000001)}", "f64", b"return:f64:7ff8000000000001"),
             ('fn selected()->String{String::from("known")}', "String", b'return:String:"known"'),
-            ("fn selected(){}", "()", b"return:():()"),
+            ("fn selected(){}", "()", b"return:unit:()"),
             ("fn selected()->i32{panic!(\"known\")}", "i32", b'error:str:"known"'),
         ]
         for source, output, expected in sources:
@@ -125,7 +125,7 @@ class StaticObserverTests(unittest.TestCase):
             ("package main\nimport \"math\"\nfunc selected() float64{return math.Float64frombits(0x8000000000000000)}\n", "float64", [], [], b"return:float64:8000000000000000"),
             ("package main\nconst true=false\nfunc selected(v bool) bool{return v}\n", "bool", [True], ["bool"], b"return:bool:true"),
             ("package main\nfunc selected() int{panic(\"known\")}\n", "int", [], [], b'error:string:"known"'),
-            ("package main\nimport \"fmt\"\ntype int int64\nfunc (int) GoString() string{fmt.Println(\"CALLBACK\");return \"masked\"}\nfunc selected() int{return int(7)}\n", "int", [], [], b"return:main.int:7"),
+            ("package main\nimport \"fmt\"\ntype int int64\nfunc (int) GoString() string{fmt.Println(\"CALLBACK\");return \"masked\"}\nfunc selected() int{return int(7)}\n", "int", [], [], b"return:@int64|main.int:7"),
         ]
         for source, output, arguments, parameters, expected in sources:
             compiled, result, observation = self.execute("go", source, output, arguments, parameters)

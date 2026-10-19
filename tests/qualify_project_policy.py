@@ -131,10 +131,18 @@ cases=[[55296]]
     (control / "bundle.json").write_text(json.dumps(bundle))
     command([cli, "compare-workload", control / "bundle.json"], control, "compare", expected=1)
     (control / "KIND.txt").write_text("Deliberately altered retained observation; not another target execution.\n")
+    typed = json.loads((destination / "comparison" / unicode_case["case"] / "typed-bundle.json").read_text())
+    for attempt in typed["cases"][0]["instrumented_on"]:
+        value = attempt["observation"]["outcome"]["graph"]["roots"]["result"]
+        assert value["value"] == expected and value["encoding"] == "utf16_be"
+        value["value"] = expected[:-1] + "1"
+    (control / "typed-bundle.json").write_text(json.dumps(typed))
+    command([cli, "compare-observations", control / "typed-bundle.json"], control, "compare-typed", expected=1)
     summary = {"claim": "equivalence over these tests and observations", "artefact_class": "diagnostic",
                "cli_sha256": hashlib.sha256(cli.read_bytes()).hexdigest(), "languages": sorted(languages),
                "configured_cases": 38, "matching_attempts": 228, "repeats_per_lane": 3,
                "unicode_utf16_and_signed_unsigned_extremes": True, "altered_unicode_control_rejected": True,
+               "altered_typed_unicode_control_rejected": True,
                "source_preserved": report["source_preserved"], "configuration_sha256": data["configuration_sha256"]}
     (destination / "qualification.json").write_text(json.dumps(summary, indent=2) + "\n")
     print(json.dumps(summary), flush=True)

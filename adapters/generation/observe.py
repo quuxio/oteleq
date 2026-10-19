@@ -2,7 +2,7 @@
 import struct
 import sys
 from pathlib import Path
-from types import CodeType, FunctionType, GetSetDescriptorType, ModuleType
+from types import CodeType, FunctionType, GetSetDescriptorType, MemberDescriptorType, ModuleType
 MISSING = object()
 
 
@@ -65,15 +65,41 @@ def runtime_type(item: object) -> tuple[type, str, str]:
 def class_member(cls: type, name: str) -> object | None:
     """Find a descriptor without invoking properties or dynamic lookup."""
     for base in type.__dict__["__mro__"].__get__(cls):
-        members = type.__dict__["__dict__"].__get__(base)
+        members = class_members(base)
         if name in members:
             return members[name]
     return None
 
 
+def class_members(cls: type):
+    """Read normal metadata keys without descriptor or key comparison hooks."""
+    members = type.__dict__["__dict__"].__get__(cls)
+    if any(type(key) is not str for key in members):
+        raise ValueError("class metadata keys require an observation fixture")
+    return members
+
+
+def supported_storage(cls: type, base: type) -> None:
+    """Unknown native storage cannot masquerade as a complete dictionary view."""
+    members = class_members(base)
+    if "__slots__" in members:
+        raise ValueError("slotted state requires an observation fixture")
+    native_fields = any(type(value) in (GetSetDescriptorType, MemberDescriptorType)
+                        and name not in ("__dict__", "__weakref__") for name, value in members.items())
+    if base not in (BaseException, object) and native_fields:
+        raise ValueError("native instance fields require an observation fixture")
+    module = type.__dict__["__module__"].__get__(base)
+    if type(module) is not str:
+        raise ValueError("base class identity requires an observation fixture")
+    if base not in (cls, object) and module in ("builtins", "types") and not issubclass(cls, BaseException):
+        raise ValueError("builtin base state requires an observation fixture")
+
+
 def instance_state(item: object) -> object:
     """Read the builtin instance dictionary; never evaluate an override."""
     cls = type(item)
+    for base in type.__dict__["__mro__"].__get__(cls):
+        supported_storage(cls, base)
     descriptor = class_member(cls, "__dict__")
     if type(descriptor) is not GetSetDescriptorType:
         raise ValueError("instance dictionary descriptor requires a fixture")
@@ -98,7 +124,7 @@ class GraphEncoder:
             raise ValueError("opaque object state")
         if any(type(name) is not str for name in state):
             raise ValueError("non-string object field requires a fixture")
-        return [[name, self.value(state[name], depth + 1)] for name in sorted(state)]
+        return [[name, self.value(value, depth + 1)] for name, value in state.items()]
 
     def populate(self, node, item, depth):
         cls, module, _ = runtime_type(item)

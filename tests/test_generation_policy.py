@@ -206,9 +206,16 @@ cases=[[7],[41]]
                 entry = data["inventory"][0]
                 case = generation.read(workspace / "tests/corpus.json")[0]
                 folder = base / "comparison";folder.mkdir()
-                observed = {"witness": {"functions": {"api.sample": 1}}}
+                captured_graph = {"roots": {"arguments": {"type":"null"}}, "nodes": []}
+                raw = json.dumps({"before":captured_graph,"after":captured_graph,
+                                  "outcome":{"kind":"return","value":{"roots":{**captured_graph["roots"],"result":{"type":"int","value":"1"}},"nodes":[]}}}).encode()
+                observed = {"witness": {"functions": {"api.sample": 1}},
+                            "channels":{"stdout":[],"stderr":[],"state-and-outcome":list(raw)}}
+                def captured(*arguments):
+                    arguments[5].mkdir(exist_ok=True)
+                    return observed
                 result = subprocess.CompletedProcess([], 0, b'{"verdict":"equivalent_observed"}', b"")
-                with patch.object(generation, "attempt", return_value=observed) as attempt, \
+                with patch.object(generation, "attempt", side_effect=captured) as attempt, \
                      patch.object(generation, "execute", return_value=result):
                     generation.compare_case(workspace, data, entry, case, folder, None)
                 self.assertEqual(attempt.call_count, 7)

@@ -1,6 +1,6 @@
 # Typed observation comparison
 
-`compare-observations` compares retained, versioned boundary graphs together with the workload comparator's exact byte channels, source identities, process completion and decoded telemetry witness. It does not execute application code. The existing scalar generator still emits canonical byte observations; adapter conversion to this shared graph format remains unfinished.
+`compare-observations` compares retained, versioned boundary graphs together with the workload comparator's exact byte channels, source identities, process completion and decoded telemetry witness. It does not execute application code. Generated scalar workers emit this format for all eight language IDs. They retain raw observations separately and compare semantic graphs with exact application stdout/stderr.
 
 ```sh
 ./target/debug/quux-oteleq compare-observations examples/typed-observations.json > /tmp/typed-comparison.json
@@ -27,7 +27,7 @@ A graph has `roots`, a map of root names to typed values, and `nodes`, a list of
 | --- | --- |
 | `null`, `undefined`, `unbound` | Separate absence tags |
 | `unit` | Qualified `type` |
-| `boolean` | Boolean `value` |
+| `boolean` | Boolean `value`; optional qualified `type` (generated application values retain it; logical codec flags may omit it) |
 | `integer` | Qualified `type`, canonical decimal string `value`, optional `bits` (8/16/32/64/128), `signed` |
 | `float` | Qualified `type`, exact lowercase hexadecimal `bits` (16/32/64/128 bits) |
 | `string` | Qualified `type`, `encoding`, lowercase hexadecimal `value` |
@@ -47,4 +47,4 @@ Typed graphs are compared across lanes and within each lane. Repeat instability 
 
 Differences use escaped JSON Pointer paths such as `/after/receiver/calls`; initial differences are retained separately under `/before`. A graph allows 512 nodes, depth 32, 8192 total fields/roots and 256 KiB of payload. At most 128 differences are retained per graph comparison. Opaque gap details are capped at 128 per lane, with a 256 KiB diagnostic payload budget per lane; differences have their own 256 KiB diagnostic payload budget. A limit marker records omitted diagnostics, which cannot produce an equivalence result. Iterative gap traversal retains one path per active graph level rather than copying long paths for every queued child. These are payload budgets, not limits on JSON escaping overhead. Input files are capped at 16 MiB. Unknown schema fields, duplicate map keys, invalid values and malformed references are rejected.
 
-The protocol accepts all eight language IDs. That is shared comparator coverage, not evidence that each adapter has emitted or qualified every graph kind. Generated framework integration, richer language codecs and executed typed-graph qualification remain on the [completion checklist](completion.md).
+The protocol accepts all eight language IDs. That is shared comparator coverage, not evidence that each adapter has emitted or qualified every graph kind. Retained unittest/replay/export consume the typed comparator. Richer receivers/factories, additional language codecs, project build context and shipping qualification remain on the [completion checklist](completion.md).

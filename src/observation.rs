@@ -113,7 +113,8 @@ pub struct Observation {
     pub outcome: Outcome,
     pub after: Snapshot,
 }
-#[derive(Debug, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct Comparison {
     pub verdict: Verdict,
     pub reasons: Vec<String>,
@@ -222,7 +223,7 @@ fn value_type<'a>(value: &'a Value, graph: &'a Snapshot) -> Option<&'a str> {
         Value::Null => Some("null"),
         Value::Undefined => Some("undefined"),
         Value::Unbound => Some("unbound"),
-        Value::Boolean { .. } => Some("boolean"),
+        Value::Boolean { r#type, .. } => Some(r#type.as_deref().unwrap_or("boolean")),
     }
 }
 fn baseline_valid(observation: &Observation, contract: &Contract) -> Option<bool> {

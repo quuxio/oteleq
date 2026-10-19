@@ -28,3 +28,5 @@ max_capture_bytes = 262144
 # source = "src/api.py"
 # function = "src.api.calculate"
 # cases = [[7], [41]]
+# Intentional errors require an explicit contract; otherwise a return is required.
+# expected_baseline = { kind = "error", category = "exception", type = "python.builtins.ValueError" }
