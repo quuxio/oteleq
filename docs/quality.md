@@ -2,7 +2,7 @@
 
 ## Current scope
 
-CI validates Markdown, illustrative JSON/TOML syntax, diagnostic capture observers and the Rust comparator. The required Rust job runs formatting, Clippy, regression tests and a minimum 80% line-coverage gate over product `src/` files; integration-test code is excluded from that measurement. The documentation job tests the capture observers and enforces at least 80% line coverage separately for each new eight-language capture module. CI uses fake witness fixtures and private subprocesses; actual otelc toolchain qualification uses the separate eight-language integration run. CI also checks the scalar generator, syntax discovery, harness materialisation, state observers, process limits and source preservation, with 80% coverage gates on each Python module. Real otelc execution is qualified separately; unobserved state and unsupported build contexts remain outside the claim.
+CI validates Markdown, illustrative JSON/TOML syntax, diagnostic capture observers and the Rust comparator. The required Rust job runs formatting, Clippy, regression tests and a minimum 80% line-coverage gate over product `src/` files; integration-test code is excluded from that measurement. The documentation job tests the capture observers and enforces at least 80% line coverage separately for each eight-language capture module and the collection validator. CI uses fake witness fixtures and private subprocesses; actual otelc toolchain qualification uses the separate eight-language integration run. CI also checks the scalar generator, syntax discovery, harness materialisation, state observers, process limits and source preservation, with 80% coverage gates on each Python module. Real otelc execution is qualified separately; unobserved state and unsupported build contexts remain outside the claim.
 
 Install the locked documentation tools and run:
 
@@ -47,6 +47,24 @@ This credential retains its original GitHub permissions; storing it as `TRAFFIC_
 ## Main branch protection
 
 The active `Protect main` repository ruleset blocks deletion and force pushes, requires pull requests, and requires current passing documentation/design, Rust comparator/coverage and SonarCloud checks from their configured GitHub Apps. There are no bypass actors. Pull requests must be up to date with main before merging; no second human approval is required for this personal repository. The separate `traffic-badges` data branch allows the existing badge updater to publish without bypassing main protection.
+
+## Python collection qualification
+
+[PR #14](https://github.com/quuxio/oteleq/pull/14) adds the [fixed collection corpus](eight-language-capture.md#python-collection-lifetime-workload). The runtime implementation `081e8be4d04409e45817483d98126327601fe769` passed the complete local gate on 19 October 2026: 99 regressions (18 Rust, 63 capture, 18 generation), 96.87% Rust product line coverage, 100% for the new collection validator and at least 80% for every independently gated Python module. The Rust SDK identity regression covers dependency shared libraries as well as archives. The reported OTLP-path duplication finding was resolved in source.
+
+Actual collection execution used frozen otelc `8baeded305d66aaad8b1b0efac2c5ef860b97ff8`: two plain and two instrumented attempts, exact expected output and successful exits, four complete roots per instrumented run, one creation call and three completed collections, with zero loss/pending/live/censored state. All 13 provider-file hashes and the actual CPython 3.12.15 executable hash matched before and after capture. Fifteen altered-observation controls were rejected. Source and policy bytes were unchanged; the local OTLP endpoint was set only in private policy copies.
+
+| Qualified input | SHA-256 |
+| --- | --- |
+| oteleq diagnostic CLI | `f09120ebdaa663f39dcad7d1f78c46752b712ff8ec4c6d6cb11ca9eabe14853b` |
+| otelc CLI | `266f353908b37d481a7e5fdf4f9d0be62ff4497e493f6098704333d95f3732f7` |
+| Python fixture source | `ab60ac8ab2cd08a470335a3240e7b0859b5f72fa875b41787f3a6c6948f7ed45` |
+| Original collection policy | `1135a115818e4804c0b6959ead829c837b6fba049218d835441e21d6f919c08a` |
+| Actual CPython executable | `c4e9f06cb179ae4b3728c748990fbbef7f30580ea42c0eb9c702ebc7c7861c89` |
+
+The same final oteleq executable also passed the complete eight-language scalar generation qualification against a private, unchanged otelc `63d3c7afbfd6667ea318b0240f06a19d5f8d0102` runtime copy: 24 matching cases/96 paired launches, eight generated unittest cases, one exported replay and three same-return/different-object-state controls. Application sources were preserved. The earlier interrupted run against the superseded executable is excluded from these results.
+
+This is **equivalence over these tests and observations**. The qualification checks local OTLP and the fixture's declared byte channels; it does not validate Tempo storage, Prometheus queries, arbitrary object retention, resource-release contracts or a shipping artefact.
 
 ## Implementation quality
 

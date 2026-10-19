@@ -1,0 +1,23 @@
+{
+  "python": {
+    "case_id": "python-collection-lifetime-example",
+    "source": "examples/apps/python_collection_app.py",
+    "policy": "examples/python-collection.toml",
+    "functions": {
+      "examples.apps.python_collection_app.create": 1,
+      "examples.apps.python_collection_app.Item lifetime": 3
+    },
+    "trees": 4,
+    "errors": 0,
+    "collection": {
+      "creator": "examples.apps.python_collection_app.create",
+      "type": "examples.apps.python_collection_app.Item",
+      "span": "examples.apps.python_collection_app.Item lifetime",
+      "count": 3
+    },
+    "channels": {
+      "stdout": "collections=3; value=6; layouts=true\n",
+      "stderr": ""
+    }
+  }
+}

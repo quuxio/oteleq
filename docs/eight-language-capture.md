@@ -25,6 +25,8 @@ All target source/configuration remains unchanged. Generated copies and reports 
 
 Managed reports must declare the expected language and schema; native reports must confirm draining. Python pending contexts cannot be omitted. Fixture manifests also reject duplicate JSON keys and their contents join the observer identity manifest. Both examples reject unexpected baseline telemetry, retain HTTP evidence and application output before later qualification checks, and refuse source-contained temporary parents before probing them. Parent graphs are validated with one visit per node.
 
+Rust content identity includes SDK dependency archives and shared libraries, including procedural macros. Replacing or removing one during capture prevents qualification. Capturing those filenames does not establish execution qualification for another operating system.
+
 Any failed build, missing report, unexpected telemetry, timeout or changed artefact aborts capture and retains partial evidence. The failing language cannot acquire a complete bundle or successful comparison. Already completed language reports remain available; languages after the failure have not been qualified. Reuse a new report directory for the next attempt.
 
 ## Scope
@@ -64,6 +66,26 @@ make capture-otelc PYTHON=../otelc/.venv/bin/python \
 This requires `JavaWorkerApp.java` and `java-worker-context.toml` from [otelc PR #46](https://github.com/quuxio/otelc/pull/46). The exact qualified otelc head is `6bfbb1441cfa3f2b1b861d665ef6a04fb49c4f45`. Two baseline and two instrumented JVMs use matching `-Xshare:off`; original source/policy/CLI/agent identities must remain unchanged. Each instrumented attempt independently requires five `JavaWorkerApp.root(java.util.concurrent.ThreadPoolExecutor,int)` spans, three `JavaWorkerApp.child(int)` spans, five complete roots and two escaping errors, with no losses or pending contexts.
 
 All four attempts must produce exactly `results=11,21; original-error=true; cancelled=true; future-identity=true; rejection-identity=true` plus newline and empty stderr. The fixture checks original FutureTask, worker exception and rejection identity, results and queued cancellation. Running cancellation and shutdown edge cases have separate otelc tests; this corpus does not claim to exercise every executor or schedule. Choosing `python-workers` still selects Python only, and choosing `java-workers` selects Java only; unavailable language requests fail before capture.
+
+## Python collection lifetime workload
+
+The source-free collection corpus uses ordinary CPython classes with their own initialiser, existing application weak references and an application-requested cycle collection:
+
+```sh
+make capture-otelc PYTHON=../otelc/.venv/bin/python \
+  OTELC_ROOT=../otelc REPORT_DIR=/tmp/oteleq-python-collection \
+  CAPTURE_ARGS="--workload python-collection"
+```
+
+This requires `examples/apps/python_collection_app.py`, `examples/python-collection.toml` and the collection adapter from [otelc PR #49](https://github.com/quuxio/otelc/pull/49). Qualification on 19 October 2026 used the frozen provider `8baeded305d66aaad8b1b0efac2c5ef860b97ff8` and CPython 3.12.15. The Python adapter, source and policy were unchanged from the original `55ec514` candidate. An older checkout without those files cannot run it. The [independent manifest](../examples/otelc-collection-workloads.json) selects Python only and has a distinct case identity.
+
+Each instrumented run must emit exactly one `examples.apps.python_collection_app.create` function span and three `examples.apps.python_collection_app.Item lifetime` spans, forming four complete roots with no escaping errors. Lifetime spans must be internal standalone roots with one intact link to the actual creation-function trace/span ID, the selected type, collection boundary and distinct positive instance identities. Missing, extra, dropped or wrong links, duplicated attributes and incomplete metadata cannot qualify. The function runtime count remains one; lifetime completions are checked separately instead of counted as function calls. Random IDs and GC durations are not compared between runs.
+
+The lifetime report must declare admitted/completed `3`, failed initialisations `0`, and zero live/censored/tracked objects or active constructors. Required runtime/trace/export health must be complete with zero losses and pending contexts. All four application attempts must independently produce exactly `collections=3; value=6; layouts=true` plus newline, empty stderr and exit `0`. A shared wrong output cannot pass merely because both lanes match. Raw channels and HTTP evidence remain available when validation fails.
+
+The actual run completed two baseline and two instrumented attempts. Fifteen deliberately altered retained observations were rejected, covering missing/wrong creation links and collection spans, wrong boundary metadata, incomplete/censored/live/failed state, malformed counters, lifetime loss, identical wrong stdout, unexpected stderr and provider identity mismatches. These controls modify evidence copies; they are not additional target executions. Provider files and interpreter hashes were unchanged. See the [qualification record](quality.md#python-collection-qualification).
+
+The fixture checks weak-reference collection, the existing values and its instance-field layout through those declared output assertions. It does not establish arbitrary receiver/global state, object retention for every class or exact GC timing. Resources/close/dispose, custom finalisers or metaclasses, inherited-only/C/decorated initialisers, weak-reference introspection and concurrent collection schedules remain unqualified. The observer does not add source probes or call GC; the original application already requests collection. Automatic scalar generation is unchanged.
 
 ## Optional native TypeScript workload
 

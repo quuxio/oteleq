@@ -38,9 +38,12 @@ def attempt(root, spec, language, destination, lane, repeat, originals, tools, i
                 env["OTELC_REPORT_PATH"] = str(report_path)
             command = baseline if lane == "baseline" else instrumented
             result = capture.execute(command, workspace, env)
+        (folder / "commands.json").write_text(json.dumps({"executed": [str(p) for p in command], "service": service,
+                                                          "working_directory": str(workspace), "typescript_backend": backend}, indent=2) + "\n")
         capture.retain_http(folder, bodies, errors)
         for channel in ("stdout", "stderr"):
             (folder / channel).write_bytes(getattr(result, channel))
+        capture.otelc_collection.expected_channels(result, spec.get("channels", {}))
         capture.stable(root, language, tools, identities)
         if source.read_bytes() != originals["source"] or policy.read_bytes() != configured:
             raise ValueError("private source or policy changed during execution")
@@ -63,8 +66,6 @@ def attempt(root, spec, language, destination, lane, repeat, originals, tools, i
         elif bodies:
             raise ValueError("uninstrumented baseline unexpectedly exported telemetry")
         (folder / "attempt.json").write_text(json.dumps(observed, indent=2) + "\n")
-        (folder / "commands.json").write_text(json.dumps({"executed": [str(p) for p in command], "service": service,
-                                                          "working_directory": str(workspace), "typescript_backend": backend}, indent=2) + "\n")
         return observed
 
 
@@ -105,10 +106,11 @@ def main():
     parser.add_argument("--otelc-root", required=True, type=Path)
     parser.add_argument("--report-dir", required=True, type=Path)
     parser.add_argument("--comparator", type=Path, default=Path(__file__).resolve().parents[1] / "target/debug/quux-oteleq")
-    parser.add_argument("--workload", choices=("functions", "python-workers", "java-workers", "typescript-native"), default="functions")
+    parser.add_argument("--workload", choices=("functions", "python-workers", "java-workers", "typescript-native", "python-collection"), default="functions")
     parser.add_argument("--language", action="append", choices=("c", "cpp", "rust", "python", "java", "javascript", "typescript", "go"))
     args = parser.parse_args()
-    filenames = {"functions": "otelc-workloads.json", "typescript-native": "otelc-typescript-native-workloads.json"}
+    filenames = {"functions": "otelc-workloads.json", "typescript-native": "otelc-typescript-native-workloads.json",
+                 "python-collection": "otelc-collection-workloads.json"}
     filename = filenames.get(args.workload, "otelc-worker-workloads.json")
     manifest = capture.strict_json(Path(__file__).with_name(filename).read_text())
     if args.workload != "functions":

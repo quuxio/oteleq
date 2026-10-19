@@ -42,6 +42,10 @@ const RESOURCES: &[(&str, &str)] = &[
         include_str!("../examples/otelc_capture.py"),
     ),
     (
+        "otelc_collection.py",
+        include_str!("../examples/otelc_collection.py"),
+    ),
+    (
         "capture_otelc_languages.py",
         include_str!("../examples/capture_otelc_languages.py"),
     ),
@@ -56,6 +60,10 @@ const RESOURCES: &[(&str, &str)] = &[
     (
         "otelc-typescript-native-workloads.json",
         include_str!("../examples/otelc-typescript-native-workloads.json"),
+    ),
+    (
+        "otelc-collection-workloads.json",
+        include_str!("../examples/otelc-collection-workloads.json"),
     ),
 ];
 
