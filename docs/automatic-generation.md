@@ -92,6 +92,8 @@ Repeats range from 2 to 32 per lane. `case_timeout_ms` bounds each application l
 | JavaScript/TypeScript | otelc's pinned TypeScript compiler AST | Private appended Node caller and actual loader; matched TypeScript baseline emission |
 | Go | Standard `go/parser` AST | Private appended same-file caller and actual Go compile adapter |
 
+C/C++ scalar spellings are scoped to those languages. Other languages' names such as `i32`, `float64` and `String` do not establish a native primitive: unresolved native aliases are visible fixture/type blockers. Generated native callers also use compiler type checks on parameters, returned values and observed globals before permitting raw scalar reads. Structured values and unsupported floating representations cannot be compared through object padding. Broader canonical alias resolution remains part of semantic/build-aware discovery.
+
 These are syntax inventories. Compilation and runtime witnesses qualify individual runnable cases; syntax alone does not establish semantic types, build visibility or safe domain inputs. Parse/tool errors produce inventory blockers. Rust requires otelc's separate standalone-source artefact API (`rust --build SOURCE.rs --output-dir BUNDLE`, then `rust --run BUNDLE`). The qualified candidate contract is [otelc PR65](https://github.com/quuxio/otelc/pull/65); providers which expose only combined compile-and-run are unsupported. Cargo build-only is not qualified.
 
 Dependencies must already be available to the qualified local tools; generation does not install them into the application.
@@ -105,6 +107,8 @@ Every case runs at least twice without instrumentation and at least twice with t
 Bundle artefact digests aggregate the frozen source, case harness and qualified tool/adapter contents. They do not hash every output emitted by a runtime compiler or loader. Available native build binaries have separate retained hashes; shipping-artefact qualification remains outside this result.
 
 The comparator checks exact application stdout/stderr and typed return/error plus before/after state bytes. Python graph observations retain object fields, reference aliases, cycles, arbitrary-size integers and float bits. Node observes plain objects/arrays through own data descriptors, preserving aliases, sparse-array properties, bigint and float bits; accessors, symbols and unsupported prototypes are incomplete observations. Opaque observer failures are not converted into application exceptions. Python exception graphs retain arguments, custom fields and causal links; Node observes supported Error own fields and excludes stacks. Exception traceback/stack objects and Java/C++ extra exception fields are outside scope; unrecognised native panic/error payloads fail capture. Native observers capture scalar value representations, without reading object padding. Java, Rust and Go use tagged scalar representations, including float bits where supported.
+
+C++ message observation is limited to exact `std::exception`, `runtime_error`, `logic_error`, `invalid_argument`, `domain_error`, `length_error`, `out_of_range`, `range_error`, `overflow_error` and `underflow_error` types. Other exception types and subclasses fail capture before their virtual `what()` accessor is called; an application-defined accessor is not a passive codec. Extra fields and general exception fixtures remain unsupported.
 
 The shared JavaScript/TypeScript observer identifies supported errors by their known prototype identities without reading a potentially overridden `name` getter. Accessor and proxy state is refused without evaluating it. Replacement of the observer runtime builtins remains outside qualification.
 
@@ -170,3 +174,12 @@ Exit `0` requires nonzero completed cases and no selected blockers. `1` reports 
 Export copies the frozen application snapshot, tests, corpus, plan and instructions into a new destination. The exported suite runs against that snapshot and retains its original provenance. It can be incorporated into an application's repository by choosing a new subdirectory explicitly; it does not silently rebind tests to future application changes. Create a new plan to test changed application code. The destination refuses overwrites. Retained/generated boilerplate is MIT licensed; copied application source retains its own licence, and the oteleq implementation remains AGPL-3.0.
 
 Cleanup requires the ownership marker and refuses unknown top-level files or edited snapshots/suites. Private snapshot/suite checks include cache/build directories as well as source files; added files there remain preserved when cleanup refuses. Set `PYTHONDONTWRITEBYTECODE=1` when importing generated tests through another runner. Keep reports independently before cleanup. A retained workspace is not a guarantee that external toolchains or dependencies will remain available.
+
+## Qualify native scalar type guards
+
+```sh
+make generation-native-otelc PYTHON=/path/to/otelc/.venv/bin/python \
+  OTELC_ROOT=/path/to/qualified/otelc REPORT_DIR=/tmp/oteleq-native-types-new
+```
+
+This C/C++ diagnostic checks six primitive cases with independent value oracles and retains two deliberately unsupported object aliases and compiler-declared constructors as blockers. Its tested application therefore exits the strict generation gate with `3`; the qualification script succeeds only when all six supported cases match with actual instrumentation and unresolved aliases cannot pass. This is not whole-inventory equivalence. Compiler regressions separately refuse object results, globals and implicit constructor arguments even if malformed metadata bypasses inventory validation.

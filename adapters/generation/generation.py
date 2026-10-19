@@ -205,6 +205,8 @@ def qualify_entry(entry, snapshot, count):
     try:
         harness.corpus(entry, count)
         outputs = harness.INTEGERS | harness.FLOATS | harness.BOOLS | harness.VOIDS | harness.STRINGS
+        if entry["language"] in ("c", "cpp"):
+            outputs = harness.native_scalar_types(entry["language"]) | {"void"}
         if entry["language"] not in ("python", "javascript", "typescript") and harness.scalar_type(entry["output"]) not in outputs:
             raise ValueError("result type requires an observation fixture")
         gaps = harness.global_gaps(entry)
