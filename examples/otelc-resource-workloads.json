@@ -1,0 +1,24 @@
+{
+  "python": {
+    "case_id": "python-resource-lifetime-example",
+    "source": "examples/apps/python_resource_app.py",
+    "policy": "examples/python-resource.toml",
+    "functions": {
+      "examples.apps.python_resource_app.create": 1,
+      "examples.apps.python_resource_app.Resource lifetime": 2
+    },
+    "trees": 3,
+    "errors": 0,
+    "resource": {
+      "creator": "examples.apps.python_resource_app.create",
+      "type": "examples.apps.python_resource_app.Resource",
+      "span": "examples.apps.python_resource_app.Resource lifetime",
+      "count": 2,
+      "failed_releases": 1
+    },
+    "channels": {
+      "stdout": "resources=2; value=7; failed_close=1; layouts=true\n",
+      "stderr": ""
+    }
+  }
+}
