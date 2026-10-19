@@ -172,3 +172,12 @@ Exit `0` requires nonzero completed cases and no selected blockers. `1` reports 
 Export copies the frozen application snapshot, tests, corpus, plan and instructions into a new destination. The exported suite runs against that snapshot and retains its original provenance. It can be incorporated into an application's repository by choosing a new subdirectory explicitly; it does not silently rebind tests to future application changes. Create a new plan to test changed application code. The destination refuses overwrites. Retained/generated boilerplate is MIT licensed; copied application source retains its own licence, and the oteleq implementation remains AGPL-3.0.
 
 Cleanup requires the ownership marker and refuses unknown top-level files or edited snapshots/suites. Private snapshot/suite checks include cache/build directories as well as source files; added files there remain preserved when cleanup refuses. Set `PYTHONDONTWRITEBYTECODE=1` when importing generated tests through another runner. Keep reports independently before cleanup. A retained workspace is not a guarantee that external toolchains or dependencies will remain available.
+
+## Qualify native scalar type guards
+
+```sh
+make generation-native-otelc PYTHON=/path/to/otelc/.venv/bin/python \
+  OTELC_ROOT=/path/to/qualified/otelc REPORT_DIR=/tmp/oteleq-native-types-new
+```
+
+This C/C++ diagnostic checks six primitive cases with independent value oracles and retains two deliberately unsupported object aliases as blockers. Its tested application therefore exits the strict generation gate with `3`; the qualification script succeeds only when all six supported cases match with actual instrumentation and the two unresolved aliases cannot pass. This is not whole-inventory equivalence. Compiler regressions separately refuse object results, globals and implicit constructor arguments even if malformed metadata bypasses inventory validation.

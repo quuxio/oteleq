@@ -1,5 +1,6 @@
 """Qualify native primitive callers while unresolved object aliases stay blocked."""
 import argparse
+import ctypes
 import hashlib
 import json
 import os
@@ -52,7 +53,6 @@ cases=[[true],[false]]
     report = json.loads((comparison / "report.json").read_text())
     assert report["source_preserved"] and len(report["blocked"]) == 2 and len(report["cases"]) == 6
     assert all(case["exit_code"] == 0 for case in report["cases"])
-    import ctypes
     for case in report["cases"]:
         bundle = json.loads((comparison / case["case"] / "bundle.json").read_text())["cases"][0]
         expected = 8 if "selected_good" in case["function"] else int(case["arguments"][0])
