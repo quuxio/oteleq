@@ -347,6 +347,7 @@ def native_guards(language: str) -> str:
     if language == "cpp":
         return r'''
 #include <type_traits>
+#include <stdexcept>
 template<class T> using __oteleq_type = std::remove_cv_t<std::remove_reference_t<T>>;
 template<class T> constexpr bool __oteleq_scalar =
   (std::is_integral_v<__oteleq_type<T>> && sizeof(T)<=8) ||
@@ -354,6 +355,16 @@ template<class T> constexpr bool __oteleq_scalar =
   std::is_same_v<__oteleq_type<T>,double>;
 #define __oteleq_assert_scalar(T) static_assert(__oteleq_scalar<T>, "native type requires a scalar fixture")
 #define __oteleq_assert_value(v) __oteleq_assert_scalar(decltype(v))
+static bool __oteleq_error(FILE* out,const std::exception& error){
+  const std::type_info& kind=typeid(error);
+  if(kind!=typeid(std::exception) && kind!=typeid(std::runtime_error) &&
+     kind!=typeid(std::logic_error) && kind!=typeid(std::invalid_argument) &&
+     kind!=typeid(std::domain_error) && kind!=typeid(std::length_error) &&
+     kind!=typeid(std::out_of_range) && kind!=typeid(std::range_error) &&
+     kind!=typeid(std::overflow_error) && kind!=typeid(std::underflow_error)) return false;
+  fprintf(out,"error:%s:%s\n",kind.name(),error.what());
+  return true;
+}
 '''
     return r'''
 typedef _Bool __oteleq_bool;
@@ -388,7 +399,7 @@ def native_driver(entry, args):
     state = "\n".join('__oteleq_bytes(out,' + json.dumps(g["name"] + ":" + g["type"]) + ',&' + g["name"] + ',sizeof(' + g["name"] + '));' for g in entry["globals"])
     invocation = returned
     if entry["language"] == "cpp":
-        invocation = 'try {' + returned + '} catch(const std::exception& e){fprintf(out,"error:%s:%s\\n",typeid(e).name(),e.what());} catch(...){fclose(out);return 91;}'
+        invocation = 'try {' + returned + '} catch(const std::exception& e){if(!__oteleq_error(out,e)){fclose(out);return 91;}} catch(...){fclose(out);return 91;}'
     headers = '#include <exception>\n#include <typeinfo>\n' if entry["language"] == "cpp" else ''
     arguments_checked = "\n".join("__oteleq_assert_scalar(" + type_ + ");" for type_ in entry["parameters"])
     return headers + '''#include <stdio.h>

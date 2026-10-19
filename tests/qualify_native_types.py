@@ -45,13 +45,14 @@ cases=[[true],[false]]
                               "--workspace-parent", destination, "--config", policy], destination, "plan"))
     plan = json.loads((workspace / "plan.json").read_text())
     blocked = [entry for entry in plan["inventory"] if entry["status"] == "blocked"]
-    assert len(blocked) == 2 and all(entry["name"] == "selected_bad" for entry in blocked)
+    aliases = [entry for entry in blocked if entry["name"] == "selected_bad"]
+    assert len(aliases) == 2
     assert all("fixture" in entry["reason"] for entry in blocked)
     command([cli, "generate", "--workspace", workspace], destination, "generate")
     comparison = destination / "comparison"
     command([cli, "run", "--workspace", workspace, "--report-dir", comparison], destination, "run", expected=3)
     report = json.loads((comparison / "report.json").read_text())
-    assert report["source_preserved"] and len(report["blocked"]) == 2 and len(report["cases"]) == 6
+    assert report["source_preserved"] and len(report["blocked"]) == len(blocked) and len(report["cases"]) == 6
     assert all(case["exit_code"] == 0 for case in report["cases"])
     for case in report["cases"]:
         bundle = json.loads((comparison / case["case"] / "bundle.json").read_text())["cases"][0]
@@ -61,10 +62,12 @@ cases=[[true],[false]]
             assert len(bundle[lane]) == 2
             assert all(token in bytes(attempt["channels"]["state-and-outcome"]) for attempt in bundle[lane])
     summary = {"claim": "equivalence over these tests and observations", "artefact_class": "diagnostic",
-               "scope": "six witnessed C/C++ primitive cases; two unsupported object aliases remain blocked",
+               "scope": "six witnessed C/C++ primitive cases; object aliases and compiler-declared constructors remain blocked",
                "oteleq_cli_sha256": hashlib.sha256(cli.read_bytes()).hexdigest(),
                "otelc_cli_sha256": hashlib.sha256((root / "target/debug/quux-otelc").read_bytes()).hexdigest(),
-               "matching_cases": 6, "matching_attempts": 24, "blocked_callables": 2,
+               "matching_cases": 6, "matching_attempts": 24, "blocked_callables": len(blocked),
+               "blocked_object_aliases": len(aliases), "blocked_other_declarations": len(blocked) - len(aliases),
+               "qualifier_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
                "strict_gate_exit": 3, "source_preserved": True, "native_scalar_value_oracles": True}
     (destination / "qualification.json").write_text(json.dumps(summary, indent=2) + "\n")
     print(json.dumps(summary), flush=True)

@@ -89,6 +89,25 @@ class NativeScalarTests(unittest.TestCase):
                     self.assertNotEqual(result.returncode, 0)
                     self.assertIn(b"native type requires a scalar fixture", result.stderr)
 
+    def test_unknown_cpp_exception_accessors_are_not_called(self):
+        sources = [
+            ("#include <stdexcept>\nint selected(void){throw std::runtime_error(\"known\");}\n", 0),
+            ("#include <exception>\n#include <cstdio>\nstruct Error:std::exception {const char* what()const noexcept override{std::fputs(\"CALLBACK\\n\",stdout);return \"unknown\";}};\n"
+             "int selected(void){throw Error{};}\n", 91),
+        ]
+        for source, expected in sources:
+            with tempfile.TemporaryDirectory() as temporary:
+                folder = Path(temporary)
+                result, binary = self.compile(folder, entry("cpp"), source, [])
+                self.assertEqual(result.returncode, 0, result.stderr)
+                observation = folder / "observation"
+                result = subprocess.run([str(binary)], env={**os.environ, "OTELEQ_OBSERVATION": str(observation)},
+                                        capture_output=True, check=False, timeout=10)
+                self.assertEqual(result.returncode, expected, result.stderr)
+                self.assertEqual(result.stdout, b"")
+                if expected == 0:
+                    self.assertIn(b"known", observation.read_bytes())
+
 
 if __name__ == "__main__":
     unittest.main()
