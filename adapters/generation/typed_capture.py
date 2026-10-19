@@ -104,7 +104,18 @@ def python_exception_fields(node: dict) -> dict:
     return fields
 
 
+def python_dictionary_fields(items: list) -> dict:
+    """Retain insertion order and typed keys separately from dictionary values."""
+    fields = {}
+    for index, pair in enumerate(items):
+        require(type(pair) is list and len(pair) == 2, "invalid dictionary entry")
+        for part, value in zip(("key", "value"), pair):
+            fields["entry:" + str(index) + ":" + part] = dynamic_value(value, "python")
+    return fields
+
+
 def python_node(node: dict) -> dict:
+    """Decode one supported Python container, ordinary object or exception node."""
     label = node["type"]
     require(type(label) is str, "invalid Python type label")
     fields = {}
@@ -113,10 +124,7 @@ def python_node(node: dict) -> dict:
         fields = {"item:" + str(index): dynamic_value(value, "python") for index, value in enumerate(node["items"])}
     elif label == "builtins.dict":
         require(set(node) == {"type", "items"} and type(node["items"]) is list, "invalid dictionary node")
-        for index, pair in enumerate(node["items"]):
-            require(type(pair) is list and len(pair) == 2, "invalid dictionary entry")
-            for part, value in zip(("key", "value"), pair):
-                fields["entry:" + str(index) + ":" + part] = dynamic_value(value, "python")
+        fields = python_dictionary_fields(node["items"])
     else:
         expected = {"type", "fields"} | ({"args", "cause", "context", "suppress_context"} if "args" in node else set())
         require(set(node) == expected, "unsupported Python object fields")
