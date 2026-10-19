@@ -13,6 +13,13 @@ test('primitive values retain exact bits and absence tags',()=>{
   assert.equal(graph.roots.integer.value,'2');
   assert.equal(graph.roots.text.value,'\ud800');
   assert.equal(graph.roots.flag.value,true);
+  const original=Object.getOwnPropertyDescriptor(BigInt.prototype,'toString');
+  let calls=0;
+  try{
+    Object.defineProperty(BigInt.prototype,'toString',{value(){calls++;return 'masked'},configurable:true});
+    assert.equal(__oteleqGraph({integer:2n}).roots.integer.value,'2');
+    assert.equal(calls,0);
+  }finally{Object.defineProperty(BigInt.prototype,'toString',original);}
 });
 
 test('aliases cycles sparse arrays descriptors and prototype state survive',()=>{

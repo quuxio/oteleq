@@ -96,6 +96,14 @@ def own_fields(fields: list, language: str, descriptors: bool) -> dict:
     return result
 
 
+def python_exception_fields(node: dict) -> dict:
+    """Keep the exception's argument and chaining state without formatting it."""
+    fields = {"exception:" + name: dynamic_value(node[name], "python") for name in ("args", "cause", "context")}
+    require(type(node["suppress_context"]) is bool, "invalid exception context flag")
+    fields["exception:suppress_context"] = {"kind": "boolean", "value": node["suppress_context"]}
+    return fields
+
+
 def python_node(node: dict) -> dict:
     label = node["type"]
     require(type(label) is str, "invalid Python type label")
@@ -114,10 +122,7 @@ def python_node(node: dict) -> dict:
         require(set(node) == expected, "unsupported Python object fields")
         fields = own_fields(node["fields"], "python", False)
         if "args" in node:
-            for name in ("args", "cause", "context"):
-                fields["exception:" + name] = dynamic_value(node[name], "python")
-            require(type(node["suppress_context"]) is bool, "invalid exception context flag")
-            fields["exception:suppress_context"] = {"kind": "boolean", "value": node["suppress_context"]}
+            fields.update(python_exception_fields(node))
     # Type names are labels of observed state, not a proof of class origin.
     try:
         label.encode("utf-8", errors="strict")
@@ -295,7 +300,66 @@ def managed_scalar(raw: bytes, language: str, abi: dict) -> dict:
     return java_scalar(tag, payload) if language == "java" else readers[language](tag, payload, abi)
 
 
+def scalar_value(payload: bytes, type_: str, abi: dict, language: str) -> dict:
+    """Select the closed codec for the actual worker language."""
+    if language in ("c", "cpp"):
+        return native_scalar(payload, type_, abi, language)
+    return managed_scalar(payload, language, abi)
+
+
+def scalar_state(records: list[bytes], entry: dict, abi: dict) -> dict:
+    """Require the plan's complete ordered global list at each boundary."""
+    language = entry["language"]
+    roots = {}
+    for item, record in zip(entry["globals"], records):
+        prefix = item["name"].encode() + b":"
+        if language in ("c", "cpp"):
+            prefix += item["type"].encode() + b":"
+        require(record.startswith(prefix), "missing/misordered declared global")
+        roots["global:" + item["name"]] = scalar_value(record[len(prefix):], item["type"], abi, language)
+    return {"roots": roots, "nodes": []}
+
+
+def scalar_return(payload: bytes, entry: dict, abi: dict) -> dict:
+    """Read a successful result only after checking its native type framing."""
+    language = entry["language"]
+    if payload == b"void":
+        return {"kind": "unit", "type": language + ".unit"}
+    if language in ("c", "cpp"):
+        prefix = entry["output"].replace("const ", "").strip().encode() + b":"
+        require(payload.startswith(prefix), "unexpected native return type")
+        payload = payload[len(prefix):]
+    return scalar_value(payload, entry["output"], abi, language)
+
+
+def scalar_error(payload: bytes, language: str, abi: dict, graph: dict) -> dict:
+    """Decode only qualified error/panic payloads, never application formatters."""
+    category = "exception"
+    if language == "cpp":
+        tag, delimiter, message = payload.partition(b"\t")
+        require(bool(delimiter), "unsupported C++ error codec")
+        type_, message_value = "cpp." + tag.decode("ascii"), {"kind": "bytes", "type": "cpp.what", "hex": message.hex()}
+    elif language == "java":
+        tag, delimiter, message = payload.partition(b":")
+        require(bool(delimiter), "invalid Java error codec")
+        type_, message_value = tag.decode("ascii"), managed_scalar(message, language, abi)
+    elif language == "rust":
+        tag, delimiter, message = payload.partition(b":")
+        require(tag in (b"string", b"str") and bool(delimiter), "unsupported Rust panic payload")
+        type_ = "rust.panic." + tag.decode()
+        category = "panic"
+        message_value = {"kind": "string", "type": "rust.str", "encoding": "utf8", "value": quoted(message.decode(), "rust").hex()}
+    else:
+        require(language == "go", "C error observation requires a fixture")
+        graph["roots"]["error"] = managed_scalar(payload, language, abi)
+        return {"kind": "error", "category": "panic", "graph": graph}
+    graph["roots"]["error"] = reference(0)
+    graph["nodes"].append({"id": "n0", "type": type_, "fields": {"message": message_value}})
+    return {"kind": "error", "category": category, "graph": graph}
+
+
 def scalar_capture(raw: bytes, entry: dict) -> tuple[dict, dict, dict]:
+    """Frame complete boundaries from the frozen global count, not delimiters in values."""
     language = entry["language"]
     lines = raw.split(b"\n")
     require(len(lines) >= 4, "missing observation boundaries")
@@ -309,53 +373,15 @@ def scalar_capture(raw: bytes, entry: dict) -> tuple[dict, dict, dict]:
     count = len(entry["globals"])
     after_index = len(lines) - count - 1
     require(lines[0] == b"before" and after_index > count and lines[after_index] == b"after", "invalid state boundary framing")
-    def value(payload, type_):
-        return native_scalar(payload, type_, abi, language) if language in ("c", "cpp") else managed_scalar(payload, language, abi)
-    def state(records):
-        roots = {}
-        for item, record in zip(entry["globals"], records):
-            prefix = item["name"].encode() + b":"
-            if language in ("c", "cpp"):
-                prefix += item["type"].encode() + b":"
-            require(record.startswith(prefix), "missing/misordered declared global")
-            roots["global:" + item["name"]] = value(record[len(prefix):], item["type"])
-        return {"roots": roots, "nodes": []}
-    before, after = state(lines[1:1 + count]), state(lines[after_index + 1:])
-    outcome = b"\n".join(lines[1 + count:after_index])
-    kind, separator, payload = outcome.partition(b":")
+    before = scalar_state(lines[1:1 + count], entry, abi)
+    after = scalar_state(lines[after_index + 1:], entry, abi)
+    kind, separator, payload = b"\n".join(lines[1 + count:after_index]).partition(b":")
     require(kind in (b"return", b"error") and bool(separator), "invalid outcome")
     graph = {"roots": dict(after["roots"]), "nodes": []}
     if kind == b"return":
-        if payload == b"void":
-            result = {"kind": "unit", "type": language + ".unit"}
-        elif language in ("c", "cpp"):
-            prefix = entry["output"].replace("const ", "").strip().encode() + b":"
-            require(payload.startswith(prefix), "unexpected native return type")
-            result = value(payload[len(prefix):], entry["output"])
-        else:
-            result = value(payload, entry["output"])
-        graph["roots"]["result"] = result
+        graph["roots"]["result"] = scalar_return(payload, entry, abi)
         return before, {"kind": "return", "graph": graph}, after
-    if language == "cpp":
-        tag, delimiter, message = payload.partition(b"\t")
-        require(bool(delimiter), "unsupported C++ error codec")
-        type_, message_value = "cpp." + tag.decode("ascii"), {"kind": "bytes", "type": "cpp.what", "hex": message.hex()}
-    elif language == "java":
-        tag, delimiter, message = payload.partition(b":")
-        require(bool(delimiter), "invalid Java error codec")
-        type_, message_value = tag.decode("ascii"), managed_scalar(message, language, abi)
-    elif language == "rust":
-        tag, delimiter, message = payload.partition(b":")
-        require(tag in (b"string", b"str") and bool(delimiter), "unsupported Rust panic payload")
-        type_ = "rust.panic." + tag.decode()
-        message_value = {"kind": "string", "type": "rust.str", "encoding": "utf8", "value": quoted(message.decode(), "rust").hex()}
-    else:
-        require(language == "go", "C error observation requires a fixture")
-        graph["roots"]["error"] = managed_scalar(payload, language, abi)
-        return before, {"kind": "error", "category": "panic", "graph": graph}, after
-    graph["roots"]["error"] = reference(0)
-    graph["nodes"].append({"id": "n0", "type": type_, "fields": {"message": message_value}})
-    return before, {"kind": "error", "category": "panic" if language == "rust" else "exception", "graph": graph}, after
+    return before, scalar_error(payload, language, abi, graph), after
 
 
 def required_roots(entry: dict) -> list[str]:

@@ -26,6 +26,7 @@ MAX_OUTPUT = 4 * 1024 * 1024
 OWNED_MARKER = '.oteleq-owned.json'
 PLAN_FILE = 'plan.json'
 GENERATED_MANIFEST = 'generated-manifest.json'
+TYPED_BUNDLE = 'typed-bundle.json'
 BUILD_IDENTITIES = 'build-identities.json'
 README_FILE = 'README.txt'
 COMMANDS = ("plan", "generate", "run", "replay", "clean", "export-tests")
@@ -614,10 +615,10 @@ def compare_case(workspace, data, entry, case, destination, decoder):
     typed_scope = {**scope, "channels": ["stdout", "stderr"],
                    "observer": "oteleq typed boundary codecs v1; captured globals/arguments and initial-state checks; name-only decoded invocation witness"}
     typed_scope["gaps"] = [*scope["gaps"], "graph identities are local to each boundary; cross-boundary replacement, weakref and finalizer effects are unobserved"]
-    write(destination / "typed-bundle.json", {"typed_schema_version": 1, "scope": typed_scope, "cases": [typed_case]})
-    if (destination / "typed-bundle.json").stat().st_size > 16 * 1024 * 1024:
+    write(destination / TYPED_BUNDLE, {"typed_schema_version": 1, "scope": typed_scope, "cases": [typed_case]})
+    if (destination / TYPED_BUNDLE).stat().st_size > 16 * 1024 * 1024:
         raise ValueError("typed bundle exceeds comparator input limit; lower repeats or capture budget")
-    result = execute([os.environ["OTELEQ_EXECUTABLE"], "compare-observations", destination / "typed-bundle.json"], workspace,
+    result = execute([os.environ["OTELEQ_EXECUTABLE"], "compare-observations", destination / TYPED_BUNDLE], workspace,
                      folder=destination / "comparator")
     (destination / "comparison.json").write_bytes(result.stdout)
     return {"case": case["id"], "function": entry["otelc_function"], "exit_code": result.returncode,

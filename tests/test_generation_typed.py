@@ -48,8 +48,9 @@ class TypedCodecTests(unittest.TestCase):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 typed.integer("int", value, 32)
         for payload in (b"i8:128", b"u8:-1", b"unknown:7", b"float32:000000000", b"char:10000"):
+            language = "java" if payload.startswith(b"char") else "rust"
             with self.subTest(payload=payload), self.assertRaises(ValueError):
-                typed.managed_scalar(payload, "java" if payload.startswith(b"char") else "rust", {})
+                typed.managed_scalar(payload, language, {})
 
     def test_python_alias_cycles_dictionary_order_and_instance_order_are_explicit(self):
         class Cell:
@@ -90,8 +91,9 @@ class TypedCodecTests(unittest.TestCase):
         Base.__module__ = Identity()
         class Derived(Base):
             pass
+        derived = Derived()
         with self.assertRaises(ValueError):
-            observe.graph({"root": Derived()})
+            observe.graph({"root": derived})
         self.assertEqual(calls, [])
 
     def test_outcome_framing_retains_native_newlines_without_delimiter_guessing(self):
@@ -101,9 +103,10 @@ class TypedCodecTests(unittest.TestCase):
         _, outcome, _ = typed.scalar_capture(abi + raw, candidate)
         self.assertEqual(outcome["graph"]["nodes"][0]["fields"]["message"]["hex"], b"first\nafter\nlast".hex())
         self.assertEqual(outcome["graph"]["nodes"][0]["type"], "cpp.std::runtime_error")
+        candidate = entry("rust")
         for malformed in (b"", b"before\nafter\n", b"abi:[]\nbefore\nreturn:i32:7\nafter\n"):
             with self.subTest(malformed=malformed), self.assertRaises(ValueError):
-                typed.scalar_capture(malformed, entry("rust"))
+                typed.scalar_capture(malformed, candidate)
 
     def test_missing_or_ambiguous_codec_fields_never_disappear(self):
         invalid = [{"type": "null", "value": 7}, {"type": "int", "value": "7", "hidden": 2},
@@ -116,9 +119,12 @@ class TypedCodecTests(unittest.TestCase):
         for escaped in ('"\\q"', '"\\x0"', '"\\u{110000}"'):
             with self.subTest(escaped=escaped), self.assertRaises((ValueError, UnicodeError)):
                 typed.quoted(escaped, "rust")
+        candidate = entry("python")
+        frozen = contract(candidate)
         for capture in (None, [], {"before": {}, "outcome": {"kind": "return", "value": {}, "hidden": 1}, "after": {}}):
+            payload = json.dumps(capture).encode()
             with self.subTest(capture=capture), self.assertRaises(ValueError):
-                typed.observation(json.dumps(capture).encode(), entry("python"), contract(entry("python")))
+                typed.observation(payload, candidate, frozen)
 
     def test_expected_error_fixtures_are_explicit_and_strict(self):
         fixture = {"function": "*selected*", "cases": [[]],
