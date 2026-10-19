@@ -8,6 +8,13 @@ const input = JSON.parse(fs.readFileSync(0, 'utf8'));
 const source = ts.createSourceFile(input.filename, input.source, ts.ScriptTarget.Latest, true);
 if (source.parseDiagnostics.length) throw new Error('TypeScript parser rejected source');
 const functions = [], globals = [];
+// Preserve the hashbang and directive prologue before inserting a hoisted
+// declaration binding capture. UTF-16 parser offsets become UTF-8 byte offsets.
+let bindingCaptureOffset = source.statements[0]?.getStart(source) ?? input.source.length;
+for (const statement of source.statements) {
+  if (!ts.isExpressionStatement(statement) || !ts.isStringLiteral(statement.expression)) break;
+  bindingCaptureOffset = statement.end;
+}
 function reasonFor(node, depth) {
   if(depth || !ts.isFunctionDeclaration(node)) return 'nested function, method or closure needs an access fixture';
   if(node.typeParameters?.length || node.parameters.some(p => p.dotDotDotToken)) return 'generic or variadic callable needs a fixture';
@@ -34,4 +41,5 @@ function visit(node, depth = 0) {
   ts.forEachChild(node, child => visit(child, depth));
 }
 visit(source);
-process.stdout.write(JSON.stringify({functions, globals, parser: 'TypeScript ' + ts.version}));
+process.stdout.write(JSON.stringify({functions, globals, parser: 'TypeScript ' + ts.version,
+  binding_capture_offset: Buffer.byteLength(input.source.slice(0,bindingCaptureOffset),'utf8')}));
