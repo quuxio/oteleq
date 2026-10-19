@@ -385,14 +385,14 @@ class CaptureBoundaryTests(unittest.TestCase):
                 self.assertEqual(on[-2:], ["run", workspace / "instrumented"])
                 self.assertEqual(plain, [workspace / "plain"])
 
-    def test_managed_and_rust_execution_recipes_keep_the_original_source(self):
+    def test_managed_execution_recipes_keep_the_original_source(self):
         workspace, root, policy, source = map(Path, ("/tmp/work", "/tmp/otelc", "/tmp/policy", "/tmp/source"))
-        for language in ("python", "java", "go", "javascript", "typescript", "rust"):
+        for language in ("python", "java", "go", "javascript", "typescript"):
             with self.subTest(language=language), patch.object(capture, "build"):
-                tools = {language: Path("/qualified/tool"), "rustc": Path("/qualified/rustc")}
+                tools = {language: Path("/qualified/tool")}
                 plain, on = capture.commands(root, workspace, language, source, policy, tools, {}, workspace)
                 self.assertEqual(on[-1], source)
-                self.assertIn(str(source), [str(p) for p in plain] if language != "rust" else [str(source)])
+                self.assertIn(str(source), [str(p) for p in plain])
                 if language == "java":
                     self.assertEqual(plain[1], "-Xshare:off")
                     self.assertEqual(on[-2], "-Xshare:off")

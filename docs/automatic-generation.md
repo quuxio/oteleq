@@ -92,9 +92,11 @@ Repeats range from 2 to 32 per lane. `case_timeout_ms` bounds each application l
 | JavaScript/TypeScript | otelc's pinned TypeScript compiler AST | Private appended Node caller and actual loader; matched TypeScript baseline emission |
 | Go | Standard `go/parser` AST | Private appended same-file caller and actual Go compile adapter |
 
-These are syntax inventories. Compilation and runtime witnesses qualify individual runnable cases; syntax alone does not establish semantic types, build visibility or safe domain inputs. Parse/tool errors produce inventory blockers. Dependencies must already be available to the qualified local tools; generation does not install them into the application.
+These are syntax inventories. Compilation and runtime witnesses qualify individual runnable cases; syntax alone does not establish semantic types, build visibility or safe domain inputs. Parse/tool errors produce inventory blockers. Rust requires otelc's separate standalone-source artefact API (`rust --build SOURCE.rs --output-dir BUNDLE`, then `rust --run BUNDLE`). The qualified candidate contract is [otelc PR65](https://github.com/quuxio/otelc/pull/65); providers which expose only combined compile-and-run are unsupported. Cargo build-only is not qualified.
 
-Java uses `-Xshare:off` in both lanes. C/C++ select fixed LLVM 22 locations or explicit `OTELC_CLANG`/`OTELC_CLANGXX`; metadata verifies the canonical selected directory. Set qualified `OTELC_RUSTC`, `OTELC_NODE`, `OTELC_JAVA` and `OTELC_GO` where defaults are unsuitable. Rust SDK/compiler distributions and Node native observer ABI must match. See [tool qualification](eight-language-capture.md#run). The real eight-language integration is qualified on macOS ARM64; Linux/Windows are not qualified by that result.
+Dependencies must already be available to the qualified local tools; generation does not install them into the application.
+
+Java uses `-Xshare:off` in both lanes. C/C++ select fixed LLVM 22 locations or explicit `OTELC_CLANG`/`OTELC_CLANGXX`; metadata verifies the canonical selected directory. Set qualified `OTELC_RUSTC`, `OTELC_NODE`, `OTELC_JAVA` and `OTELC_GO` where defaults are unsuitable. Rust SDK/compiler distributions and Node native observer ABI must match. Both Rust lanes use `--edition=2024 -O -g` and the same source-relative pathname. Build stdout/stderr stay in build evidence; application capture uses a no-build launch. The consumer rejects a changed baseline flag contract and verifies executable, retained plan, entry source, SDK and adapter hashes plus compiler provenance. Metadata never selects executable paths. See [tool qualification](eight-language-capture.md#run). The real eight-language integration is qualified on macOS ARM64; Linux/Windows are not qualified by that result.
 
 ## What is compared
 
@@ -124,6 +126,15 @@ make generation-otelc PYTHON=/absolute/path/to/otelc/.venv/bin/python \
 ```
 
 The fixture covers 24 matching cases/96 paired-control launches, eight generated framework cases, exported replay and three deliberately different state cases. It is diagnostic evidence with the declared observation scope. No original application/source tree is modified.
+
+The Rust split-path qualification preserves real unused-function build warnings separately from exact application stderr, checks u128 extrema, f32/negative-zero representation and `file!()` logical paths, and rejects deliberately altered retained stderr:
+
+```sh
+make generation-rust-otelc PYTHON=/absolute/path/to/otelc/.venv/bin/python \
+  OTELC_ROOT=/absolute/path/to/otelc REPORT_DIR=/tmp/new-rust-build-qualification
+```
+
+This is a Rust-only standalone-source check; it does not establish a common eight-language provider revision.
 
 The configured-policy qualification adds concrete domain cases, three repeats per lane, integer extremes and lossless UTF-16 strings, plus an altered-observation rejection control:
 
