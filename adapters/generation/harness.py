@@ -239,19 +239,21 @@ def python_driver(entry, args):
 import importlib.util, json, os, sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
-from _oteleq_observe import graph, MISSING
+from _oteleq_observe import graph, MISSING, function_code, bound_function
 target = Path({entry['path']!r})
+expected_code = function_code(target, {entry['name']!r}, {entry['line']!r})
 sys.path.insert(0, str(target.parent))
 spec = importlib.util.spec_from_file_location("_oteleq_target", target)
 module = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = module
 spec.loader.exec_module(module)
 arguments = {args!r}
+function = bound_function(module, {entry['name']!r}, expected_code)
 def roots():
     return {{**{{"global:" + name: vars(module).get(name, MISSING) for name in {globals_!r}}}, "arguments": arguments}}
 before = graph(roots())
 try:
-    result = getattr(module, {entry['name']!r})(*arguments)
+    result = function(*arguments)
 except Exception as error:
     outcome = {{"kind": "error", "value": graph({{"error": error, **roots()}})}}
 else:

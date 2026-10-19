@@ -161,7 +161,7 @@ class HarnessTests(unittest.TestCase):
             with tempfile.TemporaryDirectory() as temporary:
                 project=Path(temporary)
                 entry=self.entry(language,path="source"+suffix,parameters=["i32"] if language=="rust" else ["int"],output="i32" if language=="rust" else "int",
-                                 globals=[{"name":"state","type":"int"}], async_=True)
+                                 globals=[{"name":"state","type":"int"}], line=1, async_=True)
                 source=project/entry["path"]
                 source.write_text("package main\n" if language=="go" else "// original\n" if language!="python" else "# original\n")
                 driver=harness.materialise(project,entry,[0])
