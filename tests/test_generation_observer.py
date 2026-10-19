@@ -4,6 +4,8 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
+from types import ModuleType
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "adapters/generation"))
@@ -12,6 +14,46 @@ import harness
 
 
 class PassiveObserverTests(unittest.TestCase):
+    def test_selected_function_binding_uses_frozen_code_not_a_startup_span(self):
+        original = "def selected(value:int)->int:\n    return value+1\n"
+        with tempfile.TemporaryDirectory() as folder:
+            source = Path(folder).resolve() / "target.py"
+            source.write_text(original)
+            expected = observe.function_code(source, "selected", 1)
+            module = ModuleType("target")
+            exec(compile(original, str(source), "exec"), vars(module))
+            self.assertEqual(observe.bound_function(module, "selected", expected)(7), 8)
+            exec(compile("def replacement(value):return 99\n", str(source), "exec"), vars(module))
+            vars(module)["selected"] = vars(module)["replacement"]
+            with self.assertRaisesRegex(ValueError, "binding differs"):
+                observe.bound_function(module, "selected", expected)
+            vars(module)["selected"] = lambda value: 99
+            with self.assertRaisesRegex(ValueError, "binding differs"):
+                observe.bound_function(module, "selected", expected)
+            with self.assertRaisesRegex(ValueError, "unique source"):
+                observe.function_code(source, "missing", 1)
+            with self.assertRaisesRegex(ValueError, "binding fixture"):
+                observe.bound_function(object(), "selected", expected)
+
+    def test_dynamic_callable_binding_does_not_invoke_lookup_or_call_hooks(self):
+        calls = []
+
+        class Callable:
+            def __getattribute__(self, name):
+                calls.append(name)
+                return super().__getattribute__(name)
+
+            def __call__(self, value):
+                calls.append("call")
+                return value
+
+        module = ModuleType("target")
+        vars(module)["selected"] = Callable()
+        expected = compile("def selected(value):return value\n", "target.py", "exec").co_consts[0]
+        with self.assertRaisesRegex(ValueError, "binding differs"):
+            observe.bound_function(module, "selected", expected)
+        self.assertEqual(calls, [])
+
     def test_dictionary_properties_are_refused_without_running_getters(self):
         calls = []
 

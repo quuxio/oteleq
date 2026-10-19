@@ -436,6 +436,10 @@ def build_command(root, project, entry, driver, config, tools, env, folder, scra
         old_execute = capture.execute
         capture.execute = lambda command, cwd, environment, timeout=180: execute(command, cwd, environment, folder / ("build-" + uuid.uuid4().hex), timeout)
         try:
+            if language == "rust":
+                command = capture.rust_command(root, project, driver, config, tools, env, folder, scratch, lane)
+                shutil.copyfile(folder / (lane + "-build-identities.json"), folder / BUILD_IDENTITIES)
+                return command
             plain, on = capture.commands(root, project, language, driver, config, tools, env, folder)
         finally:
             capture.execute = old_execute

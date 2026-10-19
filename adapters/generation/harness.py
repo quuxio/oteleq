@@ -215,6 +215,10 @@ def literal(value, type_, language):
             return str(value).lower()
         return str(value) + (".0" if type_ in ("f32", "f64") and type(value) is int else "") + type_
     if language == "go":
+        if type_ in ("float32", "float64"):
+            width = float_width(type_, language)
+            bits = struct.pack(">f" if width == 32 else ">d", value).hex()
+            return f"__oteleq_math.Float{width}frombits(0x{bits})"
         return type_ + "(" + json.dumps(value) + ")"
     return json.dumps(value)
 
@@ -235,19 +239,21 @@ def python_driver(entry, args):
 import importlib.util, json, os, sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
-from _oteleq_observe import graph, MISSING
+from _oteleq_observe import graph, MISSING, function_code, bound_function
 target = Path({entry['path']!r})
+expected_code = function_code(target, {entry['name']!r}, {entry['line']!r})
 sys.path.insert(0, str(target.parent))
 spec = importlib.util.spec_from_file_location("_oteleq_target", target)
 module = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = module
 spec.loader.exec_module(module)
 arguments = {args!r}
+function = bound_function(module, {entry['name']!r}, expected_code)
 def roots():
     return {{**{{"global:" + name: vars(module).get(name, MISSING) for name in {globals_!r}}}, "arguments": arguments}}
 before = graph(roots())
 try:
-    result = getattr(module, {entry['name']!r})(*arguments)
+    result = function(*arguments)
 except Exception as error:
     outcome = {{"kind": "error", "value": graph({{"error": error, **roots()}})}}
 else:
@@ -387,7 +393,7 @@ fn main() {{
 def go_driver(entry, args, source):
     source = rename_main(source, entry["file_functions"], "go")
     position = entry["package_end"]
-    imports = '\nimport (oteleqfmt "fmt"; oteleqos "os"; oteleqmath "math")\n'
+    imports = '\nimport (__oteleq_fmt "fmt"; __oteleq_os "os"; __oteleq_math "math")\n'
     raw = source.encode()
     source = (raw[:position] + imports.encode() + raw[position:]).decode()
     call = entry["name"] + "(" + ",".join(literal(v, t, "go") for v, t in zip(args, entry["parameters"])) + ")"
@@ -395,15 +401,15 @@ def go_driver(entry, args, source):
     state = "\n".join('s+=' + json.dumps(g["name"] + ':') + '+__oteleqValue(' + g["name"] + ')+"\\n"' for g in entry["globals"])
     return source + f'''
 func __oteleqValue(v any) string {{
- switch x:=v.(type) {{case float32: return oteleqfmt.Sprintf("float32:%x",oteleqmath.Float32bits(x));case float64:return oteleqfmt.Sprintf("float64:%x",oteleqmath.Float64bits(x))}}
+ switch x:=v.(type) {{case float32: return __oteleq_fmt.Sprintf("float32:%x",__oteleq_math.Float32bits(x));case float64:return __oteleq_fmt.Sprintf("float64:%x",__oteleq_math.Float64bits(x))}}
  switch v.(type) {{case nil,bool,string,int,int8,int16,int32,int64,uint,uint8,uint16,uint32,uint64:default:panic("opaque observation requires a fixture")}}
- return oteleqfmt.Sprintf("%T:%#v",v,v)
+ return __oteleq_fmt.Sprintf("%T:%#v",v,v)
 }}
 func main(){{
  s:="before\\n"; {state}
  func(){{defer func(){{if p:=recover();p!=nil{{s+="error:"+__oteleqValue(p)+"\\n"}}}}();{invoked}}}()
  s+="after\\n"; {state}
- if err:=oteleqos.WriteFile(oteleqos.Getenv("OTELEQ_OBSERVATION"),[]byte(s),0600);err!=nil{{panic(err)}}
+ if err:=__oteleq_os.WriteFile(__oteleq_os.Getenv("OTELEQ_OBSERVATION"),[]byte(s),0600);err!=nil{{panic(err)}}
 }}
 '''
 

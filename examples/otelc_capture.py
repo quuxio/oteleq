@@ -100,6 +100,10 @@ def strict_json(data):
     return json.loads(data, object_pairs_hook=unique_object)
 
 
+OTELC_CLI_PATH = "target/debug/quux-otelc"
+RUST_BUILD_FILENAME = "build.json"
+
+
 def digest(data):
     return hashlib.sha256(data).hexdigest()
 
@@ -164,7 +168,7 @@ def typescript_backend(root, language, spec, policy):
 
 def artefacts(root, language, tools):
     """Re-enumerate executable adapter inputs so additions/removals are visible."""
-    paths = [root / "target/debug/quux-otelc"]
+    paths = [root / OTELC_CLI_PATH]
     trees = []
     if language in ("c", "cpp"):
         paths += [root / "target/debug/libquux_otelc_runtime.a",
@@ -221,8 +225,76 @@ def build(command, workspace, environment, output):
         raise ValueError(f"build failed; inspect {output}")
 
 
+RUST_BASELINE_FLAGS = ("--edition=2024", "-O", "-g")
+
+
+def rust_metadata(bundle: Path) -> dict:
+    """Read only fixed bundle files and reject an unqualified schema/flag contract."""
+    for name in ("application", "plan.json", RUST_BUILD_FILENAME):
+        path = bundle / name
+        if path.is_symlink() or not path.is_file():
+            raise ValueError("Rust build bundle needs regular application/plan/build files")
+    metadata_path = bundle / RUST_BUILD_FILENAME
+    if metadata_path.stat().st_size > 4 * 1024 * 1024:
+        raise ValueError("Rust build metadata exceeds its size limit")
+    metadata = strict_json(metadata_path.read_text())
+    if (not isinstance(metadata, dict) or type(metadata.get("schema_version")) is not int or metadata["schema_version"] != 1
+            or metadata.get("language") != "rust"
+            or metadata.get("baseline_flags") != list(RUST_BASELINE_FLAGS)):
+        raise ValueError("Rust build flags or manifest schema require separate qualification")
+    return metadata
+
+
+def rust_compiler(metadata: dict, tools: dict[str, Path]) -> dict:
+    """Check compiler provenance as text; metadata cannot select an executable."""
+    compiler = metadata.get("compiler", {})
+    if (not isinstance(compiler, dict) or compiler.get("program") != str(tools["rustc"])
+            or not isinstance(compiler.get("argv"), list)
+            or not all(isinstance(arg, str) for arg in compiler["argv"])
+            or not all(flag in compiler["argv"] for flag in RUST_BASELINE_FLAGS)):
+        raise ValueError("Rust build compiler provenance does not match the selected compiler")
+    return compiler
+
+
+def rust_manifest(root: Path, workspace: Path, source: Path, bundle: Path, tools: dict[str, Path]) -> dict:
+    """Verify all source/build/provider hashes using only caller-selected paths."""
+    metadata = rust_metadata(bundle)
+    compiler = rust_compiler(metadata, tools)
+    expected = {"executable_sha256": file_digest(bundle / "application"),
+                "plan_sha256": file_digest(bundle / "plan.json"),
+                "source_sha256": file_digest(source),
+                "sdk_sha256": file_digest(root / "target/debug/libquux_otelc_rust.rlib"),
+                "adapter_sha256": file_digest(root / "target/debug/otelc-rust-adapter")}
+    if (any(metadata.get(key) != value for key, value in expected.items())
+            or metadata.get("source") != str(source.resolve())
+            or metadata.get("source_root") != str(workspace.resolve())):
+        raise ValueError("Rust build source, executable, policy or provider identity changed")
+    return {**expected, "manifest_sha256": file_digest(bundle / RUST_BUILD_FILENAME),
+            "baseline_flags": list(RUST_BASELINE_FLAGS), "compiler": compiler}
+
+
+def rust_command(root, workspace, source, policy, tools, environment, evidence, output, lane):
+    """Build only the selected lane; application launch never invokes rustc."""
+    prefix = [root / OTELC_CLI_PATH, "--config", policy, "--language", "rust"]
+    relative = source.relative_to(workspace)
+    if lane == "baseline":
+        binary = output / "plain"
+        build([tools["rustc"], *RUST_BASELINE_FLAGS, relative, "-o", binary], workspace,
+              environment, evidence / "plain-build.log")
+        command = [binary]
+        identities = {"application": file_digest(binary), "baseline_flags": list(RUST_BASELINE_FLAGS)}
+    else:
+        bundle = output / "rust-bundle"
+        build(prefix + ["rust", "--build", relative, "--output-dir", bundle], workspace,
+              environment, evidence / "instrumented-build.log")
+        identities = rust_manifest(root, workspace, source, bundle, tools)
+        command = prefix + ["rust", "--run", bundle]
+    (evidence / (lane + "-build-identities.json")).write_text(json.dumps(identities, indent=2) + "\n")
+    return command
+
+
 def commands(root, workspace, language, source, policy, tools, environment, evidence):
-    prefix = [root / "target/debug/quux-otelc", "--config", policy, "--language", language]
+    prefix = [root / OTELC_CLI_PATH, "--config", policy, "--language", language]
     if language in ("c", "cpp"):
         tool = "clang++" if language == "cpp" else "clang"
         flags = ["-O2", "-pthread", "-std=c++17"] if language == "cpp" else ["-O1", "-pthread"]
@@ -231,9 +303,8 @@ def commands(root, workspace, language, source, policy, tools, environment, evid
         build(prefix + [tool, *flags, source, "-o", instrumented], workspace, environment, evidence / "instrumented-build.log")
         return [plain], prefix + ["run", instrumented]
     if language == "rust":
-        plain = workspace / "plain"
-        build([tools["rustc"], "--edition=2024", source, "-o", plain], workspace, environment, evidence / "plain-build.log")
-        return [plain], prefix + ["rust", source]
+        return tuple(rust_command(root, workspace, source, policy, tools, environment, evidence, workspace, lane)
+                     for lane in ("baseline", "instrumented_on"))
     interpreter = tools[language]
     plain = [interpreter, source]
     if language == "go":

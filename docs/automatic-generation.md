@@ -75,7 +75,7 @@ cases = [[7], [41]]
 
 Source and function selectors are case-sensitive globs over complete POSIX relative paths and qualified function identities; exclusions win. Source selectors limit discovery, while the immutable snapshot retains the regular application inputs needed by existing private builds. `excluded_files` and excluded language IDs remain in the plan. Qualified function identities are available in an initial `plan.json`; create a new plan after configuring their fixtures.
 
-Each fixture replaces automatic inputs for its matched callable(s). `source` defaults to `**`; optional `language` scopes a fixture when a shared policy is narrowed with CLI language selectors. Multiple matching fixtures are an error. A fixture matching no inventoried callable is an error, including its partial workspace path for inspection. Arguments must have the correct arity and supported scalar types; integer range checks reject narrowing. Cases retain both requested values and the concrete target representation (including binary32/binary64 rounding); duplicate cases after conversion are rejected. No application observations are normalised. Plain native `char` currently uses the portable 0..127 range; explicitly signed/unsigned byte types have their declared ranges. Current native ranges describe host builds, not cross-compilation. Complex objects/buffers still require the unfinished factory contract.
+Each fixture replaces automatic inputs for its matched callable(s). `source` defaults to `**`; optional `language` scopes a fixture when a shared policy is narrowed with CLI language selectors. Multiple matching fixtures are an error. A fixture matching no inventoried callable is an error, including its partial workspace path for inspection. Arguments must have the correct arity and supported scalar types; integer range checks reject narrowing. Cases retain both requested values and the concrete target representation (including binary32/binary64 rounding); duplicate cases after conversion are rejected. Go floating inputs are constructed from their exact IEEE bits; an untyped Go `-0.0` constant would otherwise lose its sign. No application observations are normalised. Plain native `char` currently uses the portable 0..127 range; explicitly signed/unsigned byte types have their declared ranges. Current native ranges describe host builds, not cross-compilation. Complex objects/buffers still require the unfinished factory contract.
 
 The resolved policy, exact typed cases and a policy digest are frozen into the owned plan and retained reports. An external policy edit does not change a frozen suite; export carries the resolved policy without requiring its original file. Editing a policy inside the application changes the source snapshot identity and requires a new plan.
 
@@ -92,9 +92,11 @@ Repeats range from 2 to 32 per lane. `case_timeout_ms` bounds each application l
 | JavaScript/TypeScript | otelc's pinned TypeScript compiler AST | Private appended Node caller and actual loader; matched TypeScript baseline emission |
 | Go | Standard `go/parser` AST | Private appended same-file caller and actual Go compile adapter |
 
-These are syntax inventories. Compilation and runtime witnesses qualify individual runnable cases; syntax alone does not establish semantic types, build visibility or safe domain inputs. Parse/tool errors produce inventory blockers. Dependencies must already be available to the qualified local tools; generation does not install them into the application.
+These are syntax inventories. Compilation and runtime witnesses qualify individual runnable cases; syntax alone does not establish semantic types, build visibility or safe domain inputs. Parse/tool errors produce inventory blockers. Rust requires otelc's separate standalone-source artefact API (`rust --build SOURCE.rs --output-dir BUNDLE`, then `rust --run BUNDLE`). The qualified candidate contract is [otelc PR65](https://github.com/quuxio/otelc/pull/65); providers which expose only combined compile-and-run are unsupported. Cargo build-only is not qualified.
 
-Java uses `-Xshare:off` in both lanes. C/C++ select fixed LLVM 22 locations or explicit `OTELC_CLANG`/`OTELC_CLANGXX`; metadata verifies the canonical selected directory. Set qualified `OTELC_RUSTC`, `OTELC_NODE`, `OTELC_JAVA` and `OTELC_GO` where defaults are unsuitable. Rust SDK/compiler distributions and Node native observer ABI must match. See [tool qualification](eight-language-capture.md#run). The real eight-language integration is qualified on macOS ARM64; Linux/Windows are not qualified by that result.
+Dependencies must already be available to the qualified local tools; generation does not install them into the application.
+
+Java uses `-Xshare:off` in both lanes. C/C++ select fixed LLVM 22 locations or explicit `OTELC_CLANG`/`OTELC_CLANGXX`; metadata verifies the canonical selected directory. Set qualified `OTELC_RUSTC`, `OTELC_NODE`, `OTELC_JAVA` and `OTELC_GO` where defaults are unsuitable. Rust SDK/compiler distributions and Node native observer ABI must match. Both Rust lanes use `--edition=2024 -O -g` and the same source-relative pathname. Build stdout/stderr stay in build evidence; application capture uses a no-build launch. The consumer rejects a changed baseline flag contract and verifies executable, retained plan, entry source, SDK and adapter hashes plus compiler provenance. Metadata never selects executable paths. See [tool qualification](eight-language-capture.md#run). The real eight-language integration is qualified on macOS ARM64; Linux/Windows are not qualified by that result.
 
 ## What is compared
 
@@ -112,6 +114,8 @@ Global roots are source-declared top-level assignments/variables. Imported-modul
 
 Telemetry is decoded separately. Each instrumented invocation must contain exactly the selected function identity and one complete root tree, with valid IDs/parent graphs, matching service/scope, zero loss/pending counters and finished export. Recursive span counts and escaping-error counts are runtime observations, not independently predicted call counts. Repeated counts must agree. A baseline that exports telemetry, missing instrumentation, missing observations, crashes, timeouts, output overflow, unstable repeats or source changes cannot pass.
 
+Before importing Python application code, the driver compiles the frozen source without executing it and retains the selected function's code identity. Before calling it, the driver requires an ordinary function with the same code, source location and module namespace. Dynamic rebinding, callable proxies and replaced bodies fail capture; a span emitted by a startup call cannot qualify a rebound replacement. Startup calls that add extra selected root trees remain incomplete under the current witness contract. General action-scoped telemetry attribution for constructed fixtures and sequences still needs provider support.
+
 Source snapshots are capped at 10,000 files, 8 MiB per file and 256 MiB in total. Symlinks and non-regular files in the selected snapshot are rejected. `.git`, `target`, `node_modules`, `.venv`, `__pycache__`, `build` and `dist` are excluded and recorded; functions in those directories are outside the inventory. `.h` defaults to C; C++ headers use `.hpp`, `.hh` or `.hxx`. Recognised JSX/TSX can still require unsupported runtime/build context. Generation is capped at 1,024 cases. Workers have a wall-time limit and a 4 MiB combined captured stdout/stderr limit, and their process group is killed on completion/failure. Application stdout/stderr plus the state/outcome observation must fit within 256 KiB per attempt. Python/Node graphs are bounded at 512 nodes and depth 32. This is trusted local execution, not a hostile-code sandbox.
 
 ## Reproduce the qualification
@@ -124,6 +128,15 @@ make generation-otelc PYTHON=/absolute/path/to/otelc/.venv/bin/python \
 ```
 
 The fixture covers 24 matching cases/96 paired-control launches, eight generated framework cases, exported replay and three deliberately different state cases. It is diagnostic evidence with the declared observation scope. No original application/source tree is modified.
+
+The Rust split-path qualification preserves real unused-function build warnings separately from exact application stderr, checks u128 extrema, f32/negative-zero representation and `file!()` logical paths, and rejects deliberately altered retained stderr:
+
+```sh
+make generation-rust-otelc PYTHON=/absolute/path/to/otelc/.venv/bin/python \
+  OTELC_ROOT=/absolute/path/to/otelc REPORT_DIR=/tmp/new-rust-build-qualification
+```
+
+This is a Rust-only standalone-source check; it does not establish a common eight-language provider revision.
 
 The configured-policy qualification adds concrete domain cases, three repeats per lane, integer extremes and lossless UTF-16 strings, plus an altered-observation rejection control:
 

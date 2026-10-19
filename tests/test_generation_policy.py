@@ -99,6 +99,9 @@ class PolicyTests(unittest.TestCase):
                 harness.corpus(candidate, 1)
         with self.assertRaisesRegex(ValueError, "argument count"):
             harness.corpus({"language": "python", "parameters": ["int"], "input_cases": [[]]}, 1)
+        self.assertEqual(harness.literal(-0.0, "float32", "go"), "__oteleq_math.Float32frombits(0x80000000)")
+        self.assertEqual(harness.literal(-0.0, "float64", "go"), "__oteleq_math.Float64frombits(0x8000000000000000)")
+        self.assertEqual(harness.literal(1.3, "float32", "go"), "__oteleq_math.Float32frombits(0x3fa66666)")
         self.assertEqual(harness.literal(-(2**63), "long", "java"), "(long)-9223372036854775808L")
         self.assertIn("ULL", harness.literal(2**64 - 1, "unsigned long long", "cpp"))
         self.assertIn("-9223372036854775807LL-1", harness.literal(-(2**63), "long long", "c"))

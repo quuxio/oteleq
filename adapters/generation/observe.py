@@ -1,7 +1,35 @@
 """MIT-licensed generated Python graph observer. Never compare arbitrary repr output."""
 import struct
-from types import GetSetDescriptorType
+import sys
+from pathlib import Path
+from types import CodeType, FunctionType, GetSetDescriptorType, ModuleType
 MISSING = object()
+
+
+def function_code(source: Path, name: str, line: int) -> CodeType:
+    """Compile without execution before import to freeze the selected body."""
+    source = source.resolve(strict=True)
+    compiled = compile(source.read_bytes(), str(source), "exec", dont_inherit=True,
+                       optimize=sys.flags.optimize)
+    matches = [item for item in compiled.co_consts if type(item) is CodeType
+               and item.co_name == name and item.co_firstlineno == line]
+    if len(matches) != 1:
+        raise ValueError("selected function has no unique source code identity")
+    return matches[0]
+
+
+def bound_function(module: ModuleType, name: str, expected: CodeType) -> FunctionType:
+    """Refuse replaced callables without invoking application lookup hooks."""
+    if type(module) is not ModuleType:
+        raise ValueError("selected function module requires a binding fixture")
+    namespace = vars(module)
+    target = namespace.get(name)
+    if (type(target) is not FunctionType or target.__globals__ is not namespace
+            or target.__code__ != expected
+            or target.__code__.co_filename != expected.co_filename
+            or target.__code__.co_firstlineno != expected.co_firstlineno):
+        raise ValueError("selected function binding differs from its frozen source identity")
+    return target
 
 
 def scalar(item):
