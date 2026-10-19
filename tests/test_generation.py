@@ -419,6 +419,25 @@ class WorkflowTests(unittest.TestCase):
         with patch.object(gen,"MAX_TREE",1):
             with self.assertRaisesRegex(ValueError,"document"):gen.read(self.workspace/"plan.json")
 
+    def test_denied_group_cleanup_requires_independent_absence_of_live_members(self):
+        def processes(output=b"", code=0):
+            return subprocess.CompletedProcess([], code, output, b"")
+
+        with patch.object(gen.os, "killpg", side_effect=PermissionError("denied")):
+            for output in (b"", b"12 12 Z\n", b"15 16 S\n"):
+                with patch.object(gen.subprocess, "run", return_value=processes(output)):
+                    gen.kill_group(12)
+            for output in (b"12 12 S\n", b"15 12 R+\n"):
+                with patch.object(gen.subprocess, "run", return_value=processes(output)):
+                    with self.assertRaises(PermissionError):
+                        gen.kill_group(12)
+            for result in (processes(code=1), processes(b"invalid 12 S\n")):
+                with patch.object(gen.subprocess, "run", return_value=result):
+                    with self.assertRaises(ValueError):
+                        gen.kill_group(12)
+        with patch.object(gen.os, "killpg", side_effect=ProcessLookupError()):
+            gen.kill_group(12)
+
     def test_cli_routes_use_actual_flags_and_fail_closed(self):
         with patch.object(gen,"plan") as planning,patch.object(sys,"stderr",io.StringIO()),self.assertRaises(SystemExit) as abbreviated:
             gen.main(["plan","--source",str(self.source),"--otelc-ro",str(self.root)])
