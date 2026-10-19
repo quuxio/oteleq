@@ -1,0 +1,20 @@
+{
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "scope": "six witnessed C/C++ primitive cases; object aliases and compiler-declared constructors remain blocked",
+  "oteleq_cli_sha256": "a5a35fbef28e2e3dfda1478a9e0450fe57232cba8178fe8a03db4af88e695442",
+  "otelc_cli_sha256": "4f11a98a7628411000c6a9992c907a8068d56156b29e51558b070ee57a972ecf",
+  "matching_cases": 6,
+  "matching_attempts": 24,
+  "blocked_callables": 5,
+  "blocked_object_aliases": 2,
+  "blocked_other_declarations": 3,
+  "qualifier_sha256": "d84b1d7401c8e9fbf9ffaa80fcc8d86a87ebddf55b006439a15b279122a7484c",
+  "strict_gate_exit": 3,
+  "source_preserved": true,
+  "native_scalar_value_oracles": true,
+  "date": "2026-10-19",
+  "runtime_revision": "cb56979a7474507405e407d35052268ee5f57b84",
+  "provider_revision": "8a7689a6d6779ed8621bbe852188eeb56e6fafad",
+  "provider_status": "private integration candidate, not merged-main qualification"
+}
