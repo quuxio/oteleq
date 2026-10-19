@@ -1,5 +1,5 @@
 """Independent witness checks for the fixed Python resource-close workload."""
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from typing import Any
 
 import otelc_collection
@@ -11,19 +11,24 @@ def metric_decoder() -> Any:
     return ExportMetricsServiceRequest
 
 
-def metrics(bodies: Sequence[tuple[str, bytes]], service: str, decoder: Any) -> Any:
+def scoped_metrics(resource: Any, service: str) -> Iterator[Any]:
+    """Reject telemetry from a different execution or instrumentation scope."""
+    attributes = otelc_collection.attributes(resource.resource)
+    if attributes.get("service.name") != service:
+        raise ValueError("resource metric service differs from the execution")
+    for scope in resource.scope_metrics:
+        if scope.scope.name != "quux.otelc":
+            raise ValueError("resource metric instrumentation scope differs")
+        yield from scope.metrics
+
+
+def metrics(bodies: Sequence[tuple[str, bytes]], service: str, decoder: Any) -> Iterator[Any]:
     """Read metrics only from the independently identified execution/scope."""
     for path, body in bodies:
         if path != "/v1/metrics":
             continue
         for resource in decoder.FromString(body).resource_metrics:
-            attributes = otelc_collection.attributes(resource.resource)
-            if attributes.get("service.name") != service:
-                raise ValueError("resource metric service differs from the execution")
-            for scope in resource.scope_metrics:
-                if scope.scope.name != "quux.otelc":
-                    raise ValueError("resource metric instrumentation scope differs")
-                yield from scope.metrics
+            yield from scoped_metrics(resource, service)
 
 
 def metric_points(metric: Any, kind: str, count: int, spec: Mapping[str, Any]) -> None:
