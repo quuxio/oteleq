@@ -17,7 +17,7 @@
       "failed_releases": 1
     },
     "channels": {
-      "stdout": "resources=2; value=7; failed_close=1; layouts=true\n",
+      "stdout": "resources=2; value=7; failed_close=1; layouts=true; retained=0\n",
       "stderr": ""
     }
   }
