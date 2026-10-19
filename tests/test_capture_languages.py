@@ -485,6 +485,27 @@ class LanguageArtefactTests(unittest.TestCase):
                 with self.assertRaises(FileNotFoundError):
                     capture.stable(root, language, tools, identities)
 
+    def test_rust_sdk_shared_libraries_are_content_identified(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for name in ("target/debug/quux-otelc", "target/debug/otelc-rust-adapter",
+                         "target/debug/libquux_otelc_rust.rlib", "Cargo.lock"):
+                path = root / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(b"original")
+            for suffix in (".dylib", ".so", ".dll"):
+                path = root / ("target/debug/deps/macro" + suffix)
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(b"original")
+                identities = capture.artefacts(root, "rust", {})
+                self.assertIn(str(path.relative_to(root)), identities)
+                path.write_bytes(b"replacement")
+                with self.subTest(suffix=suffix), self.assertRaises(ValueError):
+                    capture.stable(root, "rust", {}, identities)
+                path.unlink()
+                with self.assertRaises(ValueError):
+                    capture.stable(root, "rust", {}, identities)
+
     def test_missing_adapter_tree_and_unknown_language_fail(self):
         with tempfile.TemporaryDirectory() as temporary:
             for language in ("go", "python", "javascript", "swift"):

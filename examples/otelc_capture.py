@@ -172,7 +172,9 @@ def artefacts(root, language, tools):
     elif language == "rust":
         paths += [root / "target/debug/otelc-rust-adapter", root / "target/debug/libquux_otelc_rust.rlib",
                   root / "Cargo.lock"]
-        paths += sorted((root / "target/debug/deps").glob("*.rlib"))
+        dependencies = root / "target/debug/deps"
+        paths += sorted(path for pattern in ("*.rlib", "*.dylib", "*.so", "*.dll")
+                        for path in dependencies.glob(pattern))
     elif language == "java":
         paths += [root / "adapters/java/target/java-agent-0.1.0-agent.jar"]
     elif language == "go":

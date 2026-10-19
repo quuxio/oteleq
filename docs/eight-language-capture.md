@@ -25,6 +25,8 @@ All target source/configuration remains unchanged. Generated copies and reports 
 
 Managed reports must declare the expected language and schema; native reports must confirm draining. Python pending contexts cannot be omitted. Fixture manifests also reject duplicate JSON keys and their contents join the observer identity manifest. Both examples reject unexpected baseline telemetry, retain HTTP evidence and application output before later qualification checks, and refuse source-contained temporary parents before probing them. Parent graphs are validated with one visit per node.
 
+Rust content identity includes SDK dependency archives and shared libraries, including procedural macros. Replacing or removing one during capture prevents qualification. Capturing those filenames does not establish execution qualification for another operating system.
+
 Any failed build, missing report, unexpected telemetry, timeout or changed artefact aborts capture and retains partial evidence. The failing language cannot acquire a complete bundle or successful comparison. Already completed language reports remain available; languages after the failure have not been qualified. Reuse a new report directory for the next attempt.
 
 ## Scope

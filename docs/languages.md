@@ -2,7 +2,7 @@
 
 ## Required language set
 
-All eight current otelc targets are required and have implemented scalar adapters: `c`, `cpp`, `rust`, `python`, `java`, `javascript`, `typescript`, `go`. The published [language documentation](https://github.com/quuxio/otelc/blob/3d5b2d7c9167d9cc6fb1be876a05f83a9d6c6e5a/docs/languages.md) is the original design baseline. The [current discovery/execution matrix](automatic-generation.md#discovery-and-build-boundary) and [qualification record](quality.md#published-qualification) describe the implemented scope as of 9 October 2026.
+All eight current otelc targets are required and have implemented scalar adapters: `c`, `cpp`, `rust`, `python`, `java`, `javascript`, `typescript`, `go`. The published [language documentation](https://github.com/quuxio/otelc/blob/3d5b2d7c9167d9cc6fb1be876a05f83a9d6c6e5a/docs/languages.md) is the original design baseline. The [current discovery/execution matrix](automatic-generation.md#discovery-and-build-boundary) and [qualification record](quality.md#published-qualification) describe the implemented scope as of 19 October 2026.
 
 The [implemented scalar generator](automatic-generation.md) supports bounded syntax inventory, private harnesses and actual paired otelc execution for all eight IDs. The rows below describe the broader proposed adapters, frameworks and build-aware capabilities beyond that slice. Toolchain/runtime versions and executable capabilities are pinned when each adapter is qualified against otelc. Objective-C, Swift, Fortran, Zig and .NET appear as later or exploratory otelc routes; they are outside its current eight-language set and are not silently advertised as supported here.
 
