@@ -261,7 +261,10 @@ def rust_profile(root: Path, tools: dict[str, Path]) -> dict[str, Path]:
     """Validate profile data and return only caller-derived asset paths for I/O."""
     profile = rust_document(root / RUST_PROFILE_FILENAME)
     expected_keys = {"schema_version", "rustc", "sdk", "sdk_sha256", "plugin", "plugin_sha256", "llvm_version", "protected_source_roots"}
-    if (set(profile) != expected_keys or type(profile["schema_version"]) is not int or profile["schema_version"] != 1
+    version = profile.get("schema_version")
+    if type(version) is int and version == 2:
+        expected_keys |= {"frontend", "frontend_sha256"}
+    if (set(profile) != expected_keys or type(version) is not int or version not in (1, 2)
             or profile["rustc"] != str(tools["rustc"])):
         raise ValueError("Rust LLVM profile schema or selected compiler differs")
     suffix = {"darwin": ".dylib", "linux": ".so", "win32": ".dll"}.get(sys.platform)
@@ -269,6 +272,8 @@ def rust_profile(root: Path, tools: dict[str, Path]) -> dict[str, Path]:
         raise ValueError("Rust LLVM host profile is unsupported")
     assets = {"sdk": root / "target/rust-llvm-sdk/debug/libquux_otelc_rust.rlib",
               "plugin": root / ("target/debug/otelc_rust_pass" + suffix)}
+    if version == 2:
+        assets["frontend"] = root / "target/debug/otelc-rust-frontend"
     for key, path in assets.items():
         if (profile[key] != str(path) or path.resolve() != path or not path.is_file()
                 or profile[key + "_sha256"] != file_digest(path)):
@@ -287,7 +292,7 @@ def rust_llvm_inputs(root: Path, tools: dict[str, Path]) -> list[Path]:
     dependencies = assets["sdk"].parent / "deps"
     if not dependencies.is_dir() or dependencies.resolve() != dependencies:
         raise ValueError("Rust LLVM SDK dependency directory is missing or linked")
-    paths = [root / RUST_PROFILE_FILENAME, assets["sdk"], assets["plugin"]]
+    paths = [root / RUST_PROFILE_FILENAME, *assets.values()]
     paths += sorted(path for pattern in ("*.rlib", "*.rmeta", "*.dylib", "*.so", "*.dll")
                     for path in dependencies.glob(pattern))
     if any(path.is_symlink() or not path.is_file() for path in paths):
@@ -333,7 +338,10 @@ def rust_llvm_compiler(compiler: dict, source: Path, workspace: Path, tools: dic
     """Verify the complete driver recipe against the selected compiler itself."""
     if not environment or "TMPDIR" not in environment or set(compiler) != {"program", "argv", "version"}:
         raise ValueError("Rust LLVM compiler context or provenance is incomplete")
-    prefix = [source.relative_to(workspace).as_posix(), *RUST_LLVM_BASELINE_FLAGS, "-o"]
+    prefix = [source.relative_to(workspace).as_posix(), *RUST_LLVM_BASELINE_FLAGS]
+    if "frontend" in assets:
+        prefix += ["--sysroot", str(tools["rustc"].parent.parent)]
+    prefix += ["-o"]
     tail = ["-Zllvm-plugins=" + str(assets["plugin"]), "-Zunstable-options", "--extern",
             "noprelude,force,nounused:quux_otelc_rust=" + str(assets["sdk"]), "-L",
             "dependency=" + str(assets["sdk"].parent / "deps")]
@@ -386,10 +394,54 @@ def rust_llvm_function(declaration: dict, resolved: dict, source: Path, name: st
         raise ValueError("Rust LLVM resolved symbol, selection or source identity differs")
 
 
+def rust_frontend_rows(inventory: dict) -> None:
+    """Only emitted compiler instances have symbols; declaration rows are not witnesses."""
+    symbols = set()
+    for row in inventory["functions"]:
+        symbol = row.get("compiled_symbol")
+        if (type(row.get("compiler_name")) is not str or not row["compiler_name"].strip()
+                or len(row["compiler_name"]) > 16384
+                or type(row.get("compiler_expansion")) is not bool or type(row.get("emitted")) is not bool
+                or type(symbol) is not str or len(symbol) > 16384 or row["emitted"] != bool(symbol)
+                or symbol and not symbol.strip()):
+            raise ValueError("Rust frontend compiler definition is malformed")
+        if symbol and symbol in symbols:
+            raise ValueError("Rust frontend compiled symbols are not unique")
+        if symbol:
+            symbols.add(symbol)
+
+
+def rust_frontend_function(declaration: dict, resolved: dict, name: str, identity: str) -> None:
+    """Bind one supported ordinary callable to its exact emitted compiler instance."""
+    compiler_name = declaration["compiler_name"].replace("::", ".").replace("r#", "")
+    if (name != identity + "." + compiler_name or declaration["compiler_expansion"]
+            or not declaration["emitted"] or declaration["compiled_symbol"] != resolved["compiled_symbol"]):
+        raise ValueError("Rust frontend expansion, compiler name or emitted symbol differs")
+
+
+def rust_frontend_records(inventory: dict, resolved: dict, identity: str) -> dict:
+    """Require a bijection between this caller's target/startup and their resolved symbols."""
+    rust_frontend_rows(inventory)
+    symbols = [row["compiled_symbol"] for row in resolved["functions"] if row["selected"] or row["startup"]]
+    if len(resolved["functions"]) != 2 or len(set(symbols)) != 2:
+        raise ValueError("Rust frontend resolution has unexpected or duplicate instances")
+    actual = {row["compiled_symbol"]: row for row in resolved["functions"]}
+    selected = None
+    for row in inventory["functions"]:
+        if row["selected"] or row["startup"]:
+            match = actual.get(row["compiled_symbol"])
+            if match is None or (row["selected"], row["startup"]) != (match["selected"], match["startup"]):
+                raise ValueError("Rust frontend compiled instance does not match its resolved role")
+            rust_frontend_function(row, match, row["name"], identity)
+            if row["selected"]:
+                selected = row["compiler_name"]
+    return {"selected_compiler_name": selected, "compiler_expansion": False}
+
+
 def rust_llvm_records(inventory: dict, resolved: dict, workspace: Path, source: Path, expected_function: str,
-                      scratch: Path) -> dict:
+                      scratch: Path, *, frontend: bool = False) -> dict:
     """Qualify this standalone entry and reject unsupported multi-source builds."""
-    selected, startup = rust_llvm_rows(inventory, 2)
+    selected, startup = rust_llvm_rows(inventory, 3 if frontend else 2)
     actual_selected, actual_startup = rust_llvm_rows(resolved, 1)
     relative = source.relative_to(workspace).as_posix()
     discovery = [relative, *RUST_LLVM_BASELINE_FLAGS, "--emit=dep-info=" + str(scratch / "original.d")]
@@ -404,8 +456,14 @@ def rust_llvm_records(inventory: dict, resolved: dict, workspace: Path, source: 
     main = str(Path(relative).with_suffix("")).replace("/", ".") + ".main"
     rust_llvm_function(selected[0], actual_selected[0], source, expected_function)
     rust_llvm_function(startup[0], actual_startup[0], source, main)
+    provenance = {}
+    if frontend:
+        provenance = rust_frontend_records(inventory, resolved, main.removesuffix(".main"))
+    elif any({"compiler_name", "compiler_expansion", "compiled_symbol", "emitted"} & row.keys()
+             for row in inventory["functions"]):
+        raise ValueError("Rust legacy inventory cannot carry frontend provenance")
     return {"selected_symbol": actual_selected[0]["compiled_symbol"], "selected_function": expected_function,
-            "resolution_phase": resolved["phase"]}
+            "resolution_phase": resolved["phase"], **provenance}
 
 
 def rust_llvm_manifest(root: Path, workspace: Path, source: Path, bundle: Path, metadata: dict,
@@ -430,8 +488,10 @@ def rust_llvm_manifest(root: Path, workspace: Path, source: Path, bundle: Path, 
             or plan.get("execution_available") is not True or plan.get("unavailable") != []):
         raise ValueError("Rust LLVM retained selection plan differs from the requested entry")
     scratch = rust_llvm_compiler(metadata["compiler"], source, workspace, tools, assets, environment)
-    records = rust_llvm_records(inventory, resolved, workspace, source, expected_function, scratch)
-    return {"backend": "llvm", "compiler_hook": hashes, **records}
+    records = rust_llvm_records(inventory, resolved, workspace, source, expected_function, scratch,
+                                frontend="frontend" in assets)
+    frontend = {"frontend_sha256": file_digest(assets["frontend"])} if "frontend" in assets else {}
+    return {"backend": "llvm", "compiler_hook": hashes, **frontend, **records}
 
 
 def rust_manifest(root: Path, workspace: Path, source: Path, bundle: Path, tools: dict[str, Path], *,

@@ -6,6 +6,8 @@ CI validates Markdown, illustrative JSON/TOML syntax, diagnostic capture observe
 
 Rust build-contract regressions separately cover the default compiler manifest and opt-in LLVM profile. They reject changed assets/dependencies, compiler arguments/version, discovery/selection, source coordinates and resolved symbols. Actual LLVM qualification covers six matching standalone cases/36 launches plus an unstable panic case/six launches which must remain incomplete. Its application hook helper is explicitly excluded. Independent column/error oracles and strict stderr checks remain mandatory; unit fixtures and an earlier compiler qualification do not establish LLVM support.
 
+The profile2/inventory3 frontend regressions repeat the legacy refusal corpus and add fixed frontend path/hash/freeze checks, exact selected sysroot, strict compiler provenance, uninstantiated declaration handling and duplicate/rebound symbol rejection. Rehashed semantic changes are checked as data, never used to select executable paths. These tests preserve profile1/inventory2 support. Actual frontend-provider qualification remains pending until its immutable candidate is available; the earlier LLVM record does not qualify it retroactively.
+
 Install the locked documentation tools and run:
 
 ```sh
