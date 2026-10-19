@@ -1,0 +1,20 @@
+{
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "scope": "fixed Python resource workload only; no generated object sequences or all-language claim",
+  "oteleq_cli_sha256": "ff2fc031109394552c9d28f5161897090b9a4f57e8c15108888f3fb56c425ff9",
+  "otelc_cli_sha256": "6cc104a09340f4efeb19ee7754a799fe17abf479923d6be8c4943f8eecfcd34c",
+  "source_sha256": "ea4e3bb636e1286e1ab239e2ab48c695826beec502d17a94f84f6ad91f10d818",
+  "attempts": 4,
+  "spans_per_instrumented_attempt": 3,
+  "resource_instances": 2,
+  "expected_failed_releases": 1,
+  "metric_and_creation_link_checks": true,
+  "altered_retained_stdout_rejected": true,
+  "source_preserved": true,
+  "date": "2026-10-19",
+  "runtime_revision": "83a77dafd317d1fca1a5b8f0ab007a031ab2e2d1",
+  "provider_revision": "60e5c4963da32574f75d895389761935249c6696",
+  "provider_status": "private candidate from otelc PR67; not merged-main qualification",
+  "retention_assertion": "application-owned strong-reference control and weak-reference clearance before runtime shutdown; exact retained=0 output required"
+}

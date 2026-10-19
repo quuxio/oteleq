@@ -87,6 +87,21 @@ The actual run completed two baseline and two instrumented attempts. Fifteen del
 
 The fixture checks weak-reference collection, the existing values and its instance-field layout through those declared output assertions. It does not establish arbitrary receiver/global state, object retention for every class or exact GC timing. Resources/close/dispose, custom finalisers or metaclasses, inherited-only/C/decorated initialisers, weak-reference introspection and concurrent collection schedules remain unqualified. The observer does not add source probes or call GC; the original application already requests collection. Automatic scalar generation is unchanged.
 
+## Python resource-close workload
+
+The separate fixed resource workload uses `examples/apps/python_resource_app.py` and `examples/python-resource.toml` from the qualified provider candidate, with the [independent expectation manifest](../examples/otelc-resource-workloads.json):
+
+```sh
+make resource-otelc PYTHON=/path/to/otelc/.venv/bin/python \
+  OTELC_ROOT=/path/to/qualified/otelc REPORT_DIR=/tmp/oteleq-resource-new
+```
+
+Two plain and two instrumented attempts must produce the independently declared stdout, empty stderr and successful exits. The original application exercises a failed close, subsequent successful closes, a duplicate close and instance-layout assertions. Two distinct resource lifetime roots must link to the selected factory span. Runtime reports require admitted/completed `2`, live/censored/tracked/active counts `0`, failed initialisations `0` and exactly one failed release. That expected failed release is a lifecycle event; genuine runtime, trace, lifetime and export losses still fail.
+
+Actual OTLP metrics must independently confirm admitted/completed `2`, live `0` and failed releases `1`, with the correct service, instrumentation scope, resource type/boundary and cumulative counter representation. Missing or flagged points, duplicate attributes, different counts, missing/wrong creation links and duplicate completions are rejected. An altered retained-stdout control must produce a difference; it is labelled as an evidence edit, not another application execution.
+
+This qualifies only the fixed ordinary Python resource example. The retention candidate `60e5c49` adds an application-owned strong-reference control, clears the application owners and requires both weak references to clear while the observer is active. The original application requests collection; the observer does not insert GC calls. The earlier `fb03960` evidence, whose application owners stayed alive, does not establish that retention check. Generated resource sequences, hidden receiver state, custom/inherited/C release methods, every scheduling context and other languages remain unqualified. Collection lifetime capture remains a distinct workload.
+
 ## Optional native TypeScript workload
 
 The default function workload continues to use the source TypeScript compiler. To qualify otelc's optional native executable emitter separately:

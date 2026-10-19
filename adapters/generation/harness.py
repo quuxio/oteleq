@@ -6,14 +6,24 @@ from pathlib import Path
 import random
 import struct
 
-INTEGERS = {"int", "long", "short", "signed", "signed int", "long long", "unsigned", "unsigned int",
-            "unsigned long", "unsigned short", "unsigned long long", "char", "signed char", "unsigned char",
-            "int8", "int16", "int32", "int64", "uint", "uint8", "uint16", "uint32", "uint64", "byte",
-            "i8", "i16", "i32", "i64", "i128", "isize", "u8", "u16", "u32", "u64", "u128", "usize"}
+NATIVE_INTEGERS = {
+    "int", "long", "short", "signed", "signed int", "long long", "unsigned", "unsigned int",
+    "unsigned long", "unsigned short", "unsigned long long", "char", "signed char", "unsigned char",
+}
+INTEGERS = NATIVE_INTEGERS | {
+    "int8", "int16", "int32", "int64", "uint", "uint8", "uint16", "uint32", "uint64", "byte",
+    "i8", "i16", "i32", "i64", "i128", "isize", "u8", "u16", "u32", "u64", "u128", "usize",
+}
 FLOATS = {"float", "double", "f32", "f64", "float32", "float64", "number"}
 STRINGS = {"str", "string", "String", "java.lang.String"}
 BOOLS = {"bool", "boolean", "_Bool"}
 VOIDS = {"void", "()", "None", "NoneType"}
+
+
+def native_scalar_types(language: str) -> set[str]:
+    """Native spellings only; aliases need canonical compiler type resolution."""
+    boolean = "_Bool" if language == "c" else "bool"
+    return NATIVE_INTEGERS | {"float", "double", boolean}
 
 
 def scalar_type(name):
@@ -22,6 +32,8 @@ def scalar_type(name):
 
 def values(name, language):
     name = scalar_type(name)
+    if language in ("c", "cpp") and name not in native_scalar_types(language):
+        return None
     if name in BOOLS:
         return [False, True]
     if name in INTEGERS:
@@ -227,6 +239,8 @@ def global_gaps(entry):
     if entry["language"] in ("python", "javascript", "typescript"):
         return [g["name"] for g in entry["globals"] if g["name"].startswith("<")]
     scalar = INTEGERS | FLOATS | BOOLS
+    if entry["language"] in ("c", "cpp"):
+        scalar = native_scalar_types(entry["language"])
     if entry["language"] in ("go", "java"):
         scalar |= STRINGS
     return [g["name"] for g in entry["globals"]
@@ -328,6 +342,55 @@ __oteleqFs.writeFileSync(process.env.OTELEQ_OBSERVATION,JSON.stringify({{before:
 '''
 
 
+def native_guards(language: str) -> str:
+    """Resolve source aliases through the compiler before any raw scalar read."""
+    if language == "cpp":
+        return r'''
+#include <type_traits>
+#include <stdexcept>
+template<class T> using __oteleq_type = std::remove_cv_t<std::remove_reference_t<T>>;
+template<class T> constexpr bool __oteleq_scalar =
+  (std::is_integral_v<__oteleq_type<T>> && sizeof(T)<=8) ||
+  std::is_same_v<__oteleq_type<T>,float> ||
+  std::is_same_v<__oteleq_type<T>,double>;
+#define __oteleq_assert_scalar(T) static_assert(__oteleq_scalar<T>, "native type requires a scalar fixture")
+#define __oteleq_assert_value(v) __oteleq_assert_scalar(decltype(v))
+static bool __oteleq_error(FILE* out,const std::exception& error){
+  const std::type_info& kind=typeid(error);
+  if(kind!=typeid(std::exception) && kind!=typeid(std::runtime_error) &&
+     kind!=typeid(std::logic_error) && kind!=typeid(std::invalid_argument) &&
+     kind!=typeid(std::domain_error) && kind!=typeid(std::length_error) &&
+     kind!=typeid(std::out_of_range) && kind!=typeid(std::range_error) &&
+     kind!=typeid(std::overflow_error) && kind!=typeid(std::underflow_error)) return false;
+  fprintf(out,"error:%s:%s\n",kind.name(),error.what());
+  return true;
+}
+'''
+    return r'''
+typedef _Bool __oteleq_bool;
+typedef char __oteleq_char;
+typedef signed char __oteleq_schar;
+typedef unsigned char __oteleq_uchar;
+typedef short __oteleq_short;
+typedef unsigned short __oteleq_ushort;
+typedef int __oteleq_int;
+typedef unsigned int __oteleq_uint;
+typedef long __oteleq_long;
+typedef unsigned long __oteleq_ulong;
+typedef long long __oteleq_llong;
+typedef unsigned long long __oteleq_ullong;
+typedef float __oteleq_float;
+typedef double __oteleq_double;
+#define __oteleq_scalar_value(v) _Generic((v), \
+  __oteleq_bool:1, __oteleq_char:1, __oteleq_schar:1, __oteleq_uchar:1, \
+  __oteleq_short:1, __oteleq_ushort:1, __oteleq_int:1, __oteleq_uint:1, \
+  __oteleq_long:1, __oteleq_ulong:1, __oteleq_llong:1, __oteleq_ullong:1, \
+  __oteleq_float:1, __oteleq_double:1, default:0)
+#define __oteleq_assert_value(v) _Static_assert(__oteleq_scalar_value(v), "native type requires a scalar fixture")
+#define __oteleq_assert_scalar(T) __oteleq_assert_value(*((T*)0))
+'''
+
+
 def native_driver(entry, args):
     parameters = ", ".join(literal(v, t, entry["language"]) for v, t in zip(args, entry["parameters"]))
     output = scalar_type(entry["output"])
@@ -336,20 +399,26 @@ def native_driver(entry, args):
     state = "\n".join('__oteleq_bytes(out,' + json.dumps(g["name"] + ":" + g["type"]) + ',&' + g["name"] + ',sizeof(' + g["name"] + '));' for g in entry["globals"])
     invocation = returned
     if entry["language"] == "cpp":
-        invocation = 'try {' + returned + '} catch(const std::exception& e){fprintf(out,"error:%s:%s\\n",typeid(e).name(),e.what());} catch(...){fclose(out);return 91;}'
+        invocation = 'try {' + returned + '} catch(const std::exception& e){if(!__oteleq_error(out,e)){fclose(out);return 91;}} catch(...){fclose(out);return 91;}'
     headers = '#include <exception>\n#include <typeinfo>\n' if entry["language"] == "cpp" else ''
+    arguments_checked = "\n".join("__oteleq_assert_scalar(" + type_ + ");" for type_ in entry["parameters"])
     return headers + '''#include <stdio.h>
 #include <stdlib.h>
-#define main __oteleq_original_main
-#include ''' + json.dumps(entry["path"]) + '''
-#undef main
-static void __oteleq_bytes(FILE* out,const char* label,const void* v,size_t n){
+''' + native_guards(entry["language"]) + '''
+static void __oteleq_raw_bytes(FILE* out,const char* label,const void* v,size_t n){
   const unsigned char* p=(const unsigned char*)v; fprintf(out,"%s:",label);
   for(size_t i=0;i<n;i++) fprintf(out,"%02x",p[i]); fputc('\\n',out);
 }
+#define __oteleq_bytes(out,label,value,size) do { \\
+  __oteleq_assert_value(*(value)); \\
+  __oteleq_raw_bytes((out),(label),(value),(size)); \\
+} while(0)
+#define main __oteleq_original_main
+#include ''' + json.dumps(entry["path"]) + '''
+#undef main
 int main(void){ FILE* out=fopen(getenv("OTELEQ_OBSERVATION"),"wb"); if(!out)return 90;
 fputs("before\\n",out);
-''' + state + '\n' + invocation + '\nfputs("after\\n",out);\n' + state + '\nreturn fclose(out)!=0;}\n'
+''' + arguments_checked + '\n' + state + '\n' + invocation + '\nfputs("after\\n",out);\n' + state + '\nreturn fclose(out)!=0;}\n'
 
 
 def rename_main(source, entries, language):

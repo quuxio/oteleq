@@ -9,7 +9,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "adapters/generation"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "examples"))
@@ -418,6 +418,33 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(gen.execute([sys.executable,"-c","print('ok')"],self.base).stdout,b"ok\n")
         with patch.object(gen,"MAX_TREE",1):
             with self.assertRaisesRegex(ValueError,"document"):gen.read(self.workspace/"plan.json")
+
+    def test_denied_group_cleanup_requires_independent_absence_of_live_members(self):
+        def processes(output=b"", code=0):
+            return subprocess.CompletedProcess([], code, output, b"")
+
+        with patch.object(gen.os, "killpg", side_effect=PermissionError("denied")):
+            for output in (b"", b"12 12 Z\n", b"15 16 S\n"):
+                with patch.object(gen.subprocess, "run", return_value=processes(output)):
+                    gen.kill_group(12)
+            for output in (b"12 12 S\n", b"15 12 R+\n"):
+                with patch.object(gen.subprocess, "run", return_value=processes(output)):
+                    with self.assertRaises(PermissionError):
+                        gen.kill_group(12)
+            for result in (processes(code=1), processes(b"invalid 12 S\n")):
+                with patch.object(gen.subprocess, "run", return_value=result):
+                    with self.assertRaises(ValueError):
+                        gen.kill_group(12)
+        with patch.object(gen.os, "killpg", side_effect=ProcessLookupError()):
+            gen.kill_group(12)
+        process = MagicMock(pid=12)
+        process.poll.return_value = None
+        process.wait.side_effect = subprocess.TimeoutExpired("fixture", 1)
+        with patch.object(gen.subprocess, "Popen", return_value=process), \
+                patch.object(gen, "kill_group", side_effect=PermissionError("live group")):
+            with self.assertRaisesRegex(PermissionError, "live group"):
+                gen.execute(["fixture"], self.base, folder=self.base / "denied-cleanup", timeout=-1)
+        process.wait.assert_called_once_with(timeout=1)
 
     def test_cli_routes_use_actual_flags_and_fail_closed(self):
         with patch.object(gen,"plan") as planning,patch.object(sys,"stderr",io.StringIO()),self.assertRaises(SystemExit) as abbreviated:

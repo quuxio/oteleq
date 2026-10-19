@@ -106,11 +106,11 @@ def main():
     parser.add_argument("--otelc-root", required=True, type=Path)
     parser.add_argument("--report-dir", required=True, type=Path)
     parser.add_argument("--comparator", type=Path, default=Path(__file__).resolve().parents[1] / "target/debug/quux-oteleq")
-    parser.add_argument("--workload", choices=("functions", "python-workers", "java-workers", "typescript-native", "python-collection"), default="functions")
+    parser.add_argument("--workload", choices=("functions", "python-workers", "java-workers", "typescript-native", "python-collection", "python-resource"), default="functions")
     parser.add_argument("--language", action="append", choices=("c", "cpp", "rust", "python", "java", "javascript", "typescript", "go"))
     args = parser.parse_args()
     filenames = {"functions": "otelc-workloads.json", "typescript-native": "otelc-typescript-native-workloads.json",
-                 "python-collection": "otelc-collection-workloads.json"}
+                 "python-collection": "otelc-collection-workloads.json", "python-resource": "otelc-resource-workloads.json"}
     filename = filenames.get(args.workload, "otelc-worker-workloads.json")
     manifest = capture.strict_json(Path(__file__).with_name(filename).read_text())
     if args.workload != "functions":
