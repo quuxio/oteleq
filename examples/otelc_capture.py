@@ -17,6 +17,7 @@ import time
 import tomllib
 
 import otelc_collection
+import otelc_resource
 
 
 MAX_REQUEST_BYTES = 1024 * 1024
@@ -202,7 +203,7 @@ def artefacts(root, language, tools):
                   and "tests" not in p.relative_to(tree).parts]
     identities = {str(p.relative_to(root)): file_digest(p) for p in paths}
     identities.update({"tool:" + name: file_digest(path) for name, path in tools.items()})
-    for name in ("otelc_capture.py", "otelc_collection.py", "capture_otelc_languages.py", "otelc-workloads.json", "otelc-worker-workloads.json", "otelc-typescript-native-workloads.json", "otelc-collection-workloads.json"):
+    for name in ("otelc_capture.py", "otelc_collection.py", "otelc_resource.py", "capture_otelc_languages.py", "otelc-workloads.json", "otelc-worker-workloads.json", "otelc-typescript-native-workloads.json", "otelc-collection-workloads.json", "otelc-resource-workloads.json"):
         identities["observer:" + name] = file_digest(Path(__file__).with_name(name))
     return identities
 
@@ -441,20 +442,31 @@ def require_counters(values):
         raise ValueError("invalid runtime counter")
 
 
+def lifetime_diagnostics(bodies, report, spec, service, decoder, language):
+    """Keep lifetime events separate from ordinary function call accounting."""
+    selected = [kind for kind in ("collection", "resource") if kind in spec]
+    if not selected:
+        return {}, 0
+    kind = selected[0]
+    if len(selected) != 1 or language != "python":
+        raise ValueError(f"{kind} qualification requires Python and a distinct workload")
+    spans = [span for path, body in bodies if path == TRACE_PATH
+             for span in service_spans(decoder.FromString(body), service)]
+    verify = {"collection": otelc_collection.verify, "resource": otelc_resource.verify}[kind]
+    if kind == "resource":
+        otelc_resource.metric_values(bodies, service, spec[kind], otelc_resource.metric_decoder())
+    return verify(spans, report, spec[kind]), spec[kind]["count"]
+
+
 def witness(bodies, report, spec, service, decoder, language):
     require_runtime_identity(report, language)
     names, raw, roots, errors = decode(bodies, service, decoder)
     if names != spec["functions"] or roots != spec["trees"] or errors != spec["errors"]:
         raise ValueError("decoded telemetry does not match independent fixture expectations")
     losses, export = loss_diagnostics(report, language)
-    function_calls = sum(names.values())
-    if "collection" in spec:
-        if language != "python":
-            raise ValueError("collection qualification requires Python")
-        spans = [span for path, body in bodies if path == TRACE_PATH
-                 for span in service_spans(decoder.FromString(body), service)]
-        losses.update(otelc_collection.verify(spans, report, spec["collection"]))
-        function_calls -= spec["collection"]["count"]
+    lifetime_losses, lifetime_count = lifetime_diagnostics(bodies, report, spec, service, decoder, language)
+    losses.update(lifetime_losses)
+    function_calls = sum(names.values()) - lifetime_count
     if report.get("export_finished") is not True or report.get("drained", True) is not True:
         raise ValueError("missing or unfinished export status")
     traces = report["traces"]
