@@ -10,6 +10,7 @@ const MAX_DEPTH: usize = 32;
 const MAX_FIELDS: usize = 8192;
 const MAX_TEXT: usize = 262144;
 const MAX_DIFFERENCES: usize = 128;
+const MAX_GAPS: usize = 128;
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
@@ -101,6 +102,7 @@ pub enum Gap {
 pub enum ComparisonLimit {
     Differences,
     Depth,
+    Diagnostics,
 }
 impl Gap {
     pub fn description(&self) -> String {
@@ -245,29 +247,35 @@ fn opaque_gaps(snapshot: &Snapshot, lane: &str) -> Vec<Gap> {
         .map(|node| (node.id.as_str(), node))
         .collect();
     let mut gaps = Vec::new();
+    let mut payload = 0;
     let mut visited = BTreeSet::new();
-    let mut stack: Vec<_> = snapshot
-        .roots
-        .iter()
-        .rev()
-        .map(|(name, value)| (path("", name), value))
-        .collect();
-    while let Some((location, value)) = stack.pop() {
+    // Retain iterators rather than a copied long path for every pending child.
+    let mut stack = vec![(String::new(), snapshot.roots.iter())];
+    while let Some((parent, fields)) = stack.last_mut() {
+        let Some((name, value)) = fields.next() else {
+            stack.pop();
+            continue;
+        };
+        let location = path(parent, name);
         match value {
-            Value::Opaque { r#type, reason } => gaps.push(Gap::Opaque {
-                lane: lane.into(),
-                path: location,
-                r#type: r#type.clone(),
-                reason: reason.clone(),
-            }),
+            Value::Opaque { r#type, reason } => {
+                payload += lane.len() + location.len() + r#type.len() + reason.len() + 32;
+                if gaps.len() == MAX_GAPS || payload > MAX_TEXT {
+                    gaps.push(Gap::Limit {
+                        path: "/".into(),
+                        limit: ComparisonLimit::Diagnostics,
+                    });
+                    break;
+                }
+                gaps.push(Gap::Opaque {
+                    lane: lane.into(),
+                    path: location,
+                    r#type: r#type.clone(),
+                    reason: reason.clone(),
+                });
+            }
             Value::Reference { node_id } if visited.insert(node_id.as_str()) => {
-                stack.extend(
-                    nodes[node_id.as_str()]
-                        .fields
-                        .iter()
-                        .rev()
-                        .map(|(name, value)| (path(&location, name), value)),
-                );
+                stack.push((location, nodes[node_id.as_str()].fields.iter()));
             }
             _ => {}
         }
@@ -349,8 +357,22 @@ struct Matcher<'a> {
     forward: BTreeMap<&'a str, &'a str>,
     reverse: BTreeMap<&'a str, &'a str>,
     result: Comparison,
+    diagnostic_bytes: usize,
 }
 impl<'a> Matcher<'a> {
+    fn limit(&mut self, limit: ComparisonLimit) {
+        if !self
+            .result
+            .gaps
+            .iter()
+            .any(|gap| matches!(gap, Gap::Limit { limit: existing, .. } if *existing == limit))
+        {
+            self.result.gaps.push(Gap::Limit {
+                path: "/".into(),
+                limit,
+            });
+        }
+    }
     fn difference(
         &mut self,
         path: &str,
@@ -359,22 +381,16 @@ impl<'a> Matcher<'a> {
         right: Option<&Value>,
     ) {
         if self.result.differences.len() == MAX_DIFFERENCES {
-            if !self.result.gaps.iter().any(|gap| {
-                matches!(
-                    gap,
-                    Gap::Limit {
-                        limit: ComparisonLimit::Differences,
-                        ..
-                    }
-                )
-            }) {
-                self.result.gaps.push(Gap::Limit {
-                    path: path.into(),
-                    limit: ComparisonLimit::Differences,
-                });
-            }
+            self.limit(ComparisonLimit::Differences);
             return;
         }
+        let payload =
+            path.len() + reason.len() + left.map_or(0, value_size) + right.map_or(0, value_size);
+        if self.diagnostic_bytes + payload > MAX_TEXT {
+            self.limit(ComparisonLimit::Diagnostics);
+            return;
+        }
+        self.diagnostic_bytes += payload;
         self.result.differences.push(Difference {
             path: path.into(),
             reason: reason.into(),
@@ -418,10 +434,7 @@ impl<'a> Matcher<'a> {
                 return;
             }
             if depth > MAX_DEPTH {
-                self.result.gaps.push(Gap::Limit {
-                    path: location.into(),
-                    limit: ComparisonLimit::Depth,
-                });
+                self.limit(ComparisonLimit::Depth);
                 return;
             }
             self.forward.insert(a, b);
@@ -463,6 +476,7 @@ pub fn compare(left: &Snapshot, right: &Snapshot) -> Result<Comparison, String> 
             differences: Vec::new(),
             gaps,
         },
+        diagnostic_bytes: 0,
     };
     matcher.fields(&left.roots, &right.roots, "", 0);
     Ok(matcher.result)

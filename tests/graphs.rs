@@ -1,4 +1,4 @@
-use quux_oteleq::graph::{compare, Encoding, Node, Snapshot, Value};
+use quux_oteleq::graph::{compare, ComparisonLimit, Encoding, Gap, Node, Snapshot, Value};
 use std::collections::BTreeMap;
 
 fn integer(value: impl ToString) -> Value {
@@ -317,4 +317,83 @@ fn bounded_graph_and_difference_limits_cannot_produce_a_truncated_pass() {
             .collect(),
     };
     assert!(compare(&too_many, &too_many).is_err());
+}
+
+fn deep_fanout(value: Value) -> Snapshot {
+    let mut snapshot = Snapshot {
+        roots: BTreeMap::from([("root".into(), reference("n0"))]),
+        nodes: vec![],
+    };
+    for index in 0..32 {
+        snapshot.nodes.push(Node {
+            id: format!("n{index}"),
+            r#type: "node".into(),
+            fields: if index == 31 {
+                (0..512)
+                    .map(|field| (format!("f{field}"), value.clone()))
+                    .collect()
+            } else {
+                BTreeMap::from([("x".repeat(1024), reference(&format!("n{}", index + 1)))])
+            },
+        });
+    }
+    snapshot
+}
+
+#[test]
+fn long_paths_respect_diagnostic_payload_and_record_budgets() {
+    let opaque = deep_fanout(Value::Opaque {
+        r#type: "handle".into(),
+        reason: "unknown".into(),
+    });
+    let result = compare(&opaque, &opaque).unwrap();
+    let payload: usize = result.gaps.iter().map(|gap| gap.description().len()).sum();
+    eprintln!(
+        "opaque input bytes={}, gap records={}, diagnostic bytes={payload}",
+        serde_json::to_vec(&opaque).unwrap().len(),
+        result.gaps.len()
+    );
+    assert!(!result.equivalent());
+    assert!(payload <= 2 * (262144 + 1024));
+    assert!(result.gaps.len() <= 258);
+    let result = compare(&deep_fanout(integer(1)), &deep_fanout(integer(2))).unwrap();
+    let payload: usize = result
+        .differences
+        .iter()
+        .map(|difference| difference.path.len())
+        .sum();
+    assert!(!result.equivalent());
+    assert!(payload <= 262144);
+    assert!(!result.gaps.is_empty());
+    let flat = Snapshot {
+        roots: (0..150)
+            .map(|index| {
+                (
+                    index.to_string(),
+                    Value::Opaque {
+                        r#type: "handle".into(),
+                        reason: "unknown".into(),
+                    },
+                )
+            })
+            .collect(),
+        nodes: vec![],
+    };
+    let result = compare(&flat, &flat).unwrap();
+    assert_eq!(result.gaps.len(), 258);
+    assert_eq!(
+        result
+            .gaps
+            .iter()
+            .filter(|gap| matches!(
+                gap,
+                Gap::Limit {
+                    limit: ComparisonLimit::Diagnostics,
+                    ..
+                }
+            ))
+            .count(),
+        2
+    );
+    assert!(!result.equivalent());
 }
