@@ -158,6 +158,33 @@ fn matching_unexpected_errors_are_invalid_and_declared_errors_can_qualify() {
         compare(&left, &right, &specification).unwrap().verdict,
         Verdict::Blocked
     );
+    for observed in [&mut left, &mut right] {
+        let mut graph = observed.after.clone();
+        graph.roots.insert(
+            "error".into(),
+            Value::Boolean {
+                r#type: Some("go.main.Flag".into()),
+                value: true,
+            },
+        );
+        observed.outcome = Outcome::Error {
+            category: ErrorCategory::Panic,
+            graph,
+        };
+    }
+    for (label, verdict) in [
+        ("go.main.Flag", Verdict::EquivalentObserved),
+        ("go.bool", Verdict::Blocked),
+    ] {
+        specification.expected_baseline = ExpectedOutcome::Error {
+            category: ErrorCategory::Panic,
+            r#type: label.into(),
+        };
+        assert_eq!(
+            compare(&left, &right, &specification).unwrap().verdict,
+            verdict
+        );
+    }
 }
 #[test]
 fn instrumentation_introducing_an_exception_is_a_difference_with_a_valid_baseline() {

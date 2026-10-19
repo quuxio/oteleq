@@ -153,7 +153,9 @@ make generation-otelc PYTHON=/absolute/path/to/otelc/.venv/bin/python \
   OTELC_ROOT=/absolute/path/to/otelc REPORT_DIR=/tmp/new-generation-qualification
 ```
 
-The fixture covers 24 matching cases/96 paired-control launches, eight generated framework cases, exported replay and three deliberately different state cases. It is diagnostic evidence with the declared observation scope. No original application/source tree is modified.
+The fixture covers 24 matching cases/96 paired-control launches, eight generated framework cases, exported replay and three deliberately different state cases. It also checks rebound callables, refused static observer callbacks, three explicit fixture/initial-state controls and two Node helper lexical-shadow cases. It is diagnostic evidence with the declared observation scope. No original application/source tree is modified.
+
+The [19 October typed-worker record](qualification/generated-typed-2026-10-19.json) binds these results and the 38-case/228-launch configured corpus to runtime revision `162ae7c`, its frozen CLI and the immutable private provider candidate. Raw and typed Unicode alteration controls are rejected. This qualifies the declared diagnostic scope on macOS ARM64; richer object/build contexts, the [proposed invocation-scoped witness](action-witness.md), shipping artefacts and other platforms remain open.
 
 The Rust split-path qualification preserves real unused-function build warnings separately from exact application stderr, checks u128 extrema, f32/negative-zero representation and `file!()` logical paths, and rejects deliberately altered retained stderr:
 
