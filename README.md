@@ -33,7 +33,7 @@ Fixed diagnostic corpora also qualify [Python and Java executor context](docs/ei
 
 The result is **equivalence over these tests and observations**. It is not a blanket proof that every function is identical.
 
-Generated tests live in a new private directory outside the application repository. Users can retain or explicitly export them, using Python's standard `unittest` suite independently of the application's existing framework.
+Generated tests live in a new private directory outside the application repository. Selection, scalar domain fixtures, seeded inputs and execution budgets use a [validated project policy](docs/automatic-generation.md#project-policy-and-concrete-fixtures). Users can retain or explicitly export them, using Python's standard `unittest` suite independently of the application's existing framework.
 
 **Status: automatic scalar test generation, AST inventory and repeated actual otelc execution are implemented for all eight languages.** Supported functions receive frozen concrete inputs; unsupported callables and state remain visible blockers. Python and Node capture supported object graphs; other adapters capture scalar results and accessible scalar globals. Generated access/entrypoint helpers produce diagnostic evidence. Shipping-artefact qualification and application-specific fixtures remain future work.
 
@@ -71,9 +71,11 @@ OTELEQ_WORKSPACE=/tmp/oteleq-run-actual-id
 "$OTELEQ_PYTHON" "$OTELEQ_WORKSPACE/tests/test_equivalence.py"
 ```
 
+Rust requires the qualified [standalone build/run provider API](docs/automatic-generation.md#discovery-and-build-boundary); combined compile-and-launch providers are unsupported.
+
 The default generates up to three distinct scalar cases per function and compares two plain with two instrumented runs per case. Missing instrumentation, changed source, unstable observations, failed builds and selected blockers fail the gate. The report records tested inputs, state coverage, telemetry and gaps. Syntax discovery and scalar samples do not establish business preconditions.
 
-Use repeated `--language ID`, `--exclude 'qualified.pattern'` and `--cases 1` through `--cases 16` on `plan` to select a supported scope. [The CLI reference](docs/cli-and-configuration.md#implemented-commands) lists every public command and flag.
+Use repeated `--language ID`, `--exclude 'qualified.pattern'` and `--cases 1` through `--cases 1024` on `plan` to select a supported scope. [The CLI reference](docs/cli-and-configuration.md#implemented-commands) lists every public command and flag.
 
 ### Replay, retain or incorporate
 
@@ -88,7 +90,7 @@ Use repeated `--language ID`, `--exclude 'qualified.pattern'` and `--cases 1` th
 "$OTELEQ_CLI" clean --workspace "$OTELEQ_WORKSPACE"
 ```
 
-Export includes a frozen application snapshot and runnable suite. It refuses existing destinations and may be placed in the application only by that explicit choice. Generated boilerplate is MIT licensed; application code retains its licence. Retained suites test their frozen snapshot; create a new plan for changed application code. See [capabilities, limits and complete usage](docs/automatic-generation.md). The broader [configuration/adapter protocol](docs/cli-and-configuration.md) and [example policy](examples/equivalence.toml) remain proposed interfaces.
+Export includes a frozen application snapshot and runnable suite. It refuses existing destinations and may be placed in the application only by that explicit choice. Generated boilerplate is MIT licensed; application code retains its licence. Retained suites test their frozen snapshot; create a new plan for changed application code. See [capabilities, limits and complete usage](docs/automatic-generation.md). Pass the executable [example policy](examples/equivalence.toml) with `plan --config PATH` for selection, scalar fixtures and budgets. Broader build/factory and graph/adapter contracts remain on the [completion checklist](docs/completion.md).
 
 ### Compare an existing workload bundle
 

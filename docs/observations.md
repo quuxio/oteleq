@@ -4,6 +4,8 @@
 
 The [scalar generator](automatic-generation.md#what-is-compared) records typed return/error and before/after state as exact declared byte channels, alongside application stdout/stderr. Python observes supported objects, sequences, dictionaries, exception graphs and declared module globals; Node observes supported plain objects/arrays, Error fields and declared globals. Their codecs preserve supported aliases/cycles, large integers and float bits. C/C++, Rust, Java and Go observe supported scalar results/errors and accessible scalar globals. Python/Node graph capture is bounded at 512 nodes and depth 32; opaque or oversized observations cannot pass.
 
+The Python observer reads ordinary builtin dictionary/exception descriptors and refuses custom accessors, custom metaclasses and non-string object fields before invoking their Python callbacks. Custom extension descriptors, slots and modified observer/interpreter builtins require separate qualification; they are not general reflection support.
+
 Receiver construction, imported-module state, hidden fields, mutation-and-reversion between boundaries, filesystem/network observation and arbitrary action sequences remain outside this slice. The fixed diagnostic captures compare stdout/stderr and successful exits with independently declared telemetry expectations; they do not supply these generated state channels. Scope and gaps are retained in each report.
 
 The remaining sections describe the broader proposed observation/graph protocol. Its record shape and typed tags are illustrative; they are not the scalar worker's wire format. The Rust workload comparator currently compares the generated canonical bytes and does not implement arbitrary structural graph matching or field-path difference reporting.

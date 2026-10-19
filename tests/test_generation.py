@@ -17,6 +17,7 @@ import discovery
 import generation as gen
 import harness
 import observe
+import policy
 
 
 def args(command, **kwargs):
@@ -136,7 +137,11 @@ class HarnessTests(unittest.TestCase):
             self.assertEqual(harness.values(type_, "java")[0], "")
         self.assertIsNone(harness.values("Database", "python"))
         self.assertEqual(harness.corpus(self.entry("python"),3), [[0],[1],[-1]])
-        self.assertEqual(harness.corpus(self.entry("python"),16), [[0],[1],[-1]])
+        extended = harness.corpus(self.entry("python"), 16)
+        self.assertEqual(extended[:3], [[0], [1], [-1]])
+        self.assertEqual(len(extended), 16)
+        self.assertEqual(extended, harness.corpus(self.entry("python"), 16))
+        self.assertNotEqual(extended, harness.corpus(self.entry("python"), 16, seed=7))
         self.assertEqual(harness.corpus(self.entry("python",parameters=["bool"]),3), [[False],[True]])
         self.assertEqual(harness.corpus(self.entry("python",parameters=[]),3), [[]])
         opaque_entry=self.entry("python",parameters=["Database"])
@@ -156,7 +161,7 @@ class HarnessTests(unittest.TestCase):
             with tempfile.TemporaryDirectory() as temporary:
                 project=Path(temporary)
                 entry=self.entry(language,path="source"+suffix,parameters=["i32"] if language=="rust" else ["int"],output="i32" if language=="rust" else "int",
-                                 globals=[{"name":"state","type":"int"}], async_=True)
+                                 globals=[{"name":"state","type":"int"}], line=1, async_=True)
                 source=project/entry["path"]
                 source.write_text("package main\n" if language=="go" else "// original\n" if language!="python" else "# original\n")
                 driver=harness.materialise(project,entry,[0])
@@ -169,7 +174,7 @@ class HarnessTests(unittest.TestCase):
                     self.assertEqual(harness.global_gaps(entry),["opaque"])
                 entry["globals"]=[{"name":"<destructured>","type":"unknown"}]
                 self.assertEqual(harness.global_gaps(entry),["<destructured>"])
-        self.assertIn("await sample",harness.js_driver(self.entry("javascript",**{"async":True}),[],""))
+        self.assertIn("await __oteleqSelected",harness.js_driver(self.entry("javascript",**{"async":True}),[],""))
         self.assertIn("return:void",harness.native_driver(self.entry("c",output="void"),[]))
         self.assertIn("return:void",harness.go_driver(self.entry("go",output="void"),[],"package main\n"))
         self.assertIn("return:void",harness.java_driver(self.entry("java",output="void",package="example"),[]))
@@ -252,6 +257,38 @@ class WorkflowTests(unittest.TestCase):
         with patch.object(gen,"execute",return_value=subprocess.CompletedProcess([],1,b"",b"compiler failure")):
             with self.assertRaisesRegex(ValueError,"native build failed"):
                 gen.native_command([],self.source,"c",driver,{"clang":"/selected/clang"},{},folder,scratch,"baseline")
+
+    def test_private_tree_guards_include_originally_ignored_build_and_cache_names(self):
+        self.generate()
+        cleanup = args("clean", workspace=self.workspace)
+        application_output = self.source / "target"
+        application_output.mkdir()
+        (application_output / "original-build-note.txt").write_text("original user output")
+        gen.load_workspace(self.workspace, generated=True)
+        for area in ("snapshot", "tests"):
+            for name in (".git", "target", "node_modules", "__pycache__", "build", "dist"):
+                added = self.workspace / area / name
+                added.mkdir()
+                note = added / "user-note.txt"
+                note.write_text("new user content must survive a refused cleanup")
+                with self.subTest(area=area, name=name):
+                    with self.assertRaisesRegex(ValueError, "changed"):
+                        gen.load_workspace(self.workspace, generated=True)
+                    with self.assertRaisesRegex(ValueError, "edited"):
+                        gen.clean(cleanup)
+                    self.assertTrue(note.is_file())
+                note.unlink()
+                added.rmdir()
+        hidden = self.workspace / "tests" / "target"
+        hidden.symlink_to(self.source, target_is_directory=True)
+        with self.assertRaisesRegex(ValueError, "symlink"):
+            gen.load_workspace(self.workspace, generated=True)
+        with self.assertRaisesRegex(ValueError, "symlink"):
+            gen.clean(cleanup)
+        hidden.unlink()
+        gen.clean(cleanup)
+        self.assertFalse(self.workspace.exists())
+        self.assertTrue((application_output / "original-build-note.txt").is_file())
 
     def reseal(self,data):
         gen.write(self.workspace/"plan.json",data)
@@ -420,7 +457,8 @@ class WorkflowTests(unittest.TestCase):
         with patch.object(gen,"attempt",return_value=attempt),patch.object(gen,"execute",return_value=subprocess.CompletedProcess([],1,b'{"verdict":"different_observed"}',b"")):
             gen.compare_case(self.workspace,data,entry,case,destination,None)
         self.assertNotEqual(bundle["scope"]["baseline_artefact_sha256"],gen.read(destination/"bundle.json")["scope"]["baseline_artefact_sha256"])
-        with patch.object(gen.capture,"stable"),patch.object(gen.capture,"commands",side_effect=lambda root,project,lang,driver,*rest:([sys.executable,driver],[sys.executable,driver])),patch.object(gen,"MAX_CHANNEL_BYTES",1):
+        data["configuration"]["limits"]["max_capture_bytes"] = 1
+        with patch.object(gen.capture,"stable"),patch.object(gen.capture,"commands",side_effect=lambda root,project,lang,driver,*rest:([sys.executable,driver],[sys.executable,driver])):
             with self.assertRaisesRegex(ValueError,"channel budget"):
                 gen.attempt(self.workspace,data,entry,case,"baseline",self.base/"overflow",None)
 
