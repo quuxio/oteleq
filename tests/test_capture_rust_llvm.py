@@ -100,6 +100,7 @@ class RustLlvmTests(unittest.TestCase):
                                          backend="llvm", expected_function="app.selected", environment=self.environment)
 
     def test_exact_profile_recipe_selection_and_compiled_symbol_qualify(self):
+        self.assertEqual(capture.rust_profile(self.root, self.tools), {"sdk": self.sdk, "plugin": self.plugin})
         result = self.verify()
         self.assertEqual(result["backend"], "llvm")
         self.assertEqual(result["selected_function"], "app.selected")
