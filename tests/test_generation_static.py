@@ -121,6 +121,7 @@ class StaticObserverTests(unittest.TestCase):
     def test_go_primitives_preserve_bits_and_shadowed_literals_do_not_change_inputs(self):
         sources = [
             ("package main\nimport \"math\"\nfunc selected() float32{return math.Float32frombits(0x7fc00001)}\n", "float32", [], [], b"return:float32:7fc00001"),
+            ("package main\nimport \"math\"\nfunc selected() float32{return math.Float32frombits(0x7f800001)}\n", "float32", [], [], b"return:float32:7f800001"),
             ("package main\nimport \"math\"\nfunc selected() float64{return math.Float64frombits(0x8000000000000000)}\n", "float64", [], [], b"return:float64:8000000000000000"),
             ("package main\nconst true=false\nfunc selected(v bool) bool{return v}\n", "bool", [True], ["bool"], b"return:bool:true"),
             ("package main\nfunc selected() int{panic(\"known\")}\n", "int", [], [], b'error:string:"known"'),

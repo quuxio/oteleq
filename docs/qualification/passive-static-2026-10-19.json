@@ -1,0 +1,105 @@
+{
+  "date": "2026-10-19",
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "runtime_revision": "50bb758d0858fb943112b4996d9a60951a5f3ca1",
+  "cli_sha256": "5fc17f9a40a3a8a5ba3a095afebe8da2e3a2966cb52fdfd7e6f9fd5cbdffe080",
+  "host": {
+    "system": "Darwin",
+    "machine": "arm64"
+  },
+  "providers": {
+    "scalar": {
+      "revision": "8a7689a6d6779ed8621bbe852188eeb56e6fafad",
+      "cli_sha256": "4f11a98a7628411000c6a9992c907a8068d56156b29e51558b070ee57a972ecf"
+    },
+    "resource": {
+      "revision": "60e5c4963da32574f75d895389761935249c6696",
+      "cli_sha256": "6cc104a09340f4efeb19ee7754a799fe17abf479923d6be8c4943f8eecfcd34c"
+    }
+  },
+  "provider_status": "immutable private candidates, not merged-main qualification",
+  "captures": {
+    "default": {
+      "cli_sha256": "5fc17f9a40a3a8a5ba3a095afebe8da2e3a2966cb52fdfd7e6f9fd5cbdffe080",
+      "languages": [
+        "c",
+        "cpp",
+        "go",
+        "java",
+        "javascript",
+        "python",
+        "rust",
+        "typescript"
+      ],
+      "matching_cases": 24,
+      "matching_attempts": 96,
+      "framework_cases": 8,
+      "export_replay_cases": 1,
+      "same_return_mutation_cases": 3,
+      "source_preserved": true,
+      "rebound_callable_with_startup_witness_rejected": true,
+      "static_observer_callback_controls_refused": 3,
+      "claim": "equivalence over these tests and observations",
+      "artefact_class": "diagnostic"
+    },
+    "policy": {
+      "claim": "equivalence over these tests and observations",
+      "artefact_class": "diagnostic",
+      "cli_sha256": "5fc17f9a40a3a8a5ba3a095afebe8da2e3a2966cb52fdfd7e6f9fd5cbdffe080",
+      "languages": [
+        "c",
+        "cpp",
+        "go",
+        "java",
+        "javascript",
+        "python",
+        "rust",
+        "typescript"
+      ],
+      "configured_cases": 38,
+      "matching_attempts": 228,
+      "repeats_per_lane": 3,
+      "unicode_utf16_and_signed_unsigned_extremes": true,
+      "altered_unicode_control_rejected": true,
+      "source_preserved": true,
+      "configuration_sha256": "a6c0a75776b150668c844cc239dee4c4018197465ab738ae79f53adb8fd2c28a"
+    },
+    "native": {
+      "claim": "equivalence over these tests and observations",
+      "artefact_class": "diagnostic",
+      "scope": "six witnessed C/C++ primitive cases; object aliases and compiler-declared constructors remain blocked",
+      "oteleq_cli_sha256": "5fc17f9a40a3a8a5ba3a095afebe8da2e3a2966cb52fdfd7e6f9fd5cbdffe080",
+      "otelc_cli_sha256": "4f11a98a7628411000c6a9992c907a8068d56156b29e51558b070ee57a972ecf",
+      "matching_cases": 6,
+      "matching_attempts": 24,
+      "blocked_callables": 5,
+      "blocked_object_aliases": 2,
+      "blocked_other_declarations": 3,
+      "qualifier_sha256": "d84b1d7401c8e9fbf9ffaa80fcc8d86a87ebddf55b006439a15b279122a7484c",
+      "strict_gate_exit": 3,
+      "source_preserved": true,
+      "native_scalar_value_oracles": true
+    },
+    "resource": {
+      "claim": "equivalence over these tests and observations",
+      "artefact_class": "diagnostic",
+      "scope": "fixed Python resource workload only; no generated object sequences or all-language claim",
+      "oteleq_cli_sha256": "5fc17f9a40a3a8a5ba3a095afebe8da2e3a2966cb52fdfd7e6f9fd5cbdffe080",
+      "otelc_cli_sha256": "6cc104a09340f4efeb19ee7754a799fe17abf479923d6be8c4943f8eecfcd34c",
+      "source_sha256": "ea4e3bb636e1286e1ab239e2ab48c695826beec502d17a94f84f6ad91f10d818",
+      "attempts": 4,
+      "spans_per_instrumented_attempt": 3,
+      "resource_instances": 2,
+      "expected_failed_releases": 1,
+      "metric_and_creation_link_checks": true,
+      "altered_retained_stdout_rejected": true,
+      "source_preserved": true
+    }
+  },
+  "static_callback_control_scope": "Java/Go baseline launches refused; Rust compiler refuses unsupported Debug; no instrumented-attempt qualification claim for these refused controls",
+  "limits": [
+    "scalar diagnostic fixtures and fixed Python resource workload",
+    "no arbitrary factories, project build graphs, action-scoped witness or shipping-artefact claim"
+  ]
+}
