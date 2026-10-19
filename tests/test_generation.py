@@ -174,7 +174,7 @@ class HarnessTests(unittest.TestCase):
                     self.assertEqual(harness.global_gaps(entry),["opaque"])
                 entry["globals"]=[{"name":"<destructured>","type":"unknown"}]
                 self.assertEqual(harness.global_gaps(entry),["<destructured>"])
-        self.assertIn("await sample",harness.js_driver(self.entry("javascript",**{"async":True}),[],""))
+        self.assertIn("await __oteleqSelected",harness.js_driver(self.entry("javascript",**{"async":True}),[],""))
         self.assertIn("return:void",harness.native_driver(self.entry("c",output="void"),[]))
         self.assertIn("return:void",harness.go_driver(self.entry("go",output="void"),[],"package main\n"))
         self.assertIn("return:void",harness.java_driver(self.entry("java",output="void",package="example"),[]))
