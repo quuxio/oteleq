@@ -76,6 +76,14 @@ The final local gate passed 120 regressions (18 Rust, 66 capture, 36 generation)
 
 Raw captures, private workspaces, tool/provider manifests and frozen executables are retained privately. These scoped positive fixtures and negative controls do not establish arbitrary business preconditions, dependency initialisation, complete action-scoped witness attribution, rich graph codecs, other platforms or shipping artefact equivalence.
 
+## Python resource qualification
+
+The [resource record](qualification/python-resource-2026-10-19.json) names exact consumer runtime `83a77da` and private provider `60e5c49` from [otelc PR67](https://github.com/quuxio/otelc/pull/67). Two plain and two instrumented attempts passed the independently declared application output, including `retained=0`, with unchanged source. The original application verifies failed/subsequent/duplicate closes, layout, a strong-reference control and collection after clearing application owners while the observer is active.
+
+Each instrumented attempt contained the factory span plus two distinct linked lifetime roots. Runtime lifecycle counters and independently decoded cumulative OTLP metrics required admitted/completed `2`, live `0` and expected failed releases `1`, with zero loss or pending state. An altered retained-stdout control was rejected as a difference. These are local capture checks; the consumer did not query Tempo or Prometheus. Raw captures and the immutable provider remain retained privately.
+
+The local gate passed 126 regressions (18 Rust, 71 capture, 37 generation), Rust coverage 96.87% and all per-module Python gates. This qualifies the fixed ordinary Python fixture, not arbitrary resource classes, generated action sequences, hidden object state or all-language resource support. The collection corpus remains separate. Earlier `fb03960` resource captures lacked the application-owned collect-after-close assertion and cannot establish it retroactively.
+
 ## Implementation quality
 
 The [roadmap](roadmap.md) defines the remaining core and adapter gates. Use the pinned rustup workflow above for reproducible coverage. A qualified non-rustup distribution can supply matching `LLVM_COV` and `LLVM_PROFDATA` paths through `COVERAGE_ENV`; verify that their LLVM version matches that compiler's instrumentation. Meaningful comparator, codec, process-isolation, source-preservation and incomplete-evidence regression tests are required. Native generator regressions require Clang with C11 and C++17 support (override `OTELC_CLANG`/`OTELC_CLANGXX` when needed). These compiler tests do not establish compatibility with an otelc adapter built for another LLVM distribution. Publish actual implementation coverage with language/component scope. Extend the shared defect corpus with changed results, globals, receivers and effects as each observation capability is delivered.

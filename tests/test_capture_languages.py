@@ -566,7 +566,8 @@ class PrivateExecutionTests(unittest.TestCase):
         expectations = {"python-workers": ("python", ("python-executor-context-example", 10, 5, 1)),
                         "java-workers": ("java", ("java-executor-context-example", 8, 5, 2)),
                         "typescript-native": ("typescript", ("typescript-native-trace-example", 11, 5, 1)),
-                        "python-collection": ("python", ("python-collection-lifetime-example", 4, 4, 0))}
+                        "python-collection": ("python", ("python-collection-lifetime-example", 4, 4, 0)),
+                        "python-resource": ("python", ("python-resource-lifetime-example", 3, 3, 0))}
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary) / "otelc"
             root.mkdir()
