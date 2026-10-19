@@ -92,6 +92,8 @@ Repeats range from 2 to 32 per lane. `case_timeout_ms` bounds each application l
 | JavaScript/TypeScript | otelc's pinned TypeScript compiler AST | Private appended Node caller and actual loader; matched TypeScript baseline emission |
 | Go | Standard `go/parser` AST | Private appended same-file caller and actual Go compile adapter |
 
+C/C++ scalar spellings are scoped to those languages. Other languages' names such as `i32`, `float64` and `String` do not establish a native primitive: unresolved native aliases are visible fixture/type blockers. Generated native callers also use compiler type checks on parameters, returned values and observed globals before permitting raw scalar reads. Structured values and unsupported floating representations cannot be compared through object padding. Broader canonical alias resolution remains part of semantic/build-aware discovery.
+
 These are syntax inventories. Compilation and runtime witnesses qualify individual runnable cases; syntax alone does not establish semantic types, build visibility or safe domain inputs. Parse/tool errors produce inventory blockers. Rust requires otelc's separate standalone-source artefact API (`rust --build SOURCE.rs --output-dir BUNDLE`, then `rust --run BUNDLE`). The qualified candidate contract is [otelc PR65](https://github.com/quuxio/otelc/pull/65); providers which expose only combined compile-and-run are unsupported. Cargo build-only is not qualified.
 
 Dependencies must already be available to the qualified local tools; generation does not install them into the application.
