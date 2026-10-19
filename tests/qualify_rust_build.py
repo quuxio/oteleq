@@ -24,7 +24,8 @@ fn logical_source_length()->usize{file!().len()}
 '''
     if backend == "llvm":
         text += '''fn logical_source_column()->usize{column!() as usize}
-fn intentional_error()->i32{std::panic::panic_any("expected")}
+fn intentional_error()->i32{std::panic::set_hook(Box::new(|_|eprintln!("app-panic:expected")));std::panic::panic_any("expected")}
+fn unstable_error()->i32{eprintln!("case-pid:{}",std::process::id());std::panic::panic_any("expected")}
 '''
     (source / "wide.rs").write_text(text)
     policy = destination / "equivalence.toml"
@@ -41,10 +42,16 @@ function="wide.decimal"
 cases=[[1.3],[-0.0]]
 '''
     if backend == "llvm":
-        settings += '''[adapters.rust]
+        settings += '''[functions]
+exclude=["*<closure>*"]
+[adapters.rust]
 backend="llvm"
 [[fixtures]]
 function="wide.intentional_error"
+cases=[[]]
+expected_baseline={kind="error",category="panic",type="rust.panic.str"}
+[[fixtures]]
+function="wide.unstable_error"
 cases=[[]]
 expected_baseline={kind="error",category="panic",type="rust.panic.str"}
 '''
@@ -65,19 +72,15 @@ def expected_channels(case, column):
         token = "return:usize:" + str(column)
     elif function == "wide.intentional_error":
         token = 'error:str:"expected"'
+        stderr = b"app-panic:expected\n"
     else:
         assert function == "wide.logical_source_length"
         token = "return:usize:7"
     return token.encode(), stderr
 
 
-def check_attempt(case, folder, backend, column, lane, index, attempt):
-    """Validate one independent application capture and its separate build record."""
-    token, expected_stderr = expected_channels(case, column)
-    assert bytes(attempt["channels"]["stdout"]) == b""
-    assert bytes(attempt["channels"]["stderr"]) == expected_stderr
-    assert token in bytes(attempt["channels"]["state-and-outcome"])
-    evidence = folder / f"{lane}-{index}"
+def check_build(evidence, backend, function, lane):
+    """Verify the same build and provenance contract even for negative cases."""
     log = evidence / ("plain-build.log" if lane == "baseline" else "instrumented-build.log")
     assert b"warning:" in log.read_bytes()
     identities = json.loads((evidence / "build-identities.json").read_text())
@@ -89,8 +92,17 @@ def check_attempt(case, folder, backend, column, lane, index, attempt):
         assert identities["manifest_sha256"] and identities["plan_sha256"]
         if backend == "llvm":
             assert identities["backend"] == "llvm" and identities["selected_symbol"]
-            assert identities["selected_function"] == case["function"]
+            assert identities["selected_function"] == function
             assert identities["resolution_phase"] == "llvm-pipeline-start"
+
+
+def check_attempt(case, folder, backend, column, lane, index, attempt):
+    """Validate one independent application capture and its separate build record."""
+    token, expected_stderr = expected_channels(case, column)
+    assert bytes(attempt["channels"]["stdout"]) == b""
+    assert bytes(attempt["channels"]["stderr"]) == expected_stderr
+    assert token in bytes(attempt["channels"]["state-and-outcome"])
+    check_build(folder / f"{lane}-{index}", backend, case["function"], lane)
 
 
 def check_case(case, report_root, backend, column):
@@ -118,6 +130,25 @@ def altered_channels(cli, destination, folder):
         path.write_text(json.dumps(altered))
         command([cli, comparator, path], control, kind, expected=1)
     (control / "KIND.txt").write_text("Deliberately altered retained evidence; no new target execution.\n")
+
+
+def check_unstable_panic(case, report_root):
+    """Keep volatile application stderr exact and require an incomplete result."""
+    assert case["exit_code"] == 3
+    comparison = case["comparison"]["cases"][0]
+    assert comparison["verdict"] == "inconclusive"
+    assert all(pair["comparison"]["verdict"] == "equivalent_observed" for pair in comparison["pairs"])
+    assert any("unstable observations" in reason for reason in comparison["execution"]["reasons"])
+    folder = report_root / case["case"]
+    bundle = json.loads((folder / "bundle.json").read_text())["cases"][0]
+    for lane in ("baseline", "instrumented_on"):
+        attempts = bundle[lane]
+        assert len(attempts) == 3
+        assert len({bytes(attempt["channels"]["stderr"]) for attempt in attempts}) > 1
+        for index, attempt in enumerate(attempts):
+            assert b"case-pid:" in bytes(attempt["channels"]["stderr"])
+            assert b'error:str:"expected"' in bytes(attempt["channels"]["state-and-outcome"])
+            check_build(folder / f"{lane}-{index}", "llvm", case["function"], lane)
 
 
 def write_manifest_control(control, original_bytes, documents, filename, keys, value):
@@ -200,14 +231,21 @@ def main():
                               "--workspace-parent", destination, "--config", policy], destination, "plan"))
     plan = json.loads((workspace / "plan.json").read_text())
     assert not any(entry["status"] == "blocked" for entry in plan["inventory"])
+    excluded = [entry for entry in plan["inventory"] if entry["status"] == "excluded"]
+    assert len(excluded) == int(args.backend == "llvm")
+    assert all(entry["name"] == "<closure>" for entry in excluded)
     command([cli, "generate", "--workspace", workspace], destination, "generate")
     report_root = destination / "comparison"
-    command([cli, "run", "--workspace", workspace, "--report-dir", report_root], destination, "run", timeout=900)
+    expected_exit = 3 if args.backend == "llvm" else 0
+    command([cli, "run", "--workspace", workspace, "--report-dir", report_root], destination, "run", expected=expected_exit, timeout=900)
     report = json.loads((report_root / "report.json").read_text())
-    count = 6 if args.backend == "llvm" else 4
+    count = 7 if args.backend == "llvm" else 4
     assert len(report["cases"]) == count and report["source_preserved"]
     for case in report["cases"]:
-        check_case(case, report_root, args.backend, column)
+        if case["function"] == "wide.unstable_error":
+            check_unstable_panic(case, report_root)
+        else:
+            check_case(case, report_root, args.backend, column)
     case = report["cases"][0]
     folder = report_root / case["case"]
     altered_channels(cli, destination, folder)
@@ -217,7 +255,11 @@ def main():
                       "scope": "Rust-only standalone-source build/run contract; no Cargo, async or eight-language LLVM claim",
                       "backend": args.backend, "oteleq_cli_sha256": hashlib.sha256(cli.read_bytes()).hexdigest(),
                       "provider_artefacts_sha256": hashlib.sha256(json.dumps(artefacts, sort_keys=True).encode()).hexdigest(),
-                      "cases": count, "attempts": count * 6, "source_preserved": True,
+                      "cases": count, "attempts": count * 6, "matching_cases": count - int(args.backend == "llvm"),
+                      "matching_attempts": (count - int(args.backend == "llvm")) * 6,
+                      "unstable_panic_negative_cases": int(args.backend == "llvm"), "strict_gate_exit": expected_exit,
+                      "excluded_panic_hook_helpers": len(excluded),
+                      "source_preserved": True,
                       "build_warnings_separate": True, "raw_and_typed_stderr_controls_rejected": True,
                       "retained_manifest_controls_rejected": controls,
                       "llvm_column_and_expected_panic_controls": args.backend == "llvm"}), flush=True)
