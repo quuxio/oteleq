@@ -18,6 +18,45 @@ def command(arguments, folder, name, expected=0, timeout=900):
     return result.stdout.decode().strip()
 
 
+def qualify_passive_observers(cli, root, destination):
+    """Unsupported callbacks must fail capture before any equivalence verdict."""
+    source = destination / "callback-application"
+    source.mkdir()
+    (source / "App.java").write_text('''class App {
+static class E extends RuntimeException {
+ public String getMessage(){System.out.println("CALLBACK");return "masked";}
+}
+static int selected(){throw new E();}
+}
+''')
+    (source / "app.go").write_text('''package main
+import "fmt"
+type int struct{}
+func (int) GoString() string {fmt.Println("CALLBACK");return "masked"}
+func selected() int{return int{}}
+''')
+    (source / "app.rs").write_text('''#[allow(non_camel_case_types)]
+struct i32;
+impl std::fmt::Debug for i32 {
+ fn fmt(&self,f:&mut std::fmt::Formatter)->std::fmt::Result {
+  println!("CALLBACK");write!(f,"masked")
+ }
+}
+fn selected()->i32{i32}
+''')
+    policy = destination / "callback-policy.toml"
+    policy.write_text('schema_version=1\nlanguages=["java","go","rust"]\n[functions]\ninclude=["*selected*"]\n')
+    workspace = Path(command([cli, "plan", "--source", source, "--otelc-root", root,
+                              "--workspace-parent", destination, "--config", policy], destination, "callback-plan"))
+    command([cli, "generate", "--workspace", workspace], destination, "callback-generate")
+    captures = destination / "callback-comparison"
+    command([cli, "run", "--workspace", workspace, "--report-dir", captures], destination, "callback-run", expected=4)
+    report = json.loads((captures / "report.json").read_text())
+    assert report["source_preserved"] and len(report["cases"]) == 3
+    assert all(case["exit_code"] == 4 for case in report["cases"])
+    assert all(b"CALLBACK" not in path.read_bytes() for path in captures.rglob("stdout"))
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--otelc-root",type=Path,required=True)
@@ -108,9 +147,11 @@ cases=[[7]]
     assert all(case["exit_code"]==4 for case in binding["cases"])
     assert any(b"selected function binding differs" in path.read_bytes()
                for path in (destination/"binding-comparison").rglob("stderr"))
+    qualify_passive_observers(cli, root, destination)
     summary={"cli_sha256":hashlib.sha256(cli.read_bytes()).hexdigest(),"languages":sorted(languages),"matching_cases":24,
              "matching_attempts":96,"framework_cases":8,"export_replay_cases":1,"same_return_mutation_cases":3,"source_preserved":True,
              "rebound_callable_with_startup_witness_rejected":True,
+             "static_observer_callback_controls_refused":3,
              "claim":"equivalence over these tests and observations","artefact_class":"diagnostic"}
     (destination/"qualification.json").write_text(json.dumps(summary,indent=2)+"\n")
     print(json.dumps(summary),flush=True)
