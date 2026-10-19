@@ -259,6 +259,13 @@ Path(os.environ["OTELEQ_OBSERVATION"]).write_text(json.dumps({{"before": before,
 
 JS_OBSERVER = '''
 const __oteleqIsProxy=(await import('node:util')).types.isProxy;
+// Labels come from known prototype identities, never application getters.
+const __oteleqErrorPrototypes=new Map([
+  [Error.prototype,'Error'],[TypeError.prototype,'TypeError'],
+  [RangeError.prototype,'RangeError'],[SyntaxError.prototype,'SyntaxError'],
+  [ReferenceError.prototype,'ReferenceError'],[URIError.prototype,'URIError'],
+  [EvalError.prototype,'EvalError'],[AggregateError.prototype,'AggregateError']
+]);
 function __oteleqGraph(roots) {
   const seen = new Map(), nodes = [];
   function value(v, depth=0) {
@@ -271,10 +278,10 @@ function __oteleqGraph(roots) {
     if(seen.has(v)) return {ref:seen.get(v)};
     const id=nodes.length; seen.set(v,id);
     const prototype=Object.getPrototypeOf(v);
-    const errorPrototypes=[Error.prototype,TypeError.prototype,RangeError.prototype,SyntaxError.prototype,ReferenceError.prototype,URIError.prototype,EvalError.prototype,AggregateError.prototype];
-    const isError=errorPrototypes.includes(prototype);
+    const errorType=__oteleqErrorPrototypes.get(prototype);
+    const isError=errorType!==undefined;
     if(![Object.prototype,Array.prototype,null].includes(prototype) && !isError) throw new Error('opaque object prototype');
-    const n={type:isError?prototype.name:Array.isArray(v)?'array':'object',fields:[]}; nodes.push(n);
+    const n={type:isError?errorType:Array.isArray(v)?'array':'object',fields:[]}; nodes.push(n);
     for(const key of Reflect.ownKeys(v)) {
       if(isError && key==='stack') continue;
       if(typeof key!=='string') throw new Error('symbol state requires a fixture');
