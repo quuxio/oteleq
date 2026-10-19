@@ -216,6 +216,17 @@ def native_literal(value, type_, language):
     return json.dumps(value)
 
 
+def go_literal(value: object, type_: str) -> str:
+    """Freeze Go bits and boolean expressions independently of source bindings."""
+    if type(value) is bool:
+        return type_ + "(1==" + ("1" if value else "0") + ")"
+    if type_ in ("float32", "float64"):
+        width = float_width(type_, "go")
+        bits = struct.pack(">f" if width == 32 else ">d", value).hex()
+        return f"__oteleq_math.Float{width}frombits(0x{bits})"
+    return type_ + "(" + json.dumps(value) + ")"
+
+
 def literal(value, type_, language):
     type_ = scalar_type(type_)
     if language == "java":
@@ -227,13 +238,7 @@ def literal(value, type_, language):
             return str(value).lower()
         return str(value) + (".0" if type_ in ("f32", "f64") and type(value) is int else "") + type_
     if language == "go":
-        if type(value) is bool:
-            return type_ + "(1==" + ("1" if value else "0") + ")"
-        if type_ in ("float32", "float64"):
-            width = float_width(type_, language)
-            bits = struct.pack(">f" if width == 32 else ">d", value).hex()
-            return f"__oteleq_math.Float{width}frombits(0x{bits})"
-        return type_ + "(" + json.dumps(value) + ")"
+        return go_literal(value, type_)
     return json.dumps(value)
 
 
