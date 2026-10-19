@@ -78,7 +78,7 @@ Raw captures, private workspaces, tool/provider manifests and frozen executables
 
 ## Python resource qualification
 
-The [resource record](qualification/python-resource-2026-10-19.json) names exact consumer runtime `edb78ce` and private provider `60e5c49` from [otelc PR67](https://github.com/quuxio/otelc/pull/67). Two plain and two instrumented attempts passed the independently declared application output, including `retained=0`, with unchanged source. The original application verifies failed/subsequent/duplicate closes, layout, a strong-reference control and collection after clearing application owners while the observer is active.
+The [resource record](qualification/python-resource-2026-10-19.json) names exact consumer runtime `83a77da` and private provider `60e5c49` from [otelc PR67](https://github.com/quuxio/otelc/pull/67). Two plain and two instrumented attempts passed the independently declared application output, including `retained=0`, with unchanged source. The original application verifies failed/subsequent/duplicate closes, layout, a strong-reference control and collection after clearing application owners while the observer is active.
 
 Each instrumented attempt contained the factory span plus two distinct linked lifetime roots. Runtime lifecycle counters and independently decoded cumulative OTLP metrics required admitted/completed `2`, live `0` and expected failed releases `1`, with zero loss or pending state. An altered retained-stdout control was rejected as a difference. These are local capture checks; the consumer did not query Tempo or Prometheus. Raw captures and the immutable provider remain retained privately.
 
