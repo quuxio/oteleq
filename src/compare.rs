@@ -1,8 +1,8 @@
 use crate::protocol::{Attempt, Bundle, Case, Scope, Termination};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Verdict {
     EquivalentObserved,
@@ -20,13 +20,13 @@ impl Verdict {
         }
     }
 }
-#[derive(Debug, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Difference {
     pub path: String,
     pub baseline: Vec<u8>,
     pub instrumented_on: Vec<u8>,
 }
-#[derive(Debug, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct CaseReport {
     pub case_id: String,
     pub verdict: Verdict,

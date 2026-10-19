@@ -71,6 +71,13 @@ OTELEQ_WORKSPACE=/tmp/oteleq-run-actual-id
 "$OTELEQ_PYTHON" "$OTELEQ_WORKSPACE/tests/test_equivalence.py"
 ```
 
+Render a retained run as [standalone HTML and JUnit XML](docs/reporting.md):
+
+```sh
+"$OTELEQ_CLI" render-report /absolute/path/to/new-report/report.json \
+  --output-dir /absolute/path/to/new-presentation
+```
+
 The default generates up to three distinct scalar cases per function and compares two plain with two instrumented runs per case. Missing instrumentation, changed source, unstable observations, failed builds and selected blockers fail the gate. The report records tested inputs, state coverage, telemetry and gaps. Syntax discovery and scalar samples do not establish business preconditions.
 
 Use repeated `--language ID`, `--exclude 'qualified.pattern'` and `--cases 1` through `--cases 1024` on `plan` to select a supported scope. [The CLI reference](docs/cli-and-configuration.md#implemented-commands) lists every public command and flag.

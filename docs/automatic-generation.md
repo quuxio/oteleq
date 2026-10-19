@@ -104,7 +104,7 @@ Bundle artefact digests aggregate the frozen source, case harness and qualified 
 
 The comparator checks exact application stdout/stderr and typed return/error plus before/after state bytes. Python graph observations retain object fields, reference aliases, cycles, arbitrary-size integers and float bits. Node observes plain objects/arrays through own data descriptors, preserving aliases, sparse-array properties, bigint and float bits; accessors, symbols and unsupported prototypes are incomplete observations. Opaque observer failures are not converted into application exceptions. Python exception graphs retain arguments, custom fields and causal links; Node observes supported Error own fields and excludes stacks. Exception traceback/stack objects and Java/C++ extra exception fields are outside scope; unrecognised native panic/error payloads fail capture. Native observers capture scalar value representations, without reading object padding. Java, Rust and Go use tagged scalar representations, including float bits where supported.
 
-Global roots are source-declared top-level assignments/variables. Imported-module state, hidden fields, arbitrary receivers, filesystem/network effects, mutation-and-reversion between boundaries and concurrent schedules are outside this observation scope. Those limits appear in the evidence. This version does not implement an instrumented-off lane, automatic shrinking, HTML or JUnit reporting.
+Global roots are source-declared top-level assignments/variables. Imported-module state, hidden fields, arbitrary receivers, filesystem/network effects, mutation-and-reversion between boundaries and concurrent schedules are outside this observation scope. Those limits appear in the evidence. This version does not implement an instrumented-off lane or automatic shrinking. Retained JSON reports can be presented as [standalone HTML and JUnit XML](reporting.md).
 
 Telemetry is decoded separately. Each instrumented invocation must contain exactly the selected function identity and one complete root tree, with valid IDs/parent graphs, matching service/scope, zero loss/pending counters and finished export. Recursive span counts and escaping-error counts are runtime observations, not independently predicted call counts. Repeated counts must agree. A baseline that exports telemetry, missing instrumentation, missing observations, crashes, timeouts, output overflow, unstable repeats or source changes cannot pass.
 
@@ -129,6 +129,8 @@ make generation-policy-otelc PYTHON=/absolute/path/to/otelc/.venv/bin/python \
 ```
 
 ## Reports, replay and retention
+
+[`render-report`](reporting.md) creates private HTML/JUnit presentations from this retained JSON without executing the application. Incomplete or untested inventory entries remain errors, including in partial replay reports.
 
 `report.json` retains every case result, the complete selected/excluded/blocked inventory, source identity, observation scope and source-preservation result. Case directories retain the concrete corpus, generated source, build logs and hashes, launch vectors, raw application observations, runtime reports, OTLP protobuf/HTTP records, comparator bundle and JSON comparison. Partial results remain available if a later case fails.
 
