@@ -100,6 +100,10 @@ def strict_json(data):
     return json.loads(data, object_pairs_hook=unique_object)
 
 
+OTELC_CLI_PATH = "target/debug/quux-otelc"
+RUST_BUILD_FILENAME = "build.json"
+
+
 def digest(data):
     return hashlib.sha256(data).hexdigest()
 
@@ -164,7 +168,7 @@ def typescript_backend(root, language, spec, policy):
 
 def artefacts(root, language, tools):
     """Re-enumerate executable adapter inputs so additions/removals are visible."""
-    paths = [root / "target/debug/quux-otelc"]
+    paths = [root / OTELC_CLI_PATH]
     trees = []
     if language in ("c", "cpp"):
         paths += [root / "target/debug/libquux_otelc_runtime.a",
@@ -226,11 +230,11 @@ RUST_BASELINE_FLAGS = ("--edition=2024", "-O", "-g")
 
 def rust_metadata(bundle: Path) -> dict:
     """Read only fixed bundle files and reject an unqualified schema/flag contract."""
-    for name in ("application", "plan.json", "build.json"):
+    for name in ("application", "plan.json", RUST_BUILD_FILENAME):
         path = bundle / name
         if path.is_symlink() or not path.is_file():
             raise ValueError("Rust build bundle needs regular application/plan/build files")
-    metadata_path = bundle / "build.json"
+    metadata_path = bundle / RUST_BUILD_FILENAME
     if metadata_path.stat().st_size > 4 * 1024 * 1024:
         raise ValueError("Rust build metadata exceeds its size limit")
     metadata = strict_json(metadata_path.read_text())
@@ -265,13 +269,13 @@ def rust_manifest(root: Path, workspace: Path, source: Path, bundle: Path, tools
             or metadata.get("source") != str(source.resolve())
             or metadata.get("source_root") != str(workspace.resolve())):
         raise ValueError("Rust build source, executable, policy or provider identity changed")
-    return {**expected, "manifest_sha256": file_digest(bundle / "build.json"),
+    return {**expected, "manifest_sha256": file_digest(bundle / RUST_BUILD_FILENAME),
             "baseline_flags": list(RUST_BASELINE_FLAGS), "compiler": compiler}
 
 
 def rust_command(root, workspace, source, policy, tools, environment, evidence, output, lane):
     """Build only the selected lane; application launch never invokes rustc."""
-    prefix = [root / "target/debug/quux-otelc", "--config", policy, "--language", "rust"]
+    prefix = [root / OTELC_CLI_PATH, "--config", policy, "--language", "rust"]
     relative = source.relative_to(workspace)
     if lane == "baseline":
         binary = output / "plain"
@@ -290,7 +294,7 @@ def rust_command(root, workspace, source, policy, tools, environment, evidence, 
 
 
 def commands(root, workspace, language, source, policy, tools, environment, evidence):
-    prefix = [root / "target/debug/quux-otelc", "--config", policy, "--language", language]
+    prefix = [root / OTELC_CLI_PATH, "--config", policy, "--language", language]
     if language in ("c", "cpp"):
         tool = "clang++" if language == "cpp" else "clang"
         flags = ["-O2", "-pthread", "-std=c++17"] if language == "cpp" else ["-O1", "-pthread"]
