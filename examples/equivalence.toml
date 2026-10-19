@@ -1,57 +1,30 @@
-# Proposed schema; the implemented CLI does not consume this policy.
-# Paths are placeholders. See docs/automatic-generation.md for current usage.
+# Executable policy for quux-oteleq plan --config.
+# Build recipes, object factories and sequences remain on the completion checklist.
 schema_version = 1
 languages = ["c", "cpp", "rust", "python", "java", "javascript", "typescript", "go"]
 
 [sources]
 include = ["**"]
-exclude = [".git/**", "vendor/**", "node_modules/**", "target/**", "build/**"]
+exclude = []
 
 [functions]
 include = ["*"]
 exclude = []
 
-[workspace]
-location = "system-temp"
-retain_on_failure = true
-
-[instrumentation]
-provider = "otelc"
-executable = "quux-otelc"
-policy = "/path/to/otelc.toml"
-required_lanes = ["baseline", "instrumented-on"]
-optional_lanes = ["instrumented-off"]
-
 [generation]
 seed = 20261008
-cases_per_function = 100
-edge_cases = true
-stateful_sequences = true
-max_sequence_steps = 20
-
-[state]
-receiver = true
-mutable_arguments = true
-globals = "discovered-observable"
-capture = "boundary_snapshots"
-
-[effects]
-stdout = true
-stderr = true
-filesystem_roots = ["{case_dir}/files"]
-network = "declared-fixtures"
+cases_per_function = 16
 
 [limits]
-case_timeout_ms = 5000
-shutdown_timeout_ms = 2000
-max_graph_nodes = 10000
-max_graph_depth = 32
-max_capture_bytes = 10485760
+case_timeout_ms = 60000
 baseline_repeats = 2
 instrumented_repeats = 2
+max_capture_bytes = 262144
 
-[ci]
-require_complete_selected_inventory = true
-require_complete_requested_observations = true
-require_instrumentation_witness = true
-allow_zero_cases = false
+# Optional explicit domain cases replace automatic samples for matching functions.
+# Use the exact function identity from plan.json or a deliberate glob.
+# [[fixtures]]
+# language = "python"
+# source = "src/api.py"
+# function = "src.api.calculate"
+# cases = [[7], [41]]

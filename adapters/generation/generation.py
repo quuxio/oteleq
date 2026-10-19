@@ -1,6 +1,5 @@
 """External generated test workflow; Rust CLI/comparator with compiler-specific workers."""
 import argparse
-import fnmatch
 import importlib.util
 import json
 import os
@@ -16,12 +15,12 @@ import uuid
 import discovery
 import harness
 import otelc_capture as capture
+import policy as project_policy
 
 VERSION = 1
 MAX_FILE = 8 * 1024 * 1024
 MAX_TREE = 256 * 1024 * 1024
 MAX_OUTPUT = 4 * 1024 * 1024
-MAX_CHANNEL_BYTES = 256 * 1024
 OWNED_MARKER = '.oteleq-owned.json'
 PLAN_FILE = 'plan.json'
 GENERATED_MANIFEST = 'generated-manifest.json'
@@ -193,7 +192,11 @@ def inventory_entry(function, discovered, name, language, source_hash, snapshot,
     entry["id"] = identity({k: entry[k] for k in ("language", "path", "name", "line", "column", "parameters", "source_sha256")})[:20]
     entry["otelc_function"] = entry_identity(entry)
     excluded = is_entrypoint(function, language) or bool(function.get("declaration_only"))
-    excluded |= any(fnmatch.fnmatchcase(entry["otelc_function"], pattern) for pattern in args.exclude)
+    excluded |= not project_policy.selected(entry["otelc_function"], args.configuration["functions"])
+    entry["generation_seed"] = args.configuration["generation"]["seed"]
+    configured = project_policy.concrete_cases(entry, args.configuration) if not excluded else None
+    if configured is not None:
+        entry["input_cases"] = configured
     entry["status"] = "excluded" if excluded else qualify_entry(entry, snapshot, args.cases)
     return entry
 
@@ -202,7 +205,8 @@ def inventory_tree(contents, root, snapshot, workspace, args):
     tools, artefacts, inventory = {}, {}, []
     for name, sha in contents.items():
         language = discovery.LANGUAGES.get(Path(name).suffix)
-        if not language or args.language and language not in args.language:
+        if (not language or language not in args.language
+                or not project_policy.selected(name, args.configuration["sources"])):
             continue
         discovered = discover_file(name, language, root, snapshot, workspace, tools, artefacts)
         discovered["entrypoints"] = [function for function in discovered["functions"] if is_entrypoint(function, language)]
@@ -218,6 +222,14 @@ def plan(args):
     root = args.otelc_root.resolve(strict=True)
     if not source.is_dir() or not root.is_dir():
         raise ValueError("source and otelc root must be directories")
+    configuration = project_policy.load(getattr(args, "config", None))
+    if args.language:
+        configuration["languages"] = list(dict.fromkeys(args.language))
+    if args.cases is not None:
+        configuration["generation"]["cases_per_function"] = args.cases
+    configuration["functions"]["exclude"] = list(dict.fromkeys(configuration["functions"]["exclude"] + args.exclude))
+    args.configuration, args.language = configuration, configuration["languages"]
+    args.cases = configuration["generation"]["cases_per_function"]
     temporary = capture.temporary_parent(source, root)
     parent = source_outside(args.workspace_parent or temporary, source, root)
     contents = manifest(source)
@@ -227,11 +239,18 @@ def plan(args):
     write(workspace / OWNED_MARKER, {"schema_version": VERSION, "id": uuid.uuid4().hex})
     snapshot = snapshot_source(source, workspace, contents)
     tools, artefacts, inventory = inventory_tree(contents, root, snapshot, workspace, args)
+    for fixture in configuration["fixtures"]:
+        if fixture["language"] is not None and fixture["language"] not in args.language:
+            continue
+        if not any(project_policy.fixture_matches(entry, fixture) for entry in inventory):
+            raise ValueError(f"configured fixture matches no selected callable: {fixture['function']}; partial workspace: {workspace}")
     if manifest(source) != contents or manifest(snapshot) != contents:
         raise ValueError("source changed during discovery")
     data = {"schema_version": VERSION, "source": str(source), "otelc_root": str(root), "source_manifest": contents,
             "source_sha256": identity(contents), "tools": {lang: {k: str(v) for k, v in selected.items()} for lang, selected in tools.items()},
             "artefacts": artefacts, "inventory": inventory, "cases_per_function": args.cases,
+            "configuration": configuration, "configuration_sha256": identity(configuration),
+            "excluded_files": [name for name in contents if not project_policy.selected(name, configuration["sources"])],
             "excluded_directories": sorted(discovery.IGNORED), "excluded_languages": sorted(set(discovery.LANGUAGES.values()) - set(args.language or discovery.LANGUAGES.values())),
             "generator_sha256": generator_identity(), "cli_sha256": capture.file_digest(Path(os.environ["OTELEQ_EXECUTABLE"]))}
     write(workspace / PLAN_FILE, data)
@@ -268,7 +287,7 @@ def decoder_files():
 
 def generator_identity():
     here = Path(__file__).parent
-    names = ("generation.py", "discovery.py", "harness.py", "observe.py", "discover.mjs", "discover.go", "Discover.java")
+    names = ("generation.py", "policy.py", "discovery.py", "harness.py", "observe.py", "discover.mjs", "discover.go", "Discover.java")
     files = {name: capture.file_digest(here / name) for name in names}
     files["host-python"] = capture.file_digest(Path(sys.executable))
     files["host-version"] = sys.version
@@ -285,6 +304,9 @@ def load_workspace(path, generated=False):
         raise ValueError("plan identity changed")
     if data["schema_version"] != VERSION or data["generator_sha256"] != generator_identity() or data["cli_sha256"] != capture.file_digest(Path(os.environ["OTELEQ_EXECUTABLE"])):
         raise ValueError("generator or CLI identity changed; create a new plan")
+    if (data["configuration_sha256"] != identity(data["configuration"])
+            or project_policy.validate(data["configuration"]) != data["configuration"]):
+        raise ValueError("configuration identity or schema changed; create a new plan")
     if manifest(Path(data["source"])) != data["source_manifest"] or manifest(workspace / "snapshot") != data["source_manifest"]:
         raise ValueError("application source or immutable snapshot changed")
     if generated and manifest(workspace / "tests") != read(workspace / GENERATED_MANIFEST):
@@ -300,7 +322,11 @@ def generate(args):
     for entry in data["inventory"]:
         if entry["status"] == "ready":
             for index, values in enumerate(harness.corpus(entry, data["cases_per_function"])):
-                cases.append({"id": entry["id"] + "-" + str(index), "function_id": entry["id"], "arguments": values})
+                case = {"id": entry["id"] + "-" + str(index), "function_id": entry["id"],
+                        "arguments": values, "argument_types": entry["parameters"]}
+                if "input_cases" in entry:
+                    case["arguments_requested"] = entry["input_cases"][index]
+                cases.append(case)
     write(destination / "corpus.json", cases)
     if len(cases) > 1024:
         raise ValueError("generation exceeds 1024 concrete cases; reduce --cases or use explicit exclusions")
@@ -441,7 +467,7 @@ def qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, 
     observation = folder / "observation"
     if not observation.is_file() or observation.stat().st_size > MAX_OUTPUT:
         raise ValueError("missing or oversized typed observation")
-    if len(result.stdout) + len(result.stderr) + observation.stat().st_size > MAX_CHANNEL_BYTES:
+    if len(result.stdout) + len(result.stderr) + observation.stat().st_size > data["configuration"]["limits"]["max_capture_bytes"]:
         raise ValueError("case observation exceeds comparator channel budget")
     witness = None
     if lane == "baseline":
@@ -476,7 +502,7 @@ def attempt(workspace, data, entry, case, lane, folder, decoder):
         config.write_text(policy(entry, endpoint))
         command = build_command(root, project, entry, driver, config, tools, env, folder, scratch, lane)
         write(folder / "command.json", [str(p) for p in command])
-        result = execute(command, project, env, folder, timeout=60)
+        result = execute(command, project, env, folder, timeout=data["configuration"]["limits"]["case_timeout_ms"] / 1000)
     capture.retain_http(folder, bodies, errors)
     validate_private_sources(project, immutable, folder)
     capture.stable(root, language, tools, data["artefacts"][language])
@@ -486,14 +512,15 @@ def compare_case(workspace, data, entry, case, destination, decoder):
     write(destination / "corpus.json", case)
     observed = {"baseline": [], "instrumented_on": []}
     for lane in observed:
-        for repeat in range(2):
+        key = "baseline_repeats" if lane == "baseline" else "instrumented_repeats"
+        for repeat in range(data["configuration"]["limits"][key]):
             observed[lane].append(attempt(workspace, data, entry, case, lane, destination / f"{lane}-{repeat}", decoder))
     selected = observed["instrumented_on"][0]["witness"]["functions"]
     diagnostic = {"source": data["source_sha256"], "harness": manifest(workspace / "tests/harnesses" / case["id"]),
                   "tools": {name: sha for name, sha in data["artefacts"][entry["language"]].items() if name.startswith("tool:")}}
     scope = {"language": entry["language"], "artefact_class": "diagnostic", "source_sha256": data["source_sha256"],
              "baseline_artefact_sha256": identity(diagnostic), "instrumented_artefact_sha256": identity({**diagnostic, "adapter": data["artefacts"][entry["language"]]}),
-             "policy_sha256": capture.digest(policy(entry, "receiver").encode()), "observer": "oteleq scalar generator v1; independently one selected root, recursive span counts observed",
+             "policy_sha256": identity({"otelc": policy(entry, "receiver"), "generation": data["configuration"]}), "observer": "oteleq configured scalar generator v1; independently one selected root, recursive span counts observed",
              "channels": ["stdout", "stderr", "state-and-outcome"],
              "gaps": ["scalar corpus; business preconditions and branch exhaustiveness not established", "diagnostic access/entrypoint helpers; not shipping artefact evidence", "artefact digests aggregate diagnostic inputs and qualified tools/adapters; emitted runtime compiler/loader outputs are outside those digests", "no filesystem/network, imported-module globals, instrumented-off or concurrent-schedule qualification", "exception traceback/stack and Java/C++ extra exception fields are unobserved", "compiler sysroots and OS libraries are outside content identity", "trusted local execution; no hostile-code sandbox"]}
     bundle = {"workload_schema_version": 1, "scope": scope, "cases": [{"case_id": case["id"], "corpus_sha256": identity(case),
@@ -537,6 +564,9 @@ def run(args):
             result = compare_case(workspace, data, entry, case, case_path, message_decoder)
         except (ValueError, OSError, KeyError) as error:
             result = {"case": case["id"], "function": entry["otelc_function"], "arguments": case["arguments"], "exit_code": 4, "error": str(error)}
+        result["argument_types"] = case["argument_types"]
+        if "arguments_requested" in case:
+            result["arguments_requested"] = case["arguments_requested"]
         results.append(result)
         write(destination / "partial-results.json", results)
     blocked = [e for e in data["inventory"] if e["status"] == "blocked"] if args.command == "run" else []
@@ -546,6 +576,8 @@ def run(args):
     report = {"schema_version": VERSION, "claim": "equivalence over these tests and observations", "exit_code": code,
               "cases": results, "blocked": blocked, "inventory": data["inventory"], "source_sha256": data["source_sha256"],
               "source_preserved": True, "workspace": str(workspace), "artefact_class": "diagnostic"}
+    report["configuration"] = data["configuration"]
+    report["configuration_sha256"] = data["configuration_sha256"]
     write(destination / "report.json", report)
     print(json.dumps({"report": str(destination / "report.json"), "exit_code": code, "cases": len(results), "blocked": len(blocked)}), flush=True)
     return code
@@ -582,14 +614,28 @@ def clean(args):
     allowed = {OWNED_MARKER, PLAN_FILE, "snapshot", "tests", GENERATED_MANIFEST, README_FILE, "runs", "go-cache"}
     if any(p.name not in allowed for p in workspace.iterdir()):
         raise ValueError("workspace contains unowned files; retain and inspect it")
-    if (workspace / PLAN_FILE).exists():
-        data = read(workspace / PLAN_FILE)
-        if manifest(workspace / "snapshot") != data["source_manifest"]:
-            raise ValueError("snapshot was edited; retain and inspect it")
+    marker = read(workspace / OWNED_MARKER)
+    if not (workspace / PLAN_FILE).is_file():
+        raise ValueError("workspace plan is unsealed; retain and inspect it")
+    data = read(workspace / PLAN_FILE)
+    if marker.get("plan_sha256") != identity(data):
+        raise ValueError("plan identity changed; retain and inspect it")
+    if manifest(workspace / "snapshot") != data["source_manifest"]:
+        raise ValueError("snapshot was edited; retain and inspect it")
+    if (workspace / "tests").exists() and not (workspace / GENERATED_MANIFEST).is_file():
+        raise ValueError("generated suite is unsealed; retain and inspect it")
     if (workspace / GENERATED_MANIFEST).exists() and manifest(workspace / "tests") != read(workspace / GENERATED_MANIFEST):
         raise ValueError("generated suite was edited; retain and inspect it")
     shutil.rmtree(workspace)
     return 0
+
+
+def case_budget(value):
+    """Keep CLI budget errors bounded instead of printing 1,024 choices."""
+    try:
+        return project_policy.integer(int(value), 1, project_policy.MAX_CASES, "--cases")
+    except ValueError as error:
+        raise argparse.ArgumentTypeError("--cases must be an integer from 1 to 1024") from error
 
 
 def main(argv=None):
@@ -598,10 +644,11 @@ def main(argv=None):
     planning = commands.add_parser("plan", help="AST inventory and external immutable snapshot", allow_abbrev=False)
     planning.add_argument("--source", type=Path, required=True)
     planning.add_argument("--otelc-root", type=Path, required=True)
+    planning.add_argument("--config", type=Path, help="validated TOML selection, concrete fixtures and execution budgets")
     planning.add_argument("--workspace-parent", type=Path)
     planning.add_argument("--language", action="append", choices=sorted(set(discovery.LANGUAGES.values())))
     planning.add_argument("--exclude", action="append", default=[])
-    planning.add_argument("--cases", type=int, default=3, choices=range(1, 17))
+    planning.add_argument("--cases", type=case_budget, metavar="N", help="per-function budget, 1..1024; policy default or 3")
     for command in COMMANDS[1:]:
         sub = commands.add_parser(command, allow_abbrev=False)
         sub.add_argument("--workspace", type=Path, required=True)

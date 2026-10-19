@@ -2,7 +2,7 @@
 
 ## Implemented slice
 
-[Automatic generation](automatic-generation.md) creates deterministic scalar cases, diagnostic callers and a retained independent `unittest` suite for all eight languages. It implements explicit inventory gaps, two plain/two instrumented repetitions, supported state observations, replay and portable export. Factories, domain preconditions, property frameworks, action sequences and shrinking remain future work.
+[Automatic generation](automatic-generation.md) creates deterministic scalar cases, diagnostic callers and a retained independent `unittest` suite for all eight languages. It implements explicit inventory gaps, configured repeated plain/instrumented execution (at least two each), supported state observations, replay and portable export. Explicit scalar domain cases and seeded budgets are configured through [the project policy](automatic-generation.md#project-policy-and-concrete-fixtures). Object factories, inferred domain preconditions, property frameworks, action sequences and shrinking remain future work.
 
 ## Current workspace
 
@@ -11,7 +11,7 @@
 ```text
 oteleq-run-<id>/
   .oteleq-owned.json
-  plan.json                 # source/tool identities and full inventory
+  plan.json                 # source/tool identities, resolved policy and full inventory
   snapshot/                 # selected immutable application contents
   generated-manifest.json   # generated suite/corpus content hashes
   README.txt
@@ -38,7 +38,7 @@ Builds use fresh per-attempt private project copies. Reports retain outputs, bui
 | `export-tests --apply` | Copies the frozen snapshot, suite, corpus, instructions and sealed plan into a new destination |
 | `clean` | Explicitly removes the owned workspace after preservation checks |
 
-There is no automatic successful-run deletion or `--keep-workspace` flag. Keep reports or export the suite before `clean`. Cleanup requires `.oteleq-owned.json`, rejects unknown top-level files and edited snapshots/suites, and does not require the original application or toolchain still to exist. It removes the owned workspace, including its internal replay evidence; independently stored external reports remain available.
+There is no automatic successful-run deletion or `--keep-workspace` flag. Keep reports or export the suite before `clean`. Cleanup requires `.oteleq-owned.json`, rejects unknown top-level files, unsealed plans/suites and edited snapshots/suites, and does not require the original application or toolchain still to exist. It removes the owned workspace, including its internal replay evidence; independently stored external reports remain available.
 
 ## Optional incorporation into a repository
 

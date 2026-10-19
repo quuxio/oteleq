@@ -2,13 +2,13 @@
 
 ## Status
 
-Updated 9 October 2026. `quux-oteleq` implements the commands below. The scalar workflow uses embedded workers and a frozen JSON workspace contract. The later configuration and adapter sections describe proposed interfaces; the implemented commands do not consume `equivalence.toml` or the illustrative graph records.
+Updated 19 October 2026. `quux-oteleq` implements the commands below. The scalar workflow uses embedded workers and a frozen JSON workspace contract. The generator consumes a validated TOML selection/input/budget policy through `plan --config`. The later build/observer configuration and adapter sections describe proposed interfaces; the illustrative graph protocol remains unimplemented.
 
 ## Implemented commands
 
 | Command | Required arguments | Optional arguments | Result |
 | --- | --- | --- | --- |
-| `plan` | `--source PATH --otelc-root PATH` | `--workspace-parent PATH`, repeated `--language ID`, repeated `--exclude PATTERN`, `--cases N` | New private workspace path on stdout; snapshot, tool identities and syntax inventory in `plan.json` |
+| `plan` | `--source PATH --otelc-root PATH` | `--config PATH`, `--workspace-parent PATH`, repeated `--language ID`, repeated `--exclude PATTERN`, `--cases N` | New private workspace path on stdout; snapshot, tool identities and syntax inventory in `plan.json` |
 | `generate` | `--workspace PATH` | None | Frozen concrete corpus, diagnostic harness previews and `tests/test_equivalence.py` |
 | `run` | `--workspace PATH --report-dir PATH` | None | All generated cases, complete inventory and JSON report in a new external directory |
 | `replay` | `--workspace PATH --case ID` | None | One frozen case in a new `runs/replay-*` directory inside the workspace |
@@ -16,7 +16,7 @@ Updated 9 October 2026. `quux-oteleq` implements the commands below. The scalar 
 | `clean` | `--workspace PATH` | None | Removes an owned workspace after checking its snapshot/suite and top-level contents |
 | `compare-workload` | `BUNDLE.json` positional path | None | Byte-channel comparison JSON on stdout |
 
-The generation commands accept `--help`. `quux-oteleq --help` lists both workflows and their exit contracts. Use full option names; abbreviations are rejected. Paths accept both `--source PATH` and `--source=PATH` forms. `--cases` accepts 1 through 16 and defaults to 3 distinct scalar cases per function. Language IDs are `c`, `cpp`, `rust`, `python`, `java`, `javascript`, `typescript`, `go`; repeated language selectors form a subset, and exclusions match qualified function identities.
+The generation commands accept `--help`. `quux-oteleq --help` lists both workflows and their exit contracts. Use full option names; abbreviations are rejected. Paths accept both `--source PATH` and `--source=PATH` forms. `--cases` accepts 1 through 1024 and defaults to the policy budget or 3 scalar cases per function. Larger budgets add seeded samples; finite domains can produce fewer distinct cases. Language IDs are `c`, `cpp`, `rust`, `python`, `java`, `javascript`, `typescript`, `go`; repeated language selectors form a subset, and exclusions match qualified function identities.
 
 Set `OTELEQ_PYTHON` to otelc's qualified Python 3.12+ environment with the OTLP protobuf decoder. The selected language tools and built otelc adapters must already exist. `plan` performs syntax discovery using those tools, without executing target functions. It does not establish arbitrary build graphs or valid business preconditions. `generate` creates the suite once; a changed source, corpus, CLI or tool identity requires a new plan. Dependencies are not installed into the application.
 
@@ -26,11 +26,15 @@ Generation execution exits are `0` complete, `1` observed difference, `2` argume
 
 ## Proposed extensions
 
-The broader design adds a `doctor` capability command, policy-driven build/fixture configuration, richer promotion planning, stateful inputs, HTML/JUnit reports and a versioned graph/worker protocol. `doctor`, `promote`, `--config`, `--keep-workspace`, `--dry-run` and replay `--bundle` are proposal names, not available CLI options. Current retention uses `export-tests` and explicit `clean`.
+The broader design adds a `doctor` capability command, build recipes and object/receiver factories, richer promotion planning, stateful inputs, HTML/JUnit reports and a versioned graph/worker protocol. `doctor`, `promote`, `--keep-workspace`, `--dry-run` and replay `--bundle` are proposal names, not available CLI options. Current retention uses `export-tests` and explicit `clean`.
 
-## Proposed configuration
+## Implemented configuration
 
-The [example policy](../examples/equivalence.toml) illustrates all eight languages and a proposed strict evidence requirement. `/path/...` values are placeholders. This repository validates TOML syntax, not application-schema execution. Its settings, including 100 cases and stateful sequences, do not change the current scalar CLI defaults.
+The [example policy](../examples/equivalence.toml) is consumed by `plan --config`. It configures `schema_version = 1`, enabled `languages`, `sources`/`functions` include/exclude selectors, `generation.seed`/`cases_per_function`, finite scalar `[[fixtures]]`, and `limits.case_timeout_ms`/`baseline_repeats`/`instrumented_repeats`/`max_capture_bytes`. Unknown or unsupported keys fail validation. CLI language/case flags override the policy, and CLI exclusions are added. The resolved policy is frozen with the corpus and carried into replay/export. See the [complete policy contract](automatic-generation.md#project-policy-and-concrete-fixtures).
+
+## Proposed build and observation configuration
+
+The following broader sections are future contracts. They are not additional accepted keys in the current policy; unsupported requests are rejected rather than ignored.
 
 | Section | Contract |
 | --- | --- |

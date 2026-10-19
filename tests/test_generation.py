@@ -17,6 +17,7 @@ import discovery
 import generation as gen
 import harness
 import observe
+import policy
 
 
 def args(command, **kwargs):
@@ -136,7 +137,11 @@ class HarnessTests(unittest.TestCase):
             self.assertEqual(harness.values(type_, "java")[0], "")
         self.assertIsNone(harness.values("Database", "python"))
         self.assertEqual(harness.corpus(self.entry("python"),3), [[0],[1],[-1]])
-        self.assertEqual(harness.corpus(self.entry("python"),16), [[0],[1],[-1]])
+        extended = harness.corpus(self.entry("python"), 16)
+        self.assertEqual(extended[:3], [[0], [1], [-1]])
+        self.assertEqual(len(extended), 16)
+        self.assertEqual(extended, harness.corpus(self.entry("python"), 16))
+        self.assertNotEqual(extended, harness.corpus(self.entry("python"), 16, seed=7))
         self.assertEqual(harness.corpus(self.entry("python",parameters=["bool"]),3), [[False],[True]])
         self.assertEqual(harness.corpus(self.entry("python",parameters=[]),3), [[]])
         opaque_entry=self.entry("python",parameters=["Database"])
@@ -420,7 +425,8 @@ class WorkflowTests(unittest.TestCase):
         with patch.object(gen,"attempt",return_value=attempt),patch.object(gen,"execute",return_value=subprocess.CompletedProcess([],1,b'{"verdict":"different_observed"}',b"")):
             gen.compare_case(self.workspace,data,entry,case,destination,None)
         self.assertNotEqual(bundle["scope"]["baseline_artefact_sha256"],gen.read(destination/"bundle.json")["scope"]["baseline_artefact_sha256"])
-        with patch.object(gen.capture,"stable"),patch.object(gen.capture,"commands",side_effect=lambda root,project,lang,driver,*rest:([sys.executable,driver],[sys.executable,driver])),patch.object(gen,"MAX_CHANNEL_BYTES",1):
+        data["configuration"]["limits"]["max_capture_bytes"] = 1
+        with patch.object(gen.capture,"stable"),patch.object(gen.capture,"commands",side_effect=lambda root,project,lang,driver,*rest:([sys.executable,driver],[sys.executable,driver])):
             with self.assertRaisesRegex(ValueError,"channel budget"):
                 gen.attempt(self.workspace,data,entry,case,"baseline",self.base/"overflow",None)
 

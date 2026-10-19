@@ -13,6 +13,7 @@ As of 9 October 2026, `quux-oteleq compare-workload` runs the Rust comparator, w
 | [Test generation](test-generation.md) | Understand automatic inputs, fixtures, sequences and optional incorporation |
 | [Observations](observations.md) | Understand return values, errors, global/object mutations and side effects |
 | [CLI and configuration](cli-and-configuration.md) | Look up current commands/flags and distinguish proposed policy/adapter interfaces |
+| [Completion checklist](completion.md) | Track every remaining full-product acceptance boundary |
 | [Delivery roadmap](roadmap.md) | See implementation stages and acceptance requirements |
 | [Repository quality](quality.md) | Set up pinned checks, inspect published qualification and interpret badges |
 

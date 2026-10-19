@@ -1,6 +1,10 @@
 """Deterministic scalar corpora and diagnostic harness materialisation."""
 import json
+import ctypes
+import math
 from pathlib import Path
+import random
+import struct
 
 INTEGERS = {"int", "long", "short", "signed", "signed int", "long long", "unsigned", "unsigned int",
             "unsigned long", "unsigned short", "unsigned long long", "char", "signed char", "unsigned char",
@@ -31,8 +35,97 @@ def values(name, language):
     return None
 
 
-def corpus(entry, count):
-    pools = [values(t, entry["language"]) for t in entry["parameters"]]
+def float_width(name, language):
+    return 32 if name in ("f32", "float32") or name == "float" and language in ("c", "cpp", "java") else 64
+
+
+def finite_number(value):
+    if type(value) not in (int, float):
+        return False
+    try:
+        return math.isfinite(value)
+    except OverflowError:
+        return False
+
+
+def validate_arguments(entry, arguments):
+    """Reject a fixture which would be narrowed or passed to an unsupported type."""
+    if len(arguments) != len(entry["parameters"]):
+        raise ValueError("configured fixture argument count differs from the callable")
+    for value, parameter in zip(arguments, entry["parameters"]):
+        name, language = scalar_type(parameter), entry["language"]
+        pool = values(name, language)
+        if pool is None:
+            raise ValueError("argument type requires an object or buffer fixture: " + name)
+        if name in INTEGERS:
+            if type(value) is not int:
+                raise ValueError("configured integer argument requires an integer")
+            low, high = integer_range(name, language)
+            if low is not None and not low <= value <= high:
+                raise ValueError("configured integer argument exceeds its qualified type range: " + name)
+        elif name in BOOLS and type(value) is not bool:
+            raise ValueError("configured boolean argument requires a boolean")
+        elif name in FLOATS:
+            if not finite_number(value):
+                raise ValueError("configured floating argument requires a finite number")
+            if float_width(name, language) == 32 and abs(value) > 3.4028234663852886e38:
+                raise ValueError("configured floating argument exceeds its target type")
+        elif name in STRINGS and type(value) is not str:
+            raise ValueError("configured string argument requires a string")
+
+
+def integer_range(name, language):
+    """Bounds for the current host builds; cross-target build contexts need their own ABI."""
+    if language == "python" and name == "int":
+        return None, None
+    if language in ("javascript", "typescript"):
+        return -(2**53 - 1), 2**53 - 1
+    if language in ("c", "cpp") and name == "char":
+        return 0, 127
+    if language == "java":
+        bits = {"byte": 8, "short": 16, "char": 16, "int": 32, "long": 64}[name]
+        unsigned = name == "char"
+    else:
+        c_types = {"char": ctypes.c_byte, "signed char": ctypes.c_byte, "unsigned char": ctypes.c_ubyte,
+                   "short": ctypes.c_short, "unsigned short": ctypes.c_ushort, "int": ctypes.c_int,
+                   "signed": ctypes.c_int, "signed int": ctypes.c_int, "unsigned": ctypes.c_uint,
+                   "unsigned int": ctypes.c_uint, "long": ctypes.c_long, "unsigned long": ctypes.c_ulong,
+                   "long long": ctypes.c_longlong, "unsigned long long": ctypes.c_ulonglong}
+        suffix = next((name[len(prefix):] for prefix in ("uint", "int", "u", "i")
+                       if name.startswith(prefix) and name[len(prefix):].isdecimal()), "")
+        bits = int(suffix) if suffix.isdecimal() else 8 if name == "byte" else ctypes.sizeof(c_types.get(name, ctypes.c_void_p)) * 8
+        unsigned = name.startswith(("u", "unsigned")) or name == "byte"
+    return (0, 2**bits - 1) if unsigned else (-2**(bits - 1), 2**(bits - 1) - 1)
+
+
+def expanded_pool(name, language, count, rng):
+    """Keep deterministic edges first, then add seeded finite scalar samples."""
+    pool = values(name, language)
+    if pool is None or scalar_type(name) in BOOLS or scalar_type(name) in ("dynamic", "unknown"):
+        return pool
+    for _ in range(count * 4):
+        if len(pool) >= count:
+            break
+        if scalar_type(name) in INTEGERS:
+            low, high = integer_range(scalar_type(name), language)
+            value = rng.randint(max(-127, low if low is not None else -127), min(127, high if high is not None else 127))
+        elif scalar_type(name) in FLOATS:
+            value = rng.uniform(-128, 128)
+        else:
+            value = "".join(rng.choice("abcXYZ0129 ") for _ in range(rng.randrange(1, 25)))
+        if value not in pool:
+            pool.append(value)
+    return pool
+
+
+def corpus(entry, count, seed=20261008):
+    if "input_cases" in entry:
+        concrete = [concrete_arguments(entry, arguments) for arguments in entry["input_cases"]]
+        if len({json.dumps(arguments) for arguments in concrete}) != len(concrete):
+            raise ValueError("configured cases collapse to duplicate target representations")
+        return concrete
+    rng = random.Random(entry.get("generation_seed", seed))
+    pools = [expanded_pool(t, entry["language"], count, rng) for t in entry["parameters"]]
     if any(pool is None for pool in pools):
         raise ValueError("argument type requires a concrete fixture")
     if not pools:
@@ -41,11 +134,39 @@ def corpus(entry, count):
     candidates = [[pool[(index + column) % len(pool)] for column, pool in enumerate(pools)] for index in range(count)]
     unique = {}
     for candidate in candidates:
+        candidate = concrete_arguments(entry, candidate)
         unique.setdefault(json.dumps(candidate), candidate)
     return list(unique.values())
 
 
+def concrete_arguments(entry, arguments):
+    """Freeze the actual target scalar representation and retain requests separately."""
+    validate_arguments(entry, arguments)
+    result = []
+    for value, parameter in zip(arguments, entry["parameters"]):
+        name, language = scalar_type(parameter), entry["language"]
+        numeric_node = language in ("javascript", "typescript") and type(value) in (int, float)
+        if name in FLOATS or numeric_node:
+            if not finite_number(value):
+                raise ValueError("configured numeric input exceeds the target representation")
+            representation = ">f" if float_width(name, language) == 32 else ">d"
+            value = struct.unpack(representation, struct.pack(representation, float(value)))[0]
+        result.append(value)
+    return result
+
+
 def literal(value, type_, language):
+    type_ = scalar_type(type_)
+    if language == "java" and type_ in STRINGS and any(ord(char) < 32 or ord(char) > 126 for char in value):
+        encoded = value.encode("utf-16-be", errors="surrogatepass")
+        units = ["(char)0x" + encoded[index:index + 2].hex() for index in range(0, len(encoded), 2)]
+        return "new String(new char[]{" + ",".join(units) + "})"
+    if language == "java" and type_ == "long":
+        return "(long)" + str(value) + "L"
+    if language in ("c", "cpp") and type(value) is int and type_ in INTEGERS:
+        suffix = "ULL" if type_.startswith(("u", "unsigned")) else "LL"
+        number = "(-9223372036854775807LL-1)" if value == -(2**63) else str(value) + suffix
+        return "(" + type_ + ")" + number
     if language == "rust":
         if isinstance(value, bool):
             return str(value).lower()
@@ -251,6 +372,8 @@ static String value(Object v){
  if(v==null)return "null";
  if(v instanceof Double x)return "double:"+Long.toHexString(Double.doubleToRawLongBits(x));
  if(v instanceof Float x)return "float:"+Integer.toHexString(Float.floatToRawIntBits(x));
+ if(v instanceof Character x)return "char:"+Integer.toHexString(x.charValue());
+ if(v instanceof String x){StringBuilder units=new StringBuilder("string:utf16:");for(int i=0;i<x.length();i++)units.append(String.format("%04x",(int)x.charAt(i)));return units.toString();}
  return v.getClass().getName()+":"+java.util.Base64.getEncoder().encodeToString(v.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
 }
 public static void main(String[] args) throws Exception {
