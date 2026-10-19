@@ -20,6 +20,7 @@ import otelc_collection
 
 
 MAX_REQUEST_BYTES = 1024 * 1024
+TRACE_PATH = "/v1/traces"
 MAX_REQUESTS = 32
 REQUEST_TIMEOUT = 2
 
@@ -31,7 +32,7 @@ class Receiver(BaseHTTPRequestHandler):
         if (len(lengths) != 1 or not lengths[0].isascii() or not lengths[0].isdecimal()
                 or self.headers.get("Transfer-Encoding") is not None
                 or self.headers.get("Content-Encoding", "identity") != "identity"
-                or self.path not in ("/v1/traces", "/v1/metrics")):
+                or self.path not in (TRACE_PATH, "/v1/metrics")):
             self.send_error(400)
             return
         size = int(lengths[0])
@@ -317,7 +318,7 @@ def decode(bodies, service, decoder):
     """Validate the full local causal graph, without comparing random IDs."""
     names, nodes, raw, errors = Counter(), {}, [], 0
     for path, body in bodies:
-        if path != "/v1/traces":
+        if path != TRACE_PATH:
             continue
         raw.append(body)
         for span in service_spans(decoder.FromString(body), service):
@@ -379,7 +380,7 @@ def witness(bodies, report, spec, service, decoder, language):
     if "collection" in spec:
         if language != "python":
             raise ValueError("collection qualification requires Python")
-        spans = [span for path, body in bodies if path == "/v1/traces"
+        spans = [span for path, body in bodies if path == TRACE_PATH
                  for span in service_spans(decoder.FromString(body), service)]
         losses.update(otelc_collection.verify(spans, report, spec["collection"]))
         function_calls -= spec["collection"]["count"]
