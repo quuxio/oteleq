@@ -1,0 +1,53 @@
+{
+  "date": "2026-10-19",
+  "claim": "equivalence over these tests and observations",
+  "runtime_revision": "3fa678f3f6db24f5320b95a9d54a36b67f0b40c2",
+  "oteleq_cli_sha256": "d66dad631fd49a241260b4e12b7f2979c44f4343c0afabe020e61789b80e23ae",
+  "provider_revision": "8a7689a6d6779ed8621bbe852188eeb56e6fafad",
+  "provider_status": "private integration candidate; not a merged-main claim",
+  "otelc_cli_sha256": "4f11a98a7628411000c6a9992c907a8068d56156b29e51558b070ee57a972ecf",
+  "default": {
+    "cli_sha256": "d66dad631fd49a241260b4e12b7f2979c44f4343c0afabe020e61789b80e23ae",
+    "languages": [
+      "c",
+      "cpp",
+      "go",
+      "java",
+      "javascript",
+      "python",
+      "rust",
+      "typescript"
+    ],
+    "matching_cases": 24,
+    "matching_attempts": 96,
+    "framework_cases": 8,
+    "export_replay_cases": 1,
+    "same_return_mutation_cases": 3,
+    "source_preserved": true,
+    "rebound_callable_with_startup_witness_rejected": true,
+    "claim": "equivalence over these tests and observations",
+    "artefact_class": "diagnostic"
+  },
+  "configured": {
+    "claim": "equivalence over these tests and observations",
+    "artefact_class": "diagnostic",
+    "cli_sha256": "d66dad631fd49a241260b4e12b7f2979c44f4343c0afabe020e61789b80e23ae",
+    "languages": [
+      "c",
+      "cpp",
+      "go",
+      "java",
+      "javascript",
+      "python",
+      "rust",
+      "typescript"
+    ],
+    "configured_cases": 38,
+    "matching_attempts": 228,
+    "repeats_per_lane": 3,
+    "unicode_utf16_and_signed_unsigned_extremes": true,
+    "altered_unicode_control_rejected": true,
+    "source_preserved": true,
+    "configuration_sha256": "a6c0a75776b150668c844cc239dee4c4018197465ab738ae79f53adb8fd2c28a"
+  }
+}
