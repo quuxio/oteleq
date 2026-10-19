@@ -215,13 +215,8 @@ def inventory_tree(contents, root, snapshot, workspace, args):
     return tools, artefacts, inventory
 
 
-def plan(args):
-    if sys.version_info < (3, 12):
-        raise ValueError("generation requires Python 3.12+")
-    source = args.source.resolve(strict=True)
-    root = args.otelc_root.resolve(strict=True)
-    if not source.is_dir() or not root.is_dir():
-        raise ValueError("source and otelc root must be directories")
+def plan_configuration(args):
+    """Resolve CLI selection overrides before any private source copy is created."""
     configuration = project_policy.load(getattr(args, "config", None))
     if args.language:
         configuration["languages"] = list(dict.fromkeys(args.language))
@@ -230,6 +225,17 @@ def plan(args):
     configuration["functions"]["exclude"] = list(dict.fromkeys(configuration["functions"]["exclude"] + args.exclude))
     args.configuration, args.language = configuration, configuration["languages"]
     args.cases = configuration["generation"]["cases_per_function"]
+    return configuration
+
+
+def plan(args):
+    if sys.version_info < (3, 12):
+        raise ValueError("generation requires Python 3.12+")
+    source = args.source.resolve(strict=True)
+    root = args.otelc_root.resolve(strict=True)
+    if not source.is_dir() or not root.is_dir():
+        raise ValueError("source and otelc root must be directories")
+    configuration = plan_configuration(args)
     temporary = capture.temporary_parent(source, root)
     parent = source_outside(args.workspace_parent or temporary, source, root)
     contents = manifest(source)

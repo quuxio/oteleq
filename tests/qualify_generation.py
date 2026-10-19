@@ -9,8 +9,8 @@ import subprocess
 import sys
 
 
-def command(arguments, folder, name, expected=0):
-    result = subprocess.run([str(p) for p in arguments], capture_output=True, check=False, timeout=900)
+def command(arguments, folder, name, expected=0, timeout=900):
+    result = subprocess.run([str(p) for p in arguments], capture_output=True, check=False, timeout=timeout)
     (folder / (name + ".stdout")).write_bytes(result.stdout)
     (folder / (name + ".stderr")).write_bytes(result.stderr)
     if result.returncode != expected:

@@ -35,11 +35,13 @@ def values(name, language):
     return None
 
 
-def float_width(name, language):
+def float_width(name: str, language: str) -> int:
+    """Resolve the primitive floating representation used by this caller."""
     return 32 if name in ("f32", "float32") or name == "float" and language in ("c", "cpp", "java") else 64
 
 
-def finite_number(value):
+def finite_number(value: object) -> bool:
+    """Recognise finite scalar numbers without overflowing an implicit conversion."""
     if type(value) not in (int, float):
         return False
     try:
@@ -53,25 +55,39 @@ def validate_arguments(entry, arguments):
     if len(arguments) != len(entry["parameters"]):
         raise ValueError("configured fixture argument count differs from the callable")
     for value, parameter in zip(arguments, entry["parameters"]):
-        name, language = scalar_type(parameter), entry["language"]
-        pool = values(name, language)
-        if pool is None:
-            raise ValueError("argument type requires an object or buffer fixture: " + name)
-        if name in INTEGERS:
-            if type(value) is not int:
-                raise ValueError("configured integer argument requires an integer")
-            low, high = integer_range(name, language)
-            if low is not None and not low <= value <= high:
-                raise ValueError("configured integer argument exceeds its qualified type range: " + name)
-        elif name in BOOLS and type(value) is not bool:
-            raise ValueError("configured boolean argument requires a boolean")
-        elif name in FLOATS:
-            if not finite_number(value):
-                raise ValueError("configured floating argument requires a finite number")
-            if float_width(name, language) == 32 and abs(value) > 3.4028234663852886e38:
-                raise ValueError("configured floating argument exceeds its target type")
-        elif name in STRINGS and type(value) is not str:
-            raise ValueError("configured string argument requires a string")
+        validate_argument(value, scalar_type(parameter), entry["language"])
+
+
+def validate_argument(value: object, name: str, language: str) -> None:
+    """Apply the scalar domain contract before generating source literals."""
+    if values(name, language) is None:
+        raise ValueError("argument type requires an object or buffer fixture: " + name)
+    if name in INTEGERS:
+        validate_integer(value, name, language)
+        return
+    if name in FLOATS:
+        validate_float(value, name, language)
+        return
+    for names, expected, label in ((BOOLS, bool, "boolean"), (STRINGS, str, "string")):
+        if name in names and type(value) is not expected:
+            raise ValueError("configured " + label + " argument requires a " + label)
+
+
+def validate_integer(value: object, name: str, language: str) -> None:
+    """Check exact integer type and the qualified representable range."""
+    if type(value) is not int:
+        raise ValueError("configured integer argument requires an integer")
+    low, high = integer_range(name, language)
+    if low is not None and not low <= value <= high:
+        raise ValueError("configured integer argument exceeds its qualified type range: " + name)
+
+
+def validate_float(value: object, name: str, language: str) -> None:
+    """Keep non-finite and overflowing requests outside the finite scalar corpus."""
+    if not finite_number(value):
+        raise ValueError("configured floating argument requires a finite number")
+    if float_width(name, language) == 32 and abs(value) > 3.4028234663852886e38:
+        raise ValueError("configured floating argument exceeds its target type")
 
 
 def integer_range(name, language):
@@ -93,7 +109,12 @@ def integer_range(name, language):
                    "long long": ctypes.c_longlong, "unsigned long long": ctypes.c_ulonglong}
         suffix = next((name[len(prefix):] for prefix in ("uint", "int", "u", "i")
                        if name.startswith(prefix) and name[len(prefix):].isdecimal()), "")
-        bits = int(suffix) if suffix.isdecimal() else 8 if name == "byte" else ctypes.sizeof(c_types.get(name, ctypes.c_void_p)) * 8
+        if suffix.isdecimal():
+            bits = int(suffix)
+        elif name == "byte":
+            bits = 8
+        else:
+            bits = ctypes.sizeof(c_types.get(name, ctypes.c_void_p)) * 8
         unsigned = name.startswith(("u", "unsigned")) or name == "byte"
     return (0, 2**bits - 1) if unsigned else (-2**(bits - 1), 2**(bits - 1) - 1)
 
@@ -106,16 +127,20 @@ def expanded_pool(name, language, count, rng):
     for _ in range(count * 4):
         if len(pool) >= count:
             break
-        if scalar_type(name) in INTEGERS:
-            low, high = integer_range(scalar_type(name), language)
-            value = rng.randint(max(-127, low if low is not None else -127), min(127, high if high is not None else 127))
-        elif scalar_type(name) in FLOATS:
-            value = rng.uniform(-128, 128)
-        else:
-            value = "".join(rng.choice("abcXYZ0129 ") for _ in range(rng.randrange(1, 25)))
+        value = scalar_sample(scalar_type(name), language, rng)
         if value not in pool:
             pool.append(value)
     return pool
+
+
+def scalar_sample(name: str, language: str, rng: random.Random):
+    """Sample within small legal domains; explicit fixtures supply business values."""
+    if name in INTEGERS:
+        low, high = integer_range(name, language)
+        return rng.randint(max(-127, low if low is not None else -127), min(127, high if high is not None else 127))
+    if name in FLOATS:
+        return rng.uniform(-128, 128)
+    return "".join(rng.choice("abcXYZ0129 ") for _ in range(rng.randrange(1, 25)))
 
 
 def corpus(entry, count, seed=20261008):
@@ -155,28 +180,42 @@ def concrete_arguments(entry, arguments):
     return result
 
 
-def literal(value, type_, language):
-    type_ = scalar_type(type_)
-    if language == "java" and type_ in STRINGS and any(ord(char) < 32 or ord(char) > 126 for char in value):
+def java_literal(value, type_):
+    """Use UTF-16 code units and legal long constants without source escape loss."""
+    if type_ in STRINGS and any(ord(char) < 32 or ord(char) > 126 for char in value):
         encoded = value.encode("utf-16-be", errors="surrogatepass")
         units = ["(char)0x" + encoded[index:index + 2].hex() for index in range(0, len(encoded), 2)]
         return "new String(new char[]{" + ",".join(units) + "})"
-    if language == "java" and type_ == "long":
+    if type_ == "long":
         return "(long)" + str(value) + "L"
-    if language in ("c", "cpp") and type(value) is int and type_ in INTEGERS:
+    if type_ in ("byte", "short", "char", "float"):
+        return "(" + type_ + ")" + str(value).lower()
+    return json.dumps(value)
+
+
+def native_literal(value, type_, language):
+    """Avoid implementation-defined integer literal narrowing in the native caller."""
+    if type(value) is int and type_ in INTEGERS:
         suffix = "ULL" if type_.startswith(("u", "unsigned")) else "LL"
         number = "(-9223372036854775807LL-1)" if value == -(2**63) else str(value) + suffix
         return "(" + type_ + ")" + number
+    if language == "c" and type(value) is bool:
+        return "1" if value else "0"
+    return json.dumps(value)
+
+
+def literal(value, type_, language):
+    type_ = scalar_type(type_)
+    if language == "java":
+        return java_literal(value, type_)
+    if language in ("c", "cpp"):
+        return native_literal(value, type_, language)
     if language == "rust":
         if isinstance(value, bool):
             return str(value).lower()
         return str(value) + (".0" if type_ in ("f32", "f64") and type(value) is int else "") + type_
     if language == "go":
         return type_ + "(" + json.dumps(value) + ")"
-    if language == "java" and type_ in ("byte", "short", "char", "long", "float"):
-        return "(" + type_ + ")" + str(value).lower()
-    if language == "c" and type(value) is bool:
-        return "1" if value else "0"
     return json.dumps(value)
 
 

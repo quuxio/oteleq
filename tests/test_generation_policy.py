@@ -94,8 +94,9 @@ class PolicyTests(unittest.TestCase):
                                       ("python", "int", True), ("python", "bool", 1),
                                       ("python", "str", 1), ("python", "float", True),
                                       ("java", "float", 1e100), ("java", "Database", 1)):
+            candidate = entry(language, name, value)
             with self.subTest(language=language, name=name), self.assertRaises(ValueError):
-                harness.corpus(entry(language, name, value), 1)
+                harness.corpus(candidate, 1)
         with self.assertRaisesRegex(ValueError, "argument count"):
             harness.corpus({"language": "python", "parameters": ["int"], "input_cases": [[]]}, 1)
         self.assertEqual(harness.literal(-(2**63), "long", "java"), "(long)-9223372036854775808L")
