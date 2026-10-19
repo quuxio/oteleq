@@ -190,6 +190,7 @@ def inventory_entry(function, discovered, name, language, source_hash, snapshot,
     entry = {**function, "path": name, "language": language, "globals": discovered["globals"],
              "parser": discovered.get("parser", "unavailable"), "package": discovered.get("package", ""),
              "package_end": discovered.get("package_end"), "file_functions": discovered["entrypoints"],
+             "binding_capture_offset": discovered.get("binding_capture_offset", 0),
              "source_sha256": source_hash, "column": function.get("column", 0)}
     entry["id"] = identity({k: entry[k] for k in ("language", "path", "name", "line", "column", "parameters", "source_sha256")})[:20]
     entry["otelc_function"] = entry_identity(entry)

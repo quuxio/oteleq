@@ -304,11 +304,17 @@ function __oteleqGraph(roots) {
 
 def js_driver(entry, args, source):
     roots = "".join(json.dumps("global:" + g["name"]) + ":" + g["name"] + "," for g in entry["globals"])
-    call = entry["name"] + "(...__oteleqArguments)"
+    call = "__oteleqSelected(...__oteleqArguments)"
     if entry.get("async"):
         call = "await " + call
-    # Appended helpers are outside the exact function selection. The delta is recorded as diagnostic.
+    # Capture the hoisted declaration before application statements can rebind
+    # it, retaining hashbang/directive syntax at the parser-selected position.
+    raw = source.encode()
+    position = entry.get("binding_capture_offset", 0)
+    capture = (";const __oteleqSelected=" + entry["name"] + ";\n").encode()
+    source = (raw[:position] + capture + raw[position:]).decode()
     return source + JS_OBSERVER + f'''
+if(typeof __oteleqSelected!=='function' || {entry['name']}!==__oteleqSelected) throw new Error('selected function binding differs from its frozen declaration');
 const __oteleqArguments={json.dumps(args)};
 const __oteleqRoots=()=>({{{roots}arguments:__oteleqArguments}});
 const __oteleqBefore=__oteleqGraph(__oteleqRoots());

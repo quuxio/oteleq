@@ -84,9 +84,15 @@ def replacement(value:int)->int:
     return counter
 globals().update(selected=replacement)
 ''')
+    for extension in ("mjs", "mts"):
+        annotation = ":number" if extension == "mts" else ""
+        (rebound/("bindings."+extension)).write_text(
+            "#!/usr/bin/env node\n'use strict';\n// Unicode prologue: \U0001f600\nlet counter=0;\n"
+            + f"function selected(value{annotation}){annotation}{{counter+=value+1;return counter;}}\n"
+            + f"selected(0);\nselected=(value{annotation}){annotation}=>counter;\n")
     binding_policy=destination/"binding-policy.toml"
     binding_policy.write_text('''schema_version=1
-languages=["python"]
+languages=["python","javascript","typescript"]
 [functions]
 include=["*.selected"]
 [[fixtures]]
@@ -98,7 +104,8 @@ cases=[[7]]
     command([cli,"generate","--workspace",binding_workspace],destination,"binding-generate")
     command([cli,"run","--workspace",binding_workspace,"--report-dir",destination/"binding-comparison"],destination,"binding-run",expected=4)
     binding=json.loads((destination/"binding-comparison/report.json").read_text())
-    assert binding["source_preserved"] and len(binding["cases"])==1 and binding["cases"][0]["exit_code"]==4
+    assert binding["source_preserved"] and len(binding["cases"])==3
+    assert all(case["exit_code"]==4 for case in binding["cases"])
     assert any(b"selected function binding differs" in path.read_bytes()
                for path in (destination/"binding-comparison").rglob("stderr"))
     summary={"cli_sha256":hashlib.sha256(cli.read_bytes()).hexdigest(),"languages":sorted(languages),"matching_cases":24,

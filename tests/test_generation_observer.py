@@ -170,6 +170,28 @@ class PassiveObserverTests(unittest.TestCase):
 
 
 class NodePassiveObserverTests(unittest.TestCase):
+    def test_node_driver_rejects_rebinding_and_preserves_hashbang_and_directives(self):
+        node = os.environ.get("OTELC_NODE") or shutil.which("node")
+        self.assertIsNotNone(node)
+        prologue = "#!/usr/bin/env node\n'use strict';"
+        source = prologue + "\n// unicode: \U0001f600\nfunction sample(value){return value+1;}\n"
+        entry = {"name": "sample", "globals": [], "binding_capture_offset": len(prologue.encode())}
+        for rebound in (False, True):
+            with tempfile.TemporaryDirectory() as folder:
+                observation = Path(folder) / "observation.json"
+                script = Path(folder) / "driver.mjs"
+                body = source + ("sample=(value)=>99;\n" if rebound else "")
+                script.write_text(harness.js_driver(entry, [7], body))
+                result = subprocess.run([node, script], capture_output=True, check=False, timeout=30,
+                                        env={**os.environ, "OTELEQ_OBSERVATION": str(observation)})
+                if rebound:
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn(b"selected function binding differs", result.stderr)
+                    self.assertFalse(observation.exists())
+                else:
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertTrue(observation.exists())
+
     def test_node_observer_does_not_evaluate_error_names_accessors_or_proxies(self):
         node = os.environ.get("OTELC_NODE") or shutil.which("node")
         self.assertIsNotNone(node, "Node24+ is required for the shared Node observer regression")
