@@ -38,7 +38,7 @@ def attributes(span: Any) -> dict[str, str]:
     return values
 
 
-def lifetime_span(span: Any, spec: Mapping[str, Any], creator: Any, instances: set[str]) -> None:
+def lifetime_span(span: Any, spec: Mapping[str, Any], creator: Any, instances: set[str], *, boundary: str = "collection") -> None:
     """Validate one collection root and its link to the actual creation call."""
     if (span.parent_span_id or span.kind != 1 or span.dropped_links_count
             or span.dropped_attributes_count or len(span.links) != 1):
@@ -50,14 +50,14 @@ def lifetime_span(span: Any, spec: Mapping[str, Any], creator: Any, instances: s
     values = attributes(span)
     instance = values.get("otelc.lifetime.instance", "")
     if (values.get("code.type.name") != spec["type"]
-            or values.get("otelc.lifetime.boundary") != "collection"
+            or values.get("otelc.lifetime.boundary") != boundary
             or not instance or not instance.isascii() or not instance.isdecimal()
             or len(instance) > 20 or instance[0] == "0" or instance in instances):
         raise ValueError("wrong collection type, boundary or instance identity")
     instances.add(instance)
 
 
-def verify(spans: Sequence[Any], report: Mapping[str, Any], spec: Mapping[str, Any]) -> dict[str, int]:
+def verify(spans: Sequence[Any], report: Mapping[str, Any], spec: Mapping[str, Any], *, boundary: str = "collection") -> dict[str, int]:
     """Span IDs/parents, service and scope have already passed the shared decoder."""
     creators = [span for span in spans if span.name == spec["creator"]]
     lifetimes = [span for span in spans if span.name == spec["span"]]
@@ -66,7 +66,7 @@ def verify(spans: Sequence[Any], report: Mapping[str, Any], spec: Mapping[str, A
     creator = creators[0]
     instances = set()
     for span in lifetimes:
-        lifetime_span(span, spec, creator, instances)
+        lifetime_span(span, spec, creator, instances, boundary=boundary)
     functions = report.get("functions")
     expected = {spec["creator"]: {"count": 1, "unwinds": 0}}
     if (functions != expected or any(type(functions[spec["creator"]].get(key)) is not int
