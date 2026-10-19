@@ -1,5 +1,6 @@
 """Fail closed on unwitnessed instrumentation, unstable tools and broken capture."""
 from http.client import HTTPConnection
+import copy
 import json
 import os
 import socket
@@ -151,6 +152,117 @@ class TelemetryWitnessTests(unittest.TestCase):
         self.assertEqual(roots, 1)
 
 
+class CollectionWitnessTests(unittest.TestCase):
+    def test_private_export_override_accepts_omitted_default_and_rejects_ambiguous_policy(self):
+        endpoint = "http://127.0.0.1:1234"
+        original = b'[export]\nmax_queued_batches=8\n'
+        configured = capture.configure(original, endpoint)
+        self.assertEqual(capture.tomllib.loads(configured.decode())["export"],
+                         {"endpoint": endpoint, "max_queued_batches": 8})
+        self.assertEqual(original, b'[export]\nmax_queued_batches=8\n')
+        for policy in (b'[resource]\nname="no-export"\n',
+                       b'[export]\nendpoint="one"\n[other]\nendpoint="two"\n',
+                       b'[export]\n  endpoint="one"\n[other]\nendpoint="two"\n'):
+            with self.subTest(policy=policy), self.assertRaises(ValueError):capture.configure(policy, endpoint)
+        self.assertEqual(capture.tomllib.loads(capture.configure(b'[export]\nendpoint="old"\n', endpoint).decode())["export"]["endpoint"], endpoint)
+
+    def setUp(self):
+        self.spec = json.loads(Path(observer.__file__).with_name("otelc-collection-workloads.json").read_text())["python"]
+        self.bodies = [("/v1/traces", b"collection")]
+        self.creator = span(self.spec["collection"]["creator"])
+        self.nodes = [self.creator]
+        for index in range(1, 4):
+            node = span(self.spec["collection"]["span"], identity=index.to_bytes(8, "big"))
+            node.trace_id = index.to_bytes(16, "big")
+            node.kind, node.dropped_links_count, node.dropped_attributes_count = 1, 0, 0
+            node.links = [NS(trace_id=self.creator.trace_id, span_id=self.creator.span_id, dropped_attributes_count=0)]
+            node.attributes = [NS(key=key, value=NS(string_value=value)) for key, value in
+                               (("code.type.name", self.spec["collection"]["type"]),
+                                ("otelc.lifetime.boundary", "collection"), ("otelc.lifetime.instance", str(index)))]
+            self.nodes.append(node)
+        self.status = report()
+        self.status["traces"]["completed_trees"] = 4
+        self.status["functions"] = {self.creator.name: {"count": 1, "unwinds": 0}}
+        self.status["lifetimes"] = {"admitted": 3, "completed": 3, "current_live": 0, "censored": 0,
+                                    "tracked_instances": 0, "active_constructors": 0,
+                                    "failed_initialisations": 0, "losses": {}}
+
+    def check(self, nodes=None, status=None, language="python"):
+        return capture.witness(self.bodies, status or self.status, self.spec, "expected",
+                               decoder(nodes or self.nodes), language)
+
+    def test_collection_roots_link_to_creation_without_counting_as_function_calls(self):
+        result = self.check()
+        self.assertEqual(result["spans"], 4)
+        self.assertEqual(result["functions"], self.spec["functions"])
+        self.assertEqual(result["pending"], 0)
+        self.assertTrue(all(value == 0 for value in result["losses"].values()))
+        self.status["lifetimes"]["losses"] = {"capacity": 0}
+        self.assertEqual(self.check()["losses"]["lifetimes.capacity"], 0)
+        with self.assertRaisesRegex(ValueError, "requires Python"):
+            self.check(status={**self.status, "language": "java"}, language="java")
+
+    def test_missing_wrong_extra_dropped_or_parented_creation_links_fail(self):
+        changes = [lambda n: n[1].links.clear(), lambda n: n[1].links.append(n[1].links[0]),
+                   lambda n: setattr(n[1].links[0], "trace_id", b"z" * 16),
+                   lambda n: setattr(n[1].links[0], "span_id", b"z" * 8),
+                   lambda n: setattr(n[1].links[0], "dropped_attributes_count", 1),
+                   lambda n: setattr(n[1], "dropped_links_count", 1),
+                   lambda n: setattr(n[1], "parent_span_id", self.creator.span_id),
+                   lambda n: setattr(n[1], "kind", 2)]
+        for change in changes:
+            nodes = copy.deepcopy(self.nodes)
+            change(nodes)
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                self.check(nodes=nodes)
+
+    def test_collection_type_boundary_instance_and_complete_attributes_are_required(self):
+        changes = [lambda n: n[1].attributes.clear(), lambda n: n[1].attributes.append(n[1].attributes[0]),
+                   lambda n: setattr(n[1].attributes[0], "key", ""),
+                   lambda n: setattr(n[1].attributes[0].value, "string_value", "other.Item"),
+                   lambda n: setattr(n[1].attributes[1].value, "string_value", "close"),
+                   lambda n: setattr(n[1].attributes[2].value, "string_value", "2"),
+                   lambda n: setattr(n[1].attributes[2].value, "string_value", "0"),
+                   lambda n: setattr(n[1].attributes[2].value, "string_value", "01"),
+                   lambda n: setattr(n[1].attributes[2].value, "string_value", "bad"),
+                   lambda n: setattr(n[1].attributes[2].value, "string_value", "9" * 21),
+                   lambda n: setattr(n[1], "dropped_attributes_count", 1)]
+        for change in changes:
+            nodes = copy.deepcopy(self.nodes)
+            change(nodes)
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                self.check(nodes=nodes)
+
+    def test_missing_collection_censored_live_failed_or_malformed_report_cannot_pass(self):
+        for key in self.status["lifetimes"]:
+            for value in (None, True, -1, 1.0):
+                status = copy.deepcopy(self.status)
+                if value is None:status["lifetimes"].pop(key)
+                else:status["lifetimes"][key] = value
+                with self.subTest(key=key, value=value), self.assertRaises(ValueError):
+                    self.check(status=status)
+        for key, value in (("completed", 2), ("admitted", 4), ("censored", 1), ("current_live", 1),
+                           ("tracked_instances", 1), ("active_constructors", 1), ("failed_initialisations", 1),
+                           ("losses", {"incomplete": 1}), ("losses", {" ": 0}), ("losses", {"capacity": False})):
+            status = copy.deepcopy(self.status);status["lifetimes"][key] = value
+            with self.subTest(key=key, value=value), self.assertRaises(ValueError):self.check(status=status)
+        status = copy.deepcopy(self.status);status.pop("lifetimes")
+        with self.assertRaisesRegex(ValueError, "missing collection lifetime report"):self.check(status=status)
+
+    def test_runtime_function_accounting_and_missing_creator_or_collection_spans_fail(self):
+        changes = [lambda r: r.update(function_calls=4), lambda r: r.pop("functions"),
+                   lambda r: r["functions"][self.creator.name].update(count=True),
+                   lambda r: r["functions"][self.creator.name].update(unwinds=1)]
+        for change in changes:
+            status = copy.deepcopy(self.status);change(status)
+            with self.subTest(change=change), self.assertRaises(ValueError):self.check(status=status)
+        for nodes in (self.nodes[:-1], self.nodes[1:]):
+            with self.subTest(nodes=nodes), self.assertRaises(ValueError):self.check(nodes=nodes)
+        # The collection validator itself rejects missing observations independently of total span count.
+        with self.assertRaisesRegex(ValueError, "missing creator"):
+            capture.otelc_collection.verify(self.nodes[1:], self.status, self.spec["collection"])
+
+
 class CaptureBoundaryTests(unittest.TestCase):
     def test_receiver_retains_exact_bytes_and_rejects_unknown_oversized_or_truncated(self):
         with capture.receiver() as (endpoint, bodies, errors):
@@ -213,7 +325,7 @@ class CaptureBoundaryTests(unittest.TestCase):
         actual = capture.configure(policy, "http://127.0.0.1:123")
         self.assertIn(b'endpoint = "http://127.0.0.1:123"', actual)
         self.assertIn(b"interval_ms = 500", actual)
-        for invalid in (b"[export]\n", policy + b'endpoint = "second"\n'):
+        for invalid in (b"[resource]\n", policy + b'endpoint = "second"\n'):
             with self.assertRaises(ValueError):
                 capture.configure(invalid, "new")
 
@@ -354,7 +466,7 @@ class LanguageArtefactTests(unittest.TestCase):
                     path.write_bytes(b"original")
                 tools = {"tool": root / "tool"}
                 identities = capture.artefacts(root, language, tools)
-                for filename in ("otelc-workloads.json", "otelc-worker-workloads.json"):
+                for filename in ("otelc-workloads.json", "otelc-worker-workloads.json", "otelc-collection-workloads.json", "otelc_collection.py"):
                     self.assertEqual(identities["observer:" + filename],
                                      capture.file_digest(Path(observer.__file__).with_name(filename)))
                 capture.stable(root, language, tools, identities)
@@ -381,6 +493,27 @@ class LanguageArtefactTests(unittest.TestCase):
 
 
 class PrivateExecutionTests(unittest.TestCase):
+    def test_collection_expected_channels_reject_even_identical_wrong_output_in_both_lanes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "otelc"
+            source = root / "examples/apps/app.py";source.parent.mkdir(parents=True);source.write_text("pass")
+            policy = root / "policy.toml";policy.write_text('[export]\nendpoint="http://localhost:4318"\n')
+            destination = Path(temporary) / "evidence";destination.mkdir()
+            spec = {"source": "examples/apps/app.py", "policy": "policy.toml", "channels": {"stdout": "expected\n", "stderr": ""}}
+            originals = {"source": source.read_bytes(), "policy": policy.read_bytes()}
+            for lane in ("baseline", "instrumented_on"):
+                with patch.object(capture, "stable"), patch.object(capture, "commands", return_value=(["plain"], ["on"])), \
+                     patch.object(capture, "execute", return_value=NS(returncode=0, stdout=b"wrong\n", stderr=b"")), \
+                     patch.object(capture, "witness") as witness:
+                    with self.assertRaisesRegex(ValueError, "independent fixture expectations"):
+                        observer.attempt(root, spec, "python", destination, lane, 0, originals, {}, {}, None)
+                    witness.assert_not_called()
+                folder = destination / (lane + "-0")
+                self.assertEqual((folder / "stdout").read_bytes(), b"wrong\n")
+                self.assertTrue((folder / "http-capture.json").is_file())
+                self.assertEqual(json.loads((folder / "commands.json").read_text())["executed"], ["plain" if lane == "baseline" else "on"])
+                self.assertFalse((folder / "attempt.json").exists())
+
     def test_native_attempts_override_ambient_backend_identically_in_both_lanes(self):
         with tempfile.TemporaryDirectory() as temporary:
             root=Path(temporary)/"otelc"
@@ -411,7 +544,8 @@ class PrivateExecutionTests(unittest.TestCase):
     def test_worker_workloads_select_only_requested_language_and_reject_unavailable_languages(self):
         expectations = {"python-workers": ("python", ("python-executor-context-example", 10, 5, 1)),
                         "java-workers": ("java", ("java-executor-context-example", 8, 5, 2)),
-                        "typescript-native": ("typescript", ("typescript-native-trace-example", 11, 5, 1))}
+                        "typescript-native": ("typescript", ("typescript-native-trace-example", 11, 5, 1)),
+                        "python-collection": ("python", ("python-collection-lifetime-example", 4, 4, 0))}
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary) / "otelc"
             root.mkdir()
@@ -422,7 +556,7 @@ class PrivateExecutionTests(unittest.TestCase):
             module_name = "opentelemetry.proto.collector.trace.v1.trace_service_pb2"
             module = NS(ExportTraceServiceRequest=object())
             for workload, (selected, expected) in expectations.items():
-                argv = ["capture", "--otelc-root", str(root), "--report-dir", str(Path(temporary) / selected),
+                argv = ["capture", "--otelc-root", str(root), "--report-dir", str(Path(temporary) / workload),
                         "--comparator", str(comparator), "--workload", workload]
                 with patch.dict(sys.modules, {module_name: module}), patch.object(observer, "run", side_effect=run) as runner, \
                      patch.object(observer.subprocess, "run", return_value=NS(returncode=0, stdout=b'equivalent_observed')):

@@ -65,6 +65,24 @@ This requires `JavaWorkerApp.java` and `java-worker-context.toml` from [otelc PR
 
 All four attempts must produce exactly `results=11,21; original-error=true; cancelled=true; future-identity=true; rejection-identity=true` plus newline and empty stderr. The fixture checks original FutureTask, worker exception and rejection identity, results and queued cancellation. Running cancellation and shutdown edge cases have separate otelc tests; this corpus does not claim to exercise every executor or schedule. Choosing `python-workers` still selects Python only, and choosing `java-workers` selects Java only; unavailable language requests fail before capture.
 
+## Python collection lifetime workload
+
+The source-free collection corpus uses ordinary CPython classes with their own initialiser, existing application weak references and an application-requested cycle collection:
+
+```sh
+make capture-otelc PYTHON=../otelc/.venv/bin/python \
+  OTELC_ROOT=../otelc REPORT_DIR=/tmp/oteleq-python-collection \
+  CAPTURE_ARGS="--workload python-collection"
+```
+
+This requires `examples/apps/python_collection_app.py`, `examples/python-collection.toml` and the collection adapter from [otelc PR #49](https://github.com/quuxio/otelc/pull/49). The frozen provider under qualification is `55ec514b2fc03ce570188c07fe515a608e080af2`, using CPython 3.12.15. It is a candidate-provider workload; an older published checkout without those files cannot run it. The [independent manifest](../examples/otelc-collection-workloads.json) selects Python only and has a distinct case identity.
+
+Each instrumented run must emit exactly one `examples.apps.python_collection_app.create` function span and three `examples.apps.python_collection_app.Item lifetime` spans, forming four complete roots with no escaping errors. Lifetime spans must be internal standalone roots with one intact link to the actual creation-function trace/span ID, the selected type, collection boundary and distinct positive instance identities. Missing, extra, dropped or wrong links, duplicated attributes and incomplete metadata cannot qualify. The function runtime count remains one; lifetime completions are checked separately instead of counted as function calls. Random IDs and GC durations are not compared between runs.
+
+The lifetime report must declare admitted/completed `3`, failed initialisations `0`, and zero live/censored/tracked objects or active constructors. Required runtime/trace/export health must be complete with zero losses and pending contexts. All four application attempts must independently produce exactly `collections=3; value=6; layouts=true` plus newline, empty stderr and exit `0`. A shared wrong output cannot pass merely because both lanes match. Raw channels and HTTP evidence remain available when validation fails.
+
+The fixture checks weak-reference collection, the existing values and its instance-field layout through those declared output assertions. It does not establish arbitrary receiver/global state, object retention for every class or exact GC timing. Resources/close/dispose, custom finalisers or metaclasses, inherited-only/C/decorated initialisers, weak-reference introspection and concurrent collection schedules remain unqualified. The observer does not add source probes or call GC; the original application already requests collection. Automatic scalar generation is unchanged.
+
 ## Optional native TypeScript workload
 
 The default function workload continues to use the source TypeScript compiler. To qualify otelc's optional native executable emitter separately:

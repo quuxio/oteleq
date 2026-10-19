@@ -16,6 +16,8 @@ import threading
 import time
 import tomllib
 
+import otelc_collection
+
 
 MAX_REQUEST_BYTES = 1024 * 1024
 MAX_REQUESTS = 32
@@ -193,7 +195,7 @@ def artefacts(root, language, tools):
                   and "tests" not in p.relative_to(tree).parts]
     identities = {str(p.relative_to(root)): file_digest(p) for p in paths}
     identities.update({"tool:" + name: file_digest(path) for name, path in tools.items()})
-    for name in ("otelc_capture.py", "capture_otelc_languages.py", "otelc-workloads.json", "otelc-worker-workloads.json", "otelc-typescript-native-workloads.json"):
+    for name in ("otelc_capture.py", "otelc_collection.py", "capture_otelc_languages.py", "otelc-workloads.json", "otelc-worker-workloads.json", "otelc-typescript-native-workloads.json", "otelc-collection-workloads.json"):
         identities["observer:" + name] = file_digest(Path(__file__).with_name(name))
     return identities
 
@@ -257,9 +259,19 @@ def receiver():
 
 
 def configure(policy, endpoint):
-    text, count = re.subn(r'^endpoint\s*=.*$', "endpoint = " + json.dumps(endpoint), policy.decode(), flags=re.MULTILINE)
+    original = policy.decode()
+    expected = tomllib.loads(original)
+    export = expected.get("export", {})
+    if "endpoint" in export:
+        text, count = re.subn(r'^endpoint\s*=.*$', "endpoint = " + json.dumps(endpoint), original, flags=re.MULTILINE)
+    else:
+        text, count = re.subn(r'^\[export\][ \t]*(?:#.*)?$', "[export]\nendpoint = " + json.dumps(endpoint),
+                             original, flags=re.MULTILINE)
     if count != 1:
-        raise ValueError("example requires exactly one export endpoint")
+        raise ValueError("example requires one explicit export table or endpoint")
+    expected["export"] = {**export, "endpoint": endpoint}
+    if tomllib.loads(text) != expected:
+        raise ValueError("private override must change only the export endpoint")
     return text.encode()
 
 
@@ -361,6 +373,14 @@ def witness(bodies, report, spec, service, decoder, language):
     if names != spec["functions"] or roots != spec["trees"] or errors != spec["errors"]:
         raise ValueError("decoded telemetry does not match independent fixture expectations")
     losses, export = loss_diagnostics(report, language)
+    function_calls = sum(names.values())
+    if "collection" in spec:
+        if language != "python":
+            raise ValueError("collection qualification requires Python")
+        spans = [span for path, body in bodies if path == "/v1/traces"
+                 for span in service_spans(decoder.FromString(body), service)]
+        losses.update(otelc_collection.verify(spans, report, spec["collection"]))
+        function_calls -= spec["collection"]["count"]
     if report.get("export_finished") is not True or report.get("drained", True) is not True:
         raise ValueError("missing or unfinished export status")
     traces = report["traces"]
@@ -375,7 +395,7 @@ def witness(bodies, report, spec, service, decoder, language):
     losses["transport.export"] = sum(export)
     pending = sum(pending_counters)
     if (any(losses.values()) or pending or traces.get("completed_trees") != roots
-            or report.get("function_calls") != sum(names.values())):
+            or report.get("function_calls") != function_calls):
         raise ValueError("lossy, incomplete or mismatched runtime report")
     raw_digest = hashlib.sha256()
     for body in raw:
