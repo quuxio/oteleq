@@ -103,6 +103,21 @@ def kill_group(group: int) -> None:
             raise
 
 
+def finish_process(process: subprocess.Popen) -> None:
+    """Clean up the owned group and reap without hiding a denied live group."""
+    try:
+        kill_group(process.pid)
+    except (OSError, ValueError, subprocess.SubprocessError):
+        # Waiting for a denied live leader must not become an unbounded hang.
+        try:
+            process.wait(timeout=1)
+        except subprocess.TimeoutExpired:
+            pass
+        raise
+    else:
+        process.wait()
+
+
 def execute(command, cwd, env=None, folder=None, timeout=60, input_data=None):
     """Trusted local execution with wall time/output limits and process-group cleanup."""
     if folder is None:
@@ -127,18 +142,7 @@ def execute(command, cwd, env=None, folder=None, timeout=60, input_data=None):
                 time.sleep(0.01)
         finally:
             # Descendants cannot keep running after the leader exits or interrupts the host.
-            try:
-                kill_group(process.pid)
-            except (OSError, ValueError, subprocess.SubprocessError):
-                # A denied live group remains a failure. Waiting for its
-                # leader must not turn that failure into an unbounded hang.
-                try:
-                    process.wait(timeout=1)
-                except subprocess.TimeoutExpired:
-                    pass
-                raise
-            else:
-                process.wait()
+            finish_process(process)
     if failure or out.stat().st_size + err.stat().st_size > MAX_OUTPUT:
         raise ValueError(failure or "process output limit exceeded")
     return subprocess.CompletedProcess(command, process.returncode, out.read_bytes(), err.read_bytes())

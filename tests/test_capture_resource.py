@@ -114,8 +114,9 @@ class ResourceWitnessTests(unittest.TestCase):
             self.check()
         self.spec.pop("collection")
         self.status["language"] = "java"
+        message_decoder = decoder(self.nodes)
         with self.assertRaises(ValueError):
-            capture.witness(self.bodies, self.status, self.spec, "expected", decoder(self.nodes), "java")
+            capture.witness(self.bodies, self.status, self.spec, "expected", message_decoder, "java")
 
 
 if __name__ == "__main__":
