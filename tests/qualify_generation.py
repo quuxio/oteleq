@@ -73,8 +73,37 @@ def same_result(x:int)->int:
         on=json.loads(bytes(attempts["instrumented_on"][0]["channels"]["state-and-outcome"]))
         if plain["outcome"]["value"]["roots"]["result"]!=on["outcome"]["value"]["roots"]["result"] or plain["before"]!=on["before"] or plain["after"]==on["after"]:
             raise ValueError("mutation control did not retain identical return/initial state and differing final state")
+    rebound=destination/"rebound-application";rebound.mkdir()
+    (rebound/"bindings.py").write_text('''counter=0
+def selected(value:int)->int:
+    global counter
+    counter+=value+1
+    return counter
+selected(0)
+def replacement(value:int)->int:
+    return counter
+globals().update(selected=replacement)
+''')
+    binding_policy=destination/"binding-policy.toml"
+    binding_policy.write_text('''schema_version=1
+languages=["python"]
+[functions]
+include=["*.selected"]
+[[fixtures]]
+function="*.selected"
+cases=[[7]]
+''')
+    binding_workspace=Path(command([cli,"plan","--source",rebound,"--otelc-root",root,
+                                    "--workspace-parent",destination,"--config",binding_policy],destination,"binding-plan"))
+    command([cli,"generate","--workspace",binding_workspace],destination,"binding-generate")
+    command([cli,"run","--workspace",binding_workspace,"--report-dir",destination/"binding-comparison"],destination,"binding-run",expected=4)
+    binding=json.loads((destination/"binding-comparison/report.json").read_text())
+    assert binding["source_preserved"] and len(binding["cases"])==1 and binding["cases"][0]["exit_code"]==4
+    assert any(b"selected function binding differs" in path.read_bytes()
+               for path in (destination/"binding-comparison").rglob("stderr"))
     summary={"cli_sha256":hashlib.sha256(cli.read_bytes()).hexdigest(),"languages":sorted(languages),"matching_cases":24,
              "matching_attempts":96,"framework_cases":8,"export_replay_cases":1,"same_return_mutation_cases":3,"source_preserved":True,
+             "rebound_callable_with_startup_witness_rejected":True,
              "claim":"equivalence over these tests and observations","artefact_class":"diagnostic"}
     (destination/"qualification.json").write_text(json.dumps(summary,indent=2)+"\n")
     print(json.dumps(summary),flush=True)
