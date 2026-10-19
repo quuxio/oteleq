@@ -8,7 +8,7 @@ The Python observer reads ordinary builtin dictionary/exception descriptors and 
 
 Receiver construction, imported-module state, hidden fields, mutation-and-reversion between boundaries, filesystem/network observation and arbitrary action sequences remain outside this slice. The fixed diagnostic captures compare stdout/stderr and successful exits with independently declared telemetry expectations; they do not supply these generated state channels. Scope and gaps are retained in each report.
 
-The remaining sections describe the broader proposed observation/graph protocol. Its record shape and typed tags are illustrative; they are not the scalar worker's wire format. The Rust workload comparator currently compares the generated canonical bytes and does not implement arbitrary structural graph matching or field-path difference reporting.
+The separate Rust [typed comparator](typed-comparison.md) implements versioned graphs, alias/cycle matching, exact scalar encodings, initial-fixture validation and field-path differences through `compare-observations`. The scalar workers still emit canonical byte observations, so their conversion and richer language codecs remain incomplete. The remaining sections describe broader capture requirements; the legacy illustrative records are not either command's wire format.
 
 ## Application observations
 
@@ -94,4 +94,4 @@ Record capture completion independently for every root/channel. Optional unobser
 
 The [baseline example](../examples/observations/baseline.json) and [instrumented example](../examples/observations/instrumented-on.json) describe the same valid fixture and return value. Their receiver counters differ. They are hand-written protocol examples, not evidence from an executed application.
 
-The proposed graph comparator must report `different_observed` at `receiver.calls`, with baseline `3 -> 4` and instrumented `3 -> 5`. It must also state that only the receiver root was captured and globals/effects were not observed. These records are acceptance fixtures for that richer protocol. The implemented scalar qualification separately demonstrates a same-return/different-global-object mutation through actual paired execution.
+The executable [typed acceptance bundle](../examples/typed-observations.json) uses the implemented schema. It reports `different_observed` at `/after/receiver/calls` for a 3-to-4 baseline change versus 3-to-5 instrumented change, with equal returns and explicit scope exclusions. These hand-authored records test comparison rules. The scalar qualification separately demonstrates a same-return/different-global-object mutation through actual paired execution.

@@ -4,9 +4,9 @@
 
 oteleq generates repeatable tests and compares an application's behaviour with and without otelc instrumentation. Its claim is **equivalence over these tests and observations**, bounded by the recorded inputs, build identities, execution environment and observation coverage.
 
-Updated 19 October 2026. The [Rust workload comparator](workload-comparison.md) and [scalar generator](automatic-generation.md) are implemented. Rust owns the CLI, Rust syntax inventory, byte-channel comparator and standalone HTML/JUnit presentation; an embedded Python adapter host coordinates language-specific syntax discovery, harness materialisation, state capture and execution. Generated tests use standard `unittest` for all eight languages. A validated project policy freezes selection, scalar fixtures, seeded samples and execution budgets. The implementation retains workspaces until explicit cleanup and exports frozen snapshots through `export-tests`.
+Updated 19 October 2026. The [Rust workload comparator](workload-comparison.md) and [scalar generator](automatic-generation.md) are implemented. Rust owns the CLI, Rust syntax inventory, byte-channel and typed graph comparators, and standalone HTML/JUnit presentation; an embedded Python adapter host coordinates language-specific syntax discovery, harness materialisation, state capture and execution. Generated tests use standard `unittest` for all eight languages. A validated project policy freezes selection, scalar fixtures, seeded samples and execution budgets. The implementation retains workspaces until explicit cleanup and exports frozen snapshots through `export-tests`.
 
-The remaining sections describe the broader design. Full semantic/build-aware adapters, arbitrary receiver factories, stateful sequences, the versioned graph protocol, off/fault lanes, shrinking and production qualification remain proposed. Use the [implemented CLI reference](cli-and-configuration.md#implemented-commands) for runnable commands.
+The remaining sections describe the broader design. Full semantic/build-aware adapters, arbitrary receiver factories, stateful sequences, generated-worker integration with the versioned graph protocol, off/fault lanes, shrinking and production qualification remain proposed. Use the [implemented CLI reference](cli-and-configuration.md#implemented-commands) for runnable commands.
 
 ## Requirements
 
