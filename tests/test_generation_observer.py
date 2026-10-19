@@ -1,10 +1,14 @@
 """Passive Python observer regressions for application descriptors."""
 from pathlib import Path
+import os
+import shutil
+import subprocess
 import sys
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "adapters/generation"))
 import observe
+import harness
 
 
 class PassiveObserverTests(unittest.TestCase):
@@ -121,3 +125,36 @@ class PassiveObserverTests(unittest.TestCase):
         for roots in ([], {1: 2}):
             with self.assertRaisesRegex(ValueError, "string-keyed"):
                 observe.graph(roots)
+
+
+class NodePassiveObserverTests(unittest.TestCase):
+    def test_node_observer_does_not_evaluate_error_names_accessors_or_proxies(self):
+        node = os.environ.get("OTELC_NODE") or shutil.which("node")
+        self.assertIsNotNone(node, "Node24+ is required for the shared Node observer regression")
+        source = "import {test} from 'node:test';import assert from 'node:assert/strict';\n" + harness.JS_OBSERVER + r"""
+test('error identity never evaluates prototype name getters', () => {
+  let calls=0;
+  const previous=Object.getOwnPropertyDescriptor(Error.prototype,'name');
+  try {
+    Object.defineProperty(Error.prototype,'name',{get(){calls++;return 'changed'},configurable:true});
+    const graph=__oteleqGraph({error:new Error('original')});
+    assert.equal(calls,0);
+    assert.equal(graph.nodes[0].type,'Error');
+  } finally { Object.defineProperty(Error.prototype,'name',previous); }
+});
+test('application accessors are refused without evaluating them', () => {
+  let calls=0;
+  const value={get field(){calls++;return 1}};
+  assert.throws(()=>__oteleqGraph({value}),/accessor state/);
+  assert.equal(calls,0);
+});
+test('proxy state is refused before evaluating traps', () => {
+  let calls=0;
+  const value=new Proxy({}, {getPrototypeOf(){calls++;return null},ownKeys(){calls++;return []}});
+  assert.throws(()=>__oteleqGraph({value}),/proxy state/);
+  assert.equal(calls,0);
+});
+"""
+        result = subprocess.run([node, "--test-reporter=tap", "--input-type=module", "-"], input=source,
+                                capture_output=True, text=True, check=False, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
