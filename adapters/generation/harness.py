@@ -197,7 +197,7 @@ def java_literal(value, type_):
     if type_ in STRINGS and any(ord(char) < 32 or ord(char) > 126 for char in value):
         encoded = value.encode("utf-16-be", errors="surrogatepass")
         units = ["(char)0x" + encoded[index:index + 2].hex() for index in range(0, len(encoded), 2)]
-        return "new String(new char[]{" + ",".join(units) + "})"
+        return "new java.lang.String(new char[]{" + ",".join(units) + "})"
     if type_ == "long":
         return "(long)" + str(value) + "L"
     if type_ in ("byte", "short", "char", "float"):
@@ -227,6 +227,8 @@ def literal(value, type_, language):
             return str(value).lower()
         return str(value) + (".0" if type_ in ("f32", "f64") and type(value) is int else "") + type_
     if language == "go":
+        if type(value) is bool:
+            return type_ + "(1==" + ("1" if value else "0") + ")"
         if type_ in ("float32", "float64"):
             width = float_width(type_, language)
             bits = struct.pack(">f" if width == 32 else ">d", value).hex()
@@ -438,53 +440,90 @@ def rename_main(source, entries, language):
 def rust_driver(entry, args, source):
     call = entry["name"] + "(" + ",".join(literal(v, t, "rust") for v, t in zip(args, entry["parameters"])) + ")"
     output = scalar_type(entry["output"])
-    formatted = 'format!("{:x}",v.to_bits())' if output in ("f32", "f64") else 'format!("{:?}",v)'
     state_lines = []
     for global_ in entry["globals"]:
-        floating = scalar_type(global_["type"]) in ("f32", "f64")
         expression = "unsafe {" + global_["name"] + "}"
-        if floating:
-            expression = "(" + expression + ").to_bits()"
-        pattern = ":{:x}\n" if floating else ":{:?}\n"
-        state_lines.append('s.push_str(&format!(' + json.dumps(global_["name"] + ':' + global_["type"] + pattern) + ',' + expression + '));')
+        state_lines.append('s.push_str(&__oteleq_std::format!(' + json.dumps(global_["name"] + ':' + global_["type"] + ':{}\n') + ',__oteleq_value(&' + expression + ')));')
     state = "\n".join(state_lines)
-    return rename_main(source, entry["file_functions"], "rust") + f'''
+    return rename_main(source, entry["file_functions"], "rust") + rust_codec() + f'''
 fn main() {{
-    let mut s=String::from("before\\n"); {state}
-    match std::panic::catch_unwind(|| {call}) {{
-      Ok(v)=>s.push_str(&format!("return:{output}:{{}}\\n",{formatted})),
+    let mut s=__oteleq_std::string::String::from("before\\n"); {state}
+    match __oteleq_std::panic::catch_unwind(|| {call}) {{
+      Ok(v)=>s.push_str(&__oteleq_std::format!("return:{output}:{{}}\\n",__oteleq_value(&v))),
       Err(payload)=>{{
-        if let Some(v)=payload.downcast_ref::<String>() {{ s.push_str(&format!("error:string:{{:?}}\\n",v)); }}
-        else if let Some(v)=payload.downcast_ref::<&str>() {{ s.push_str(&format!("error:str:{{:?}}\\n",v)); }}
-        else {{ std::process::exit(91); }}
+        if let Some(v)=payload.downcast_ref::<__oteleq_std::string::String>() {{ s.push_str(&__oteleq_std::format!("error:string:{{:?}}\\n",v)); }}
+        else if let Some(v)=payload.downcast_ref::<&__oteleq_std::primitive::str>() {{ s.push_str(&__oteleq_std::format!("error:str:{{:?}}\\n",v)); }}
+        else {{ __oteleq_std::process::exit(91); }}
       }},
     }}
     s.push_str("after\\n"); {state}
-    std::fs::write(std::env::var("OTELEQ_OBSERVATION").unwrap(),s).unwrap();
+    __oteleq_std::fs::write(__oteleq_std::env::var("OTELEQ_OBSERVATION").unwrap(),s).unwrap();
 }}
+'''
+
+
+def rust_codec() -> str:
+    """A closed implementation set prevents application Debug/to_bits callbacks."""
+    return r'''
+extern crate std as __oteleq_std;
+#[allow(non_camel_case_types)]
+trait __oteleq_Value { fn capture(&self)->__oteleq_std::string::String; }
+macro_rules! __oteleq_scalar {($($kind:ty),*)=>{$(
+  impl __oteleq_Value for $kind {
+    fn capture(&self)->__oteleq_std::string::String {__oteleq_std::format!("{:?}",self)}
+  }
+)*}}
+__oteleq_scalar!(__oteleq_std::primitive::bool,__oteleq_std::primitive::char,
+  __oteleq_std::primitive::i8,__oteleq_std::primitive::i16,__oteleq_std::primitive::i32,
+  __oteleq_std::primitive::i64,__oteleq_std::primitive::i128,__oteleq_std::primitive::isize,
+  __oteleq_std::primitive::u8,__oteleq_std::primitive::u16,__oteleq_std::primitive::u32,
+  __oteleq_std::primitive::u64,__oteleq_std::primitive::u128,__oteleq_std::primitive::usize,
+  __oteleq_std::string::String,&__oteleq_std::primitive::str,());
+impl __oteleq_Value for __oteleq_std::primitive::f32 {
+  fn capture(&self)->__oteleq_std::string::String {
+    __oteleq_std::format!("{:x}",__oteleq_std::primitive::f32::to_bits(*self))
+  }
+}
+impl __oteleq_Value for __oteleq_std::primitive::f64 {
+  fn capture(&self)->__oteleq_std::string::String {
+    __oteleq_std::format!("{:x}",__oteleq_std::primitive::f64::to_bits(*self))
+  }
+}
+fn __oteleq_value<T:__oteleq_Value>(value:&T)->__oteleq_std::string::String {value.capture()}
 '''
 
 
 def go_driver(entry, args, source):
     source = rename_main(source, entry["file_functions"], "go")
     position = entry["package_end"]
-    imports = '\nimport (__oteleq_fmt "fmt"; __oteleq_os "os"; __oteleq_math "math")\n'
+    imports = '\nimport (__oteleq_fmt "fmt"; __oteleq_os "os"; __oteleq_math "math"; __oteleq_reflect "reflect")\n'
     raw = source.encode()
     source = (raw[:position] + imports.encode() + raw[position:]).decode()
     call = entry["name"] + "(" + ",".join(literal(v, t, "go") for v, t in zip(args, entry["parameters"])) + ")"
     invoked = call + ';s+="return:void\\n"' if entry["output"] == "void" else 's+="return:"+__oteleqValue(' + call + ')+"\\n"'
     state = "\n".join('s+=' + json.dumps(g["name"] + ':') + '+__oteleqValue(' + g["name"] + ')+"\\n"' for g in entry["globals"])
     return source + f'''
-func __oteleqValue(v any) string {{
- switch x:=v.(type) {{case float32: return __oteleq_fmt.Sprintf("float32:%x",__oteleq_math.Float32bits(x));case float64:return __oteleq_fmt.Sprintf("float64:%x",__oteleq_math.Float64bits(x))}}
- switch v.(type) {{case nil,bool,string,int,int8,int16,int32,int64,uint,uint8,uint16,uint32,uint64:default:panic("opaque observation requires a fixture")}}
- return __oteleq_fmt.Sprintf("%T:%#v",v,v)
+func __oteleqValue(v interface{{}}) string {{
+ x:=__oteleq_reflect.ValueOf(v)
+ if !x.IsValid(){{return "<nil>:<nil>"}}
+ kind:=x.Type().String()+":"
+ switch x.Kind() {{
+ case __oteleq_reflect.Float32:
+  bits:=__oteleq_reflect.ValueOf(__oteleq_math.Float32bits).Call([]__oteleq_reflect.Value{{x.Convert(__oteleq_reflect.TypeOf(__oteleq_math.Float32frombits(0)))}})[0].Uint()
+  return "float32:"+__oteleq_fmt.Sprintf("%x",bits)
+ case __oteleq_reflect.Float64:return "float64:"+__oteleq_fmt.Sprintf("%x",__oteleq_math.Float64bits(x.Float()))
+ case __oteleq_reflect.Bool:return kind+__oteleq_fmt.Sprintf("%#v",x.Bool())
+ case __oteleq_reflect.String:return kind+__oteleq_fmt.Sprintf("%#v",x.String())
+ case __oteleq_reflect.Int,__oteleq_reflect.Int8,__oteleq_reflect.Int16,__oteleq_reflect.Int32,__oteleq_reflect.Int64:return kind+__oteleq_fmt.Sprintf("%#v",x.Int())
+ case __oteleq_reflect.Uint,__oteleq_reflect.Uint8,__oteleq_reflect.Uint16,__oteleq_reflect.Uint32,__oteleq_reflect.Uint64:return kind+__oteleq_fmt.Sprintf("%#v",x.Uint())
+ default:__oteleq_os.Exit(91);return ""
+ }}
 }}
 func main(){{
  s:="before\\n"; {state}
- func(){{defer func(){{if p:=recover();p!=nil{{s+="error:"+__oteleqValue(p)+"\\n"}}}}();{invoked}}}()
+ func(){{defer func(){{if p:=recover();__oteleq_reflect.ValueOf(p).IsValid(){{s+="error:"+__oteleqValue(p)+"\\n"}}}}();{invoked}}}()
  s+="after\\n"; {state}
- if err:=__oteleq_os.WriteFile(__oteleq_os.Getenv("OTELEQ_OBSERVATION"),[]byte(s),0600);err!=nil{{panic(err)}}
+ if err:=__oteleq_os.WriteFile(__oteleq_os.Getenv("OTELEQ_OBSERVATION"),[]byte(s),0600);__oteleq_reflect.ValueOf(err).IsValid(){{panic(err)}}
 }}
 '''
 
@@ -495,17 +534,31 @@ def java_driver(entry, args):
     invoked = call + ';s.append("return:void\\n");' if entry["output"] == "void" else 's.append("return:").append(value(' + call + ')).append("\\n");'
     state = "\n".join('s.append(' + json.dumps(g["name"] + ':') + ').append(value(' + g["name"] + ')).append("\\n");' for g in entry["globals"])
     return package + '''class OteleqDriver {
-static String value(Object v){
+static java.lang.String value(java.lang.Object v){
  if(v==null)return "null";
- if(v instanceof Double x)return "double:"+Long.toHexString(Double.doubleToRawLongBits(x));
- if(v instanceof Float x)return "float:"+Integer.toHexString(Float.floatToRawIntBits(x));
- if(v instanceof Character x)return "char:"+Integer.toHexString(x.charValue());
- if(v instanceof String x){StringBuilder units=new StringBuilder("string:utf16:");for(int i=0;i<x.length();i++)units.append(String.format("%04x",(int)x.charAt(i)));return units.toString();}
- return v.getClass().getName()+":"+java.util.Base64.getEncoder().encodeToString(v.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+ if(v instanceof java.lang.Double x)return "double:"+java.lang.Long.toHexString(java.lang.Double.doubleToRawLongBits(x));
+ if(v instanceof java.lang.Float x)return "float:"+java.lang.Integer.toHexString(java.lang.Float.floatToRawIntBits(x));
+ if(v instanceof java.lang.Character x)return "char:"+java.lang.Integer.toHexString(x.charValue());
+ if(v instanceof java.lang.String x){java.lang.StringBuilder units=new java.lang.StringBuilder("string:utf16:");for(int i=0;i<x.length();i++)units.append(java.lang.String.format("%04x",(int)x.charAt(i)));return units.toString();}
+ if(v instanceof java.lang.Boolean || v instanceof java.lang.Byte || v instanceof java.lang.Short ||
+    v instanceof java.lang.Integer || v instanceof java.lang.Long)
+  return v.getClass().getName()+":"+java.util.Base64.getEncoder().encodeToString(v.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+ throw new java.lang.AssertionError("opaque observation requires a fixture");
 }
-public static void main(String[] args) throws Exception {
-StringBuilder s=new StringBuilder("before\\n");
-''' + state + '\ntry{' + invoked + '}catch(Exception e){s.append("error:").append(e.getClass().getName()).append(":").append(value(e.getMessage())).append("\\n");}\ns.append("after\\n");\n' + state + '\njava.nio.file.Files.writeString(java.nio.file.Path.of(System.getenv("OTELEQ_OBSERVATION")),s.toString());\n}}\n'
+static java.lang.String message(java.lang.Exception error){
+ java.lang.Class<?> kind=error.getClass();
+ if(kind!=java.lang.Exception.class && kind!=java.lang.RuntimeException.class &&
+    kind!=java.lang.IllegalArgumentException.class && kind!=java.lang.IllegalStateException.class &&
+    kind!=java.lang.NullPointerException.class && kind!=java.lang.ArithmeticException.class &&
+    kind!=java.lang.IndexOutOfBoundsException.class && kind!=java.lang.ArrayIndexOutOfBoundsException.class &&
+    kind!=java.lang.StringIndexOutOfBoundsException.class && kind!=java.lang.UnsupportedOperationException.class &&
+    kind!=java.lang.ClassCastException.class && kind!=java.lang.NumberFormatException.class)
+  throw new java.lang.AssertionError("exception message requires a fixture");
+ return error.getMessage();
+}
+public static void main(java.lang.String[] args) throws java.lang.Exception {
+java.lang.StringBuilder s=new java.lang.StringBuilder("before\\n");
+''' + state + '\ntry{' + invoked + '}catch(java.lang.Exception e){s.append("error:").append(e.getClass().getName()).append(":").append(value(message(e))).append("\\n");}\ns.append("after\\n");\n' + state + '\njava.nio.file.Files.writeString(java.nio.file.Path.of(java.lang.System.getenv("OTELEQ_OBSERVATION")),s.toString());\n}}\n'
 
 
 def materialise(project, entry, args):

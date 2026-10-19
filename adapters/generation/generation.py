@@ -203,6 +203,8 @@ def qualify_entry(entry, snapshot, count):
     if entry["reason"]:
         return "blocked"
     try:
+        if entry.get("go_shadowed_recovery", False):
+            raise ValueError("shadowed Go panic/recover requires an observation fixture")
         harness.corpus(entry, count)
         outputs = harness.INTEGERS | harness.FLOATS | harness.BOOLS | harness.VOIDS | harness.STRINGS
         if entry["language"] in ("c", "cpp"):
@@ -238,6 +240,9 @@ def inventory_entry(function, discovered, name, language, source_hash, snapshot,
     excluded = is_entrypoint(function, language) or bool(function.get("declaration_only"))
     excluded |= not project_policy.selected(entry["otelc_function"], args.configuration["functions"])
     entry["generation_seed"] = args.configuration["generation"]["seed"]
+    if language == "go":
+        entry["go_shadowed_recovery"] = any(function["name"] in ("recover", "panic")
+                                          for function in discovered["functions"])
     configured = project_policy.concrete_cases(entry, args.configuration) if not excluded else None
     if configured is not None:
         entry["input_cases"] = configured
