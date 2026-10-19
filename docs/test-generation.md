@@ -38,7 +38,9 @@ Builds use fresh per-attempt private project copies. Reports retain outputs, bui
 | `export-tests --apply` | Copies the frozen snapshot, suite, corpus, instructions and sealed plan into a new destination |
 | `clean` | Explicitly removes the owned workspace after preservation checks |
 
-There is no automatic successful-run deletion or `--keep-workspace` flag. Keep reports or export the suite before `clean`. Cleanup requires `.oteleq-owned.json`, rejects unknown top-level files, unsealed plans/suites and edited snapshots/suites, and does not require the original application or toolchain still to exist. It removes the owned workspace, including its internal replay evidence; independently stored external reports remain available.
+There is no automatic successful-run deletion or `--keep-workspace` flag. Keep reports or export the suite before `clean`. Private snapshot and generated-suite checks include every directory and file, including cache/build names that were excluded from the original source snapshot. Added files or symlinks in those private trees invalidate replay and refuse cleanup; they are not silently discarded as caches. If another runner imports the generated test module, set `PYTHONDONTWRITEBYTECODE=1` to avoid adding a Python cache to the frozen suite.
+
+Cleanup requires `.oteleq-owned.json`, rejects unknown top-level files, unsealed plans/suites and edited snapshots/suites, and does not require the original application or toolchain still to exist. It removes the owned workspace, including its internal replay evidence; independently stored external reports remain available.
 
 ## Optional incorporation into a repository
 

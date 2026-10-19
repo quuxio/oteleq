@@ -258,6 +258,38 @@ class WorkflowTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,"native build failed"):
                 gen.native_command([],self.source,"c",driver,{"clang":"/selected/clang"},{},folder,scratch,"baseline")
 
+    def test_private_tree_guards_include_originally_ignored_build_and_cache_names(self):
+        self.generate()
+        cleanup = args("clean", workspace=self.workspace)
+        application_output = self.source / "target"
+        application_output.mkdir()
+        (application_output / "original-build-note.txt").write_text("original user output")
+        gen.load_workspace(self.workspace, generated=True)
+        for area in ("snapshot", "tests"):
+            for name in (".git", "target", "node_modules", "__pycache__", "build", "dist"):
+                added = self.workspace / area / name
+                added.mkdir()
+                note = added / "user-note.txt"
+                note.write_text("new user content must survive a refused cleanup")
+                with self.subTest(area=area, name=name):
+                    with self.assertRaisesRegex(ValueError, "changed"):
+                        gen.load_workspace(self.workspace, generated=True)
+                    with self.assertRaisesRegex(ValueError, "edited"):
+                        gen.clean(cleanup)
+                    self.assertTrue(note.is_file())
+                note.unlink()
+                added.rmdir()
+        hidden = self.workspace / "tests" / "target"
+        hidden.symlink_to(self.source, target_is_directory=True)
+        with self.assertRaisesRegex(ValueError, "symlink"):
+            gen.load_workspace(self.workspace, generated=True)
+        with self.assertRaisesRegex(ValueError, "symlink"):
+            gen.clean(cleanup)
+        hidden.unlink()
+        gen.clean(cleanup)
+        self.assertFalse(self.workspace.exists())
+        self.assertTrue((application_output / "original-build-note.txt").is_file())
+
     def reseal(self,data):
         gen.write(self.workspace/"plan.json",data)
         marker=gen.read(self.workspace/".oteleq-owned.json");marker["plan_sha256"]=gen.identity(data)

@@ -1,5 +1,6 @@
 """External generated test workflow; Rust CLI/comparator with compiler-specific workers."""
 import argparse
+from collections.abc import Collection
 import importlib.util
 import json
 import os
@@ -39,11 +40,12 @@ def read(path):
     return capture.strict_json(path.read_text())
 
 
-def manifest(root):
+def manifest(root: Path, *, excluded: Collection[str] = ()) -> dict[str, str]:
+    """Fingerprint all private contents; only original source walks exclude build trees."""
     result, total = {}, 0
     for directory, names, files in os.walk(root, followlinks=False):
         base = Path(directory)
-        names[:] = sorted(n for n in names if n not in discovery.IGNORED)
+        names[:] = sorted(n for n in names if n not in excluded)
         for name in names + files:
             if (base / name).is_symlink():
                 raise ValueError("source symlink requires an explicit build recipe: " + str(base / name))
@@ -238,7 +240,7 @@ def plan(args):
     configuration = plan_configuration(args)
     temporary = capture.temporary_parent(source, root)
     parent = source_outside(args.workspace_parent or temporary, source, root)
-    contents = manifest(source)
+    contents = manifest(source, excluded=discovery.IGNORED)
     if not contents:
         raise ValueError("empty source tree")
     workspace = Path(tempfile.mkdtemp(prefix="oteleq-run-", dir=parent))
@@ -250,7 +252,7 @@ def plan(args):
             continue
         if not any(project_policy.fixture_matches(entry, fixture) for entry in inventory):
             raise ValueError(f"configured fixture matches no selected callable: {fixture['function']}; partial workspace: {workspace}")
-    if manifest(source) != contents or manifest(snapshot) != contents:
+    if manifest(source, excluded=discovery.IGNORED) != contents or manifest(snapshot) != contents:
         raise ValueError("source changed during discovery")
     data = {"schema_version": VERSION, "source": str(source), "otelc_root": str(root), "source_manifest": contents,
             "source_sha256": identity(contents), "tools": {lang: {k: str(v) for k, v in selected.items()} for lang, selected in tools.items()},
@@ -313,7 +315,7 @@ def load_workspace(path, generated=False):
     if (data["configuration_sha256"] != identity(data["configuration"])
             or project_policy.validate(data["configuration"]) != data["configuration"]):
         raise ValueError("configuration identity or schema changed; create a new plan")
-    if manifest(Path(data["source"])) != data["source_manifest"] or manifest(workspace / "snapshot") != data["source_manifest"]:
+    if manifest(Path(data["source"]), excluded=discovery.IGNORED) != data["source_manifest"] or manifest(workspace / "snapshot") != data["source_manifest"]:
         raise ValueError("application source or immutable snapshot changed")
     if generated and manifest(workspace / "tests") != read(workspace / GENERATED_MANIFEST):
         raise ValueError("generated suite or corpus changed; create a new plan")
