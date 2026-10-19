@@ -21,6 +21,10 @@ baseline_repeats = 2
 instrumented_repeats = 2
 max_capture_bytes = 262144
 
+# Frozen provider selection. llvm requires its own matched compiler/SDK/pass profile.
+[adapters.rust]
+backend = "compiler"
+
 # Optional explicit domain cases replace automatic samples for matching functions.
 # Use the exact function identity from plan.json or a deliberate glob.
 # [[fixtures]]

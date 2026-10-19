@@ -80,7 +80,7 @@ Render a retained run as [standalone HTML and JUnit XML](docs/reporting.md):
   --output-dir /absolute/path/to/new-presentation
 ```
 
-Rust requires the qualified [standalone build/run provider API](docs/automatic-generation.md#discovery-and-build-boundary); combined compile-and-launch providers are unsupported.
+Rust requires the [standalone build/run provider API](docs/automatic-generation.md#discovery-and-build-boundary); combined compile-and-launch providers are unsupported. The default `compiler` backend and opt-in `llvm` profile use separate matched flag and provenance contracts. Qualification is specific to the recorded provider/compiler/backend.
 
 The default generates up to three distinct scalar cases per function and compares two plain with two instrumented runs per case. Missing instrumentation, changed source, unstable observations, failed builds and selected blockers fail the gate. The report records tested inputs, state coverage, telemetry and gaps. Syntax discovery and scalar samples do not establish business preconditions.
 

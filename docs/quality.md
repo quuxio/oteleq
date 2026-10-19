@@ -4,6 +4,8 @@
 
 CI validates Markdown, illustrative JSON/TOML syntax, diagnostic capture observers and the Rust comparator. The required Rust job runs formatting, Clippy, regression tests and a minimum 80% line-coverage gate over product `src/` files; integration-test code is excluded from that measurement. The documentation job tests the capture observers and enforces at least 80% line coverage separately for each eight-language capture module and the collection validator. CI uses fake witness fixtures and private subprocesses; actual otelc toolchain qualification uses the separate eight-language integration run. CI also checks the scalar generator, syntax discovery, harness materialisation, state observers, process limits and source preservation, with 80% coverage gates on each Python module. Real otelc execution is qualified separately; unobserved state and unsupported build contexts remain outside the claim.
 
+Rust build-contract regressions separately cover the default compiler manifest and opt-in LLVM profile. They reject changed assets/dependencies, compiler arguments/version, discovery/selection, source coordinates and resolved symbols. Actual LLVM qualification uses the separate six-case/36-launch standalone qualifier with independent column and expected-panic controls; unit fixtures and an earlier compiler qualification do not establish LLVM support.
+
 Install the locked documentation tools and run:
 
 ```sh

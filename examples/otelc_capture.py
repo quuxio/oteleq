@@ -167,7 +167,7 @@ def typescript_backend(root, language, spec, policy):
     return selected
 
 
-def artefacts(root, language, tools):
+def artefacts(root, language, tools, *, rust_backend="compiler"):
     """Re-enumerate executable adapter inputs so additions/removals are visible."""
     paths = [root / OTELC_CLI_PATH]
     trees = []
@@ -176,11 +176,15 @@ def artefacts(root, language, tools):
                   root / "target/debug/otelc-llvm-toolchain.json",
                   root / "target/debug/libotelc_pass.dylib"]
     elif language == "rust":
-        paths += [root / "target/debug/otelc-rust-adapter", root / "target/debug/libquux_otelc_rust.rlib",
-                  root / "Cargo.lock"]
-        dependencies = root / "target/debug/deps"
-        paths += sorted(path for pattern in ("*.rlib", "*.dylib", "*.so", "*.dll")
-                        for path in dependencies.glob(pattern))
+        paths += [root / "target/debug/otelc-rust-adapter", root / "Cargo.lock"]
+        if rust_backend == "llvm":
+            paths += rust_llvm_inputs(root, tools)
+        else:
+            rust_flags(rust_backend)
+            paths += [root / "target/debug/libquux_otelc_rust.rlib"]
+            dependencies = root / "target/debug/deps"
+            paths += sorted(path for pattern in ("*.rlib", "*.dylib", "*.so", "*.dll")
+                            for path in dependencies.glob(pattern))
     elif language == "java":
         paths += [root / "adapters/java/target/java-agent-0.1.0-agent.jar"]
     elif language == "go":
@@ -208,8 +212,8 @@ def artefacts(root, language, tools):
     return identities
 
 
-def stable(root, language, tools, expected):
-    if artefacts(root, language, tools) != expected:
+def stable(root, language, tools, expected, *, rust_backend="compiler"):
+    if artefacts(root, language, tools, rust_backend=rust_backend) != expected:
         raise ValueError("tool or adapter artefacts changed during capture")
 
 
@@ -227,9 +231,70 @@ def build(command, workspace, environment, output):
 
 
 RUST_BASELINE_FLAGS = ("--edition=2024", "-O", "-g")
+RUST_LLVM_BASELINE_FLAGS = (*RUST_BASELINE_FLAGS, "-Zmir-enable-passes=-Inline,-ForceInline", "-Ccodegen-units=1")
+RUST_PROFILE_FILENAME = "target/debug/otelc-rust-llvm.json"
 
 
-def rust_metadata(bundle: Path) -> dict:
+def rust_flags(backend: str) -> tuple[str, ...]:
+    """The caller chooses a qualified recipe; metadata never chooses flags."""
+    if backend == "compiler":
+        return RUST_BASELINE_FLAGS
+    if backend == "llvm":
+        return RUST_LLVM_BASELINE_FLAGS
+    raise ValueError("unsupported Rust backend")
+
+
+def rust_document(path: Path) -> dict:
+    """Read fixed, bounded regular files with the shared strict JSON parser."""
+    if path.is_symlink() or not path.is_file():
+        raise ValueError("Rust evidence requires regular files")
+    if path.stat().st_size > 4 * 1024 * 1024:
+        raise ValueError("Rust evidence exceeds its size limit")
+    document = strict_json(path.read_bytes())
+    if not isinstance(document, dict):
+        raise ValueError("Rust evidence must be an object")
+    return document
+
+
+def rust_profile(root: Path, tools: dict[str, Path]) -> dict:
+    """Accept only the selected compiler and fixed assets under the provider root."""
+    profile = rust_document(root / RUST_PROFILE_FILENAME)
+    expected_keys = {"schema_version", "rustc", "sdk", "sdk_sha256", "plugin", "plugin_sha256", "llvm_version", "protected_source_roots"}
+    if (set(profile) != expected_keys or type(profile["schema_version"]) is not int or profile["schema_version"] != 1
+            or profile["rustc"] != str(tools["rustc"])):
+        raise ValueError("Rust LLVM profile schema or selected compiler differs")
+    suffix = {"darwin": ".dylib", "linux": ".so", "win32": ".dll"}.get(sys.platform)
+    if suffix is None:
+        raise ValueError("Rust LLVM host profile is unsupported")
+    assets = {"sdk": root / "target/rust-llvm-sdk/debug/libquux_otelc_rust.rlib",
+              "plugin": root / ("target/debug/otelc_rust_pass" + suffix)}
+    for key, path in assets.items():
+        if (profile[key] != str(path) or path.resolve() != path or not path.is_file()
+                or profile[key + "_sha256"] != file_digest(path)):
+            raise ValueError("Rust LLVM fixed " + key + " asset or identity differs")
+    prefixes = profile["protected_source_roots"]
+    if (not isinstance(prefixes, list) or not prefixes
+            or any(type(path) is not str or not Path(path).is_absolute() for path in prefixes)
+            or type(profile["llvm_version"]) is not str or not profile["llvm_version"].strip()):
+        raise ValueError("Rust LLVM profile metadata is incomplete")
+    return profile
+
+
+def rust_llvm_inputs(root: Path, tools: dict[str, Path]) -> list[Path]:
+    """Freeze only compiler-resolvable SDK inputs, including additions/removals."""
+    profile = rust_profile(root, tools)
+    dependencies = Path(profile["sdk"]).parent / "deps"
+    if not dependencies.is_dir() or dependencies.resolve() != dependencies:
+        raise ValueError("Rust LLVM SDK dependency directory is missing or linked")
+    paths = [root / RUST_PROFILE_FILENAME, Path(profile["sdk"]), Path(profile["plugin"])]
+    paths += sorted(path for pattern in ("*.rlib", "*.rmeta", "*.dylib", "*.so", "*.dll")
+                    for path in dependencies.glob(pattern))
+    if any(path.is_symlink() or not path.is_file() for path in paths):
+        raise ValueError("Rust LLVM inputs require regular files")
+    return paths
+
+
+def rust_metadata(bundle: Path, backend: str = "compiler") -> dict:
     """Read only fixed bundle files and reject an unqualified schema/flag contract."""
     for name in ("application", "plan.json", RUST_BUILD_FILENAME):
         path = bundle / name
@@ -239,56 +304,172 @@ def rust_metadata(bundle: Path) -> dict:
     if metadata_path.stat().st_size > 4 * 1024 * 1024:
         raise ValueError("Rust build metadata exceeds its size limit")
     metadata = strict_json(metadata_path.read_text())
-    if (not isinstance(metadata, dict) or type(metadata.get("schema_version")) is not int or metadata["schema_version"] != 1
+    version = 2 if backend == "llvm" else 1
+    if (not isinstance(metadata, dict) or type(metadata.get("schema_version")) is not int or metadata["schema_version"] != version
             or metadata.get("language") != "rust"
-            or metadata.get("baseline_flags") != list(RUST_BASELINE_FLAGS)):
+            or metadata.get("baseline_flags") != list(rust_flags(backend))):
         raise ValueError("Rust build flags or manifest schema require separate qualification")
+    if backend == "llvm" and (metadata.get("backend") != "llvm" or set(metadata) != {
+            "schema_version", "language", "backend", "executable_sha256", "plan_sha256", "adapter_sha256", "sdk_sha256",
+            "source", "source_sha256", "source_root", "baseline_flags", "compiler", "compiler_hook"}):
+        raise ValueError("Rust LLVM manifest fields or backend are unqualified")
     return metadata
 
 
-def rust_compiler(metadata: dict, tools: dict[str, Path]) -> dict:
+def rust_compiler(metadata: dict, tools: dict[str, Path], backend: str = "compiler") -> dict:
     """Check compiler provenance as text; metadata cannot select an executable."""
     compiler = metadata.get("compiler", {})
     if (not isinstance(compiler, dict) or compiler.get("program") != str(tools["rustc"])
             or not isinstance(compiler.get("argv"), list)
             or not all(isinstance(arg, str) for arg in compiler["argv"])
-            or not all(flag in compiler["argv"] for flag in RUST_BASELINE_FLAGS)):
+            or not all(flag in compiler["argv"] for flag in rust_flags(backend))):
         raise ValueError("Rust build compiler provenance does not match the selected compiler")
     return compiler
 
 
-def rust_manifest(root: Path, workspace: Path, source: Path, bundle: Path, tools: dict[str, Path]) -> dict:
+def rust_llvm_compiler(compiler: dict, source: Path, workspace: Path, tools: dict,
+                       profile: dict, environment: dict | None) -> Path:
+    """Verify the complete driver recipe against the selected compiler itself."""
+    if not environment or "TMPDIR" not in environment or set(compiler) != {"program", "argv", "version"}:
+        raise ValueError("Rust LLVM compiler context or provenance is incomplete")
+    prefix = [source.relative_to(workspace).as_posix(), *RUST_LLVM_BASELINE_FLAGS, "-o"]
+    tail = ["-Zllvm-plugins=" + profile["plugin"], "-Zunstable-options", "--extern",
+            "noprelude,force,nounused:quux_otelc_rust=" + profile["sdk"], "-L",
+            "dependency=" + str(Path(profile["sdk"]).parent / "deps")]
+    argv = compiler["argv"]
+    if len(argv) != len(prefix) + 1 + len(tail) or argv[:len(prefix)] != prefix or argv[len(prefix) + 1:] != tail:
+        raise ValueError("Rust LLVM compiler arguments differ from the matched recipe")
+    output = Path(argv[len(prefix)])
+    if not output.is_absolute() or output.name != "application" or output.parent.parent != Path(environment["TMPDIR"]).resolve():
+        raise ValueError("Rust LLVM compiler output is outside the caller scratch directory")
+    version = execute([tools["rustc"], "-vV"], workspace, environment, timeout=30)
+    if (version.returncode or len(version.stdout) > 32768 or version.stderr
+            or compiler.get("version") != version.stdout.decode("utf-8").strip()):
+        raise ValueError("Rust LLVM compiler version differs from the selected tool")
+    return output.parent
+
+
+def rust_llvm_rows(document: dict, version: int) -> tuple[list[dict], list[dict]]:
+    """Selection and startup flags are explicit booleans, never truthy values."""
+    rows = document.get("functions")
+    if (type(document.get("schema_version")) is not int or document["schema_version"] != version
+            or not isinstance(rows, list) or len(rows) > 65536
+            or any(not isinstance(row, dict) or type(row.get("selected")) is not bool
+                   or type(row.get("startup")) is not bool for row in rows)):
+        raise ValueError("Rust LLVM function inventory is malformed")
+    selected = [row for row in rows if row["selected"]]
+    startup = [row for row in rows if row["startup"]]
+    if len(selected) != 1 or len(startup) != 1 or selected[0]["startup"] or startup[0]["selected"]:
+        raise ValueError("Rust LLVM requires one selected function and one independent startup")
+    return selected, startup
+
+
+def rust_llvm_function(declaration: dict, resolved: dict, source: Path, name: str) -> None:
+    """Require the selected compiler symbol to match its original declaration."""
+    coordinates = ("body_start_line", "body_start_column", "body_end_line", "body_end_column")
+    for field in coordinates:
+        if (type(declaration.get(field)) is not int or declaration[field] < 1
+                or type(resolved.get(field)) is not int or resolved[field] != declaration[field]):
+            raise ValueError("Rust LLVM resolved source coordinates differ")
+    lines = source.read_bytes().splitlines()
+    start, end = declaration["body_start_line"], declaration["body_end_line"]
+    if (start > end or end > len(lines) or declaration["body_start_column"] > len(lines[start - 1]) + 1
+            or declaration["body_end_column"] > len(lines[end - 1]) + 1
+            or start == end and declaration["body_start_column"] > declaration["body_end_column"]):
+        raise ValueError("Rust LLVM source coordinates exceed the frozen source")
+    if (declaration.get("file") != str(source.resolve()) or declaration.get("name") != name
+            or declaration.get("unsupported") != "" or resolved.get("file") != declaration["file"]
+            or resolved.get("name") != name or resolved.get("kind") != "function"
+            or resolved.get("source_sha256") != file_digest(source)
+            or type(resolved.get("compiled_symbol")) is not str or not resolved["compiled_symbol"].strip()):
+        raise ValueError("Rust LLVM resolved symbol, selection or source identity differs")
+
+
+def rust_llvm_records(inventory: dict, resolved: dict, workspace: Path, source: Path, expected_function: str,
+                      scratch: Path) -> dict:
+    """Qualify this standalone entry and reject unsupported multi-source builds."""
+    selected, startup = rust_llvm_rows(inventory, 2)
+    actual_selected, actual_startup = rust_llvm_rows(resolved, 1)
+    relative = source.relative_to(workspace).as_posix()
+    discovery = [relative, *RUST_LLVM_BASELINE_FLAGS, "--emit=dep-info=" + str(scratch / "original.d")]
+    if (set(inventory) != {"schema_version", "functions", "sources", "discovery_argv"}
+            or inventory.get("sources") != {str(source.resolve()): file_digest(source)}
+            or inventory.get("discovery_argv") != discovery):
+        raise ValueError("Rust LLVM discovery recipe or standalone source set differs")
+    if (set(resolved) != {"schema_version", "phase", "module", "functions"}
+            or resolved.get("phase") != "llvm-pipeline-start"
+            or type(resolved.get("module")) is not str or not resolved["module"].strip()):
+        raise ValueError("Rust LLVM resolution phase or module differs")
+    main = str(Path(relative).with_suffix("")).replace("/", ".") + ".main"
+    rust_llvm_function(selected[0], actual_selected[0], source, expected_function)
+    rust_llvm_function(startup[0], actual_startup[0], source, main)
+    return {"selected_symbol": actual_selected[0]["compiled_symbol"], "selected_function": expected_function,
+            "resolution_phase": resolved["phase"]}
+
+
+def rust_llvm_manifest(root: Path, workspace: Path, source: Path, bundle: Path, metadata: dict,
+                       tools: dict, profile: dict, expected_function: str | None, environment: dict | None) -> dict:
+    """Bind compiler hook evidence to fixed profile assets and the requested target."""
+    if type(expected_function) is not str or not expected_function.strip():
+        raise ValueError("Rust LLVM needs an explicit expected function identity")
+    inventory = rust_document(bundle / "inventory.json")
+    resolved = rust_document(bundle / "resolved.json")
+    hook = metadata.get("compiler_hook")
+    hashes = {"profile_sha256": file_digest(root / RUST_PROFILE_FILENAME),
+              "plugin_sha256": file_digest(Path(profile["plugin"])),
+              "inventory_sha256": file_digest(bundle / "inventory.json"),
+              "resolved_sha256": file_digest(bundle / "resolved.json")}
+    if not isinstance(hook, dict) or hook != hashes:
+        raise ValueError("Rust LLVM profile, plugin or compiler evidence identity differs")
+    plan = rust_document(bundle / "plan.json")
+    if (type(plan.get("schema_version")) is not int or plan["schema_version"] != 2
+            or plan.get("backend") != "llvm" or plan.get("language") != "rust"
+            or plan.get("functions") != {"include": [expected_function], "exclude": []}
+            or plan.get("sources") != {"include": [source.relative_to(workspace).as_posix()], "exclude": []}
+            or plan.get("execution_available") is not True or plan.get("unavailable") != []):
+        raise ValueError("Rust LLVM retained selection plan differs from the requested entry")
+    scratch = rust_llvm_compiler(metadata["compiler"], source, workspace, tools, profile, environment)
+    records = rust_llvm_records(inventory, resolved, workspace, source, expected_function, scratch)
+    return {"backend": "llvm", "compiler_hook": hashes, **records}
+
+
+def rust_manifest(root: Path, workspace: Path, source: Path, bundle: Path, tools: dict[str, Path], *,
+                  backend: str = "compiler", expected_function: str | None = None, environment: dict | None = None) -> dict:
     """Verify all source/build/provider hashes using only caller-selected paths."""
-    metadata = rust_metadata(bundle)
-    compiler = rust_compiler(metadata, tools)
+    metadata = rust_metadata(bundle, backend)
+    compiler = rust_compiler(metadata, tools, backend)
+    profile = rust_profile(root, tools) if backend == "llvm" else None
     expected = {"executable_sha256": file_digest(bundle / "application"),
                 "plan_sha256": file_digest(bundle / "plan.json"),
                 "source_sha256": file_digest(source),
-                "sdk_sha256": file_digest(root / "target/debug/libquux_otelc_rust.rlib"),
+                "sdk_sha256": file_digest(Path(profile["sdk"]) if profile else root / "target/debug/libquux_otelc_rust.rlib"),
                 "adapter_sha256": file_digest(root / "target/debug/otelc-rust-adapter")}
     if (any(metadata.get(key) != value for key, value in expected.items())
             or metadata.get("source") != str(source.resolve())
             or metadata.get("source_root") != str(workspace.resolve())):
         raise ValueError("Rust build source, executable, policy or provider identity changed")
+    hook = rust_llvm_manifest(root, workspace, source, bundle, metadata, tools, profile, expected_function, environment) if profile else {}
     return {**expected, "manifest_sha256": file_digest(bundle / RUST_BUILD_FILENAME),
-            "baseline_flags": list(RUST_BASELINE_FLAGS), "compiler": compiler}
+            "baseline_flags": list(rust_flags(backend)), "compiler": compiler, **hook}
 
 
-def rust_command(root, workspace, source, policy, tools, environment, evidence, output, lane):
+def rust_command(root, workspace, source, policy, tools, environment, evidence, output, lane, *,
+                 backend="compiler", expected_function=None):
     """Build only the selected lane; application launch never invokes rustc."""
     prefix = [root / OTELC_CLI_PATH, "--config", policy, "--language", "rust"]
     relative = source.relative_to(workspace)
     if lane == "baseline":
         binary = output / "plain"
-        build([tools["rustc"], *RUST_BASELINE_FLAGS, relative, "-o", binary], workspace,
+        build([tools["rustc"], *rust_flags(backend), relative, "-o", binary], workspace,
               environment, evidence / "plain-build.log")
         command = [binary]
-        identities = {"application": file_digest(binary), "baseline_flags": list(RUST_BASELINE_FLAGS)}
+        identities = {"application": file_digest(binary), "baseline_flags": list(rust_flags(backend))}
     else:
         bundle = output / "rust-bundle"
         build(prefix + ["rust", "--build", relative, "--output-dir", bundle], workspace,
               environment, evidence / "instrumented-build.log")
-        identities = rust_manifest(root, workspace, source, bundle, tools)
+        identities = rust_manifest(root, workspace, source, bundle, tools, backend=backend,
+                                   expected_function=expected_function, environment=environment)
         command = prefix + ["rust", "--run", bundle]
     (evidence / (lane + "-build-identities.json")).write_text(json.dumps(identities, indent=2) + "\n")
     return command
