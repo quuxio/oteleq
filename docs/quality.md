@@ -66,6 +66,16 @@ The same final oteleq executable also passed the complete eight-language scalar 
 
 This is **equivalence over these tests and observations**. The qualification checks local OTLP and the fixture's declared byte channels; it does not validate Tempo storage, Prometheus queries, arbitrary object retention, resource-release contracts or a shipping artefact.
 
+## Configured scalar and binding qualification
+
+The [exact-revision record](qualification/scalar-policy-2026-10-19.json) qualifies runtime `3fa678f` on macOS ARM64 against private integrated provider `8a7689a`. The provider is a pinned integration candidate, not a claim that its component changes have merged to main. Rust requires the separately qualified standalone build/run API. TypeScript generation uses the classic/source compiler.
+
+Both complete corpora passed on the same frozen consumer/provider pair: 24 default cases/96 launches, eight generated framework cases, one exported replay and three same-return/different-state controls; then 38 configured cases/228 launches with three repeats per lane. Independent checks cover wide signed/unsigned integers, arbitrary-size Python integers, exact float inputs including negative zero, Java UTF-16/unpaired surrogates and an altered retained-Unicode control. Sources were preserved. Rebound callable controls for Python, JavaScript and TypeScript fail capture despite an earlier startup invocation supplying the selected span.
+
+The final local gate passed 120 regressions (18 Rust, 66 capture, 36 generation), Rust line coverage 96.87% and all per-module Python coverage gates. Earlier Rust build-warning contamination, Go negative-zero input and startup-witness false-pass evidence remain recorded as failures. Rust column-location differences are delegated to [otelc issue66](https://github.com/quuxio/otelc/issues/66); the application observations are not normalised.
+
+Raw captures, private workspaces, tool/provider manifests and frozen executables are retained privately. These scoped positive fixtures and negative controls do not establish arbitrary business preconditions, dependency initialisation, complete action-scoped witness attribution, rich graph codecs, other platforms or shipping artefact equivalence.
+
 ## Implementation quality
 
 The [roadmap](roadmap.md) defines the remaining core and adapter gates. Use the pinned rustup workflow above for reproducible coverage. A qualified non-rustup distribution can supply matching `LLVM_COV` and `LLVM_PROFDATA` paths through `COVERAGE_ENV`; verify that their LLVM version matches that compiler's instrumentation. Meaningful comparator, codec, process-isolation, source-preservation and incomplete-evidence regression tests are required. Publish actual implementation coverage with language/component scope. Extend the shared defect corpus with changed results, globals, receivers and effects as each observation capability is delivered.
