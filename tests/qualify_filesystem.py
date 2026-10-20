@@ -97,6 +97,20 @@ def expected(case: dict) -> int:
     return int("write_difference" in case["function"] and case["arguments"][0] > 0)
 
 
+def actual_attempt(folder: Path, case_id: str) -> tuple[Path, Path]:
+    """Copied shrink evidence retains its actual, original execution directory."""
+    cwd = Path(json.loads((folder / "working-directory.json").read_text()))
+    assert cwd.name == "project"
+    actual = cwd.parent
+    assert actual.name == folder.name and actual.parent.name == case_id
+    if actual.resolve() != folder.resolve():
+        assert folder.parent.parent.name == "original"
+        assert actual.resolve().is_relative_to(folder.parents[3].resolve())
+        for name in ("command.json", "working-directory.json", "filesystem-controls.json", "filesystem-data.json", "typed-observation.json", "http-capture.json"):
+            assert (actual / name).read_bytes() == (folder / name).read_bytes(), name
+    return cwd, actual
+
+
 def check_report(path: Path, count: int = 18) -> int:
     """Literal input/output/file oracles are independent of agreement between lanes."""
     report = json.loads(path.read_text())
@@ -136,8 +150,8 @@ def check_report(path: Path, count: int = 18) -> int:
                 controls = json.loads((folder / "filesystem-controls.json").read_text())
                 binding = controls["environment"]["APP_DATA_DIR"]
                 assert not Path(binding).is_absolute()
-                cwd = Path(json.loads((folder / "working-directory.json").read_text()))
-                assert (cwd / binding).resolve() == (folder / "filesystem-fixtures/data").resolve()
+                cwd, actual = actual_attempt(folder, case["case"])
+                assert (cwd / binding).resolve() == (actual / "filesystem-fixtures/data").resolve()
                 if lane == "instrumented_on":
                     assert execution["witness"]["functions"] == {entry.get("otelc_runtime_function", case["function"]): 1}
                     assert not any(execution["witness"]["losses"].values())
@@ -148,8 +162,9 @@ def check_report(path: Path, count: int = 18) -> int:
     return launches
 
 
-def framework(workspace: Path, folder: Path, name: str, count: int = 18) -> int:
-    text = command([sys.executable, workspace / "tests/test_equivalence.py"], folder, name, expected=1)
+def framework(workspace: Path, folder: Path, name: str, count: int = 18, *, resume: bool = False) -> int:
+    retained = folder / (name + ".stdout")
+    text = retained.read_text() if resume and retained.is_file() else command([sys.executable, workspace / "tests/test_equivalence.py"], folder, name, expected=1)
     reports = [json.loads(line) for line in text.splitlines()]
     assert len(reports) == count
     return sum(check_report(Path(row["report"]), 1) for row in reports)
@@ -174,42 +189,67 @@ def evidence_controls(cli: Path, folder: Path) -> int:
     return controls
 
 
+def retained_workflows(cli: Path, provider: Path, folder: Path, resume: bool) -> tuple[Path, Path, int, int]:
+    """Revalidate completed routes on resume without repeating application launches."""
+    if resume:
+        plans = list((folder / "cases").glob("*/plan.json"))
+        assert len(plans) == 1
+        assert Path(json.loads(plans[0].read_text())["otelc_root"]).resolve() == provider
+        workspace = plans[0].parent
+        command([cli, "export-tests", "--workspace", workspace, "--destination", folder / "resume-identity-check"], folder, "resume-identity-check")
+    else:
+        folder.mkdir(mode=0o700)
+        workspace = prepare(cli, provider, folder / "cases")
+        command([cli, "run", "--workspace", workspace, "--report-dir", folder / "comparison"], folder, "run", expected=3)
+    launches = check_report(folder / "comparison/report.json")
+    controls = evidence_controls(cli, folder)
+    launches += framework(workspace, folder, "framework", resume=resume)
+    exported = folder / "exported"
+    if not resume:
+        command([cli, "export-tests", "--workspace", workspace, "--destination", exported, "--apply"], folder, "export")
+        command([cli, "run", "--workspace", exported, "--report-dir", folder / "export-comparison"], folder, "export-run", expected=3)
+    launches += check_report(folder / "export-comparison/report.json")
+    launches += framework(exported, folder, "export-framework", resume=resume)
+    return workspace, exported, launches, controls
+
+
+def reduce_case(cli: Path, workspace: Path, folder: Path, case: dict, resume: bool) -> tuple[int, dict]:
+    target = folder / ("shrink-" + case["case"])
+    if not (resume and (target / "shrink.json").is_file()):
+        command([cli, "shrink", "--workspace", workspace, "--case", case["case"], "--report-dir", target, "--trials", "8"], folder, target.name, expected=1)
+    shrink = json.loads((target / "shrink.json").read_text())
+    assert shrink["reduced_arguments"] == [1] and shrink["status"] == "candidate_rule_minimal"
+    launches = sum(check_report(path, 1) for path in [target / "original/report.json", target / "confirmation/report.json", *[Path(row["report"]) for row in shrink["trials"]]])
+    reduced = Path(shrink["workspace"])
+    launches += framework(reduced, folder, "reduced-" + case["case"], 1, resume=resume)
+    name = "replay-" + case["case"]
+    retained = folder / (name + ".stdout")
+    text = retained.read_text() if resume and retained.is_file() else command([cli, "replay", "--workspace", reduced, "--case", case["case"]], folder, name, expected=1)
+    replay = json.loads(text)
+    launches += check_report(Path(replay["report"]), 1)
+    print(json.dumps({"completed_reduction": case["function"], "arguments": shrink["reduced_arguments"], "actual_launches": launches}), flush=True)
+    return launches, {"function": case["function"], "arguments": shrink["reduced_arguments"]}
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--otelc-root", type=Path, required=True)
     parser.add_argument("--report-dir", type=Path, required=True)
     parser.add_argument("--cli", type=Path, required=True)
+    parser.add_argument("--resume", action="store_true", help="revalidate retained completed routes/shrinks and continue; never restart an unfinished shrink")
     args = parser.parse_args()
     cli, provider, folder = args.cli.resolve(strict=True), args.otelc_root.resolve(strict=True), args.report_dir.resolve()
     if any(folder.is_relative_to(path) for path in (provider, Path(__file__).resolve().parents[1])):
         parser.error("qualification directory must be new and outside both repositories")
-    folder.mkdir(mode=0o700)
     os.environ.update(OTELEQ_PYTHON=sys.executable, OTELEQ_CLI=str(cli))
-    workspace = prepare(cli, provider, folder / "cases")
-    command([cli, "run", "--workspace", workspace, "--report-dir", folder / "comparison"], folder, "run", expected=3)
-    launches = check_report(folder / "comparison/report.json")
-    controls = evidence_controls(cli, folder)
-    launches += framework(workspace, folder, "framework")
-    exported = folder / "exported"
-    command([cli, "export-tests", "--workspace", workspace, "--destination", exported, "--apply"], folder, "export")
-    command([cli, "run", "--workspace", exported, "--report-dir", folder / "export-comparison"], folder, "export-run", expected=3)
-    launches += check_report(folder / "export-comparison/report.json")
-    launches += framework(exported, folder, "export-framework")
+    workspace, exported, launches, controls = retained_workflows(cli, provider, folder, args.resume)
     report = json.loads((folder / "comparison/report.json").read_text())
     reductions = []
     for case in report["cases"]:
         if "write_difference" not in case["function"]:continue
-        target = folder / ("shrink-" + case["case"])
-        command([cli, "shrink", "--workspace", workspace, "--case", case["case"], "--report-dir", target, "--trials", "8"], folder, target.name, expected=1)
-        shrink = json.loads((target / "shrink.json").read_text())
-        assert shrink["reduced_arguments"] == [1] and shrink["status"] == "candidate_rule_minimal"
-        for path in [target / "original/report.json", target / "confirmation/report.json", *[Path(row["report"]) for row in shrink["trials"]]]:
-            launches += check_report(path, 1)
-        reduced = Path(shrink["workspace"])
-        launches += framework(reduced, folder, "reduced-" + case["case"], 1)
-        replay = json.loads(command([cli, "replay", "--workspace", reduced, "--case", case["case"]], folder, "replay-" + case["case"], expected=1))
-        launches += check_report(Path(replay["report"]), 1)
-        reductions.append({"function": case["function"], "arguments": shrink["reduced_arguments"]})
+        actual, reduction = reduce_case(cli, workspace, folder, case, args.resume)
+        launches += actual
+        reductions.append(reduction)
     assert len(reductions) == 8
     identities = defaultdict(list)
     for path in folder.rglob("command.json"):
