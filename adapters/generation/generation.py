@@ -14,6 +14,7 @@ import time
 import uuid
 
 import discovery
+import go_project
 import harness
 import node_receivers
 import otelc_capture as capture
@@ -186,7 +187,10 @@ def snapshot_source(source, workspace, contents):
     return snapshot
 
 
-def discover_file(name, language, root, snapshot, workspace, tools, artefacts, rust_backend="compiler"):
+def discover_file(name, language, root, snapshot, workspace, tools, artefacts, adapter_state=None):
+    adapter_state = adapter_state or {}
+    adapters = adapter_state.get("configuration", {})
+    rust_backend = adapters.get("rust", {}).get("backend", "compiler")
     try:
         if language not in tools:
             selected = capture.selected_tools(root, language)
@@ -198,7 +202,12 @@ def discover_file(name, language, root, snapshot, workspace, tools, artefacts, r
             environment = capture.environment(snapshot, tools[language], "oteleq-discovery", root)
             environment.update({"GOCACHE": str(workspace / "go-cache/build"), "GOMODCACHE": str(workspace / "go-cache/modules"), "GOTOOLCHAIN": "local",
                                 "OTELEQ_EXECUTABLE": os.environ["OTELEQ_EXECUTABLE"]})
+            if language == "go" and adapters.get("go", {}).get("module_roots"):
+                environment.update(go_project.environment(adapters["go"]))
             return execute(command, cwd, environment, input_data=input_data)
+        if language == "go" and adapters.get("go", {}).get("module_roots"):
+            return go_project.discover(snapshot / name, snapshot, adapters["go"], tools[language]["go"],
+                                       discover_execute, adapter_state.setdefault("go_cache", {}))
         return discovery.discover(snapshot / name, language, root, tools[language], discover_execute)
     except (ValueError, OSError, KeyError, SyntaxError, RecursionError) as error:
         return {"functions": [{"name": "<parse-or-tool-gap>", "line": 1, "parameters": [], "output": "unknown", "reason": str(error)}], "globals": []}
@@ -293,8 +302,15 @@ def inventory_entry(function, discovered, name, language, source_hash, snapshot,
     if language == "rust":
         entry["rust_backend"] = args.configuration["adapters"]["rust"]["backend"]
     if language == "go":
+        entry["go_main_renames"] = discovered.get("main_renames", [])
         entry["go_shadowed_recovery"] = any(function["name"] in ("recover", "panic")
                                           for function in discovered["functions"])
+        if "go_context" in discovered:
+            entry["go_context"] = discovered["go_context"]
+            entry["go_options"] = args.configuration["adapters"]["go"]
+            entry["go_shadowed_recovery"] |= entry["go_context"]["shadowed_recovery"]
+            relative = Path(name).relative_to(entry["go_context"]["module_root"])
+            entry["otelc_runtime_function"] = str(relative.with_suffix("")).replace("/", ".") + "." + entry["name"]
     if language == "python" and not excluded and args.configuration["adapters"]["python"]["import_roots"]:
         try:
             entry["python_import"] = python_project.context(snapshot, name, args.configuration["adapters"]["python"]["import_roots"])
@@ -319,13 +335,14 @@ def configure_fixture(entry, discovered, fixture):
 
 def inventory_tree(contents, root, snapshot, workspace, args):
     tools, artefacts, inventory = {}, {}, []
+    adapter_state = {"configuration": args.configuration["adapters"], "go_cache": {}}
     for name, sha in contents.items():
         language = discovery.LANGUAGES.get(Path(name).suffix)
         if (not language or language not in args.language
                 or not project_policy.selected(name, args.configuration["sources"])):
             continue
         discovered = discover_file(name, language, root, snapshot, workspace, tools, artefacts,
-                                   args.configuration["adapters"]["rust"]["backend"])
+                                   adapter_state)
         discovered["entrypoints"] = [function for function in discovered["functions"] if is_entrypoint(function, language)]
         inventory.extend(inventory_entry(function, discovered, name, language, sha, snapshot, args)
                          for function in discovered["functions"])
@@ -410,7 +427,7 @@ def decoder_files():
 
 def generator_identity():
     here = Path(__file__).parent
-    names = ("generation.py", "policy.py", "domains.py", "shrinking.py", "python_project.py", "node_receivers.py", "discovery.py", "harness.py", "observe.py", "node_observe.mjs", "typed_capture.py", "discover.mjs", "discover.go", "Discover.java")
+    names = ("generation.py", "policy.py", "domains.py", "shrinking.py", "python_project.py", "go_project.py", "node_receivers.py", "discovery.py", "harness.py", "observe.py", "node_observe.mjs", "typed_capture.py", "discover.mjs", "discover.go", "Discover.java")
     files = {name: capture.file_digest(here / name) for name in names}
     files["host-python"] = capture.file_digest(Path(sys.executable))
     files["host-version"] = sys.version
@@ -492,9 +509,10 @@ if __name__=="__main__":unittest.main()
     for case in cases:
         entry = next(e for e in data["inventory"] if e["id"] == case["function_id"])
         preview = destination / "harnesses" / case["id"]
-        target = preview / entry["path"]
-        target.parent.mkdir(parents=True)
-        shutil.copyfile(workspace / "snapshot" / entry["path"], target)
+        for name in entry.get("go_context", {}).get("files", [entry["path"]]):
+            target = preview / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(workspace / "snapshot" / name, target)
         harness.materialise(preview, entry, case["arguments"])
     write(workspace / GENERATED_MANIFEST, manifest(destination))
     (workspace / README_FILE).write_text("Generated scalar diagnostic suite. Boilerplate: MIT; application snapshot retains its original licence.\nRun: OTELEQ_PYTHON=/path/to/otelc/.venv/bin/python python3 tests/test_equivalence.py\nOr: quux-oteleq run --workspace . --report-dir /new/external/report\nEvery blocked selected callable fails the generated strict suite. No shipping-artefact or universal equivalence claim.\nKeep this whole workspace, or export-tests to a new destination.\n")
@@ -510,7 +528,7 @@ languages = [{json.dumps(language)}]
 [sources]
 include = {json.dumps(sources)}
 [functions]
-include = [{json.dumps(entry['otelc_function'])}]
+include = [{json.dumps(entry.get('otelc_runtime_function', entry['otelc_function']))}]
 [traces]
 enabled = true
 root_sample_ratio = 1.0
@@ -530,7 +548,7 @@ interval_ms = 50
 def telemetry(bodies, report, entry, service, decoder):
     # One generated invocation must start one selected trace. Recursive counts are runtime observations.
     names, _, roots, errors = capture.decode(bodies, service, decoder)
-    if set(names) != {entry["otelc_function"]} or roots != 1 or not all(n > 0 for n in names.values()):
+    if set(names) != {entry.get("otelc_runtime_function", entry["otelc_function"])} or roots != 1 or not all(n > 0 for n in names.values()):
         raise ValueError("selected function was not witnessed as one complete invocation tree")
     spec = {"functions": names, "trees": 1, "errors": errors}
     return capture.witness(bodies, report, spec, service, decoder, entry["language"])
@@ -538,6 +556,8 @@ def telemetry(bodies, report, entry, service, decoder):
 
 def driver_path(project, entry):
     language = entry["language"]
+    if language == "go" and "go_context" in entry:
+        return project / go_project.worker_path(entry["go_context"])
     relative = {"python": "_oteleq_generated/driver.py", "c": "_oteleq_driver.c", "cpp": "_oteleq_driver.cpp"}.get(language)
     if language == "java":
         relative = str(Path(entry["path"]).parent / "OteleqDriver.java")
@@ -557,23 +577,34 @@ def build_command(root, project, entry, driver, config, tools, env, folder, scra
             raise ValueError("generated Java build failed; inspect build/stderr")
         main = (entry["package"] + "." if entry["package"] else "") + "OteleqDriver"
         command = [tools["java"], "-Xshare:off", "-cp", classes, main] if lane == "baseline" else prefix + ["java", "-Xshare:off", "-cp", classes, main]
-    else:
-        # Use the proven build recipes, with bounded execution for every build and launch.
-        old_execute = capture.execute
-        capture.execute = lambda command, cwd, environment, timeout=180: execute(command, cwd, environment, folder / ("build-" + uuid.uuid4().hex), timeout)
-        try:
-            if language == "rust":
-                command = capture.rust_command(root, project, driver, config, tools, env, folder, scratch, lane,
-                                               backend=entry["rust_backend"], expected_function=entry["otelc_function"])
-                shutil.copyfile(folder / (lane + "-build-identities.json"), folder / BUILD_IDENTITIES)
-                return command
+        return command
+    # Use the proven build recipes, with bounded execution for every build and launch.
+    old_execute = capture.execute
+    capture.execute = lambda command, cwd, environment, timeout=180: execute(command, cwd, environment, folder / ("build-" + uuid.uuid4().hex), timeout)
+    try:
+        if language == "rust":
+            command = capture.rust_command(root, project, driver, config, tools, env, folder, scratch, lane,
+                                           backend=entry["rust_backend"], expected_function=entry["otelc_function"])
+            shutil.copyfile(folder / (lane + "-build-identities.json"), folder / BUILD_IDENTITIES)
+            return command
+        if language == "go":
+            plain, on = capture.go_commands(root, go_build_request(project, entry, driver), config, tools, env, folder)
+            shutil.copyfile(folder / "go-build-identities.json", folder / BUILD_IDENTITIES)
+        else:
             plain, on = capture.commands(root, project, language, driver, config, tools, env, folder)
-            if language == "go":
-                shutil.copyfile(folder / "go-build-identities.json", folder / BUILD_IDENTITIES)
-        finally:
-            capture.execute = old_execute
-        command = plain if lane == "baseline" else on
-    return command
+    finally:
+        capture.execute = old_execute
+    return plain if lane == "baseline" else on
+
+
+def go_build_request(project, entry, driver):
+    """Bind a caller-selected module, target and required active package inputs."""
+    context = entry.get("go_context")
+    module = project / context["module_root"] if context else project
+    sources = [project / name for name in context["files"]] if context else [driver]
+    if driver.is_file() and driver not in sources:
+        sources.append(driver)
+    return {"workspace": module, "target": driver, "sources": sources, "project": project}
 
 
 def native_command(prefix, project, language, driver, tools, env, folder, scratch, lane):
@@ -637,13 +668,17 @@ def attempt(workspace, data, entry, case, lane, folder, decoder):
     scratch.mkdir()
     env.update({"TMPDIR": str(scratch), "HOME": str(scratch), "GOCACHE": str(workspace / "go-cache/build"), "GOMODCACHE": str(workspace / "go-cache/modules"), "GOTOOLCHAIN": "local",
                 "OTELEQ_OBSERVATION": str(folder / "observation"), "OTELC_REPORT_PATH": str(folder / "runtime.json")})
+    if "go_options" in entry:
+        env.update(go_project.environment(entry["go_options"]))
     immutable = manifest(project)
     with capture.receiver() as (endpoint, bodies, errors):
         config = folder / "policy.toml"
         config.write_text(policy(entry, endpoint))
         command = build_command(root, project, entry, driver, config, tools, env, folder, scratch, lane)
         write(folder / "command.json", [str(p) for p in command])
-        result = execute(command, project, env, folder, timeout=data["configuration"]["limits"]["case_timeout_ms"] / 1000)
+        working_directory = project / entry["go_context"]["module_root"] if "go_context" in entry else project
+        write(folder / "working-directory.json", str(working_directory))
+        result = execute(command, working_directory, env, folder, timeout=data["configuration"]["limits"]["case_timeout_ms"] / 1000)
     capture.retain_http(folder, bodies, errors)
     validate_private_sources(project, immutable, folder)
     capture.stable(root, language, tools, data["artefacts"][language], rust_backend=entry.get("rust_backend", "compiler"))
@@ -673,7 +708,7 @@ def capture_case(workspace, data, entry, case, destination, decoder, contract):
 def compare_case(workspace, data, entry, case, destination, decoder):
     write(destination / "corpus.json", case)
     roots = typed_capture.required_roots(entry)
-    contract = {"observation_schema_version": 1, "case_id": case["id"], "function_id": entry["otelc_function"],
+    contract = {"observation_schema_version": 1, "case_id": case["id"], "function_id": entry.get("otelc_runtime_function", entry["otelc_function"]),
                 "fixture_sha256": identity({"case": case, "source": entry["source_sha256"], "roots": roots}),
                 "required_roots": roots, "expected_baseline": case["expected_baseline"]}
     observed, typed_observed = capture_case(workspace, data, entry, case, destination, decoder, contract)
@@ -699,6 +734,8 @@ def compare_case(workspace, data, entry, case, destination, decoder):
     result = execute([os.environ["OTELEQ_EXECUTABLE"], "compare-observations", destination / TYPED_BUNDLE], workspace,
                      folder=destination / "comparator")
     (destination / "comparison.json").write_bytes(result.stdout)
+    if not result.stdout:
+        raise ValueError("typed comparator produced no result: " + result.stderr.decode(errors="replace")[-2000:])
     return {"case": case["id"], "function": entry["otelc_function"], "exit_code": result.returncode,
             "comparison": capture.strict_json(result.stdout), "arguments": case["arguments"]}
 

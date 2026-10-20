@@ -48,6 +48,8 @@ Acceptance includes factories/interfaces, constructor/exception identity, module
 
 ## Stage 6: Go and Rust
 
+Explicit [Go module roots](go-package-context.md) now provide active package/type discovery, private library/main callers, sibling scalar state and fixed build tags. Broader Go fixtures, fuzz bridges, cgo/workspace recipes and receiver codecs remain open.
+
 Deliver Go package/type discovery, private same-package tests and fuzz-to-typed-corpus bridges, plus Rust Cargo/type-aware discovery, external/private harnesses and proptest integration. Their ownership, panic, package/global state and build-variant contracts have independent qualifications.
 
 Acceptance includes unchanged module/manifests/locks, unexported/private access limits, explicit generic instances, panic/defer/recover or unwind/drop scenarios, supported goroutine/async fixtures and witnessed otelc overlay/compiler-wrapper execution. No unsafe fabricated fixtures or unsupported backend substitutions.

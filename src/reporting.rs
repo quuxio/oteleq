@@ -39,8 +39,55 @@ struct Callable {
     language: Language,
     path: String,
     otelc_function: String,
+    otelc_runtime_function: Option<String>,
+    go_context: Option<GoContext>,
     status: String,
     reason: String,
+}
+#[derive(Deserialize)]
+struct GoContext {
+    module_root: String,
+}
+impl Callable {
+    fn runtime_function(&self) -> Result<&str, String> {
+        let Some(runtime) = self.otelc_runtime_function.as_deref() else {
+            if self.go_context.is_some() {
+                return Err("Go module context is missing its runtime function binding".into());
+            }
+            return Ok(&self.otelc_function);
+        };
+        let context = self
+            .go_context
+            .as_ref()
+            .ok_or("runtime function requires a Go module context")?;
+        let root = &context.module_root;
+        let canonical = root == "."
+            || (!root.is_empty()
+                && root
+                    .split('/')
+                    .all(|part| !part.is_empty() && part != "." && part != ".."));
+        if self.language != Language::Go
+            || !canonical
+            || root.contains(['\\', ':'])
+            || runtime.is_empty()
+        {
+            return Err("invalid Go runtime function binding".into());
+        }
+        let expected = if root == "." {
+            Some(self.otelc_function.as_str())
+        } else if self.path.starts_with(&format!("{root}/")) {
+            self.otelc_function
+                .strip_prefix(&format!("{}.", root.replace('/', ".")))
+        } else {
+            None
+        };
+        if expected != Some(runtime) {
+            return Err(
+                "Go runtime function differs from its source-relative module binding".into(),
+            );
+        }
+        Ok(runtime)
+    }
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -154,7 +201,7 @@ impl Comparison {
         self.validate_receiver(case)?;
         match self {
             Self::Bytes(value) => validate_byte_case(&value.cases[0]),
-            Self::Typed(value) => validate_typed_case(&value.cases[0], &case.function),
+            Self::Typed(value) => validate_typed_case(&value.cases[0], entry.runtime_function()?),
         }
     }
 }
@@ -296,6 +343,7 @@ fn validate_inventory(report: &RunReport) -> Result<BTreeMap<&str, &Callable>, S
     }
     let mut inventory = BTreeMap::new();
     for entry in &report.inventory {
+        entry.runtime_function()?;
         if entry.id.len() != 20
             || !entry.id.bytes().all(|byte| byte.is_ascii_hexdigit())
             || entry.otelc_function.is_empty()

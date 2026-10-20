@@ -598,11 +598,11 @@ def go_files(root: Path, bundle: Path) -> dict:
     return metadata
 
 
-def go_inputs(recipe: dict, source: Path, original: str, root: Path) -> None:
+def go_inputs(recipe: dict, original: dict, root: Path) -> None:
     """Bind loaded source/dependency inputs while the private build source exists."""
     inputs = recipe.get("inputs")
     go_require(type(inputs) is dict and 0 < len(inputs) <= 65536, "missing source/dependency inputs")
-    required = {str(source.resolve()): original}
+    required = dict(original)
     for name in (GO_MODULE_FILENAME, "go.sum", "policy/policy.go"):
         path = root / GO_ADAPTER_DIRECTORY / name
         required[str(path.resolve())] = file_digest(path)
@@ -620,12 +620,13 @@ def go_inputs(recipe: dict, source: Path, original: str, root: Path) -> None:
                        and file_digest(path) == expected, "loaded input changed or exceeds limit: " + name)
 
 
-def go_recipe(root: Path, workspace: Path, source: Path, bundle: Path, compiler: dict, original: str) -> dict:
+def go_recipe(root: Path, request: dict, bundle: Path, compiler: dict, original: dict) -> dict:
     """Cross-check recipe identity; paths/flags in evidence never select execution."""
     recipe = build_document(bundle / RECIPE_FILENAME)
     go_require(type(recipe.get("schema_version")) is int and recipe["schema_version"] == 1, "unsupported recipe schema")
-    go_require(recipe.get("source_root") == str(workspace.resolve())
-               and recipe.get("target") == str(source.resolve())
+    source = request["target"].resolve()
+    go_require(recipe.get("source_root") == str(request["workspace"].resolve())
+               and recipe.get("target") == str(source)
                and recipe.get("sdk_root") == str((root / GO_ADAPTER_DIRECTORY).resolve()), "source/root/SDK binding differs")
     go_require(recipe.get("compiler") == compiler, "selected compiler provenance differs")
     baseline = recipe.get("baseline_argv")
@@ -634,7 +635,7 @@ def go_recipe(root: Path, workspace: Path, source: Path, bundle: Path, compiler:
     go_require(private.is_absolute(), "compiler output provenance must be absolute")
     go_require(baseline == ["build", "-mod=readonly", "-modfile=" + str(private / "baseline.mod"), "-o", str(private / "baseline"), str(source.resolve())], "baseline compiler flags differ")
     go_require(recipe.get("instrumented_argv") == ["build", "-mod=mod", "-modfile=" + str(private / GO_MODULE_FILENAME), "-overlay=" + str(private / "overlay.json"), "-o", str(private / "application"), str(source.resolve())], "instrumented compiler flags differ")
-    go_inputs(recipe, source, original, root)
+    go_inputs(recipe, original, root)
     for name in ("baseline_build_info", "instrumented_build_info"):
         info = recipe.get(name)
         go_require(type(info) is dict and info.get("GoVersion") == compiler["version"], "missing embedded compiler identity")
@@ -699,23 +700,29 @@ def go_dependency_identity(recipe: dict, compiler: dict, workspace: Path, eviden
     return fingerprint
 
 
-def go_commands(root, workspace, source, policy, tools, environment, evidence):
+def go_commands(root, request, policy, tools, environment, evidence):
     """Build and retain one matched pair; both returned launches are compiler-free."""
-    go_caches(root, workspace, environment, evidence)
+    workspace, source, project = request["workspace"], request["target"], request["project"]
+    go_require(workspace.resolve().is_relative_to(project.resolve()) and source.resolve().is_relative_to(workspace.resolve()),
+               "requested module and target must remain inside the private project")
+    go_require(bool(request["sources"]) and all(path.resolve().is_relative_to(project.resolve())
+               and path.is_file() and not path.is_symlink() for path in request["sources"]), "invalid requested source inputs")
+    go_caches(root, project, environment, evidence)
     compiler = go_compiler(workspace, tools, environment, evidence)
-    original, policy_bytes = file_digest(source), policy.read_bytes()
+    original = {str(path.resolve()): file_digest(path) for path in request["sources"]}
+    policy_bytes = policy.read_bytes()
     bundle = evidence / "go-bundle"
     prefix = [root / OTELC_CLI_PATH, "--config", policy, "--language", "go"]
     build(prefix + ["go", "--build", source.resolve(), "--output-dir", bundle], workspace, environment, evidence / "go-build.log")
     metadata = go_files(root, bundle)
-    recipe = go_recipe(root, workspace, source, bundle, compiler, original)
+    recipe = go_recipe(root, request, bundle, compiler, original)
     go_require(policy.read_bytes() == policy_bytes, "requested policy changed during compilation")
     go_plan(bundle, tomllib.loads(policy_bytes.decode()))
     go_graphs(root, bundle)
-    dependencies = go_dependency_identity(recipe, compiler, workspace, evidence)
+    dependencies = go_dependency_identity(recipe, compiler, project, evidence)
     identities = {"baseline": metadata["files"]["baseline"], "application": metadata["files"]["application"],
                   "manifest_sha256": file_digest(bundle / BUILD_FILENAME), "recipe_sha256": file_digest(bundle / RECIPE_FILENAME),
-                  "plan_sha256": metadata["files"][PLAN_FILENAME], "compiler": compiler, "source_sha256": original,
+                  "plan_sha256": metadata["files"][PLAN_FILENAME], "compiler": compiler, "source_inputs": original,
                   "policy_sha256": digest(policy_bytes), "loaded_input_count": len(recipe["inputs"]),
                   "dependency_sha256": dependencies}
     (evidence / "go-build-identities.json").write_text(json.dumps(identities, indent=2) + "\n")
@@ -735,7 +742,8 @@ def commands(root, workspace, language, source, policy, tools, environment, evid
         return tuple(rust_command(root, workspace, source, policy, tools, environment, evidence, workspace, lane)
                      for lane in ("baseline", "instrumented_on"))
     if language == "go":
-        return go_commands(root, workspace, source, policy, tools, environment, evidence)
+        request = {"workspace": workspace, "target": source, "sources": [source], "project": workspace}
+        return go_commands(root, request, policy, tools, environment, evidence)
     interpreter = tools[language]
     plain = [interpreter, source]
     if language == "java":

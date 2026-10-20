@@ -512,6 +512,9 @@ class WorkflowTests(unittest.TestCase):
         with patch.object(gen,"attempt",side_effect=captured),patch.object(gen,"execute",return_value=subprocess.CompletedProcess([],1,b'{"verdict":"different_observed"}',b"")):
             gen.compare_case(self.workspace,data,entry,case,destination,None)
         self.assertNotEqual(bundle["scope"]["baseline_artefact_sha256"],gen.read(destination/"bundle.json")["scope"]["baseline_artefact_sha256"])
+        with patch.object(gen,"attempt",side_effect=captured),patch.object(gen,"execute",return_value=subprocess.CompletedProcess([],2,b'',b'invalid typed bundle: wrong identity')):
+            with self.assertRaisesRegex(ValueError,"typed comparator produced no result: invalid typed bundle: wrong identity"):
+                gen.compare_case(self.workspace,data,entry,case,destination,None)
         data["configuration"]["limits"]["max_capture_bytes"] = 1
         with patch.object(gen.capture,"stable"),patch.object(gen.capture,"commands",side_effect=lambda root,project,lang,driver,*rest:([sys.executable,driver],[sys.executable,driver])):
             with self.assertRaisesRegex(ValueError,"channel budget"):

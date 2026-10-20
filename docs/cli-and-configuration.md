@@ -35,7 +35,7 @@ The implemented generation policy accepts `[adapters.rust] backend = "compiler"`
 
 `[[fixtures]] receiver = { factory = "Counter", arguments = [10] }` declares an existing Python, JavaScript or TypeScript source constructor or ordinary same-module factory for a selected instance method. Method `cases` exclude the implicit receiver. [Receiver fixtures](receiver-fixtures.md) retain construction inputs and source bindings, require typed receiver/class-data roots and reconstruct independently during generated tests, replay/export and scalar method-argument shrinking. Unsupported languages or callable/storage forms fail visibly.
 
-Go execution requires the [retained build/run provider API](go-build-bundles.md), with strict schema-1 bundle, selected compiler/source/SDK bindings, separate compiler bytes and fixed build-time trace selection. Both replay lanes use the same validated pair. Private compiler/module caches remain external to the target repository. This does not enable the proposed arbitrary Go package/build recipes.
+Go execution requires the [retained build/run provider API](go-build-bundles.md), with strict schema-1 bundle, selected compiler/source/SDK bindings, separate compiler bytes and fixed build-time trace selection. Both replay lanes use the same validated pair. `[adapters.go] module_roots = ["."]` opts into [ordinary module/package context](go-package-context.md); optional `build_tags = ["integration"]` is frozen for discovery and compilation. Empty roots retain standalone mode. Private compiler/module caches remain external to the target repository. Cgo/workspaces and general build recipes remain unsupported.
 
 ## Proposed extensions
 

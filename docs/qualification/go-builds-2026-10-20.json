@@ -29,7 +29,12 @@
         "sha256": "0de8d842f148c4d55b150f32e7d5416da9193a13fc4d99aa9efc113bb66e172d"
       }
     },
-    "source_files_verified": 373
+    "source_files_verified": 373,
+    "subsequent_canonical_merge": {
+      "commit": "0624ffdb2a02c80b0a7952f9dcd80f4b3fdd3c82",
+      "source_tree_matches_qualified_provider": true,
+      "note": "The original qualification remains tied to the frozen products above."
+    }
   },
   "results": {
     "claim": "equivalence over these tests and observations",
