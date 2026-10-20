@@ -114,8 +114,7 @@ class Inventory:
         """Resolve out-of-line method owners through compiler declaration contexts."""
         kind, name = node.get("kind"), node.get("name", "")
         original = physical(node.get("loc", {}), self.path)
-        if node.get("parentDeclContextId") in self.contexts:
-            scope = self.contexts[node["parentDeclContextId"]]
+        scope = self.contexts.get(node.get("parentDeclContextId"), scope)
         if kind in ("NamespaceDecl", "CXXRecordDecl") and name and not node.get("isImplicit"):
             scope = (*scope, name)
             self.contexts[node["id"]] = scope

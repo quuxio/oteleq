@@ -14,6 +14,7 @@ LANGUAGES = {".c": "c", ".h": "c", ".cc": "cpp", ".cpp": "cpp", ".cxx": "cpp", "
              ".cjs": "javascript", ".jsx": "javascript", ".ts": "typescript", ".mts": "typescript", ".cts": "typescript", ".tsx": "typescript", ".go": "go"}
 IGNORED = {".git", "target", "node_modules", ".venv", "__pycache__", "build", "dist"}
 ANONYMOUS = "<anonymous>"
+NATIVE_CALLABLE_KINDS = {"FunctionDecl", "CXXMethodDecl", "CXXConstructorDecl", "CXXDestructorDecl", "LambdaExpr"}
 
 
 def contains_yield(node):
@@ -153,28 +154,30 @@ def native_positions(functions: list[dict], path: Path) -> None:
         function["column"] = offset - source.rfind(b"\n", 0, offset)
 
 
+def native_visit(node: dict, path: Path, functions: list[dict], globals_: list[dict],
+                 scope: tuple[str, ...] = (), inside: bool = False) -> None:
+    """Account for native callables and storage under their declaration scopes."""
+    kind, name = node.get("kind"), node.get("name", ANONYMOUS)
+    original = native_origin(node.get("loc", {}), path)
+    if kind in ("NamespaceDecl", "CXXRecordDecl") and name != ANONYMOUS:
+        scope = (*scope, name)
+    if kind == "FunctionTemplateDecl":
+        inside = True
+    if kind in NATIVE_CALLABLE_KINDS:
+        if original:
+            functions.append(native_function(node, scope, inside))
+        inside = True
+    if kind == "VarDecl" and original:
+        storage = native_storage(node, scope, inside)
+        if storage:
+            globals_.append(storage)
+    for child in node.get("inner", []):
+        native_visit(child, path, functions, globals_, scope, inside)
+
+
 def native_inventory(document, path, *, cpp=False):
     functions, globals_ = [], []
-    callable_kinds = {"FunctionDecl", "CXXMethodDecl", "CXXConstructorDecl", "CXXDestructorDecl", "LambdaExpr"}
-
-    def visit(node, scope=(), inside=False):
-        kind, name = node.get("kind"), node.get("name", ANONYMOUS)
-        original = native_origin(node.get("loc", {}), path)
-        if kind in ("NamespaceDecl", "CXXRecordDecl") and name != ANONYMOUS:
-            scope = (*scope, name)
-        if kind == "FunctionTemplateDecl":
-            inside = True
-        if kind in callable_kinds:
-            if original:
-                functions.append(native_function(node, scope, inside))
-            inside = True
-        if kind == "VarDecl" and original:
-            storage = native_storage(node, scope, inside)
-            if storage:
-                globals_.append(storage)
-        for child in node.get("inner", []):
-            visit(child, scope, inside)
-    visit(document)
+    native_visit(document, path, functions, globals_)
     native_positions(functions, path)
     result = {"functions": functions, "globals": globals_, "parser": "Clang AST JSON"}
     if cpp:
