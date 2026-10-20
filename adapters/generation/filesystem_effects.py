@@ -239,6 +239,7 @@ def seed(folder: Path, item: dict) -> Path:
                 os.fchmod(root, 0o700)
                 for name in item["directories"]:
                     with subdirectories(root, name.split("/")):
+                        # Entering the context creates and verifies the declared directory.
                         pass
                 seed_files(root, item["files"])
     return folder / "filesystem-fixtures" / item["name"]

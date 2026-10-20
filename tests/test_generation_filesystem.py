@@ -141,8 +141,9 @@ class FilesystemEffectTests(unittest.TestCase):
             base = Path(temporary); outside = base / "outside"; outside.mkdir()
             folder = base / "attempt"; folder.mkdir()
             (folder / "filesystem-fixtures").symlink_to(outside, target_is_directory=True)
+            configured = configuration(files=[{"path": "seed", "hex": "ff"}])
             with self.assertRaises(OSError):
-                effects.prepare(folder, configuration(files=[{"path": "seed", "hex": "ff"}]))
+                effects.prepare(folder, configured)
             self.assertEqual(list(outside.iterdir()), [])
 
     def test_permission_only_change_and_multiple_environment_roots_remain_observed(self):

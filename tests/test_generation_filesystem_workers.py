@@ -133,8 +133,9 @@ class FilesystemExecutionTests(unittest.TestCase):
                 budget = copy.deepcopy(data)
                 observed_folder = base / "attempt-False"
                 budget["configuration"]["limits"]["max_capture_bytes"] = (observed_folder / "observation").stat().st_size + 1
+                completed = subprocess.CompletedProcess([], 0, b"", b"")
                 with self.assertRaisesRegex(ValueError, "channel budget"):
-                    generation.qualify_attempt(budget, entry, "baseline", observed_folder, subprocess.CompletedProcess([], 0, b"", b""), [], [], "service", None, extra_channels={"filesystem:data": frame["channels"]["filesystem:data"]})
+                    generation.qualify_attempt(budget, entry, "baseline", observed_folder, completed, [], [], "service", None, extra_channels={"filesystem:data": frame["channels"]["filesystem:data"]})
                 self.assertEqual((source / "source.py").read_text(), text)
                 _, verified = generation.load_workspace(workspace, generated=True)
                 self.assertEqual(data["source_manifest"], verified["source_manifest"])
