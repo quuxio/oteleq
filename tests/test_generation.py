@@ -410,8 +410,26 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(gen.entry_identity({"language":"java","name":"X.f","parameters":["String"],"package":"p","path":"X.java"}),"p.X.f(java.lang.String)")
 
     def test_process_timeout_and_output_limit_retains_bytes_and_kills_group(self):
-        with self.assertRaisesRegex(ValueError,"timeout"):
-            gen.execute([sys.executable,"-c","import time;print('started',flush=True);time.sleep(10)"],self.base,folder=self.base/"timeout",timeout=0.05)
+        original_popen = subprocess.Popen
+        def started_process(*arguments, **keywords):
+            process = original_popen(*arguments, **keywords)
+            if not keywords.get("start_new_session"):
+                return process
+            # Prove partial-byte retention after startup, independently of a cold
+            # interpreter's startup time. The actual execution deadline stays 50 ms.
+            deadline = gen.time.monotonic() + 5
+            try:
+                output = self.base/"timeout/stdout"
+                while b"started" not in output.read_bytes() and process.poll() is None and gen.time.monotonic() < deadline:
+                    gen.time.sleep(0.01)
+                self.assertIn(b"started", output.read_bytes())
+            except BaseException:
+                gen.finish_process(process)
+                raise
+            return process
+        with patch.object(gen.subprocess, "Popen", side_effect=started_process):
+            with self.assertRaisesRegex(ValueError,"timeout"):
+                gen.execute([sys.executable,"-c","import time;print('started',flush=True);time.sleep(10)"],self.base,folder=self.base/"timeout",timeout=0.05)
         self.assertIn(b"started",(self.base/"timeout/stdout").read_bytes())
         with patch.object(gen,"MAX_OUTPUT",32):
             with self.assertRaisesRegex(ValueError,"output limit"):
