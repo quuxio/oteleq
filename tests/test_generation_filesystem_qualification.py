@@ -4,6 +4,7 @@ from pathlib import Path
 import shutil
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import qualify_filesystem as qualifier
 
@@ -17,6 +18,20 @@ class FilesystemQualificationTests(unittest.TestCase):
             (folder / name).write_text("{}")
         (folder / "working-directory.json").write_text(json.dumps(str(project)))
         return folder
+
+    def test_resume_refuses_missing_initial_routes_before_any_commands(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            workspace = base / "cases/retained"
+            workspace.mkdir(parents=True)
+            provider = base / "provider"
+            (workspace / "plan.json").write_text(json.dumps({"otelc_root": str(provider)}))
+            cli = base / "cli"
+            with patch.object(qualifier, "command") as command, patch.object(qualifier, "framework") as framework:
+                with self.assertRaisesRegex(ValueError, "all four completed"):
+                    qualifier.retained_workflows(cli, provider, base, True)
+                command.assert_not_called()
+                framework.assert_not_called()
 
     def test_direct_and_copied_original_records_resolve_the_actual_worker(self):
         with tempfile.TemporaryDirectory() as temporary:

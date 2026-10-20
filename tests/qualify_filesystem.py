@@ -192,6 +192,9 @@ def evidence_controls(cli: Path, folder: Path) -> int:
 def retained_workflows(cli: Path, provider: Path, folder: Path, resume: bool) -> tuple[Path, Path, int, int]:
     """Revalidate completed routes on resume without repeating application launches."""
     if resume:
+        required = ("comparison/report.json", "framework.stdout", "exported/plan.json", "export-comparison/report.json", "export-framework.stdout")
+        if not all((folder / name).is_file() for name in required):
+            raise ValueError("resume requires all four completed initial execution routes")
         plans = list((folder / "cases").glob("*/plan.json"))
         assert len(plans) == 1
         assert Path(json.loads(plans[0].read_text())["otelc_root"]).resolve() == provider

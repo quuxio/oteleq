@@ -6,6 +6,8 @@ All eight current otelc targets are required and have implemented scalar adapter
 
 The [implemented scalar generator](automatic-generation.md) supports bounded syntax inventory, private harnesses and actual paired otelc execution for all eight IDs. Python additionally supports explicit [regular source-package import roots](python-package-context.md), including `src` layouts, with actual module/source binding. Declared [plain Python/JavaScript/TypeScript receiver fixtures](receiver-fixtures.md) also add independent construction and typed instance/own-static roots, with awaited Node method completion. The rows below describe the broader proposed adapters, frameworks and build-aware capabilities beyond that slice. Toolchain/runtime versions and executable capabilities are pinned when each adapter is qualified against otelc. Objective-C, Swift, Fortran, Zig and .NET appear as later or exploratory otelc routes; they are outside its current eight-language set and are not silently advertised as supported here.
 
+[Declared filesystem fixtures](filesystem-effects.md) use the same independent seeding and bounded worker-boundary observation contract for all eight generated runners. They compare file bytes, kinds and permissions. Transient events, network fixtures and general resource effects remain separate work.
+
 ## Proposed framework and integration choices
 
 The implemented suite uses Python's standard `unittest` for every language. The language-native runners and property frameworks below are proposed extensions; no current command installs or selects them.
