@@ -10,6 +10,7 @@ from typing import Any
 
 import domains
 import filesystem_effects
+import http_effects
 import go_project
 import python_project
 import sequences
@@ -182,7 +183,19 @@ def validate(document: Mapping[str, Any]) -> dict[str, Any]:
         raise ValueError("fixtures must be an array of tables")
     result["fixtures"] = [fixture(value, index) for index, value in enumerate(fixtures)]
     result["adapters"] = adapters(document.get("adapters", {}))
-    result["effects"] = filesystem_effects.settings(document.get("effects", {}), keys, integer)
+    result["effects"] = effects(document.get("effects", {}))
+    return result
+
+
+def effects(value: Any) -> dict:
+    """Freeze supported effect protocols without overlapping process bindings."""
+    keys(value, {"filesystem", "http"}, "effects")
+    result = filesystem_effects.settings({"filesystem": value.get("filesystem", [])}, keys, integer)
+    if "http" in value:
+        result["http"] = http_effects.settings(value["http"], keys, integer)
+    environments = [item["environment"] for entries in result.values() for item in entries]
+    if len(environments) != len(set(environments)):
+        raise ValueError("effect fixture environments must be distinct across protocols")
     return result
 
 

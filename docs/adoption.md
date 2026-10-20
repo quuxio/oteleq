@@ -21,7 +21,7 @@ First make existing representative workloads easy to compare against the actual 
 
 Extend the existing typed before/after state observers to receiver factories, richer native/Java/Go/Rust objects and additional argument types, retaining alias/cycle and unsupported-root handling. The qualification already detects a changed Python global object while preserving the return value; add equivalent defect controls for each new observation capability. Extend syntax inventory and scalar generation with reviewed factories, preconditions and build-aware discovery; keep the existing inventory gaps visible.
 
-[Declared filesystem fixtures](filesystem-effects.md) extend same-return mutation controls to file bytes, kinds and permissions across all eight runners. Review the declared roots and limits; snapshots do not observe transient writes, undeclared paths or network traffic.
+[Declared filesystem fixtures](filesystem-effects.md) extend same-return mutation controls to file bytes, kinds and permissions across all eight runners. Review the declared roots and limits; snapshots do not observe transient writes, undeclared paths or network traffic. Separate [scripted HTTP fixtures](http-fixtures.md) observe bounded requests and offered responses for declared local services; they do not cover general network effects.
 
 Off/fault lanes and performance budgets strengthen the process when their actual adapter capabilities are qualified. Two repeats screen for obvious instability; they do not establish stability across every schedule or input. Increase repetitions for suitable workloads and retain every attempt. Avoid treating generated test counts or matching business bugs in both variants as evidence of general application correctness.
 

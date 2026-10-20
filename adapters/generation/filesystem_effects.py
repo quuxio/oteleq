@@ -38,15 +38,20 @@ def initial_files(value: Any, keys: Callable, integer: Callable) -> list[dict]:
     return result
 
 
+def binding(name: Any, environment: Any) -> tuple[str, str]:
+    """Keep fixture bindings separate from process and instrumentation controls."""
+    if type(name) is not str or not re.fullmatch(r"[a-z][a-z0-9_-]{0,63}", name):
+        raise ValueError("effect fixture name requires a short lowercase identifier")
+    if (type(environment) is not str or not re.fullmatch(r"[A-Z][A-Z0-9_]{0,127}", environment)
+            or environment in RESERVED or environment.startswith(RESERVED_PREFIXES)):
+        raise ValueError("effect fixture environment requires a distinct application variable, outside runtime/tool controls")
+    return name, environment
+
+
 def declaration(value: Any, keys: Callable, integer: Callable) -> dict:
     """Validate one named independently reconstructed application fixture."""
     keys(value, {"name", "environment", "path_mode", "files", "directories", *DEFAULT_LIMITS}, "effects.filesystem")
-    name, environment = value.get("name"), value.get("environment")
-    if type(name) is not str or not re.fullmatch(r"[a-z][a-z0-9_-]{0,63}", name):
-        raise ValueError("filesystem fixture name requires a short lowercase identifier")
-    if (type(environment) is not str or not re.fullmatch(r"[A-Z][A-Z0-9_]{0,127}", environment)
-            or environment in RESERVED or environment.startswith(RESERVED_PREFIXES)):
-        raise ValueError("filesystem environment requires a distinct application variable, outside runtime/tool controls")
+    name, environment = binding(value.get("name"), value.get("environment"))
     path_mode = value.get("path_mode", "absolute")
     if type(path_mode) is not str or path_mode not in ("absolute", "relative"):
         raise ValueError("filesystem.path_mode must be absolute or relative")

@@ -30,7 +30,7 @@ fn evaluate(value: Value) -> typed::Report {
     typed::compare(serde_json::from_value(value).unwrap()).unwrap()
 }
 #[test]
-fn required_filesystem_effect_bytes_apply_to_all_eight_languages_and_cannot_disappear() {
+fn required_effect_bytes_apply_to_all_eight_languages_and_cannot_disappear() {
     for language in [
         "c",
         "cpp",
@@ -41,47 +41,50 @@ fn required_filesystem_effect_bytes_apply_to_all_eight_languages_and_cannot_disa
         "typescript",
         "go",
     ] {
-        let mut data = fixture();
-        data["scope"]["language"] = json!(language);
-        data["scope"]["channels"]
-            .as_array_mut()
-            .unwrap()
-            .push(json!("filesystem:data"));
-        for lane in ["baseline", "instrumented_on"] {
-            for attempt in data["cases"][0][lane].as_array_mut().unwrap() {
-                attempt["execution"]["channels"]["filesystem:data"] = json!([0, 255, 10]);
+        for channel in ["filesystem:data", "http:service"] {
+            let mut data = fixture();
+            data["scope"]["language"] = json!(language);
+            data["scope"]["channels"]
+                .as_array_mut()
+                .unwrap()
+                .push(json!(channel));
+            for lane in ["baseline", "instrumented_on"] {
+                for attempt in data["cases"][0][lane].as_array_mut().unwrap() {
+                    attempt["execution"]["channels"][channel] = json!([0, 255, 10]);
+                }
             }
-        }
-        assert_eq!(evaluate(data.clone()).verdict, Verdict::EquivalentObserved);
-        let mut changed = data.clone();
-        for attempt in changed["cases"][0]["instrumented_on"]
-            .as_array_mut()
-            .unwrap()
-        {
-            attempt["execution"]["channels"]["filesystem:data"] = json!([0, 255, 11]);
-        }
-        let report = evaluate(changed);
-        assert_eq!(report.verdict, Verdict::DifferentObserved);
-        assert!(report.cases[0]
-            .execution
-            .differences
-            .iter()
-            .any(|item| item.path.contains("filesystem:data")));
-        for missing in [false, true] {
-            let mut invalid = data.clone();
-            let execution = &mut invalid["cases"][0]["instrumented_on"][0]["execution"];
-            if missing {
-                execution["channels"]
-                    .as_object_mut()
-                    .unwrap()
-                    .remove("filesystem:data");
-            } else {
-                execution["capture_complete"] = json!(false);
+            assert_eq!(evaluate(data.clone()).verdict, Verdict::EquivalentObserved);
+            let mut changed = data.clone();
+            for attempt in changed["cases"][0]["instrumented_on"]
+                .as_array_mut()
+                .unwrap()
+            {
+                attempt["execution"]["channels"][channel] = json!([0, 255, 11]);
             }
-            assert_eq!(evaluate(invalid).verdict, Verdict::Inconclusive);
+            let report = evaluate(changed);
+            assert_eq!(report.verdict, Verdict::DifferentObserved);
+            assert!(report.cases[0]
+                .execution
+                .differences
+                .iter()
+                .any(|item| item.path.contains(channel)));
+            for missing in [false, true] {
+                let mut invalid = data.clone();
+                let execution = &mut invalid["cases"][0]["instrumented_on"][0]["execution"];
+                if missing {
+                    execution["channels"]
+                        .as_object_mut()
+                        .unwrap()
+                        .remove(channel);
+                } else {
+                    execution["capture_complete"] = json!(false);
+                }
+                assert_eq!(evaluate(invalid).verdict, Verdict::Inconclusive);
+            }
         }
     }
 }
+
 fn sequence_fixture() -> Value {
     let mut data = fixture();
     let steps = json!([

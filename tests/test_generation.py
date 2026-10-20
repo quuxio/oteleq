@@ -83,7 +83,11 @@ def kwonly(*, x:int):pass
             source.write_text("def sample():return 1")
             base = {"functions": [], "globals": []}
             calls = []
-            def execute(command, cwd, input_data=None):
+            def execute(command, cwd, input_data=None, **options):
+                if "-ast-dump=json" in command:
+                    self.assertEqual(options, {"max_output_bytes": discovery.NATIVE_METADATA_BYTES})
+                else:
+                    self.assertEqual(options, {})
                 calls.append(command)
                 return subprocess.CompletedProcess(command, 0, json.dumps(base).encode(), b"")
             with patch.dict(os.environ, {"OTELEQ_EXECUTABLE": "/chosen/cli"}):
@@ -219,6 +223,46 @@ class WorkflowTests(unittest.TestCase):
 
     def generate(self):
         with redirect_stdout(io.StringIO()):gen.generate(args("generate",workspace=self.workspace))
+
+    def test_parse_gap_cannot_be_excluded_by_a_function_filter(self):
+        (self.source / "source.py").write_text("def sample(\n")
+        config = self.base / "selection.toml"
+        config.write_text('schema_version=1\n[functions]\ninclude=["*sample*"]\n')
+        output = io.StringIO()
+        with redirect_stdout(output):
+            gen.plan(args("plan", source=self.source, otelc_root=self.root,
+                          workspace_parent=self.base, language=None, exclude=[], cases=1, config=config))
+        workspace = Path(output.getvalue().strip())
+        inventory = gen.read(workspace / "plan.json")["inventory"]
+        self.assertEqual(len(inventory), 1)
+        self.assertTrue(inventory[0]["inventory_gap"])
+        self.assertEqual(inventory[0]["status"], "blocked")
+        with redirect_stdout(io.StringIO()):
+            gen.generate(args("generate", workspace=workspace))
+        self.assertEqual(gen.read(workspace / "tests/corpus.json"), [])
+        result = subprocess.run([sys.executable, workspace / "tests/test_equivalence.py"],
+                                capture_output=True, check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(b"parse-or-tool-gap", result.stderr)
+
+    def test_unmatched_fixture_retains_failed_discovery_without_sealing_a_plan(self):
+        (self.source / "source.py").write_text("def sample(\n")
+        config = self.base / "selection.toml"
+        config.write_text('schema_version=1\n[functions]\ninclude=["*sample*"]\n'
+                          '[[fixtures]]\nfunction="*sample*"\ncases=[[]]\n')
+        before = set(self.base.glob("oteleq-run-*"))
+        with self.assertRaisesRegex(ValueError, "matches no selected callable"):
+            gen.plan(args("plan", source=self.source, otelc_root=self.root,
+                          workspace_parent=self.base, language=None, exclude=[], cases=1, config=config))
+        created = set(self.base.glob("oteleq-run-*")) - before
+        self.assertEqual(len(created), 1)
+        workspace = created.pop()
+        retained = gen.read(workspace / "discovery-failure.json")
+        self.assertEqual(retained["inventory"][0]["status"], "blocked")
+        self.assertIn("never closed", retained["inventory"][0]["reason"])
+        self.assertEqual(retained["unmatched_fixture"]["function"], "*sample*")
+        self.assertFalse((workspace / "plan.json").exists())
+        self.assertNotIn("plan_sha256", gen.read(workspace / gen.OWNED_MARKER))
 
     def test_nested_and_instance_main_remain_blockers_and_entrypoint_metadata_is_small(self):
         for language in ("rust", "go", "javascript", "python"):
@@ -434,6 +478,10 @@ class WorkflowTests(unittest.TestCase):
         with patch.object(gen,"MAX_OUTPUT",32):
             with self.assertRaisesRegex(ValueError,"output limit"):
                 gen.execute([sys.executable,"-c","print('x'*1000)"],self.base,folder=self.base/"output")
+            self.assertEqual(len(gen.execute([sys.executable,"-c","print('x'*1000)"],
+                             self.base,max_output_bytes=1001).stdout),1001)
+            with self.assertRaisesRegex(ValueError,"output limit"):
+                gen.execute([sys.executable,"-c","print('x'*1000)"],self.base,max_output_bytes=1000)
         self.assertEqual(gen.execute([sys.executable,"-c","print('ok')"],self.base).stdout,b"ok\n")
         with patch.object(gen,"MAX_TREE",1):
             with self.assertRaisesRegex(ValueError,"document"):gen.read(self.workspace/"plan.json")

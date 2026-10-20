@@ -27,7 +27,7 @@
 
 ---
 
-oteleq generates diagnostic tests that compare application behaviour with and without [otelc](https://github.com/quuxio/otelc) instrumentation across C, C++, Rust, Python, Java, JavaScript, TypeScript and Go. It compares results, errors, stdout/stderr, supported global/object state and [declared filesystem boundaries](docs/filesystem-effects.md), while accounting for emitted OpenTelemetry telemetry separately.
+oteleq generates diagnostic tests that compare application behaviour with and without [otelc](https://github.com/quuxio/otelc) instrumentation across C, C++, Rust, Python, Java, JavaScript, TypeScript and Go. It compares results, errors, stdout/stderr, supported global/object state and declared [filesystem boundaries](docs/filesystem-effects.md) and [HTTP fixtures](docs/http-fixtures.md), while accounting for emitted OpenTelemetry telemetry separately.
 
 Fixed diagnostic corpora also qualify [Python and Java executor context](docs/eight-language-capture.md), [Python collection lifetimes](docs/eight-language-capture.md#python-collection-lifetime-workload), [fixed Python resource closes](docs/eight-language-capture.md#python-resource-close-workload) and the [optional native TypeScript emitter](docs/eight-language-capture.md#optional-native-typescript-workload) against the actual otelc adapters.
 

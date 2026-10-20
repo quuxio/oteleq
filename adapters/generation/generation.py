@@ -16,6 +16,7 @@ import uuid
 import discovery
 import go_project
 import filesystem_effects
+import http_effects
 import harness
 import node_receivers
 import otelc_capture as capture
@@ -128,11 +129,13 @@ def finish_process(process: subprocess.Popen) -> None:
         process.wait()
 
 
-def execute(command, cwd, env=None, folder=None, timeout=60, input_data=None):
+def execute(command, cwd, env=None, folder=None, timeout=60, input_data=None, *, max_output_bytes=None):
     """Trusted local execution with wall time/output limits and process-group cleanup."""
     if folder is None:
         with tempfile.TemporaryDirectory(prefix="oteleq-discover-") as directory:
-            return execute(command, cwd, env, Path(directory), timeout, input_data)
+            return execute(command, cwd, env, Path(directory), timeout, input_data,
+                           max_output_bytes=max_output_bytes)
+    maximum = MAX_OUTPUT if max_output_bytes is None else max_output_bytes
     folder.mkdir(parents=True, exist_ok=True)
     out, err = folder / "stdout", folder / "stderr"
     input_path = worker_input(folder, input_data)
@@ -145,7 +148,7 @@ def execute(command, cwd, env=None, folder=None, timeout=60, input_data=None):
             while process.poll() is None:
                 if time.monotonic() > deadline:
                     failure = "process timeout"
-                if out.stat().st_size + err.stat().st_size > MAX_OUTPUT:
+                if out.stat().st_size + err.stat().st_size > maximum:
                     failure = "process output limit exceeded"
                 if failure:
                     break
@@ -153,7 +156,7 @@ def execute(command, cwd, env=None, folder=None, timeout=60, input_data=None):
         finally:
             # Descendants cannot keep running after the leader exits or interrupts the host.
             finish_process(process)
-    if failure or out.stat().st_size + err.stat().st_size > MAX_OUTPUT:
+    if failure or out.stat().st_size + err.stat().st_size > maximum:
         raise ValueError(failure or "process output limit exceeded")
     return subprocess.CompletedProcess(command, process.returncode, out.read_bytes(), err.read_bytes())
 
@@ -202,19 +205,21 @@ def discover_file(name, language, root, snapshot, workspace, tools, artefacts, a
                 selected["javac"] = capture.tool_path(str(selected["java"].parent / "javac"))
             qualified = capture.artefacts(root, language, selected, rust_backend=rust_backend)
             tools[language], artefacts[language] = selected, qualified
-        def discover_execute(command, cwd, input_data=None):
+        def discover_execute(command, cwd, input_data=None, *, max_output_bytes=None):
             environment = capture.environment(snapshot, tools[language], "oteleq-discovery", root)
             environment.update({"GOCACHE": str(workspace / "go-cache/build"), "GOMODCACHE": str(workspace / "go-cache/modules"), "GOTOOLCHAIN": "local",
                                 "OTELEQ_EXECUTABLE": os.environ["OTELEQ_EXECUTABLE"]})
             if language == "go" and adapters.get("go", {}).get("module_roots"):
                 environment.update(go_project.environment(adapters["go"]))
-            return execute(command, cwd, environment, input_data=input_data)
+            return execute(command, cwd, environment, input_data=input_data,
+                           max_output_bytes=max_output_bytes)
         if language == "go" and adapters.get("go", {}).get("module_roots"):
             return go_project.discover(snapshot / name, snapshot, adapters["go"], tools[language]["go"],
                                        discover_execute, adapter_state.setdefault("go_cache", {}))
         return discovery.discover(snapshot / name, language, root, tools[language], discover_execute)
     except (ValueError, OSError, KeyError, SyntaxError, RecursionError) as error:
-        return {"functions": [{"name": "<parse-or-tool-gap>", "line": 1, "parameters": [], "output": "unknown", "reason": str(error)}], "globals": []}
+        return {"functions": [{"name": "<parse-or-tool-gap>", "line": 1, "parameters": [],
+                               "output": "unknown", "reason": str(error), "inventory_gap": True}], "globals": []}
 
 
 def qualify_entry(entry, snapshot, count):
@@ -306,6 +311,9 @@ def inventory_entry(function, discovered, name, language, source_hash, snapshot,
     entry["otelc_function"] = entry_identity(entry)
     excluded = is_entrypoint(function, language) or bool(function.get("declaration_only"))
     excluded |= not project_policy.selected(entry["otelc_function"], args.configuration["functions"])
+    if function.get("inventory_gap"):
+        # An unknown callable set cannot prove that the function filter excludes it.
+        excluded = False
     entry["generation_seed"] = args.configuration["generation"]["seed"]
     if language == "typescript":
         entry["typescript_backend"] = args.configuration["adapters"]["typescript"]["backend"]
@@ -401,6 +409,8 @@ def plan(args):
         if fixture["language"] is not None and fixture["language"] not in args.language:
             continue
         if not any(project_policy.fixture_matches(entry, fixture) for entry in inventory):
+            write(workspace / "discovery-failure.json", {"schema_version": VERSION,
+                  "inventory": inventory, "unmatched_fixture": fixture})
             raise ValueError(f"configured fixture matches no selected callable: {fixture['function']}; partial workspace: {workspace}")
     if manifest(source, excluded=discovery.IGNORED) != contents or manifest(snapshot) != contents:
         raise ValueError("source changed during discovery")
@@ -445,7 +455,7 @@ def decoder_files():
 
 def generator_identity():
     here = Path(__file__).parent
-    names = ("generation.py", "policy.py", "filesystem_effects.py", "domains.py", "shrinking.py", "sequences.py", "typescript_provider.py", "python_project.py", "go_project.py", "node_receivers.py", "discovery.py", "harness.py", "observe.py", "node_observe.mjs", "node_sequence.mjs", "typed_capture.py", "discover.mjs", "discover.go", "Discover.java")
+    names = ("generation.py", "policy.py", "filesystem_effects.py", "http_effects.py", "domains.py", "shrinking.py", "sequences.py", "typescript_provider.py", "python_project.py", "go_project.py", "node_receivers.py", "discovery.py", "harness.py", "observe.py", "node_observe.mjs", "node_sequence.mjs", "typed_capture.py", "discover.mjs", "discover.go", "Discover.java")
     files = {name: capture.file_digest(here / name) for name in names}
     files["host-python"] = capture.file_digest(Path(sys.executable))
     files["host-version"] = sys.version
@@ -702,7 +712,10 @@ def qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, 
 
 
 
-def attempt(workspace, data, entry, case, lane, folder, decoder):
+def attempt(workspace, data, entry, case, lane, folder, decoder, *, http_fixtures=None):
+    http_fixtures = http_fixtures or []
+    if [item.settings for item in http_fixtures] != http_effects.selected(data["configuration"]):
+        raise ValueError("HTTP effects require the frozen case fixture context before application execution")
     root, language = Path(data["otelc_root"]), entry["language"]
     tools = {k: Path(v) for k, v in data["tools"][language].items()}
     capture.stable(root, language, tools, data["artefacts"][language], rust_backend=entry.get("rust_backend", "compiler"))
@@ -738,15 +751,23 @@ def attempt(workspace, data, entry, case, lane, folder, decoder):
         env.update(effect_environment)
         if effects:
             write(folder / "filesystem-controls.json", {"declarations": filesystem_effects.selected(data["configuration"]), "environment": effect_environment})
-        result = execute(command, working_directory, env, folder, timeout=data["configuration"]["limits"]["case_timeout_ms"] / 1000)
+        if http_fixtures:
+            bindings = http_effects.bindings(http_fixtures)
+            env.update(bindings)
+            write(folder / "http-controls.json", {"declarations": http_effects.selected(data["configuration"]), "environment": bindings})
+        with http_effects.observe(http_fixtures, folder, data["configuration"]["limits"]["max_capture_bytes"]) as requests:
+            result = execute(command, working_directory, env, folder, timeout=data["configuration"]["limits"]["case_timeout_ms"] / 1000)
     capture.retain_http(folder, bodies, errors)
     effect_channels, complete = filesystem_effects.finish(effects, folder)
+    request_channels, request_complete = http_effects.finish(requests)
+    effect_channels.update(request_channels)
+    complete &= request_complete
     validate_private_sources(project, immutable, folder)
     capture.stable(root, language, tools, data["artefacts"][language], rust_backend=entry.get("rust_backend", "compiler"))
     return qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, decoder,
                            extra_channels=effect_channels, capture_complete=complete)
 
-def capture_case(workspace, data, entry, case, destination, decoder, contract):
+def capture_case(workspace, data, entry, case, destination, decoder, contract, *, http_fixtures=None):
     """Keep raw evidence and bounded typed observations for every actual launch."""
     observed = {"baseline": [], "instrumented_on": []}
     typed_observed = {"baseline": [], "instrumented_on": []}
@@ -754,7 +775,8 @@ def capture_case(workspace, data, entry, case, destination, decoder, contract):
         key = "baseline_repeats" if lane == "baseline" else "instrumented_repeats"
         for repeat in range(data["configuration"]["limits"][key]):
             folder = destination / f"{lane}-{repeat}"
-            execution = attempt(workspace, data, entry, case, lane, folder, decoder)
+            options = {"http_fixtures": http_fixtures} if http_fixtures else {}
+            execution = attempt(workspace, data, entry, case, lane, folder, decoder, **options)
             typed = typed_capture.observation(bytes(execution["channels"]["state-and-outcome"]), entry, contract)
             size = len(json.dumps(typed, ensure_ascii=True).encode())
             size += sum(len(value) for name, value in execution["channels"].items() if name != "state-and-outcome")
@@ -768,32 +790,42 @@ def capture_case(workspace, data, entry, case, destination, decoder, contract):
 
 
 def compare_case(workspace, data, entry, case, destination, decoder):
+    with http_effects.fixtures(data["configuration"]) as fixtures:
+        return compare_with_fixtures(workspace, data, entry, case, destination, decoder, fixtures)
+
+
+def compare_with_fixtures(workspace, data, entry, case, destination, decoder, http_fixtures):
     write(destination / "corpus.json", case)
     roots = typed_capture.required_roots(entry)
     contract = {"observation_schema_version": 1, "case_id": case["id"], "function_id": entry.get("otelc_runtime_function", entry["otelc_function"]),
                 "fixture_sha256": identity({"case": case, "source": entry["source_sha256"], "roots": roots}),
                 "required_roots": roots, "expected_baseline": case["expected_baseline"]}
-    if filesystem_effects.selected(data["configuration"]):
+    if filesystem_effects.selected(data["configuration"]) or http_fixtures:
         contract["fixture_sha256"] = identity({"fixture": contract["fixture_sha256"], "effects": data["configuration"]["effects"]})
+    if http_fixtures:
+        contract["fixture_sha256"] = identity({"fixture": contract["fixture_sha256"], "http_environment": http_effects.bindings(http_fixtures)})
     if "sequence" in case:
         contract["steps"] = sequences.contracts(case, roots)
-    observed, typed_observed = capture_case(workspace, data, entry, case, destination, decoder, contract)
+    options = {"http_fixtures": http_fixtures} if http_fixtures else {}
+    observed, typed_observed = capture_case(workspace, data, entry, case, destination, decoder, contract, **options)
     selected = sequences.expected_functions(entry, observed["instrumented_on"][0]["witness"]["functions"])
     diagnostic = {"source": data["source_sha256"], "harness": manifest(workspace / "tests/harnesses" / case["id"]),
                   "tools": {name: sha for name, sha in data["artefacts"][entry["language"]].items() if name.startswith("tool:")}}
     scope = {"language": entry["language"], "artefact_class": "diagnostic", "source_sha256": data["source_sha256"],
              "baseline_artefact_sha256": identity(diagnostic), "instrumented_artefact_sha256": identity({**diagnostic, "adapter": data["artefacts"][entry["language"]]}),
              "policy_sha256": identity({"otelc": policy(entry, "receiver"), "generation": data["configuration"]}), "observer": "oteleq configured scalar generator v1; independently one selected root, recursive span counts observed",
-             "channels": ["stdout", "stderr", "state-and-outcome", *filesystem_effects.channels(data["configuration"])],
-             "gaps": ["scalar corpus; business preconditions and branch exhaustiveness not established", "diagnostic access/entrypoint helpers; not shipping artefact evidence", "artefact digests aggregate diagnostic inputs and qualified tools/adapters; emitted runtime compiler/loader outputs are outside those digests", "no network, imported-module globals, instrumented-off or concurrent-schedule qualification", "exception traceback/stack and Java/C++ extra exception fields are unobserved", "compiler sysroots and OS libraries are outside content identity", "trusted local execution; no hostile-code sandbox"]}
+             "channels": ["stdout", "stderr", "state-and-outcome", *filesystem_effects.channels(data["configuration"]), *http_effects.channels(data["configuration"])],
+             "gaps": ["scalar corpus; business preconditions and branch exhaustiveness not established", "diagnostic access/entrypoint helpers; not shipping artefact evidence", "artefact digests aggregate diagnostic inputs and qualified tools/adapters; emitted runtime compiler/loader outputs are outside those digests", "no undeclared network, imported-module globals, instrumented-off or concurrent-schedule qualification", "exception traceback/stack and Java/C++ extra exception fields are unobserved", "compiler sysroots and OS libraries are outside content identity", "trusted local execution; no hostile-code sandbox"]}
     scope["gaps"].append("filesystem boundary bytes/kinds/permissions only; timestamps, inode/link identity, transient activity and undeclared paths are unobserved"
                          if filesystem_effects.selected(data["configuration"]) else "filesystem effects are unobserved")
+    scope["gaps"].append("HTTP fixture accepted request order/method/target/body, selected raw header lines and scripted response bytes only; other headers, peer/packet timing, other destinations, TLS and broader protocols are unobserved"
+                         if http_fixtures else "HTTP fixture effects are unobserved")
     bundle = {"workload_schema_version": 1, "scope": scope, "cases": [{"case_id": case["id"], "corpus_sha256": identity(case),
               "expected_functions": selected, "expected_spans": sum(selected.values()), **observed}]}
     write(destination / "bundle.json", bundle)
     typed_case = {"contract": contract, "corpus_sha256": identity(case), "expected_functions": selected,
                   "expected_spans": sum(selected.values()), **typed_observed}
-    typed_scope = {**scope, "channels": ["stdout", "stderr", *filesystem_effects.channels(data["configuration"])],
+    typed_scope = {**scope, "channels": ["stdout", "stderr", *filesystem_effects.channels(data["configuration"]), *http_effects.channels(data["configuration"])],
                    "observer": "oteleq typed boundary codecs v1; captured globals/arguments and initial-state checks; name-only decoded invocation witness"}
     typed_scope["gaps"] = [*scope["gaps"], "graph identities are local to each boundary; cross-boundary replacement, weakref and finalizer effects are unobserved"]
     write(destination / TYPED_BUNDLE, {"typed_schema_version": 1, "scope": typed_scope, "cases": [typed_case]})

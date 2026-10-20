@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 import sys
 
+NATIVE_METADATA_BYTES = 64 * 1024 * 1024
+
 LANGUAGES = {".c": "c", ".h": "c", ".cc": "cpp", ".cpp": "cpp", ".cxx": "cpp", ".hpp": "cpp", ".hh": "cpp", ".hxx": "cpp", ".rs": "rust",
              ".py": "python", ".java": "java", ".js": "javascript", ".mjs": "javascript",
              ".cjs": "javascript", ".jsx": "javascript", ".ts": "typescript", ".mts": "typescript", ".cts": "typescript", ".tsx": "typescript", ".go": "go"}
@@ -157,6 +159,8 @@ def discover(path, language, root, tools, execute):
     if language in ("javascript", "typescript"):
         document = json.dumps({"filename": str(path), "source": path.read_text()}).encode()
         result = execute(command, path.parent, input_data=document)
+    elif language in ("c", "cpp"):
+        result = execute(command, path.parent, max_output_bytes=NATIVE_METADATA_BYTES)
     else:
         result = execute(command, path.parent)
     if result.returncode:
