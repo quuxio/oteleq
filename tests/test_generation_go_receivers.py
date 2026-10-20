@@ -15,6 +15,7 @@ sys.path[:0] = [str(REPO / "adapters/generation"), str(REPO / "examples")]
 import generation
 import go_graph
 import go_project
+import go_receivers
 import harness
 import policy
 import typed_capture
@@ -197,3 +198,22 @@ func (value *Counter) Read(amount int64)int64{if value==nil{return amount};retur
                 data["outcome"]["kind"] = "unknown"
             with self.subTest(change=change), self.assertRaises(ValueError):
                 go_graph.boundaries(json.dumps(data).encode(), entry)
+
+    def test_scalar_constants_and_panic_payloads_are_strict(self):
+        self.assertEqual(go_receivers.scalar_input(True), {"kind": "boolean", "value": "true"})
+        self.assertEqual(go_receivers.scalar_input(-0.0), {"kind": "float", "value": "8000000000000000"})
+        self.assertEqual(go_receivers.scalar_input("\x00é"), {"kind": "string", "value": "00c3a9"})
+        with self.assertRaises(ValueError):
+            go_receivers.scalar_input([])
+        values = [{"kind": "integer", "type": "go.int16", "bits": 16, "signed": True, "value": "-3"},
+                  {"kind": "boolean", "type": "go.bool", "value": False},
+                  {"kind": "float", "type": "go.float64", "bits": "7ff0000000000001"},
+                  {"kind": "float", "type": "go.float32", "bits": "80000000"},
+                  {"kind": "string", "type": "go.string", "encoding": "raw_bytes", "value": "ff"}]
+        for value in values:
+            go_graph.panic_value(value)
+        for value in ({"kind": "null"}, {"kind": "object", "type": "go.Counter"},
+                      {"kind": "float", "type": "go.float32", "bits": "7fc00000"},
+                      {"kind": "integer", "type": "go.int16", "bits": 16, "signed": True, "value": "32768"}):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                go_graph.panic_value(value)

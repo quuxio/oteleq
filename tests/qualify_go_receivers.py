@@ -148,7 +148,11 @@ def check_report(path: Path, expected_cases: int = 7) -> int:
                 if lane == "instrumented_on":
                     assert attempt["execution"]["witness"]["functions"] == {case["function"]: 1}
                 identities = json.loads((folder / "build-identities.json").read_text())
-                assert any(name.endswith("/oteleq_generated_observer/observer.go") for name in identities["source_inputs"])
+                recipe = json.loads((folder / "go-bundle/recipe.json").read_text())
+                helpers = [(name, value) for name, value in recipe["inputs"].items()
+                           if name.endswith("/oteleq_generated_observer/observer.go")]
+                assert len(helpers) == 1 and identities["loaded_input_count"] == len(recipe["inputs"])
+                assert hashlib.sha256(Path(helpers[0][0]).read_bytes()).hexdigest() == helpers[0][1]["sha256"]
     return launches
 
 
@@ -176,6 +180,57 @@ def source_guards(cli: Path, workspace: Path, folder: Path, case: dict) -> int:
         finally:
             path.write_bytes(original)
     return len(paths)
+
+
+def refusals(cli: Path, provider: Path, folder: Path) -> dict:
+    """Missing/opaque fixtures and incomplete capture must never qualify."""
+    folder.mkdir()
+    controls = [
+        ("missing-factory", SOURCE, "Add", "Missing", 3),
+        ("wrong-factory", SOURCE, "Add", "instrumented", 3),
+        ("opaque-global", SOURCE + "\nvar pending []int\n", "Add", "New", 3),
+        ("helper-collision", SOURCE, "Add", "New", 3),
+        ("factory-failure", SOURCE.replace("func New(seed Number)*Counter{", 'func New(seed Number)*Counter{panic("bad factory");'), "Add", "New", 4),
+        ("float32-nan", SOURCE.replace("0x80000000", "0x7f800001"), "Add", "New", 4),
+        ("complex-panic", SOURCE.replace('panic("known")', "panic(value)"), "Fail", "New", 4),
+        ("nil-value-receiver", SOURCE, "Copy", "Nil", 4),
+        ("initial-state", SOURCE.replace("func New(seed Number)*Counter{", "func New(seed Number)*Counter{if instrumented(){seed++};"), "Add", "New", 2),
+    ]
+    launches = 0
+    for name, text, method, factory, expected in controls:
+        target = folder / name
+        source = target / "application"
+        (source / "counter").mkdir(parents=True)
+        (source / "go.mod").write_text("module example.test/receiver\n\ngo 1.27.2\n")
+        (source / "counter/api.go").write_text(text)
+        if name == "helper-collision":
+            (source / "oteleq_generated_observer").mkdir()
+            (source / "oteleq_generated_observer/keep.txt").write_text("application-owned\n")
+        policy = target / "equivalence.toml"
+        policy.write_text(policy_text((method,)).replace('factory="New"', 'factory=' + json.dumps(factory)))
+        workspace = Path(command([cli, "plan", "--source", source, "--otelc-root", provider,
+                                  "--workspace-parent", target, "--config", policy], target, "plan"))
+        command([cli, "generate", "--workspace", workspace], target, "generate")
+        comparison = target / "comparison"
+        command([cli, "run", "--workspace", workspace, "--report-dir", comparison], target, "run", expected=expected)
+        report = json.loads((comparison / "report.json").read_text())
+        assert report["source_preserved"]
+        raw = [path for path in comparison.rglob("command.json") if path.parent.name.startswith(("baseline-", "instrumented_on-"))]
+        launches += len(raw)
+        if expected == 3:
+            assert report["blocked"] and not report["cases"] and not raw
+        elif expected == 4:
+            assert not report["blocked"] and len(report["cases"]) == 1 and report["cases"][0]["exit_code"] == 4
+            assert len(raw) == 1 and not list(comparison.rglob("observation"))
+        else:
+            assert not report["blocked"] and len(report["cases"]) == 1 and len(raw) == 4
+            typed = report["cases"][0]["comparison"]["cases"][0]
+            assert typed["verdict"] == "blocked" and any(pair["comparison"]["initial_differences"] for pair in typed["pairs"])
+        assert all(b"APPLICATION_FORMATTER" not in path.read_bytes() for path in comparison.rglob("stderr"))
+    result = {"refusal_controls": len(controls), "actual_application_launches": launches,
+              "prelaunch_refusals": 4, "incomplete_fixture_or_observer": 4, "initial_state_blocks": 1}
+    (folder / "controls.json").write_text(json.dumps(result, indent=2) + "\n")
+    return result
 
 
 def main() -> None:
@@ -213,6 +268,8 @@ def main() -> None:
     launches += sum(check_report(path, 1) for path in paths)
     replay = json.loads(command([cli, "replay", "--workspace", shrink["workspace"], "--case", case["id"]], work, "replay", expected=1))
     launches += check_report(Path(replay["report"]), 1)
+    refused = refusals(cli, provider, folder / "refusals")
+    launches += refused["actual_application_launches"]
     for path in (workspace, exported, Path(shrink["workspace"])):
         frozen = json.loads((path / "plan.json").read_text())
         assert all(hashlib.sha256((Path(frozen["source"]) / name).read_bytes()).hexdigest() == value
@@ -224,6 +281,7 @@ def main() -> None:
               "cli_sha256": hashlib.sha256(cli.read_bytes()).hexdigest(), "cases": 7, "matching_cases": 5,
               "difference_controls": 2, "actual_application_launches": launches, "source_preserved": True,
               "prelaunch_source_refusals": controls, "retained_attempt_folders": len(commands), "unique_command_identities": len(unique),
+              "fixture_refusals": refused,
               "scope": "Declared same-package scalar factories, private struct/array slots, aliases/cycles, scalar panics and nil/value receivers. No maps/slices/interfaces, arbitrary arguments/actions, cross-boundary allocation identity or shipping qualification."}
     (folder / "QUALIFICATION.json").write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps(result), flush=True)
