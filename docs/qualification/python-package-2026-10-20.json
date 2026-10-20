@@ -1,0 +1,108 @@
+{
+  "qualification_schema_version": 1,
+  "date": "2026-10-20",
+  "platform": {
+    "os": "macOS",
+    "architecture": "ARM64",
+    "python": "3.12.15"
+  },
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "runtime": {
+    "commit": "020a6056488896d4db09cf1e1aff1b5c7ca9242a",
+    "cli_sha256": "ae492118aceb0f581353c56ee08acbff574cc83e210980e296582037ae25c526",
+    "qualification_reader_commit": "70891bcb5b3ff23bf615d93dcbde81a3b4f5e308",
+    "qualification_script_sha256": "c60d56099534709195f18158de42636264cf2704c99804b13d691676ae438aed",
+    "reader_repair_changes_product_inputs": false
+  },
+  "provider": {
+    "source_commit": "8a7689a6d6779ed8621bbe852188eeb56e6fafad",
+    "status": "Private unmerged frozen provider candidate",
+    "cli_sha256": "4f11a98a7628411000c6a9992c907a8068d56156b29e51558b070ee57a972ecf",
+    "receipt_sha256": "b9cf8b8dfd8de69d17e6ec2db9ca11e6d0a03aa3564aac5569c18a02db34521c",
+    "frozen_python_input_files_verified": 945
+  },
+  "projects": [
+    {
+      "layout": "regular",
+      "source_sha256": "6c0d12716e1b3cbb144714f4e4f39c3ce6012a8fa183d6c4a42a284dd40ec3dc",
+      "function_ids": [
+        "pkg.__init__.selected_init",
+        "pkg.api.selected"
+      ],
+      "import_contexts": {
+        "pkg/__init__.py": {
+          "module": "pkg",
+          "roots": [
+            "."
+          ]
+        },
+        "pkg/api.py": {
+          "module": "pkg.api",
+          "roots": [
+            "."
+          ]
+        }
+      }
+    },
+    {
+      "layout": "src-layout",
+      "source_sha256": "464f153c94e9baaa2c95723825b2454a339f4bd194c51d1a44e9f5f44a49b8d2",
+      "function_ids": [
+        "src.pkg.__init__.selected_init",
+        "src.pkg.api.selected"
+      ],
+      "import_contexts": {
+        "src/pkg/__init__.py": {
+          "module": "pkg",
+          "roots": [
+            "src"
+          ]
+        },
+        "src/pkg/api.py": {
+          "module": "pkg.api",
+          "roots": [
+            "src"
+          ]
+        }
+      }
+    }
+  ],
+  "results": {
+    "projects": 2,
+    "cases": 4,
+    "actual_application_launches": 48,
+    "generated_unittest_runs": 4,
+    "generated_tests": 8,
+    "changed_local_dependency_controls_rejected": 2,
+    "source_preserved": true,
+    "scope": "Explicit regular Python source packages and src layout, module-local state and scalar calls; no namespace, installed project metadata, imported-root or shipping qualification."
+  },
+  "independent_oracles": {
+    "argument": 7,
+    "selected_init_result": 10,
+    "selected_result": 17,
+    "additional_checks": [
+      "Real pkg/pkg.api module identities asserted by the fixture.",
+      "Module-local state is independently reconstructed in every attempt.",
+      "Each instrumented attempt witnesses exactly its selected source-relative callable.",
+      "Changed local dependency source is refused before execution and restored."
+    ]
+  },
+  "incomplete_attempt": {
+    "status": "separate, not part of the completed 48-launch result",
+    "cases": 2,
+    "actual_application_launches": 16,
+    "reason": "The original reader expected one summary from a two-test generated suite; fixed with a per-case reader regression before rerunning the complete qualification."
+  },
+  "retention": {
+    "complete_raw_files": 893,
+    "incomplete_raw_files": 291,
+    "method": "Complete raw/provider identities, executable, source, reader, plan, generated/exported suites, typed/raw observations and OTLP are retained privately with byte verification."
+  },
+  "limits": [
+    "Regular Python source packages and explicit import roots only; no namespace/installed-project/build metadata or dependency installation claim.",
+    "Imported-module globals outside the selected observation roots, external installed dependencies and interpreter/sysroot content remain unobserved or outside application content identity.",
+    "No arbitrary factory, async/action sequence, invocation authentication, off/fault or shipping-artefact qualification."
+  ]
+}
