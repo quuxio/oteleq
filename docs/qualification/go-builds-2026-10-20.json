@@ -1,0 +1,221 @@
+{
+  "qualification_schema_version": 1,
+  "date": "2026-10-20",
+  "platform": {
+    "os": "macOS",
+    "architecture": "ARM64",
+    "go": "go1.27.2",
+    "python": "3.12.15"
+  },
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "runtime": {
+    "commit": "863b0bcc76f62b01aa74d3727986ea8e4410ead4",
+    "cli_sha256": "c7ad98accffbc429a903f335a46a02cb2b2bd39bab98f7ac757be153889aca13",
+    "qualification_script_sha256": "dfd84a9394073dea14af8478019359179cbdf34242301fb49f3b3debc126a77e"
+  },
+  "provider": {
+    "source_commit": "5ea90fafb38c8dfcc452b01f6d3154e523494b40",
+    "source_tree": "f64ba9a6fe7dc00a8b2f28d754cc2b1a40e9fb37",
+    "status": "Private frozen candidate; producer PR91 release gates are separate",
+    "manifest_sha256": "9cc80bf560e3b4683e9e76162872857ea3fb3a1a3803a4fb6d03c2cdc599614a",
+    "products": {
+      "cli": {
+        "path": "target/debug/quux-otelc",
+        "sha256": "a03ab019f0de3197d26d6c1327ae518ceb8d817a0b060f0df4776c00d555861d"
+      },
+      "adapter": {
+        "path": "adapters/go/build/otelc-go",
+        "sha256": "0de8d842f148c4d55b150f32e7d5416da9193a13fc4d99aa9efc113bb66e172d"
+      }
+    },
+    "source_files_verified": 373
+  },
+  "results": {
+    "claim": "equivalence over these tests and observations",
+    "artefact_class": "diagnostic",
+    "cli_sha256": "c7ad98accffbc429a903f335a46a02cb2b2bd39bab98f7ac757be153889aca13",
+    "cases": 4,
+    "matching_cases": 3,
+    "difference_controls": 1,
+    "generated_qualified_launches": 68,
+    "direct_controls": {
+      "qualified_launches": 2,
+      "termination_control_launches": 4,
+      "prelaunch_refusals": 6,
+      "build_executed_init_or_main": false,
+      "source_unavailable": true,
+      "runtime_only_install": true
+    },
+    "fixed_workload_launches": 4,
+    "actual_application_launches": 78,
+    "source_preserved": true,
+    "scope": "Standalone generated scalar callers and fixed detached replay; no general Go package/build integration, cgo/workspaces, SDK dependency isolation, recording-off/fault lane or shipping qualification."
+  },
+  "source_sha256": "1082740621312090500233508a4fe4fa7f6609df1d0da86c8038e7528198d35e",
+  "inventory": {
+    "total": 7,
+    "ready": 4,
+    "excluded": 3,
+    "blocked": 0
+  },
+  "callables": [
+    {
+      "function": "app.double",
+      "arguments": [
+        7
+      ],
+      "exit_code": 0
+    },
+    {
+      "function": "app.echo_float",
+      "arguments": [
+        -0.0
+      ],
+      "exit_code": 0
+    },
+    {
+      "function": "app.state_difference",
+      "arguments": [
+        7
+      ],
+      "exit_code": 1
+    },
+    {
+      "function": "app.fail",
+      "arguments": [
+        7
+      ],
+      "exit_code": 0
+    }
+  ],
+  "direct_observed_statuses": {
+    "baseline-signal.status": {
+      "returncode": -15,
+      "expected": -15
+    },
+    "target.status": {
+      "returncode": 1,
+      "expected": 1
+    },
+    "instrumented_on.status": {
+      "returncode": 0,
+      "expected": 0
+    },
+    "instrumented_on-signal.status": {
+      "returncode": -15,
+      "expected": -15
+    },
+    "baseline-exit.status": {
+      "returncode": 17,
+      "expected": 17
+    },
+    "traces.status": {
+      "returncode": 1,
+      "expected": 1
+    },
+    "baseline.status": {
+      "returncode": 0,
+      "expected": 0
+    },
+    "binary.status": {
+      "returncode": 1,
+      "expected": 1
+    },
+    "selection.status": {
+      "returncode": 1,
+      "expected": 1
+    },
+    "instrumented_on-exit.status": {
+      "returncode": 17,
+      "expected": 17
+    },
+    "missing-recipe.status": {
+      "returncode": 1,
+      "expected": 1
+    },
+    "empty-modules.status": {
+      "returncode": 1,
+      "expected": 1
+    }
+  },
+  "controls": {
+    "old_go120_module": "Refused before application launch with explicit language-version preservation error; original module bytes retained",
+    "requested_state_omission": "Valid scalar graph missing requested global root is inconclusive, exit3",
+    "direct_prelaunch_refusals": [
+      "changed selection",
+      "changed trace weaving",
+      "changed binary",
+      "rehashed empty module snapshots with unchanged settings",
+      "missing recipe",
+      "changed target"
+    ],
+    "source_build_boundary": "init marker absent and no OTLP at build; source then moved away; runtime-only launcher/adapter with configured Go/SDK/PATH unavailable",
+    "termination": "Exit17 and SIGTERM preserve raw stdout/stderr/argv; these four launches do not promise final telemetry flush"
+  },
+  "build_evidence": {
+    "both_executables_retained": true,
+    "compiler_channels_separate": true,
+    "compiler_driver_and_three_tools_hashed": true,
+    "loaded_input_count_first_case": 2041,
+    "compiler_dependency_fingerprints_checked_across_attempts": true,
+    "source_preserved": true
+  },
+  "local_gate": {
+    "regressions": 298,
+    "rust": 58,
+    "capture": 110,
+    "generation": 117,
+    "node": 13,
+    "rust_product_line_coverage_percent": 97.17,
+    "all_independent_coverage_floors_pass": true
+  },
+  "review": {
+    "method": "Direct source review, permanent unit controls and independent actual consumer qualification",
+    "runtime_ci": 39365382461,
+    "runtime_sonar_unresolved": 0,
+    "review_threads": 0
+  },
+  "incomplete_predecessor": {
+    "runtime": "49f795de4f2590f810b8b13dcfcd14494179554d",
+    "state": "incomplete",
+    "generated_application_launches_completed": 68,
+    "direct_application_launches_completed": 6,
+    "actual_application_launches_completed": 74,
+    "prelaunch_policy_refusals_completed": 2,
+    "blocker": "The binary tamper control copied mode0500 and could not write its owned control executable. No producer defect is inferred; the fixture must make its copy writable. Remaining binary/module/recipe/target controls and final summary were not reached.",
+    "evidence": "Original log, bundles, generated/replayed comparisons and direct raw channels retained separately from the next exact-revision run."
+  },
+  "retention": {
+    "archive": "/Users/sclarke/Documents/oteleq-qualification/2026-10-20/go-builds-863b0bc",
+    "runtime": "863b0bcc76f62b01aa74d3727986ea8e4410ead4",
+    "raw_files": {
+      "final": 3743,
+      "incomplete-49f795d": 3550,
+      "development-api-probes": 92,
+      "development-fixed-workload": 134
+    },
+    "providers": {
+      "634988f": {
+        "source_commit": "634988fda06d177ae93ce00be749d8749c31f741",
+        "manifest_sha256": "3f083109ed97adbc90958dc09e61a0b52afc2fc9fbf5ef2e85934594c3e106d5",
+        "verified_files": 375
+      },
+      "5ea90fa": {
+        "source_commit": "5ea90fafb38c8dfcc452b01f6d3154e523494b40",
+        "manifest_sha256": "9cc80bf560e3b4683e9e76162872857ea3fb3a1a3803a4fb6d03c2cdc599614a",
+        "verified_files": 375
+      }
+    },
+    "retained_input_records": 9550,
+    "unique_input_contents": 2020,
+    "cache_scope": "Derived compiler/module caches omitted; actual retained binaries, compiler/application channels, source/suites/metadata and loaded source/compiler bytes retained and independently hash-verified.",
+    "limits": "Diagnostic evidence, not a portable compiler/sysroot or signed shipping attestation. The incomplete74-launch predecessor and development probes remain separately labelled."
+  },
+  "limitations": [
+    "Standalone scalar diagnostic callers and one fixed workload; arbitrary package/build contexts, SDK dependency isolation, cgo/workspaces and object codecs remain open.",
+    "Recorded loaded-input/Go-tool evidence is not a sealed native system-library/header/sysroot closure or signed shipping attestation.",
+    "No recording-off/exporter-fault lane or performance-budget qualification.",
+    "The earlier rendered-report visual decision is separate and remains pending."
+  ]
+}
