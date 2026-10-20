@@ -1,5 +1,7 @@
 # Repository quality and badges
 
+CI caches only the pinned `cargo-llvm-cov` executable using an OS, architecture, Rust-toolchain and tool-version key. A cache miss installs the locked version; every run verifies its exact version before running the same formatting, tests and coverage gates. Product sources, build outputs, credentials and telemetry data are not included in this cache. The official cache action is pinned to an immutable revision.
+
 ## Current scope
 
 CI validates Markdown, illustrative JSON/TOML syntax, diagnostic capture observers and the Rust comparator. The required Rust job runs formatting, Clippy, regression tests and a minimum 80% line-coverage gate over product `src/` files; integration-test code is excluded from that measurement. The documentation job tests the capture observers and enforces at least 80% line coverage separately for each eight-language capture module and the collection validator. CI uses fake witness fixtures and private subprocesses; actual otelc toolchain qualification uses the separate eight-language integration run. CI also checks the scalar generator, syntax discovery, harness materialisation, state observers, process limits and source preservation, with 80% coverage gates on each Python module. Real otelc execution is qualified separately; unobserved state and unsupported build contexts remain outside the claim.
