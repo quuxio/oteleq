@@ -1,0 +1,202 @@
+{
+  "schema_version": 1,
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "captured_date_utc": "2026-10-20",
+  "consumer": {
+    "runtime_revision": "027f1978bded8512852354f1f17f46b4157fd512",
+    "cli_sha256": "cbd12cc48a9f9f7c9aabe3f627559d9c3324c75f9cfd7320e83a3ef24292f1a8",
+    "qualification_script_sha256": "868ba49696d4d37d0730e595b4fb6f03428ff8b2e6df50bfee35310c9e1043c4"
+  },
+  "provider": {
+    "source_revision": "8a7689a6d6779ed8621bbe852188eeb56e6fafad",
+    "cli_sha256": "4f11a98a7628411000c6a9992c907a8068d56156b29e51558b070ee57a972ecf",
+    "snapshot_receipt_sha256": "b9cf8b8dfd8de69d17e6ec2db9ca11e6d0a03aa3564aac5569c18a02db34521c",
+    "classification": "private immutable integrated candidate; not a released shipping artefact"
+  },
+  "platform": {
+    "os": "macOS",
+    "architecture": "ARM64",
+    "rust": "1.98.1",
+    "node": "24.21.0",
+    "go": "1.27.2",
+    "java": "21",
+    "native_llvm": "22"
+  },
+  "result": {
+    "claim": "equivalence over these tests and observations",
+    "artefact_class": "diagnostic",
+    "oteleq_cli_sha256": "cbd12cc48a9f9f7c9aabe3f627559d9c3324c75f9cfd7320e83a3ef24292f1a8",
+    "languages": [
+      "c",
+      "cpp",
+      "go",
+      "java",
+      "javascript",
+      "python",
+      "rust",
+      "typescript"
+    ],
+    "cases": 11,
+    "actual_application_launches": 472,
+    "reductions": [
+      {
+        "language": "java",
+        "function": "Sample.sample(int)",
+        "arguments": [
+          7
+        ],
+        "trials": 6,
+        "status": "candidate_rule_minimal"
+      },
+      {
+        "language": "c",
+        "function": "sample",
+        "arguments": [
+          7
+        ],
+        "trials": 6,
+        "status": "candidate_rule_minimal"
+      },
+      {
+        "language": "cpp",
+        "function": "sample(int)",
+        "arguments": [
+          7
+        ],
+        "trials": 6,
+        "status": "candidate_rule_minimal"
+      },
+      {
+        "language": "go",
+        "function": "sample.sample",
+        "arguments": [
+          7
+        ],
+        "trials": 6,
+        "status": "candidate_rule_minimal"
+      },
+      {
+        "language": "javascript",
+        "function": "sample.sample",
+        "arguments": [
+          7.0
+        ],
+        "trials": 6,
+        "status": "candidate_rule_minimal"
+      },
+      {
+        "language": "python",
+        "function": "sample.sample",
+        "arguments": [
+          7
+        ],
+        "trials": 6,
+        "status": "candidate_rule_minimal"
+      },
+      {
+        "language": "python",
+        "function": "sample.floating",
+        "arguments": [
+          1.3125
+        ],
+        "trials": 8,
+        "status": "budget_limited"
+      },
+      {
+        "language": "python",
+        "function": "sample.text",
+        "arguments": [
+          "z"
+        ],
+        "trials": 5,
+        "status": "candidate_rule_minimal"
+      },
+      {
+        "language": "python",
+        "function": "sample.logical",
+        "arguments": [
+          true
+        ],
+        "trials": 1,
+        "status": "candidate_rule_minimal"
+      },
+      {
+        "language": "rust",
+        "function": "sample.sample",
+        "arguments": [
+          7
+        ],
+        "trials": 6,
+        "status": "candidate_rule_minimal"
+      },
+      {
+        "language": "typescript",
+        "function": "sample.sample",
+        "arguments": [
+          7.0
+        ],
+        "trials": 6,
+        "status": "candidate_rule_minimal"
+      }
+    ],
+    "generated_unittest_runs": 11,
+    "exported_replays": 1,
+    "altered_retained_witness_controls_rejected": 3,
+    "source_sha256": "9626055919420c7b7c135e47a80cfa4267d71e59b9baaa38e5fb0ee81abcd2d7",
+    "source_preserved": true,
+    "scope": "deliberately telemetry-sensitive fixtures, including Rust diagnostic SDK symbol presence; no shipping/object/sequence claim"
+  },
+  "local_validation": {
+    "regressions": 237,
+    "rust_product_line_coverage_percent": 97.13,
+    "domains_line_coverage_percent": 100,
+    "shrinking_line_coverage_percent": 97,
+    "all_module_gates_passed": true
+  },
+  "runtime_ci": {
+    "url": "https://github.com/quuxio/oteleq/actions/runs/39346302720",
+    "revision": "027f1978bded8512852354f1f17f46b4157fd512",
+    "required_jobs": "passed",
+    "sonar_unresolved_findings": 0
+  },
+  "retention": {
+    "directory": "/Users/sclarke/Documents/oteleq-qualification/2026-10-20/shrinking-027f197",
+    "status": "complete; full corpora byte-verified",
+    "verified_corpora": [
+      {
+        "corpus": "oteleq-shrink-027f197-evidence",
+        "files": 177504,
+        "receipt_sha256": "92b5fa1c7087dcff3ea1954400c73febc4d9e993e537ba1bd0349f4d9c090a29"
+      },
+      {
+        "corpus": "oteleq-shrink-development-1",
+        "files": 16371,
+        "receipt_sha256": "a86f84220b2720c507b5bcac0ae53f0a8c57018f16f434b75dd40bb50739f4b9"
+      },
+      {
+        "corpus": "oteleq-shrink-development-2-native",
+        "files": 224,
+        "receipt_sha256": "5e096111dab3fb95eed8d1d789f2a1030ce7ca8acee5a31d6615e63ce6bec7d9"
+      },
+      {
+        "corpus": "oteleq-shrink-development-3-rust",
+        "files": 139,
+        "receipt_sha256": "a325d1e994948120ceb7738ba1f5f0bf2766190ee50b94eedd0b2fb64ac264f1"
+      },
+      {
+        "corpus": "oteleq-shrink-development-4-python",
+        "files": 737,
+        "receipt_sha256": "f61f44a6116b9b974501e8fb2b48e0f337b9bf1d4005a70b8c41824202c14dad"
+      }
+    ]
+  },
+  "limits": [
+    "Eight integer-domain language cases; additional Python float, string and boolean domains. This is not every scalar type/toolchain combination.",
+    "The float search exhausted its eight-trial budget; no minimum is claimed.",
+    "Fixtures deliberately observe instrumentation/runtime presence; they are negative controls, not production workloads.",
+    "Local candidate-rule minima do not prove a global minimum or an identical root cause.",
+    "Relational predicates, factories, objects, action sequences, additional platforms and shipping qualification remain open.",
+    "Instrumentation witness retains the existing name-based trusted-producer scope; no invocation nonce authentication."
+  ]
+}

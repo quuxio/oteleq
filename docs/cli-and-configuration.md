@@ -2,7 +2,7 @@
 
 ## Status
 
-Updated 19 October 2026. `quux-oteleq` implements the commands below. The scalar workflow uses embedded workers and a frozen JSON workspace contract. The generator consumes a validated TOML selection/input/budget policy through `plan --config`, including explicit expected baseline outcomes. Generated workers for all eight language IDs retain raw evidence and emit the versioned typed boundary graph bundle for `compare-observations`. The later build/observer configuration and adapter sections describe proposed interfaces; project build integration and richer object/factory codecs remain incomplete.
+Updated 20 October 2026. `quux-oteleq` implements the commands below. The scalar workflow uses embedded workers and a frozen JSON workspace contract. The generator consumes a validated TOML selection/input/budget policy through `plan --config`, including explicit expected baseline outcomes and independent scalar domains for shrinking. Generated workers for all eight language IDs retain raw evidence and emit the versioned typed boundary graph bundle for `compare-observations`. The later build/observer configuration and adapter sections describe proposed interfaces; project build integration and richer object/factory codecs remain incomplete.
 
 ## Implemented commands
 
@@ -12,6 +12,7 @@ Updated 19 October 2026. `quux-oteleq` implements the commands below. The scalar
 | `generate` | `--workspace PATH` | None | Frozen concrete corpus, diagnostic harness previews and `tests/test_equivalence.py` |
 | `run` | `--workspace PATH --report-dir PATH` | None | All generated cases, complete inventory and JSON report in a new external directory |
 | `replay` | `--workspace PATH --case ID` | None | One frozen case in a new `runs/replay-*` directory inside the workspace |
+| `shrink` | `--workspace PATH --case ID --report-dir PATH` | `--trials N` | Declared-domain scalar reduction, retained trial evidence and a sealed one-case replay workspace; see [shrinking](counterexample-shrinking.md) |
 | `export-tests` | `--workspace PATH --destination PATH` | `--apply` | Copy plan by default; with `--apply`, a new runnable frozen source/suite bundle |
 | `clean` | `--workspace PATH` | None | Removes an owned workspace after checking its snapshot/suite and top-level contents |
 | `render-report` | `REPORT.json --output-dir NEW_DIRECTORY` | None | Private standalone HTML and JUnit presentation of retained generated-run evidence |

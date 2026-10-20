@@ -26,6 +26,14 @@ const RESOURCES: &[(&str, &str)] = &[
         include_str!("../adapters/generation/policy.py"),
     ),
     (
+        "domains.py",
+        include_str!("../adapters/generation/domains.py"),
+    ),
+    (
+        "shrinking.py",
+        include_str!("../adapters/generation/shrinking.py"),
+    ),
+    (
         "observe.py",
         include_str!("../adapters/generation/observe.py"),
     ),

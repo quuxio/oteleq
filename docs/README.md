@@ -1,10 +1,11 @@
 # oteleq documentation
 
-Updated 19 October 2026, `quux-oteleq compare-workload` runs the Rust comparator, with diagnostic capture integrations for all eight otelc languages. [Automatic scalar test generation](automatic-generation.md) now inventories and executes supported functions across all eight languages in private workspaces. The separate Rust typed comparator adds boundary graph matching; semantic/build-aware adapters and generated-worker conversion to that format remain incomplete.
+Updated 20 October 2026, `quux-oteleq compare-workload` runs the Rust comparator, with diagnostic capture integrations for all eight otelc languages. [Automatic scalar test generation](automatic-generation.md) inventories and executes supported functions in private workspaces, emitting shared typed boundary graphs. [Scalar shrinking](counterexample-shrinking.md) reduces qualified differences within explicit independent domains. Semantic/build-aware adapters and richer object/factory codecs remain incomplete.
 
 | Document | Use it to |
 | --- | --- |
 | [Automatic generation](automatic-generation.md) | Generate, run, replay and retain the implemented scalar suite |
+| [Counterexample shrinking](counterexample-shrinking.md) | Reduce a qualified scalar difference and retain its replay suite and trial evidence |
 | [Typed comparison](typed-comparison.md) | Compare versioned boundary graphs, aliases/cycles and precise field differences |
 | [HTML and JUnit reports](reporting.md) | Present retained cases, differences and inventory gaps without rerunning code |
 | [Workload comparison](workload-comparison.md) | Run the implemented comparator and capture the actual otelc task example |

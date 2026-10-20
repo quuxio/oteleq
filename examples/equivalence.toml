@@ -32,5 +32,7 @@ backend = "compiler"
 # source = "src/api.py"
 # function = "src.api.calculate"
 # cases = [[7], [41]]
+# Explicit independent domains are required to enable scalar shrinking.
+# domains = [{ kind = "integer", minimum = 0, maximum = 100 }]
 # Intentional errors require an explicit contract; otherwise a return is required.
 # expected_baseline = { kind = "error", category = "exception", type = "python.builtins.ValueError" }
