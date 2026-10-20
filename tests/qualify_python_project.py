@@ -21,9 +21,9 @@ def fixture(destination: Path, prefix: str) -> tuple[Path, Path]:
     return source, policy
 
 
-def check_report(path: Path) -> int:
+def check_report(path: Path, expected_cases: int = 2) -> int:
     report = json.loads(path.read_text())
-    assert report['source_preserved'] and not report['blocked'] and len(report['cases']) == 2
+    assert report['source_preserved'] and not report['blocked'] and len(report['cases']) == expected_cases
     assert len([entry for entry in report['inventory'] if entry['status'] == 'excluded']) == 1
     launches = 0
     for case in report['cases']:
@@ -41,6 +41,13 @@ def check_report(path: Path) -> int:
                 if lane == 'instrumented_on':
                     assert attempt['execution']['witness']['functions'] == {case['function']: 1}
     return launches
+
+
+def run_framework(workspace: Path, destination: Path, name: str) -> int:
+    """Each generated unittest emits its own one-case replay report summary."""
+    summaries = command([sys.executable, workspace / 'tests/test_equivalence.py'], destination, name).splitlines()
+    assert len(summaries) == 2
+    return sum(check_report(Path(json.loads(line)['report']), expected_cases=1) for line in summaries)
 
 
 def main() -> None:
@@ -67,14 +74,12 @@ def main() -> None:
         command([cli, 'run', '--workspace', workspace, '--report-dir', folder / 'comparison'], folder, 'comparison')
         launches += check_report(folder / 'comparison/report.json')
         cases += 2
-        framework = json.loads(command([sys.executable, workspace / 'tests/test_equivalence.py'], folder, 'framework'))
-        launches += check_report(Path(framework['report']))
+        launches += run_framework(workspace, folder, 'framework')
         exported = folder / 'exported'
         command([cli, 'export-tests', '--workspace', workspace, '--destination', exported], folder, 'export-dry-run')
         assert not exported.exists()
         command([cli, 'export-tests', '--workspace', workspace, '--destination', exported, '--apply'], folder, 'export-apply')
-        exported_result = json.loads(command([sys.executable, exported / 'tests/test_equivalence.py'], folder, 'exported-framework'))
-        launches += check_report(Path(exported_result['report']))
+        launches += run_framework(exported, folder, 'exported-framework')
         dependency = source / prefix / 'pkg/helper.py'
         before = dependency.read_bytes()
         try:
@@ -90,7 +95,7 @@ def main() -> None:
                    for path, value in plan['source_manifest'].items())
     result = {'claim': 'equivalence over these tests and observations', 'artefact_class': 'diagnostic',
               'cli_sha256': hashlib.sha256(cli.read_bytes()).hexdigest(), 'projects': 2, 'cases': cases,
-              'actual_application_launches': launches, 'generated_unittest_runs': 4,
+              'actual_application_launches': launches, 'generated_unittest_runs': 4, 'generated_tests': 8,
               'changed_local_dependency_controls_rejected': controls, 'source_preserved': True,
               'scope': 'Explicit regular Python source packages and src layout, module-local state and scalar calls; no namespace, installed project metadata, imported-root or shipping qualification.'}
     (destination / 'QUALIFICATION.json').write_text(json.dumps(result, indent=2)+'\n')

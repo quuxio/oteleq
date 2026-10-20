@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'adapters/generation'))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'examples'))
@@ -15,6 +16,7 @@ import generation
 import harness
 import policy
 import python_project
+import qualify_python_project
 
 
 class PythonProjectTests(unittest.TestCase):
@@ -133,6 +135,17 @@ class PythonProjectTests(unittest.TestCase):
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn(error, result.stderr.decode())
                 self.assertFalse(observation.exists())
+
+    def test_qualification_consumes_every_generated_case_summary(self):
+        summaries = '\n'.join(json.dumps({'report': path}) for path in ('first/report.json', 'second/report.json'))
+        with patch.object(qualify_python_project, 'command', return_value=summaries), \
+                patch.object(qualify_python_project, 'check_report', return_value=4) as check:
+            self.assertEqual(qualify_python_project.run_framework(Path('suite'), Path('evidence'), 'framework'), 8)
+            self.assertEqual(check.call_count, 2)
+            self.assertEqual(check.call_args_list[0].kwargs, {'expected_cases': 1})
+        with patch.object(qualify_python_project, 'command', return_value='{}'):
+            with self.assertRaises(AssertionError):
+                qualify_python_project.run_framework(Path('suite'), Path('evidence'), 'framework')
 
 
 if __name__ == '__main__':
