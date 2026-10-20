@@ -1,9 +1,7 @@
 """Qualify configured domains, repeat budgets and lossless scalar fixtures on real otelc."""
 import argparse
-import base64
 import hashlib
 import json
-import math
 import os
 from pathlib import Path
 import shutil
@@ -11,6 +9,51 @@ import sys
 import struct
 
 from qualify_generation import command
+
+
+def expected_result(case: dict, entry: dict) -> dict:
+    """Derive complete value expectations from the fixed, SDK-free fixture source."""
+    arguments = case["arguments"]
+    assert len(arguments) == 1
+    name = entry["name"].split("(", 1)[0].rsplit(".", 1)[-1]
+    value = arguments[0]
+    if name == "text":
+        return {"kind": "string", "encoding": "utf16_be",
+                "value": (value + "\ud800").encode("utf-16-be", errors="surrogatepass").hex()}
+    if name == "decimal":
+        return {"kind": "float", "bits": struct.pack(">f", value).hex()}
+    if name == "add":
+        value += 1
+        if entry["language"] in ("javascript", "typescript"):
+            return {"kind": "float", "bits": struct.pack(">d", value).hex()}
+    else:
+        assert name in ("echo", "wide", "unit"), "unknown fixed fixture result oracle"
+        if name == "unit":
+            return {"kind": "string", "encoding": "utf16_be",
+                    "value": (value % 65536).to_bytes(2, "big").hex()}
+    return {"kind": "integer", "value": str(value)}
+
+
+def check_node_argument(raw: bytes, value: int | float) -> None:
+    """Check every concrete Node argument, including negative zero, exactly."""
+    graph = json.loads(raw)["before"]
+    arguments = graph["nodes"][graph["roots"]["arguments"]["ref"]]["fields"]
+    values = [field[1] for field in arguments if field[0] == "0"]
+    assert values == [{"type": "float64", "bits": struct.pack(">d", value).hex()}]
+
+
+def check_case(case: dict, entry: dict, bundle: dict, typed: dict) -> None:
+    """A cross-lane match must also produce the independently expected result."""
+    expected = expected_result(case, entry)
+    for lane in ("baseline", "instrumented_on"):
+        assert bundle[lane] and len(bundle[lane]) == len(typed[lane])
+        for raw, attempt in zip(bundle[lane], typed[lane], strict=True):
+            outcome = attempt["observation"]["outcome"]
+            assert outcome["kind"] == "return"
+            actual = outcome["graph"]["roots"].get("result")
+            assert type(actual) is dict and all(actual.get(key) == value for key, value in expected.items()), (entry["path"], expected, actual)
+            if entry["language"] in ("javascript", "typescript"):
+                check_node_argument(bytes(raw["channels"]["state-and-outcome"]), case["arguments"][0])
 
 
 def main():
@@ -88,35 +131,14 @@ cases=[[55296]]
     assert len(languages) == 8
     by_id = {entry["id"]: entry for entry in data["inventory"]}
     corpus = {case["id"]: case for case in json.loads((workspace / "tests/corpus.json").read_text())}
-    tokens = {"wide.c": b"return:unsigned long long:ffffffffffffffff",
-              "wide.cpp": b"return:long long:" + (-(2**63)).to_bytes(8, sys.byteorder, signed=True).hex().encode(),
-              "wide.rs": b"return:u128:" + str(2**128 - 1).encode(),
-              "wide.go": hex(2**64 - 1).encode()}
     for case in report["cases"]:
-        bundle = json.loads((destination / "comparison" / case["case"] / "bundle.json").read_text())["cases"][0]
+        folder = destination / "comparison" / case["case"]
+        bundle = json.loads((folder / "bundle.json").read_text())["cases"][0]
+        typed = json.loads((folder / "typed-bundle.json").read_text())["cases"][0]
         assert len(bundle["baseline"]) == len(bundle["instrumented_on"]) == 3
         assert case["exit_code"] == 0
         entry = by_id[corpus[case["case"]]["function_id"]]
-        expected_token = tokens.get(entry["path"]) if "echo" in entry["name"] else None
-        if case["function"] == "unicode.UnicodeCases.wide(long)":
-            expected_token = b"java.lang.Long:" + base64.b64encode(str(-(2**63)).encode())
-        if case["function"] == "unicode.UnicodeCases.unit(int)":
-            expected_token = b"return:char:d800"
-        if "decimal" in entry["name"]:
-            packed = struct.pack(">f", case["arguments"][0])
-            prefix = {"rust": "return:f32:", "go": "return:float32:", "java": "return:float:"}
-            expected_token = (prefix[entry["language"]] + packed.hex()).encode() if entry["language"] in prefix else b"return:float:" + struct.pack("=f", case["arguments"][0]).hex().encode()
-        for lane in ("baseline", "instrumented_on"):
-            for attempt in bundle[lane]:
-                raw = bytes(attempt["channels"]["state-and-outcome"])
-                if expected_token is not None:
-                    assert expected_token in raw, (entry["path"], raw)
-                if entry["language"] == "python" and case["arguments"] == [2**100]:
-                    assert json.loads(raw)["outcome"]["value"]["roots"]["result"]["value"] == str(2**100 + 1)
-                if entry["language"] in ("javascript", "typescript") and math.copysign(1, case["arguments"][0]) < 0:
-                    graph = json.loads(raw)["before"]
-                    arguments = graph["nodes"][graph["roots"]["arguments"]["ref"]]["fields"]
-                    assert next(field[1] for field in arguments if field[0] == "0")["bits"] == "8000000000000000"
+        check_case(case, entry, bundle, typed)
     unicode_case = next(case for case in report["cases"] if "UnicodeCases.text" in case["function"])
     bundle = json.loads((destination / "comparison" / unicode_case["case"] / "bundle.json").read_text())
     expected = "00e90000d83dde00d800"
@@ -143,6 +165,7 @@ cases=[[55296]]
                "configured_cases": 38, "matching_attempts": 228, "repeats_per_lane": 3,
                "unicode_utf16_and_signed_unsigned_extremes": True, "altered_unicode_control_rejected": True,
                "altered_typed_unicode_control_rejected": True,
+               "exact_typed_result_oracles": True, "all_node_argument_bits_checked": True,
                "source_preserved": report["source_preserved"], "configuration_sha256": data["configuration_sha256"]}
     (destination / "qualification.json").write_text(json.dumps(summary, indent=2) + "\n")
     print(json.dumps(summary), flush=True)

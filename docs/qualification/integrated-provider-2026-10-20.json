@@ -1,0 +1,184 @@
+{
+  "qualification_schema_version": 1,
+  "date": "2026-10-20",
+  "platform": {
+    "os": "macOS",
+    "architecture": "ARM64"
+  },
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "runtime": {
+    "commit": "2e3e0561ba213d26eabd81b659d6fe8764c5a1b8",
+    "tree": "d2486c60de8a0026cbd342f97d01b7ac50f7ee7f",
+    "cli_sha256": "0e5ad495cc5d56940c87f32b2384d70b2868a7626560e074dcbd0187d1a92b88",
+    "source_archive_sha256": "42af1462dd7bef605df2c5bec2e87f9ecccfe33daba26762c944e40c7cdee273",
+    "provider_commit": "d6d03b72026cde8962b11ce3cc184ff3ebcb60d4",
+    "provider_manifest_sha256": "2a8dbf239c6444c0fb536dff049993beade7eaed6578c9654c1e2d7233e9431f"
+  },
+  "provider": {
+    "verified_at": "2026-10-20T15:48:25.028465+00:00",
+    "provider_commit": "d6d03b72026cde8962b11ce3cc184ff3ebcb60d4",
+    "provider_tree": "a577aa88d5d51f4e86bc0858bcd233be7b01c251",
+    "manifest_sha256": "2a8dbf239c6444c0fb536dff049993beade7eaed6578c9654c1e2d7233e9431f",
+    "verified_records": 7360,
+    "counts": {
+      "source_sha256": 413,
+      "products_sha256": 586,
+      "dependencies": 6361
+    },
+    "symlinks": 11,
+    "external_tools_verified": 8,
+    "cli_sha256": "037fb837ea1a3e982e9cb0d62f00b8c70c9709f25178fe936b189c2c1721c486",
+    "profile_relocation": {
+      "original_sha256": "091b340d6ed90eaa54a025719fde13abb1420c85058f864dd6d69242013c97c7",
+      "retained_sha256": "425bf561b3c2772162d95e44773cdf6660e1522b62f8fed946714fe3d1737539"
+    },
+    "scope": "Content verification only; actual behavioural qualification pending.",
+    "verification_script_sha256": "5b2e4c5b12fc2ccb3b3181011db9c595f1ab75fe2d4010fff83547185c556ea5",
+    "status": "Frozen all-language normal products; source/product identity d6d03b7 is retained independently of later producer commits.",
+    "external_identity_limit": "Recorded host executables and declared SDK/dependency inputs; compiler sysroots, OS libraries and arbitrary project dependencies remain outside the content manifest."
+  },
+  "results": {
+    "actual_application_launches": 533,
+    "unique_command_identities": 533,
+    "launch_counts": {
+      "fixed": 32,
+      "generated": 169,
+      "configured": 228,
+      "rust_generated": 96,
+      "rust_semantics": 8
+    },
+    "matching_application_launches": 508,
+    "intentional_state_difference_launches": 12,
+    "blocked_fixture_launches": 8,
+    "refused_worker_launches": 5,
+    "additional_prelaunch_build_refusals": 1,
+    "controls": {
+      "mutation-comparison": {
+        "cases": 3,
+        "actual_launches": 12,
+        "expected_exits": [
+          1,
+          1,
+          1
+        ]
+      },
+      "binding-comparison": {
+        "cases": 3,
+        "actual_launches": 3,
+        "expected_exits": [
+          4,
+          4,
+          4
+        ]
+      },
+      "callback-comparison": {
+        "cases": 3,
+        "actual_launches": 2,
+        "expected_exits": [
+          4,
+          4,
+          4
+        ]
+      },
+      "unexpected-error-comparison": {
+        "cases": 1,
+        "actual_launches": 4,
+        "expected_exits": [
+          2
+        ]
+      },
+      "initial-state-comparison": {
+        "cases": 1,
+        "actual_launches": 4,
+        "expected_exits": [
+          2
+        ]
+      }
+    },
+    "retained_rust_record_refusals": 14,
+    "metadata_control_application_launches": 0,
+    "provider_records_verified_after": 7360,
+    "raw_files_and_links": 50627,
+    "raw_manifest_sha256": "b72ea01fb30e6e0df95caad1b86ce2e4b1e8ddfdce40f76f2eec3f275b5c18c0",
+    "launch_index_sha256": "a2171df20fe1e8051b200485a30b78e92b1fc02fdedaf25a84889726e3f3cb3b",
+    "source_preserved": true
+  },
+  "value_oracles": {
+    "reports": 11,
+    "case_executions": 71,
+    "application_launches": 360,
+    "qualifier_sha256": "a95340940708bc6e8cb8a1c8f0c7663555c0b6d0ae5af21f90c60337da74d392",
+    "script_sha256": "20ae3ecb8599c2447c3da189aa550a24f4753a6f94c0593a7a84994bdbc8a812",
+    "application_reruns": 0,
+    "scope": "Ordinary add, integer extremes, f32/signed zero and Unicode; all recorded repeats/lanes checked against fixture-source expectations."
+  },
+  "inventory": {
+    "default": {
+      "callables": 13,
+      "ready": 8,
+      "excluded": 5,
+      "cases": 24
+    },
+    "configured": {
+      "callables": 25,
+      "ready": 20,
+      "excluded": 5,
+      "cases": 38
+    },
+    "rust": {
+      "callables": 3,
+      "ready": 3,
+      "excluded": 0,
+      "cases": 4
+    }
+  },
+  "qualifiers_executed": {
+    "fixed": "f013ea8cd5d3fdc6f557b9dd745a6b3bb19426ebfd8672503c3605645af40381",
+    "default": "db6e53931e17d6122e504a89e2a931a2d3df5224f6f37deff1fe135a47781652",
+    "configured_original": "401040b5658899f0fc9ff3a478c499b534d65a506b62e51fa57d0748fb04800a",
+    "rust": "62929ed31f09e0ce3ff4ee0255643cb67c9af65fa9c4b088c14eecef494d2a52",
+    "rust_semantics": "960bcf57f9fa74767ef0176af0104c0870887b82b387a95b4db30ddf44ce72da"
+  },
+  "review_finding": {
+    "issue": "The original configured qualifier lacked ordinary add result oracles and used partial raw tokens for some other values.",
+    "regression": "A matching but incorrect result in both lanes passed the original check; the focused regression fails before the fix and passes after it.",
+    "fix": "Exact typed result expectations for every configured case and every repeat/lane; complete float bits/UTF16 units and exact Node argument bits.",
+    "retained_data": "All 360 relevant actual captures were revalidated using the corrected qualifier without application reruns.",
+    "checker_calibration": "The first offline recheck refused Java char because the checker expected an integer; the established scalar codec uses one UTF16 unit. This checker mismatch was corrected; no application result or launch count changed."
+  },
+  "scope": {
+    "observed": [
+      "standard fixed function workloads for all eight language IDs",
+      "default scalar generation, retained framework and exported Python replay",
+      "configured scalar domains, repeats, integer extremes, float32 and Unicode",
+      "same-return Python/JavaScript/TypeScript state differences and fixture/binding/formatter refusals",
+      "standalone original-source Rust scalar generated/exported routes and fixed future/alias semantics"
+    ],
+    "witness": "Existing name-bound decoded instrumentation, health and loss counters; no invocation-scoped producer binding.",
+    "not_qualified": [
+      "shipping artefacts or a producer release",
+      "general project builds/Cargo/Go workspaces/cgo/classpaths/Node module graphs",
+      "general mutable objects, factories, arguments or action schedules",
+      "optional native TypeScript/worker/collection/resource profiles on this provider",
+      "filesystem/HTTP/receiver/shrinking corpora on this provider",
+      "instrumented-off/exporter fault lanes",
+      "production performance budgets",
+      "other platforms/toolchains"
+    ]
+  },
+  "task_observer_recheck": {
+    "observer_sha256": "5a7f4441de86143df7ec33d795004f7234c0c0e1ee633b87a540c749c97ca846",
+    "provider_commit": "d6d03b72026cde8962b11ce3cc184ff3ebcb60d4",
+    "application_launches": 4,
+    "ambient_decoy_adapter_ignored": true,
+    "matching": true,
+    "source_preserved": true,
+    "scope": "Existing task byte channels and eight name-bound spans; no parent graph/resource or invocation-authentication claim.",
+    "explicit_selected_adapter_root_retained": true,
+    "selected_interpreter_retained": true,
+    "identity_note": "Separate repaired observer content hash; additional to the original 533-launch frozen consumer corpus.",
+    "raw_files": 37,
+    "raw_manifest_sha256": "0412a32f390226842a858afd9e2895545c7af390a7f0336276ccc77b5bd0640d"
+  }
+}

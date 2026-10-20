@@ -12,6 +12,8 @@ The consumer implements three distinct contracts. Supporting a record format doe
 
 The [20 October compiler record](qualification/rust-compiler-2026-10-20.json) qualifies runtime `ed09f13` against content-verified candidate provider `aca9d5a`: 108 actual launches and 14 altered build-record refusals. Another 24 actual launches confirm legacy schema1 compatibility against frozen provider `0419a51`. Existing LLVM and earlier compiler records retain their original runtime/provider identities. The current scalar caller remains standalone and synchronous; fixed producer diagnostics do not enable Cargo, general module graphs, generated async targets or receiver codecs. This candidate corpus does not qualify a later producer revision or release.
 
+The separate [integrated-provider record](qualification/integrated-provider-2026-10-20.json) repeats the 96 generated/exported scalar launches, eight fixed semantic/alias launches and the standard fixed Rust workload against frozen `d6d03b7`, with 14 retained-record refusals. It keeps consumer `2e3e056`/CLI `0e5ad495` and that provider's content identity; the earlier ACA evidence is unchanged. Cargo/build-output integration and general generated async/module support remain open.
+
 ## Original-source compiler profile
 
 `target/debug/otelc-rust-compiler.json` has profile schema1 and `backend="compiler"`. The supported profile identifies Rust 1.98.1, commit `48a229ceaefd4985c50990b14116b6d856af0985`, macOS ARM64 and LLVM 22.1.8. `OTELC_RUSTC` must select that actual compiler. The consumer hashes its bytes and reads its verbose version; metadata cannot choose an executable.

@@ -314,11 +314,14 @@ class CaptureBoundaryTests(unittest.TestCase):
 
     def test_environment_isolated_from_ambient_agents_headers_and_wrappers(self):
         with patch.dict(os.environ, {"NODE_OPTIONS": "injected", "OTEL_EXPORTER_OTLP_HEADERS": "secret",
-                                     "JAVA_TOOL_OPTIONS": "injected", "RUSTC_WRAPPER": "injected"}):
+                                     "JAVA_TOOL_OPTIONS": "injected", "RUSTC_WRAPPER": "injected",
+                                     "OTELC_ADAPTER_ROOT": "/decoy/adapters", "OTELC_PYTHON": "/decoy/python"}):
             env = capture.environment(Path("/tmp/run/project"), {}, "service", Path("/tmp/otelc"))
         self.assertFalse(any(key in env for key in ("NODE_OPTIONS", "OTEL_EXPORTER_OTLP_HEADERS", "JAVA_TOOL_OPTIONS", "RUSTC_WRAPPER")))
         self.assertEqual(env["TMPDIR"], "/tmp/run")
         self.assertEqual(env["HOME"], "/tmp/run")
+        self.assertEqual(env["OTELC_ADAPTER_ROOT"], "/tmp/otelc/adapters")
+        self.assertEqual(env["OTELC_PYTHON"], sys.executable)
 
     def test_endpoint_is_only_changed_in_private_policy_and_ambiguous_policy_fails(self):
         policy = b'[export]\nendpoint = "old"\ninterval_ms = 500\n'

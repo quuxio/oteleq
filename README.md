@@ -31,6 +31,8 @@ oteleq generates diagnostic tests that compare application behaviour with and wi
 
 The [HTTP qualification](docs/qualification/http-fixtures-2026-10-20.json) covers 18 cases and 544 actual launches across all eight languages, including same-return request differences, incomplete capture and scalar shrinking/replay.
 
+A separate [integrated-provider qualification](docs/qualification/integrated-provider-2026-10-20.json) checks the standard fixed and scalar workflows against frozen otelc `d6d03b7`: 533 actual launches, including matching cases, deliberate state differences and refused fixtures. Earlier capability records retain their own provider identities.
+
 Fixed diagnostic corpora also qualify [Python and Java executor context](docs/eight-language-capture.md), [Python collection lifetimes](docs/eight-language-capture.md#python-collection-lifetime-workload), [fixed Python resource closes](docs/eight-language-capture.md#python-resource-close-workload) and the [optional native TypeScript emitter](docs/eight-language-capture.md#optional-native-typescript-workload) against the actual otelc adapters.
 
 The [original-source Rust compiler corpus](docs/rust-build-bundles.md) qualifies four generated scalar cases through generated/exported suites and fixed completion/cancellation/unwind and aliased-module diagnostics: 108 candidate-provider launches, 24 legacy compatibility launches and 14 altered build-record refusals. General Cargo, generated async and receiver support remain open.

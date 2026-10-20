@@ -34,6 +34,10 @@ The [eight-language capture integration](eight-language-capture.md) applies this
 
 The [task-workload capture example](../examples/capture_otelc_tasks.py) runs the ordinary Python task example twice without instrumentation and twice with the actual otelc launcher. It uses fresh processes, independent private source copies and a local OTLP receiver. Original source and policy are checked for modification. Original repositories receive no generated tests, dependencies or source edits. The Python observer uses otelc's existing locked environment for its OTLP protobuf decoder.
 
+Both lanes explicitly bind `OTELC_ADAPTER_ROOT` to the requested provider's `adapters` directory and `OTELC_PYTHON` to the selected interpreter. Each completed launch retains `commands.json` with its actual argv, working directory and those two safe bindings. Ambient adapter/Python settings cannot substitute another checkout. Older task records without this launch binding retain an unresolved adapter-source identity gap; snapshot file hashes alone cannot establish which compiled fallback source was loaded.
+
+The [20 October integrated-provider record](qualification/integrated-provider-2026-10-20.json) separately rechecks the repaired task observer over four actual launches against `d6d03b7`, with a decoy ambient adapter root. All match the declared byte channels and eight name-bound spans, and retain the explicit selected root/interpreter. This task recheck has its own observer hash; it is additional to the earlier 533-launch standard/generated corpus. Parent/resource graphs and invocation authentication remain outside the task observer's claim.
+
 From an oteleq checkout, with the Python task-context milestone built in the sibling otelc checkout:
 
 ```sh
