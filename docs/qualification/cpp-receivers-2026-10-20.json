@@ -10,18 +10,17 @@
     "python": "3.12.15"
   },
   "runtime": {
-    "source_commit": "499933944fd635ee8a9508f73ea6faa7d3d2ab5f",
-    "source_tree": "d0e99afba73f24c96d4cfae99ff7fff6e363f6e6",
-    "cli_sha256": "5b335b0fd3bf1f7e09a3947f620a550e3690fe56804967cc1c7254c6b4b8cde2",
-    "source_archive_sha256": "856d925511f159a3c454e89a0df6bcc018405abaf8f17251332ed6d6c9c72851",
+    "source_commit": "8c2f7f689122b82a74464785966d98c0d160b31b",
+    "source_tree": "77930c59616f449c845cb47fc662ff6f3231064a",
+    "cli_sha256": "4d8ab186cf3c67acea4da8eaa41e35610fbee770c5e652c92cec0cdde602d56d",
+    "source_archive_sha256": "955eaed490334ec182f142ae93459fa0ec517f471b252986f530089acda3febb",
     "provider_commit": "d6d03b72026cde8962b11ce3cc184ff3ebcb60d4",
     "provider_manifest_sha256": "2a8dbf239c6444c0fb536dff049993beade7eaed6578c9654c1e2d7233e9431f",
-    "generator_sha256": "6a21dd76b66798dad27ed2e2d3b1ee71ad69e221733f6028f360f7bfea85b9f6",
-    "frozen_qualifier_sha256": "1d42752df521b8952d3d112a09b6ffc6d6a17f47c8fc736b41b9140aee8af5cb",
-    "maintained_qualifier_sha256": "dde840da3d7b36a043019e70236ec64c5845c1a76e5a19fff37a20f636d2714b"
+    "generator_sha256": "cf3f41e7990af77b3bd190b2904d7005d4bcb67a85cb49ce39110deda44d0caa",
+    "qualifier_sha256": "8a3ed0d9ed52da698c6df53f8a81dcaa7de9ca5d3488c9ccc9a4f588a391dd85"
   },
   "provider": {
-    "verified_at": "2026-10-20T19:29:28.662202+00:00",
+    "verified_at": "2026-10-20T20:39:30.527987+00:00",
     "provider_commit": "d6d03b72026cde8962b11ce3cc184ff3ebcb60d4",
     "provider_tree": "a577aa88d5d51f4e86bc0858bcd233be7b01c251",
     "manifest_sha256": "2a8dbf239c6444c0fb536dff049993beade7eaed6578c9654c1e2d7233e9431f",
@@ -48,17 +47,17 @@
     "blocked": 0
   },
   "results": {
-    "cases": 9,
-    "matching_cases": 6,
+    "cases": 17,
+    "matching_cases": 14,
     "difference_controls": 3,
-    "actual_application_launches": 171,
-    "qualified_application_launches": 164,
+    "actual_application_launches": 299,
+    "qualified_application_launches": 292,
     "incomplete_fixture_launches": 3,
     "initial_state_blocked_launches": 4,
-    "retained_attempt_folders": 175,
-    "unique_command_identities": 171,
-    "refusal_controls": 10,
-    "prelaunch_refusals": 6,
+    "retained_attempt_folders": 303,
+    "unique_command_identities": 299,
+    "refusal_controls": 11,
+    "prelaunch_refusals": 7,
     "incomplete_fixture_controls": 3,
     "initial_state_controls": 1,
     "source_preserved": true,
@@ -77,49 +76,49 @@
       "reduced": [
         0
       ]
+    },
+    "profiles": {
+      "receiver_cases": 9,
+      "binding_cases": 4,
+      "crlf_cases": 4
     }
   },
-  "accounting_revalidation": {
-    "frozen_driver_exit_code": 1,
-    "failure_stage": "aggregate launch counting after all behavioural/refusal checks",
-    "correction": "Count the fresh original replay once and its four copied shrink records zero times.",
-    "application_relaunches_for_revalidation": 0,
-    "counter_regression": "passed"
-  },
   "independent_verification": {
-    "source_files_verified": 217,
-    "qualified_reports_verified": 26,
-    "refusal_reports_verified": 10,
-    "qualified_retained_attempts_verified": 168,
-    "qualified_actual_launches": 164,
+    "source_files_verified": 218,
+    "qualified_reports_verified": 46,
+    "refusal_reports_verified": 11,
+    "qualified_retained_attempts_verified": 296,
+    "qualified_actual_launches": 292,
     "copied_original_shrink_attempts": 4,
     "original_copy_relationships_verified": 4,
-    "unique_application_launches": 171,
-    "raw_attempt_folders": 175,
+    "unique_application_launches": 299,
+    "raw_attempt_folders": 303,
     "refused_application_launches": 7,
-    "private_source_records_verified": 504,
-    "raw_records": 3578,
-    "raw_manifest_sha256": "063ba86565fd0f59cc075b0957869483fc0722d465d9807999f267dfdc804862",
-    "runtime_commit": "499933944fd635ee8a9508f73ea6faa7d3d2ab5f",
+    "private_source_records_verified": 792,
+    "raw_records": 6008,
+    "raw_manifest_sha256": "26eae5fa106fb30f3c0d703070eda1fb6da36c740e6fcbad5248be6708abc1c4",
+    "runtime_commit": "8c2f7f689122b82a74464785966d98c0d160b31b",
     "source_preserved": true,
-    "verifier_sha256": "a9bbcaf716e5f5c2c566e91b2d136e3172abf212730ba947c3c248bf24405d9a",
-    "corrected_qualifier_sha256": "dde840da3d7b36a043019e70236ec64c5845c1a76e5a19fff37a20f636d2714b",
-    "scope": "Retained revalidation after the frozen driver aggregate accounting assertion; no application relaunches."
+    "verifier_sha256": "d50d341c72cb8afb0a7ac5c5610a1afbd5b7ee3b5857803cb9d4f99ca47cadc9",
+    "corrected_qualifier_sha256": "8a3ed0d9ed52da698c6df53f8a81dcaa7de9ca5d3488c9ccc9a4f588a391dd85",
+    "scope": "Frozen completed driver; full original/binding corpus, binary/source/tool checks and complete independent value oracles."
   },
   "validation": {
     "make_check": "passed at runtime commit",
-    "runtime_commit": "499933944fd635ee8a9508f73ea6faa7d3d2ab5f",
-    "unique_regressions": 492,
-    "python_regressions": 405,
+    "runtime_commit": "8c2f7f689122b82a74464785966d98c0d160b31b",
+    "unique_regressions": 501,
+    "python_regressions": 414,
     "rust_regressions": 66,
     "node_regressions": 17,
     "go_regressions": 4,
     "additional_native_cpp_observer_probe": "passed",
     "rust_product_line_coverage_percent": 97.29,
-    "cpp_observer_line_coverage_percent": 100.0
+    "cpp_observer_line_coverage_percent": 100.0,
+    "rendered_html_and_junit": "passed",
+    "unresolved_sonar_findings": 0
   },
   "scope": {
-    "observed": "Declared source constructors/free/static factories, scalar method inputs, private source fields/statics, namespace roots, nested records/arrays, exact float bits, standard exception payloads, pointer cycles, interior aliases and returned references.",
+    "observed": "Declared source constructors/free/static factories, scalar method inputs, private source fields/statics, namespace roots, nested records/arrays, exact float bits, standard exception payloads, pointer cycles, interior aliases and returned references. Global source type names, C-linkage underscore identities, direct construction of small self-referential objects and CRLF source ranges are exercised separately.",
     "private_observer_schema_version": 1,
     "witness": "Existing name-bound decoded function/span witness; invocation-scoped producer binding remains unavailable.",
     "not_qualified": [
@@ -133,8 +132,34 @@
       "arbitrary overlapping memory",
       "allocation identity across destruction/address reuse",
       "arbitrary resource/action/concurrent sequences",
-      "other platforms/toolchains"
+      "other platforms/toolchains",
+      "macro-expanded callables or storage beyond explicit refusal"
     ],
     "identity_limit": "Recorded source, selected tools and provider products; not a complete OS-library or shipping build closure."
+  },
+  "profile_inventories": {
+    "receivers": {
+      "callables": 21,
+      "ready": 9,
+      "excluded": 12,
+      "blocked": 0
+    },
+    "bindings": {
+      "callables": 5,
+      "ready": 4,
+      "excluded": 1,
+      "blocked": 0
+    },
+    "crlf": {
+      "callables": 5,
+      "ready": 4,
+      "excluded": 1,
+      "blocked": 0
+    }
+  },
+  "driver": {
+    "exit_code": 0,
+    "application_relaunches_for_retained_verification": 0,
+    "shrink_accounting": "Fresh original replay counts once; four copied records do not count as additional launches."
   }
 }
