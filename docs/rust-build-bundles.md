@@ -10,7 +10,7 @@ The consumer implements three distinct contracts. Supporting a record format doe
 | Original-source `compiler` | 3 | Fixed profile, MIR driver, original compiler request and emitted-instance inventory |
 | Explicit `llvm` | 2 | Profile1/inventory2 or profile2/inventory3, with actual LLVM resolution records |
 
-The original-source schema3 consumer is implemented and protocol-tested. Actual instrumented qualification against a content-verified replacement provider is pending. Existing frozen qualification records retain their original runtime/provider identities. The current scalar caller remains standalone and synchronous; format acceptance does not enable Cargo, general module graphs, generated async targets or receiver codecs.
+The [20 October compiler record](qualification/rust-compiler-2026-10-20.json) qualifies runtime `ed09f13` against content-verified candidate provider `aca9d5a`: 108 actual launches and 14 altered build-record refusals. Another 24 actual launches confirm legacy schema1 compatibility against frozen provider `0419a51`. Existing LLVM and earlier compiler records retain their original runtime/provider identities. The current scalar caller remains standalone and synchronous; fixed producer diagnostics do not enable Cargo, general module graphs, generated async targets or receiver codecs. This candidate corpus does not qualify a later producer revision or release.
 
 ## Original-source compiler profile
 
@@ -40,6 +40,18 @@ Build records establish compiler provenance within the trusted-provider boundary
 
 `tests/fixtures/rust_compiler_semantics.rs` has no SDK imports. Plain-compiler regression tests check source-derived column/tracked-caller observations, fixed closure/future layout, compile-time `Send`, unpolled drop, pending/completed/cancelled futures, a typed panic payload and exactly-once destruction. `rust_compiler_aliases.rs` and `rust_compiler_shared.rs` supply two logical module paths to one read-only physical source; the regression verifies both links, bytes and permissions after compilation.
 
-These plain fixtures prepare independent producer qualification. They do not establish instrumented future, aliased-module or general generated async support. Actual paired qualification must additionally check immutable provider identities, raw application observations, emitted instrumentation, health/loss status and source preservation. The [completion checklist](completion.md) retains those broader build and scheduling requirements.
+The fixed paired corpus additionally checks those original, SDK-free fixtures against the candidate's real compiler instrumentation. Both semantic lanes produce the independently specified column/caller/layout values and completion/cancellation/unwind drop counts. The aliased-module workload preserves two logical links, the shared physical bytes and read-only mode. Actual decoded spans, complete future-registry health, loss/pending counters and source preservation are required. These are curated producer diagnostics; generated module/async adapters remain open in the [completion checklist](completion.md).
+
+## Qualified corpus
+
+| Scope | Actual application launches | Observations |
+| --- | --- | --- |
+| Four generated scalar cases, all four routes | 96 | u128 extreme, f32 and signed zero, logical source path; exact typed record and stderr oracles; build warnings stay separate |
+| Fixed recursive/future/error workload | 4 | Eight spans/four trees per on attempt, including completion, cancellation and escaping unwind |
+| Independent semantic workload | 4 | Six spans with separate cancellation/unwind errors; column, tracked caller, closure/future layout, `Send`, payload and exactly-once drops |
+| Read-only aliased modules | 4 | Two selected logical function identities and two root spans; source links, bytes and permissions preserved |
+| Legacy schema1 compatibility | 24 | The same four scalar cases against the separately frozen older provider |
+
+All 132 command identities are unique. The 14 retained-bundle controls perform no application launches; they reject rehashed request policy/source/discovery, inventory source/name/role/emission/position, compiler version/output, backend/profile changes, downgrade and linked records. The scalar oracle requires a complete typed record line, so an expected value such as `7` cannot accept `70` or a prefixed/suffixed record. Fixed standard capture retains raw channels, telemetry and build identities; it does not retain detached private binaries after its workspace is removed.
 
 Run the fixed producer corpus with `make rust-semantic-otelc OTELC_ROOT=/absolute/qualified/provider REPORT_DIR=/absolute/new/report`. `--workload semantics` or `--workload aliases` on `tests/qualify_rust_semantics.py` selects one fixed workload; supply `--cli` for the actual oteleq comparator. `make generation-rust-otelc` additionally runs all four default scalar cases through generated and exported suites, including their per-case replay routes. The LLVM qualifier retains its separate contract.

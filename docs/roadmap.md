@@ -56,6 +56,8 @@ Deliver Go package/type discovery, private same-package tests and fuzz-to-typed-
 
 Acceptance includes unchanged module/manifests/locks, unexported/private access limits, explicit generic instances, panic/defer/recover or unwind/drop scenarios, supported goroutine/async fixtures and witnessed otelc overlay/compiler-wrapper execution. No unsafe fabricated fixtures or unsupported backend substitutions.
 
+The [original-source Rust compiler contract](rust-build-bundles.md) now binds the fixed stable profile/MIR driver, original request and emitted instances. Its [exact-revision corpus](qualification/rust-compiler-2026-10-20.json) completes 108 candidate-provider launches, 24 legacy compatibility launches and 14 retained-record refusals. Curated semantic/future and aliased-module workloads remain distinct from general generated async, Cargo, module and receiver adapters.
+
 ## Stage 7: Full-language release qualification
 
 All eight adapters pass the same shared qualification suite. Standalone HTML/JUnit presentation of generated-run evidence is implemented. Typed generated scalar/graph results retain contracts and field differences. Complete richer codecs, redaction, promotion plans and apply operations, production-workload replay and qualified optional telemetry-failure/live-toggle scenarios. Validate installation and a usable multi-language repository demonstration.

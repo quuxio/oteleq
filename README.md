@@ -33,6 +33,8 @@ The [HTTP qualification](docs/qualification/http-fixtures-2026-10-20.json) cover
 
 Fixed diagnostic corpora also qualify [Python and Java executor context](docs/eight-language-capture.md), [Python collection lifetimes](docs/eight-language-capture.md#python-collection-lifetime-workload), [fixed Python resource closes](docs/eight-language-capture.md#python-resource-close-workload) and the [optional native TypeScript emitter](docs/eight-language-capture.md#optional-native-typescript-workload) against the actual otelc adapters.
 
+The [original-source Rust compiler corpus](docs/rust-build-bundles.md) qualifies four generated scalar cases through generated/exported suites and fixed completion/cancellation/unwind and aliased-module diagnostics: 108 candidate-provider launches, 24 legacy compatibility launches and 14 altered build-record refusals. General Cargo, generated async and receiver support remain open.
+
 The result is **equivalence over these tests and observations**. It is not a blanket proof that every function is identical.
 
 Generated tests live in a new private directory outside the application repository. Selection, scalar domain fixtures, seeded inputs and execution budgets use a [validated project policy](docs/automatic-generation.md#project-policy-and-concrete-fixtures). Users can retain or explicitly export them, using Python's standard `unittest` suite independently of the application's existing framework.
