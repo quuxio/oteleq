@@ -85,6 +85,9 @@ class CppWorkerTests(unittest.TestCase):
         graph = capture["outcome"]["graph"]
         self.assertEqual(self.node(graph, graph["roots"]["result"])["fields"]["value"]["value"], "10")
 
+    def test_crlf_source_keeps_compiler_byte_offsets_for_private_access(self):
+        self.captured(SOURCE.replace("\n", "\r\n"))
+
     def test_global_record_name_does_not_resolve_to_the_generated_helper(self):
         source = '''class Graph {
 short value_;

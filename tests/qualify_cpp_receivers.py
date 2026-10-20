@@ -276,13 +276,13 @@ def check_bindings(path: Path, expected_cases: int) -> int:
     return launches
 
 
-def binding_controls(cli: Path, provider: Path, folder: Path) -> int:
+def binding_controls(cli: Path, provider: Path, folder: Path, source_text: str = BINDING_SOURCE) -> int:
     """Exercise both fixed naming defects over every retained/exported route."""
     destination = folder / "bindings"
     destination.mkdir()
     source = destination / "application"
     source.mkdir()
-    (source / "app.cpp").write_text(BINDING_SOURCE)
+    (source / "app.cpp").write_text(source_text)
     policy = destination / "equivalence.toml"
     text = 'schema_version=1\nlanguages=["cpp"]\n[functions]\ninclude=' + json.dumps(BINDING_FUNCTIONS) + '\n'
     for name in BINDING_FUNCTIONS:
@@ -338,13 +338,18 @@ def main() -> None:
     launches += refused_launches
     binding_launches = binding_controls(cli, provider, folder)
     launches += binding_launches
+    crlf = folder / "crlf"
+    crlf.mkdir()
+    crlf_launches = binding_controls(cli, provider, crlf, BINDING_SOURCE.replace("\n", "\r\n"))
+    launches += crlf_launches
     counts = verify_launches(folder, launches)
     summary = {"claim": "equivalence over these tests and observations", "artefact_class": "diagnostic",
-               "matching_cases": len(METHODS)-len(DIFFERENCES)+len(BINDING_FUNCTIONS), "different_cases": len(DIFFERENCES),
+               "matching_cases": len(METHODS)-len(DIFFERENCES)+2*len(BINDING_FUNCTIONS), "different_cases": len(DIFFERENCES),
                **counts,
                "all_routes": True, "scalar_shrinking_and_replay": True, "source_preserved": True,
                "refusal_controls": controls, "refused_application_launches": refused_launches,
                "binding_cases": len(BINDING_FUNCTIONS), "binding_application_launches": binding_launches,
+               "crlf_cases": len(BINDING_FUNCTIONS), "crlf_application_launches": crlf_launches,
                "oteleq_cli_sha256": hashlib.sha256(cli.read_bytes()).hexdigest(),
                "otelc_cli_sha256": hashlib.sha256((provider / "target/debug/quux-otelc").read_bytes()).hexdigest(),
                "qualifier_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest()}

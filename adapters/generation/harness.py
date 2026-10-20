@@ -615,6 +615,9 @@ def materialise(project, entry, args):
     elif language in ("c", "cpp"):
         driver = project / ("_oteleq_driver.c" if language == "c" else "_oteleq_driver.cpp")
         if language == "cpp" and "cpp_receiver" in entry:
+            # Clang source ranges are byte offsets; universal newline decoding
+            # would move closing braces in an otherwise valid CRLF source file.
+            original = source.read_bytes().decode("utf-8")
             source.write_text(cpp_receivers.private_source(original, entry["cpp_receiver"]["records"]))
             (generated / "cpp_observe.hpp").write_bytes(Path(__file__).with_name("cpp_observe.hpp").read_bytes())
             driver.write_text('#include "_oteleq_generated/cpp_observe.hpp"\n#include <stdio.h>\n' + native_abi()
