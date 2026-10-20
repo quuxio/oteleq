@@ -15,6 +15,7 @@ import uuid
 
 import discovery
 import go_project
+import go_receivers
 import filesystem_effects
 import http_effects
 import harness
@@ -234,9 +235,10 @@ def qualify_entry(entry, snapshot, count):
         if entry["language"] in ("c", "cpp"):
             outputs = harness.native_scalar_types(entry["language"]) | {"void"}
         java_receiver = entry["language"] == "java" and "receiver_fixture" in entry
+        go_receiver = entry["language"] == "go" and "receiver_fixture" in entry
         if java_receiver and not java_receivers.supported_type(entry["output"], entry["java_models"], entry["package"], void=True):
             raise ValueError("result type requires an observation fixture")
-        if not java_receiver and entry["language"] not in ("python", "javascript", "typescript") and harness.scalar_type(entry["output"]) not in outputs:
+        if not java_receiver and not go_receiver and entry["language"] not in ("python", "javascript", "typescript") and harness.scalar_type(entry["output"]) not in outputs:
             raise ValueError("result type requires an observation fixture")
         gaps = harness.global_gaps(entry)
         if gaps:
@@ -259,6 +261,9 @@ def is_entrypoint(function, language):
 def receiver_fixture(entry, discovered, declared):
     """Bind one reviewed factory to its source declaration and concrete arguments."""
     try:
+        if entry["language"] == "go":
+            go_receivers.bind(entry, discovered, declared, harness.concrete_arguments)
+            return
         if entry["language"] == "java":
             java_receivers.bind(entry, discovered, declared, harness.concrete_arguments)
             return
@@ -462,7 +467,7 @@ def decoder_files():
 
 def generator_identity():
     here = Path(__file__).parent
-    names = ("generation.py", "policy.py", "filesystem_effects.py", "http_effects.py", "domains.py", "shrinking.py", "sequences.py", "typescript_provider.py", "python_project.py", "go_project.py", "node_receivers.py", "java_receivers.py", "java_graph.py", "OteleqGraph.java", "discovery.py", "harness.py", "observe.py", "node_observe.mjs", "node_sequence.mjs", "typed_capture.py", "discover.mjs", "discover.go", "Discover.java")
+    names = ("generation.py", "policy.py", "filesystem_effects.py", "http_effects.py", "domains.py", "shrinking.py", "sequences.py", "typescript_provider.py", "python_project.py", "go_project.py", "go_receivers.py", "go_graph.py", "go_observe.go", "node_receivers.py", "java_receivers.py", "java_graph.py", "OteleqGraph.java", "discovery.py", "harness.py", "observe.py", "node_observe.mjs", "node_sequence.mjs", "typed_capture.py", "discover.mjs", "discover.go", "Discover.java")
     files = {name: capture.file_digest(here / name) for name in names}
     files["host-python"] = capture.file_digest(Path(sys.executable))
     files["host-version"] = sys.version

@@ -2,7 +2,9 @@
 
 The generator supports declared receivers for ordinary instance methods on plain Python, Java, JavaScript and TypeScript classes. Each attempt constructs a fresh instance, binds the selected source method, then captures its supported instance state and declared static/global roots before and after the call. The shared graph protocol preserves aliases and cycles, including a method returning its receiver. [Java fixtures](java-receivers.md) have their own source-field, private-access and exception contract.
 
-Other language receivers, inherited classes, private/dunder Python methods, Python/Node private class data, slots/native storage, arbitrary mutable arguments and Python asynchronous calls remain unsupported. Node supports awaiting an ordinary async method and [ordered calls/release with bounded Node collection](ordered-sequences.md); arbitrary targets, scheduler and iteration sequences remain open. They remain visible gaps rather than passing skipped tests.
+[Go fixtures](go-receivers.md) use an existing same-package scalar factory and capture supported private struct/array slots, pointer aliases and package globals. The [exact-revision corpus](qualification/go-receivers-2026-10-20.json) completes nine cases and 168 actual launches: six matches, three same-return state/alias differences, all generated/exported routes, scalar shrinking/replay and thirteen refusal controls.
+
+C/C++/Rust receivers, inherited classes, private/dunder Python methods, Python/Node private class data, slots/native storage, arbitrary mutable arguments and Python asynchronous calls remain unsupported. Node supports awaiting an ordinary async method and [ordered calls/release with bounded Node collection](ordered-sequences.md); arbitrary targets, scheduler and iteration sequences remain open. They remain visible gaps rather than passing skipped tests.
 
 ## Declare a constructor
 

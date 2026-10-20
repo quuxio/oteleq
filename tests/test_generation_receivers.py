@@ -110,7 +110,7 @@ def outer():
                 continue
             self.assertNotIn('python_receiver_class', item)
             self.assertTrue(item['reason'])
-        candidate = {'language': 'go', 'reason': ''}
+        candidate = {'language': 'c', 'reason': ''}
         gen.receiver_fixture(candidate, {'functions': []}, {'factory': 'make', 'arguments': []})
         self.assertIn('ordinary Python', candidate['reason'])
 

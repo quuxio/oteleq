@@ -14,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "adapters/generatio
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "examples"))
 import generation
 import go_project
+import go_receivers
 import harness
 import policy
 
@@ -102,6 +103,115 @@ class GoProjectTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "resolved binding"):
             go_project.rename_entrypoint("package main\n", [0])
 
+    def test_compiler_storage_binds_private_fields_aliases_cycles_and_sibling_factories(self):
+        source = self.source("counter/api.go", '''package counter
+type Number int16
+type Alias = Number
+type State struct { Value uint64 }
+type Counter struct {
+ number Number `json:"number"`
+ self *Counter
+ bytes [2]uint8
+ label string
+ active bool
+ single float32
+ double float64
+ State
+}
+var root *Counter
+func (value *Counter) Add(amount Alias) *Counter { return value }
+func init(){panic("APPLICATION_INITIALISER_MUST_NOT_RUN")}
+''')
+        self.source("counter/factory.go", "package counter\n//line logical-source.go:400\nfunc New(value Number)*Counter{return &Counter{number:value}}\n")
+        before = generation.manifest(self.snapshot)
+        discovered = self.discover(source)
+        prefix = "example.test/service/counter."
+        method = next(row for row in discovered["functions"] if row["name"] == "Counter.Add")
+        self.assertEqual(method["go_receiver"], "*" + prefix + "Counter")
+        self.assertEqual(method["go_parameters"], [prefix + "Number"])
+        self.assertEqual(method["go_parameter_types"], ["Alias"])
+        self.assertEqual(method["go_result"], "*" + prefix + "Counter")
+        self.assertEqual(method["reason"], "instance method requires a receiver fixture")
+        models = discovered["go_types"]
+        self.assertEqual(models[prefix + "Number"], {"kind": "integer", "bits": 16, "signed": True})
+        self.assertNotIn(prefix + "Alias", models)
+        self.assertEqual(models["*" + prefix + "Counter"], {"kind": "pointer", "element": prefix + "Counter"})
+        fields = models[prefix + "Counter"]["fields"]
+        self.assertEqual(fields[0], {"name": "number", "type": prefix + "Number", "embedded": False,
+                                     "package": "example.test/service/counter", "tag_hex": b'json:"number"'.hex()})
+        self.assertEqual(fields[-1]["type"], prefix + "State")
+        self.assertTrue(fields[-1]["embedded"])
+        self.assertEqual(fields[-1]["package"], "")
+        self.assertEqual(models["[2]uint8"], {"kind": "array", "element": "uint8", "length": 2})
+        self.assertEqual(models["float32"], {"kind": "float", "bits": 32})
+        self.assertEqual(models["float64"], {"kind": "float", "bits": 64})
+        self.assertEqual(discovered["go_global_types"], {"root": "*" + prefix + "Counter"})
+        factory = next(row for row in discovered["go_functions"] if row["name"] == "New")
+        self.assertEqual(factory["go_source"], "factory.go")
+        self.assertEqual(factory["go_parameters"], [prefix + "Number"])
+        self.assertEqual(factory["go_result"], method["go_receiver"])
+        self.assertEqual(generation.manifest(self.snapshot), before)
+
+    def test_opaque_and_generic_storage_stays_explicit_in_semantic_inventory(self):
+        source = self.source("counter/api.go", '''package counter
+import "time"
+type Opaque struct { queue chan int; values []int; lookup map[string]int; callback func(); foreign time.Time; any interface{} }
+type Blank struct { _ int }
+type Anonymous struct { child struct{ Value int } }
+type Oversize struct { values [4097]int }
+type Box[T any] struct { value T }
+func (value *Box[T]) Get() int {return 0}
+func selected(value int) int{return value}
+func opaque()*Opaque{return nil}
+func blank()*Blank{return nil}
+func anonymous()*Anonymous{return nil}
+func oversized()*Oversize{return nil}
+func generic()*Box[int]{return nil}
+''')
+        discovered = self.discover(source)
+        models = discovered["go_types"]
+        prefix = "example.test/service/counter."
+        for type_ in ("chan int", "[]int", "map[string]int", "func()", "interface{}", "time.Time"):
+            self.assertEqual(models[type_]["kind"], "unsupported", type_)
+        for type_, reason in ((prefix + "Blank", "blank"), ("struct{Value int}", "named type"),
+                              ("[4097]int", "array storage"), (prefix + "Box[int]", "generic storage")):
+            self.assertEqual(models[type_]["kind"], "unsupported")
+            self.assertIn(reason, models[type_]["reason"])
+        method = next(row for row in discovered["functions"] if row["name"] == "Box.Get")
+        self.assertIn("generic callable", method["reason"])
+        self.assertEqual(self.entry(source, discovered)["status"], "ready")
+
+    def test_receiver_binding_freezes_only_reachable_storage_and_the_sibling_factory(self):
+        source = self.source("counter/api.go", '''package counter
+type Count int16
+type Counter struct { value Count; next *Counter; slots [2]int; label string; enabled bool; ratio float32 }
+type Unused struct { opaque chan int }
+var shared *Counter
+func (value *Counter) Add(amount Count) *Counter{return value}
+func unused()*Unused{return nil}
+''')
+        self.source("counter/factory.go", "package counter\nfunc New(seed Count)*Counter{return &Counter{value:seed}}\n")
+        discovered = self.discover(source)
+        entry = self.entry(source, discovered, "Counter.Add")
+        declaration = {"factory": "New", "arguments": [10]}
+        go_receivers.bind(entry, discovered, declaration, harness.concrete_arguments)
+        prefix = "example.test/service/counter."
+        self.assertEqual(entry["receiver_class"], "Counter")
+        self.assertEqual(entry["go_receiver_type"], "*" + prefix + "Counter")
+        self.assertEqual(entry["go_root_types"], {"receiver": "*" + prefix + "Counter",
+                                                 "argument:0": prefix + "Count", "global:shared": "**" + prefix + "Counter"})
+        self.assertEqual(entry["receiver_fixture"]["source_path"], "services/api/counter/factory.go")
+        self.assertEqual(entry["receiver_fixture"]["source_function"], "services.api.counter.factory.New")
+        self.assertEqual(entry["receiver_fixture"]["argument_types"], ["int16"])
+        self.assertEqual(entry["receiver_fixture"]["arguments"], [10])
+        self.assertEqual(entry["receiver_configuration"], declaration)
+        self.assertNotIn(prefix + "Unused", entry["go_models"])
+        self.assertEqual(entry["reason"], "")
+        for invalid in ({"factory": "Missing", "arguments": []}, {"factory": "New", "arguments": [2**100]}):
+            candidate = self.entry(source, discovered, "Counter.Add")
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                go_receivers.bind(candidate, discovered, invalid, harness.concrete_arguments)
+
     def test_startup_methods_and_inactive_build_files_remain_explicit_inventory(self):
         source = self.source("counter/api.go", "package counter\ntype Count int\nfunc init(){}\nfunc init(){}\nfunc (*Count) Read()int{return 0}\nfunc selected(v int)int{return v}\n")
         inactive = self.source("counter/other.go", "//go:build oteleq_other\n\npackage counter\nfunc alternative(v int)int{return v}\n")
@@ -133,6 +243,9 @@ class GoProjectTests(unittest.TestCase):
         sibling.write_text("package counter\n")
         (self.module / go_project.COMMAND_DIRECTORY).mkdir()
         self.assertIn("command directory", self.discover(source)["functions"][0]["reason"])
+        (self.module / go_project.COMMAND_DIRECTORY).rmdir()
+        (self.module / go_project.OBSERVER_DIRECTORY).mkdir()
+        self.assertIn("observer directory", self.discover(source)["functions"][0]["reason"])
 
     def test_invalid_project_context_keeps_each_syntactic_callable_visible(self):
         source = self.source("counter/api.go", "package counter\nfunc one(){}\nfunc two(){}\n")

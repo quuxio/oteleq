@@ -1,0 +1,140 @@
+{
+  "qualification_schema_version": 1,
+  "date": "2026-10-20",
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "platform": {
+    "os": "macOS",
+    "architecture": "ARM64",
+    "go": "1.27.2",
+    "python": "3.12.15"
+  },
+  "runtime": {
+    "commit": "9dcdfdbb84eb97e2acae9d4066f61c1dc72aece4",
+    "tree": "d6475a45f339acd0498718c50d5b792fce08c0f9",
+    "source_archive_sha256": "5e4e741ae2802fc182d55374fbc020a74ddb6fedf39017dbe424717d4d90d139",
+    "cli_sha256": "5542c79c3705fc057f9032ea0cdf81e22a7a22eed891c44e642f37904754f2fb",
+    "provider_commit": "d6d03b72026cde8962b11ce3cc184ff3ebcb60d4",
+    "provider_manifest_sha256": "2a8dbf239c6444c0fb536dff049993beade7eaed6578c9654c1e2d7233e9431f",
+    "generator_sha256": "51b5c7249d4e53193016889872dd4e2a3e311ef696b19b8e54d1f40b33867750",
+    "qualification_script_sha256": "98e3fcb01754e258a79a211cf41488272670d86ec608eab17a771517e06392be"
+  },
+  "provider": {
+    "verified_at": "2026-10-20T17:57:52.170661+00:00",
+    "provider_commit": "d6d03b72026cde8962b11ce3cc184ff3ebcb60d4",
+    "provider_tree": "a577aa88d5d51f4e86bc0858bcd233be7b01c251",
+    "manifest_sha256": "2a8dbf239c6444c0fb536dff049993beade7eaed6578c9654c1e2d7233e9431f",
+    "verified_records": 7360,
+    "counts": {
+      "source_sha256": 413,
+      "products_sha256": 586,
+      "dependencies": 6361
+    },
+    "symlinks": 11,
+    "external_tools_verified": 8,
+    "cli_sha256": "037fb837ea1a3e982e9cb0d62f00b8c70c9709f25178fe936b189c2c1721c486",
+    "profile_relocation": {
+      "original_sha256": "091b340d6ed90eaa54a025719fde13abb1420c85058f864dd6d69242013c97c7",
+      "retained_sha256": "425bf561b3c2772162d95e44773cdf6660e1522b62f8fed946714fe3d1737539"
+    },
+    "scope": "Content verified before/after this corpus; frozen d6d03b7 identity, not a claim about later producer revisions.",
+    "verification_script_sha256": "5b2e4c5b12fc2ccb3b3181011db9c595f1ab75fe2d4010fff83547185c556ea5"
+  },
+  "inventory": {
+    "callables": 28,
+    "ready": 9,
+    "excluded": 19,
+    "blocked": 0
+  },
+  "results": {
+    "claim": "equivalence over these tests and observations",
+    "artefact_class": "diagnostic",
+    "cli_sha256": "5542c79c3705fc057f9032ea0cdf81e22a7a22eed891c44e642f37904754f2fb",
+    "cases": 9,
+    "matching_cases": 6,
+    "difference_controls": 3,
+    "actual_application_launches": 168,
+    "source_preserved": true,
+    "prelaunch_source_refusals": 4,
+    "retained_attempt_folders": 172,
+    "unique_command_identities": 168,
+    "fixture_refusals": {
+      "refusal_controls": 9,
+      "actual_application_launches": 8,
+      "prelaunch_refusals": 4,
+      "incomplete_fixture_or_observer": 4,
+      "initial_state_blocks": 1
+    },
+    "scope": "Declared same-package scalar factories, private struct/array slots, aliases/cycles, scalar panics and nil/value receivers. No maps/slices/interfaces, arbitrary arguments/actions, cross-boundary allocation identity or shipping qualification.",
+    "routes": [
+      "run",
+      "generated",
+      "exported-run",
+      "exported-framework",
+      "shrink",
+      "replay"
+    ],
+    "qualified_application_launches": 160,
+    "incomplete_fixture_launches": 4,
+    "initial_state_blocked_launches": 4,
+    "scalar_shrink": {
+      "original": [
+        3
+      ],
+      "reduced": [
+        0
+      ]
+    },
+    "refusal_controls": 13
+  },
+  "independent_verification": {
+    "source_files_verified": 202,
+    "qualified_reports_verified": 25,
+    "refusal_reports_verified": 9,
+    "qualified_attempt_records_verified": 164,
+    "qualified_actual_launches": 160,
+    "copied_original_shrink_attempts": 4,
+    "actual_application_launches": 168,
+    "retained_attempt_folders": 172,
+    "unique_command_identities": 168,
+    "raw_records": 91821,
+    "bundle_file_records_verified": 3080,
+    "unique_loaded_inputs_verified": 8025,
+    "raw_manifest_sha256": "e728acf4f9dba06db0a085b09362a1f7f8b11017df086c55c4396d45eca2995b",
+    "source_preserved": true,
+    "verifier_sha256": "a287bf411ca00a25f278515fbd8e884d97ae1dac1061d6b7f9bacd5b2f880205"
+  },
+  "validation": {
+    "make_check": "passed",
+    "unique_regressions": 468,
+    "python_regressions": 381,
+    "rust_regressions": 66,
+    "node_regressions": 17,
+    "go_regressions": 4,
+    "rust_product_line_coverage_percent": 97.24,
+    "go_observer_statement_coverage_percent": 97.58,
+    "go_receiver_line_coverage_percent": 99,
+    "go_graph_line_coverage_percent": 98,
+    "sonar_unresolved": 0
+  },
+  "scope": {
+    "observed": "Declared same-package scalar factories, pointer/value/nil receivers, private struct and array slots, package globals, raw string bytes, scalar bits, primitive panics, cycles, interior aliases and shared storage across typed pointer views. Main-package identities and returned value copies are separately checked.",
+    "private_observer_schema_version": 2,
+    "witness": "Existing name-bound decoded function/span witness; invocation-scoped producer binding remains unavailable.",
+    "not_qualified": [
+      "shipping artefacts",
+      "maps/slices/interfaces/channels/functions/unsafe pointer storage",
+      "foreign or anonymous structs and generic storage",
+      "float32 NaN payloads",
+      "non-primitive panic payloads",
+      "arbitrary mutable arguments or external factories",
+      "imported-package globals",
+      "cross-boundary allocation identity",
+      "goroutine or arbitrary resource/action sequences",
+      "cgo/workspaces/general build recipes",
+      "other platforms/toolchains",
+      "arbitrary overlapping storage from unsafe address arithmetic"
+    ],
+    "identity_limit": "Recorded source/dependency inputs and selected compiler/runtime tools; not a general OS-library or shipping build closure."
+  }
+}
