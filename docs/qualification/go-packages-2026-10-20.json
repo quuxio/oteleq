@@ -1,0 +1,323 @@
+{
+  "qualification_schema_version": 1,
+  "date": "2026-10-20",
+  "platform": {
+    "os": "macOS",
+    "architecture": "ARM64",
+    "go": "go1.27.2",
+    "python": "3.12.15"
+  },
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "runtime": {
+    "commit": "5c18f1b5574a6b1b8934848797759afec3ba463d",
+    "cli_sha256": "b86f25d1cc3b61b620c7694ff5d9097dc99d432681f4a4eede7dc90185af834c",
+    "qualification_script_sha256": "2d0151d89c053e988453797d21a4a75ca3cf12bb98b7f63b6597c86f55d38b5b",
+    "qualification_script_commit": "e909540e8e627e77475b35fbc4c8641ca5826627",
+    "application_code_unchanged_by_checker_fix": true
+  },
+  "provider": {
+    "source_commit": "5ea90fafb38c8dfcc452b01f6d3154e523494b40",
+    "manifest_sha256": "9cc80bf560e3b4683e9e76162872857ea3fb3a1a3803a4fb6d03c2cdc599614a",
+    "verified_files": 375,
+    "products": {
+      "cli": {
+        "path": "target/debug/quux-otelc",
+        "sha256": "a03ab019f0de3197d26d6c1327ae518ceb8d817a0b060f0df4776c00d555861d"
+      },
+      "adapter": {
+        "path": "adapters/go/build/otelc-go",
+        "sha256": "0de8d842f148c4d55b150f32e7d5416da9193a13fc4d99aa9efc113bb66e172d"
+      }
+    },
+    "canonical_merge": "0624ffdb2a02c80b0a7952f9dcd80f4b3fdd3c82",
+    "verified_at": "2026-10-20T04:32:59.238159+00:00",
+    "source_tree": "f64ba9a6fe7dc00a8b2f28d754cc2b1a40e9fb37",
+    "status": "Qualified frozen products; the identical full source tree is merged through otelc PR91. Canonical rebuilds/releases remain separate products."
+  },
+  "results": {
+    "claim": "equivalence over these tests and observations",
+    "artefact_class": "diagnostic",
+    "cli_sha256": "b86f25d1cc3b61b620c7694ff5d9097dc99d432681f4a4eede7dc90185af834c",
+    "cases": 6,
+    "matching_cases": 5,
+    "difference_controls": 1,
+    "actual_application_launches": 112,
+    "source_preserved": true,
+    "prelaunch_source_refusals": 3,
+    "scope": "Ordinary source modules/packages, sibling state, imported named scalar types, fixed tags, nested in-snapshot local replacement; no generic/method/cgo/workspace/shipping qualification.",
+    "completion": "Initial driver stopped after108 launches because its copied-evidence checker assumed a new build path. Fixed checker revalidated all108 unchanged retained launches; then four final replay launches completed. RuntimeCLI/code unchanged.",
+    "qualification_script_sha256": "2d0151d89c053e988453797d21a4a75ca3cf12bb98b7f63b6597c86f55d38b5b"
+  },
+  "source_sha256": "79a9157ce43461b733d7e763eaeb4b1622ce3ed984e945c20715a738724a6f41",
+  "inventory": {
+    "total": 12,
+    "ready": 6,
+    "excluded": 6,
+    "blocked": 0
+  },
+  "callables": [
+    {
+      "function": "internal.counter.api.selected",
+      "runtime_function": "internal.counter.api.selected",
+      "arguments": [
+        7
+      ],
+      "exit_code": 0,
+      "package": {
+        "directory": "internal/counter",
+        "files": [
+          "internal/counter/api.go",
+          "internal/counter/state.go"
+        ],
+        "import_path": "example.test/root/internal/counter",
+        "main_renames": {
+          "internal/counter/api.go": [],
+          "internal/counter/state.go": []
+        },
+        "module_root": ".",
+        "package": "counter",
+        "shadowed_recovery": false
+      }
+    },
+    {
+      "function": "internal.counter.api.state_difference",
+      "runtime_function": "internal.counter.api.state_difference",
+      "arguments": [
+        7
+      ],
+      "exit_code": 1,
+      "package": {
+        "directory": "internal/counter",
+        "files": [
+          "internal/counter/api.go",
+          "internal/counter/state.go"
+        ],
+        "import_path": "example.test/root/internal/counter",
+        "main_renames": {
+          "internal/counter/api.go": [],
+          "internal/counter/state.go": []
+        },
+        "module_root": ".",
+        "package": "counter",
+        "shadowed_recovery": false
+      }
+    },
+    {
+      "function": "internal.counter.api.fail",
+      "runtime_function": "internal.counter.api.fail",
+      "arguments": [
+        7
+      ],
+      "exit_code": 0,
+      "package": {
+        "directory": "internal/counter",
+        "files": [
+          "internal/counter/api.go",
+          "internal/counter/state.go"
+        ],
+        "import_path": "example.test/root/internal/counter",
+        "main_renames": {
+          "internal/counter/api.go": [],
+          "internal/counter/state.go": []
+        },
+        "module_root": ".",
+        "package": "counter",
+        "shadowed_recovery": false
+      }
+    },
+    {
+      "function": "internal.counter.api.echo_float",
+      "runtime_function": "internal.counter.api.echo_float",
+      "arguments": [
+        -0.0
+      ],
+      "exit_code": 0,
+      "package": {
+        "directory": "internal/counter",
+        "files": [
+          "internal/counter/api.go",
+          "internal/counter/state.go"
+        ],
+        "import_path": "example.test/root/internal/counter",
+        "main_renames": {
+          "internal/counter/api.go": [],
+          "internal/counter/state.go": []
+        },
+        "module_root": ".",
+        "package": "counter",
+        "shadowed_recovery": false
+      }
+    },
+    {
+      "function": "services.api.cmd.api.selected",
+      "runtime_function": "cmd.api.selected",
+      "arguments": [
+        7
+      ],
+      "exit_code": 0,
+      "package": {
+        "directory": "services/api/cmd",
+        "files": [
+          "services/api/cmd/api.go",
+          "services/api/cmd/state.go"
+        ],
+        "import_path": "example.test/service/cmd",
+        "main_renames": {
+          "services/api/cmd/api.go": [
+            109
+          ],
+          "services/api/cmd/state.go": [
+            302
+          ]
+        },
+        "module_root": "services/api",
+        "package": "main",
+        "shadowed_recovery": false
+      }
+    },
+    {
+      "function": "tagged.api.selected",
+      "runtime_function": "tagged.api.selected",
+      "arguments": [
+        true
+      ],
+      "exit_code": 0,
+      "package": {
+        "directory": "tagged",
+        "files": [
+          "tagged/api.go"
+        ],
+        "import_path": "example.test/root/tagged",
+        "main_renames": {
+          "tagged/api.go": []
+        },
+        "module_root": ".",
+        "package": "tagged",
+        "shadowed_recovery": false
+      }
+    }
+  ],
+  "checks": {
+    "matching_cases": 5,
+    "deliberate_same_return_state_difference": true,
+    "root_state_before": 5,
+    "nested_state_before": 3,
+    "nested_state_after_with_original_main_call": 11,
+    "negative_zero_bits": "8000000000000000",
+    "expected_panic": "go.string",
+    "raw_stdout_except_tagged": "INIT\\xff\\n",
+    "raw_stderr_except_tagged": "ERR\\x00\\n",
+    "module_roots": [
+      ".",
+      "services/api"
+    ],
+    "build_tags": [
+      "oteleq_selected"
+    ],
+    "source_change_refusals": [
+      "go.mod",
+      "types/types.go",
+      "internal/counter/state.go"
+    ],
+    "build_and_working_directory_provenance": "Actual recorded module roots, active package inputs, selected compiler/flags, exact typed/witness identity; copied shrink evidence retains original provenance."
+  },
+  "launches": {
+    "initial_run": 24,
+    "generated_suite": 24,
+    "exported_run": 24,
+    "exported_suite": 24,
+    "shrink_original": 4,
+    "shrink_trial": 4,
+    "shrink_confirmation": 4,
+    "reduced_replay": 4,
+    "total": 112
+  },
+  "shrinking": {
+    "original_arguments": [
+      7
+    ],
+    "reduced_arguments": [
+      0
+    ],
+    "trials": 1,
+    "status": "candidate_rule_minimal",
+    "fresh_confirmation": true,
+    "fresh_replay": true
+  },
+  "local_gate": {
+    "regressions": 309,
+    "rust": 59,
+    "capture": 112,
+    "generation": 125,
+    "node": 13,
+    "rust_product_line_coverage_percent": 97.23,
+    "go_project_line_coverage_percent": 97,
+    "all_independent_coverage_floors_pass": true,
+    "subsequent_regression": "One additional test validates copied module provenance, bringing the publication regression count to310; its focused gate passes."
+  },
+  "review": {
+    "method": "Direct source review, retained negative controls and actual consumer qualification",
+    "runtime_ci": 39370260759,
+    "runtime_sonar_unresolved": 0,
+    "unresolved_review_threads": 0
+  },
+  "driver_correction": {
+    "initial_script_sha256": "6e6932e84b979c77c4365c357099e3bdeb6defb7905d9522843fe7fe2a546efb",
+    "completed_launches_before_checker_stop": 108,
+    "reason": "The checker compared copied shrink evidence with its copy location instead of original recorded build/CWD provenance. Runtime applications/comparisons had succeeded.",
+    "revalidation": "The corrected checker independently reread and accepted all108 retained launches; four remaining replay launches then completed. The initial failure log and corrected log are both retained.",
+    "runtime_cli_unchanged": true
+  },
+  "development_evidence": {
+    "host_setup_refusals": {
+      "application_launches": 0,
+      "reason": "Initial plan used an unqualified Python host; selecting the qualified host correctly required a new plan."
+    },
+    "library": {
+      "qualified_launches": 4
+    },
+    "nested_before_binding_fix": {
+      "application_launches": 4,
+      "state": "incomplete: raw comparisons reached the typed comparator, which rejected the unbound repository/module function identity"
+    },
+    "repaired_nested_and_tagged": {
+      "qualified_launches": 8
+    },
+    "scope": "Development evidence is retained separately and is not included in the final112-launch count."
+  },
+  "retention": {
+    "archive": "/Users/sclarke/Documents/oteleq-qualification/2026-10-20/go-packages-5c18f1b",
+    "runtime": "5c18f1b5574a6b1b8934848797759afec3ba463d",
+    "raw_files": {
+      "final": 6666,
+      "development-host-refusals": 56,
+      "development-library-and-incomplete-binding": 494,
+      "development-repaired-binding": 494
+    },
+    "provider_source": "5ea90fafb38c8dfcc452b01f6d3154e523494b40",
+    "provider_verified_files": 375,
+    "retained_input_records": 5584,
+    "unique_input_contents": 2029,
+    "cache_scope": "Derived compiler/module caches omitted; actual binaries, channels, source/suites/metadata and loaded source/compiler bytes retained and independently hash-verified.",
+    "limits": "Diagnostic evidence, not signed shipping attestation. Development host refusals and the earlier four-attempt typed-binding failure remain distinct from final qualification."
+  },
+  "limitations": [
+    "Ordinary source module/package scalar diagnostics; methods, generic instances, object/factory/effect codecs and test-package execution remain open.",
+    "Cgo/assembly/SWIG/workspaces, arbitrary build recipes, cross compilation and SDK dependency isolation remain open.",
+    "No recording-off/exporter-fault lane, application overhead budget or shipping qualification.",
+    "This source/loaded-input evidence is not a sealed system closure or signed artefact attestation.",
+    "The earlier rendered-report visual decision remains a separate pending merge gate."
+  ],
+  "publication_gate": {
+    "regressions": 310,
+    "rust": 59,
+    "capture": 112,
+    "generation": 126,
+    "node": 13,
+    "rust_product_line_coverage_percent": 97.23,
+    "go_project_line_coverage_percent": 97,
+    "all_independent_coverage_floors_pass": true,
+    "application_code_unchanged_from_qualified_runtime": true
+  }
+}
