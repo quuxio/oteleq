@@ -25,7 +25,7 @@ The domain array follows parameter order. Each original concrete case and its ac
 | `integer` | `minimum`, `maximum` | Ordered integer endpoints, at most 4096 bits. Values must be integral, including integral Node `Number` representations; the language's scalar type limits still apply. Try the value closest to zero, then progressively smaller binary deltas and a unit step. |
 | `float` | `minimum`, `maximum` | Ordered finite numeric endpoints. Try the domain value closest to zero, binary deltas and a neighbour in the actual 32/64-bit representation. Positive zero is simpler than negative zero. |
 | `boolean` | No additional fields | Try `false` before `true`. |
-| `string` | `minimum_length`, `maximum_length`, `alphabet` | Lengths from 0 to 4096 and an ordered alphabet of 1 to 256 distinct Unicode scalar characters. Try a minimum-length string, chunk deletion and character simplification. |
+| `string` | `minimum_length`, `maximum_length`, `alphabet` | Lengths count Unicode scalar characters, from 0 to 4096; they do not count UTF-8 bytes or UTF-16 code units. Use an ordered alphabet of 1 to 256 distinct Unicode scalars. Try a minimum-length string, chunk deletion and character simplification. |
 
 All fields are explicit; unknown fields and unsupported domain kinds are rejected. Integer/boolean/string parameter types remain strict. The `float` domain accepts finite numeric requests; the language adapter controls their actual representation. Bounds apply after coercion too: a decimal endpoint may exclude its rounded float32 representation. Supported strings follow the adapter's existing codec. A domain cannot enable a blocked argument type, receiver or build context.
 
@@ -63,3 +63,15 @@ A retained counterexample exits `1`, including budget-limited results. Argument 
 The printed workspace has a frozen one-case corpus and explicit exclusions for the other inventoried callables. Use its case ID for `replay`, run its generated `tests/test_equivalence.py`, or use `export-tests` with a new destination and explicit `--apply`. Its normal comparison continues to fail while the instrumentation difference exists. Keep the whole shrink report if the search history is required; exporting the final suite retains that concrete replay experiment. `clean` accepts the owned final workspace after its normal preservation checks.
 
 Qualification of actual producers and platforms is recorded separately. Unit tests with controlled comparison results prove the search/ownership contracts; they do not establish an otelc runtime result.
+
+The [20 October diagnostic qualification](qualification/shrinking-2026-10-20.json) records 11 cases and 472 actual launches across all eight language IDs, with independent value checks, fresh confirmations, generated unittest execution, replay/export and altered-witness refusal controls. It names the exact consumer, provider and retained corpus. Its Python float case is intentionally budget-limited; no minimum is claimed for it.
+
+Contributors can reproduce that maintained diagnostic workflow with a compatible qualified provider and the selected language tools:
+
+```sh
+make generation-shrink-otelc PYTHON="$OTELEQ_PYTHON" \
+  OTELC_ROOT=/absolute/path/to/qualified/provider \
+  REPORT_DIR=/absolute/path/to/new-qualification
+```
+
+The fixtures deliberately inspect instrumentation/runtime presence, including SDK symbols in the Rust diagnostic binary. They are controlled differences for testing the process. A provider or build which changes those conditions needs fresh fixture qualification.
