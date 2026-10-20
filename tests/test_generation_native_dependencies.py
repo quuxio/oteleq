@@ -43,8 +43,8 @@ class NativeDependencyTests(unittest.TestCase):
             'clang-module-deps': [], 'command-line': ['-cc1', 'app.c'], 'file-deps': ['/source/app.c'],
             'input-file': '/source/app.c', 'executable': '/tools/clang'}]}]}
 
-    def test_unknown_modules_variants_inputs_compilers_and_duplicate_paths_refuse(self):
-        for alteration in ('module', 'units', 'commands', 'input', 'compiler', 'paths', 'unknown',
+    def test_unknown_modules_variants_inputs_compilers_and_invalid_arguments_refuse(self):
+        for alteration in ('module', 'units', 'commands', 'input', 'compiler', 'unknown',
                            'empty-arguments', 'nul-argument', 'oversized-argument', 'oversized-context'):
             value = self.document()
             command = value['translation-units'][0]['commands'][0]
@@ -53,7 +53,6 @@ class NativeDependencyTests(unittest.TestCase):
             elif alteration == 'commands':value['translation-units'][0]['commands'] *= 2
             elif alteration == 'input':command['input-file'] = '/other.c'
             elif alteration == 'compiler':command['executable'] = '/other/compiler'
-            elif alteration == 'paths':command['file-deps'] *= 2
             elif alteration == 'empty-arguments':command['command-line'] = []
             elif alteration == 'nul-argument':command['command-line'] = ['-cc1', 'bad\0argument']
             elif alteration == 'oversized-argument':command['command-line'] = ['x' * 8193]
@@ -64,6 +63,12 @@ class NativeDependencyTests(unittest.TestCase):
                 native_dependencies.dependency_paths(raw, Path('/source/app.c'), Path('/tools/clang'))
         raw = json.dumps(self.document()).encode()
         self.assertEqual(native_dependencies.dependency_paths(raw, Path('/source/app.c'), Path('/tools/clang')), ['/source/app.c'])
+
+    def test_repeated_legitimate_includes_keep_one_file_identity(self):
+        data = self.document()
+        data['translation-units'][0]['commands'][0]['file-deps'] = ['/source/app.c', '/source/macros.def', '/source/macros.def']
+        self.assertEqual(native_dependencies.dependency_paths(json.dumps(data).encode(), Path('/source/app.c'),
+                         Path('/tools/clang')), ['/source/app.c', '/source/macros.def'])
 
 
 if __name__ == '__main__':

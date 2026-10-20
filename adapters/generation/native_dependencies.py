@@ -1,6 +1,7 @@
 """Freeze actual Clang dependency identities from the matched scanner's JSON."""
 import hashlib
 import json
+import os
 from pathlib import Path
 
 from otelc_capture import strict_json
@@ -48,8 +49,24 @@ def dependency_paths(raw: bytes, source: Path, compiler: Path) -> list[str]:
     require(type(paths) is list and 1 <= len(paths) <= MAX_FILES and
             all(type(item) is str and 0 < len(item) <= 8192 and "\0" not in item for item in paths),
             "invalid dependency path set")
-    require(len(paths) == len(set(paths)), "duplicate dependency paths")
-    return paths
+    # Repeated includes are legitimate, notably X-macro .def/.inc files and
+    # assert headers. Keep the raw scanner output; hash each file identity once.
+    return list(dict.fromkeys(paths))
+
+
+def file_records(names: list[str], project: Path, directory: Path) -> dict:
+    """Preserve logical path bindings as well as the bytes at their actual targets."""
+    records = {}
+    for name in names:
+        logical = Path(os.path.abspath(directory / name))
+        path = logical.resolve(strict=True)
+        require(path.is_file(), "dependency is not a regular file")
+        with path.open("rb") as stream:
+            sha = hashlib.file_digest(stream, "sha256").hexdigest()
+        records[str(logical.absolute())] = {"resolved": str(path), "sha256": sha,
+            "source_relative": path.relative_to(project.resolve()).as_posix()
+            if path.is_relative_to(project.resolve()) else None}
+    return records
 
 
 def inspect(unit: dict, project: Path, compiler: Path, scanner: Path, evidence: Path, execute) -> dict:
@@ -66,18 +83,7 @@ def inspect(unit: dict, project: Path, compiler: Path, scanner: Path, evidence: 
                       "-mode=preprocess", "-j", "1"], directory)
     require(result.returncode == 0, "compiler dependency scan failed: " + result.stderr.decode(errors="replace")[-2000:])
     (evidence / "dependencies.json").write_bytes(result.stdout)
-    records = {}
-    for name in dependency_paths(result.stdout, source, compiler):
-        logical = Path(name)
-        if not logical.is_absolute():
-            logical = directory / logical
-        path = logical.resolve(strict=True)
-        require(path.is_file(), "dependency is not a regular file")
-        with path.open("rb") as stream:
-            sha = hashlib.file_digest(stream, "sha256").hexdigest()
-        records[str(logical.absolute())] = {"resolved": str(path), "sha256": sha,
-            "source_relative": path.relative_to(project.resolve()).as_posix()
-            if path.is_relative_to(project.resolve()) else None}
+    records = file_records(dependency_paths(result.stdout, source, compiler), project, directory)
     require(str(source.resolve()) in {item["resolved"] for item in records.values()},
             "compiler omitted the selected translation unit")
     require(not (evidence / "unused.o").exists(), "dependency scan unexpectedly compiled an object")

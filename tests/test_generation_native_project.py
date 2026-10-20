@@ -102,6 +102,16 @@ class NativeProjectTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'selected qualified compiler'):
             self.load(compiler=Path('/not/the/selected/compiler'))
 
+    def test_long_compiler_options_cannot_be_reinterpreted_as_joined_include_paths(self):
+        for name in ('-pch', '-after', '-'):
+            (self.root / 'build' / name).mkdir()
+        for flag in ('-include-pch', '-isystem-after', '-I-'):
+            record = copy.deepcopy(self.record)
+            record['arguments'].append(flag)
+            self.write_database([record])
+            with self.subTest(flag=flag), self.assertRaisesRegex(ValueError, 'unsupported project compiler flag'):
+                self.load()
+
     def test_metadata_and_target_validation_is_strict_and_inputs_remain_unchanged(self):
         original = (self.root / 'src/app.c').read_bytes()
         for update in ({'extra': True}, {'directory': 'build'}, {'file': '../missing.c'}, {'output': 'wrong.o'}):
@@ -140,26 +150,26 @@ class NativeProjectTests(unittest.TestCase):
 
     def test_preparation_binds_actual_headers_database_tools_and_ordered_target_units(self):
         with tempfile.TemporaryDirectory(prefix='native evidence ') as temporary:
-            scanner = self.compiler.resolve().with_name('clang-scan-deps')
             def execute(command, directory):
                 return subprocess.run(command, cwd=directory, capture_output=True, check=False, timeout=30)
+            evidence = Path(temporary)
             prepared = native_project.prepare(self.root, native_project.settings(self.configuration), 'c', self.compiler,
-                                              scanner, Path(temporary), execute)
+                                              evidence, execute)
             self.assertEqual(set(prepared['local_inputs']), {'build/compile_commands.json', 'src/app.c', 'include/config.h'})
             self.assertEqual(len(prepared['units']), 1)
             self.assertEqual(prepared['targets'][0]['units'], list(prepared['units']))
             self.assertEqual(prepared['external_inputs'], {})
-            native_project.verify(prepared)
+            native_project.verify(prepared, evidence, execute)
             header = self.root / 'include/config.h'
             original = header.read_bytes()
             header.write_text('#define OFFSET 99\n')
             with self.assertRaisesRegex(ValueError, 'build input changed'):
-                native_project.verify(prepared)
+                native_project.verify(prepared, evidence, execute)
             header.write_bytes(original)
             database = self.root / 'build/compile_commands.json'
             database.write_text(database.read_text() + ' ')
             with self.assertRaisesRegex(ValueError, 'build input changed'):
-                native_project.verify(prepared)
+                native_project.verify(prepared, evidence, execute)
 
     def test_retargeting_a_used_header_symlink_invalidates_the_frozen_input_binding(self):
         header = self.root / 'include/config.h'
@@ -171,13 +181,50 @@ class NativeProjectTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix='native alias evidence ') as temporary:
             def execute(command, directory):
                 return subprocess.run(command, cwd=directory, capture_output=True, check=False, timeout=30)
+            evidence = Path(temporary)
             prepared = native_project.prepare(self.root, native_project.settings(self.configuration), 'c', self.compiler,
-                self.compiler.resolve().with_name('clang-scan-deps'), Path(temporary), execute)
-            native_project.verify(prepared)
+                evidence, execute)
+            native_project.verify(prepared, evidence, execute)
             header.unlink()
             header.symlink_to('second.h')
             with self.assertRaisesRegex(ValueError, 'input path changed'):
-                native_project.verify(prepared)
+                native_project.verify(prepared, evidence, execute)
+
+    def test_existence_only_bytes_missing_probes_and_search_precedence_remain_bound(self):
+        (self.root / 'src/app.c').write_text('#if __has_include("present.h") && !__has_include("absent.h")\n'
+            'int selected(void){return 7;}\n#else\nint selected(void){return 9;}\n#endif\n')
+        present = self.root / 'include/present.h'
+        present.write_text('#error this file is only probed, never included\n')
+        original = present.read_bytes()
+        with tempfile.TemporaryDirectory(prefix='native probe evidence ') as temporary:
+            def execute(command, directory):
+                return subprocess.run(command, cwd=directory, capture_output=True, check=False, timeout=30)
+            evidence = Path(temporary)
+            prepared = native_project.prepare(self.root, native_project.settings(self.configuration), 'c',
+                                              self.compiler, evidence, execute)
+            self.assertIn('include/present.h', prepared['local_inputs'])
+            unit = next(iter(prepared['units'].values()))
+            self.assertEqual({item['name'] for item in unit['probes']}, {'present.h', 'absent.h'})
+            present.write_bytes(original + b'changed\n')
+            with self.assertRaisesRegex(ValueError, 'build input changed'):
+                native_project.verify(prepared, evidence, execute)
+            present.write_bytes(original)
+            absent = self.root / 'include/absent.h'
+            absent.write_text('now present\n')
+            with self.assertRaisesRegex(ValueError, 'preprocessor search results changed'):
+                native_project.verify(prepared, evidence, execute)
+            absent.unlink()
+            shadow = self.root / 'src/present.h'
+            shadow.write_bytes(original)
+            with self.assertRaisesRegex(ValueError, 'preprocessor search results changed'):
+                native_project.verify(prepared, evidence, execute)
+            shadow.unlink()
+            native_project.verify(prepared, evidence, execute)
+            key = next(iter(prepared['units']))
+            metadata = evidence / 'units' / key / 'metadata.json'
+            metadata.write_bytes(metadata.read_bytes() + b' ')
+            with self.assertRaisesRegex(ValueError, 'retained compiler metadata changed'):
+                native_project.verify(prepared, evidence, execute)
 
 
 if __name__ == '__main__':

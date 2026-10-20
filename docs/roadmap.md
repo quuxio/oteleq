@@ -40,6 +40,8 @@ Acceptance includes loader selection/witness, constructors and mutable receivers
 
 Deliver Clang/build-aware discovery, cmocka/Catch2 harnesses, valid native fixtures and typed observers, matched otelc LLVM wrapping and build inspection. Qualify optional native fuzz corpus discovery separately.
 
+The [native project foundations](native-project-context.md) now parse explicit compilation-database targets and retain matched compiler inventories, real input hashes and preprocessor existence probes. Public plan/build/replay/export integration and target-wide state observation remain open; the foundations do not qualify a project build.
+
 Acceptance includes typed buffers/aliasing, observable globals, internal-linkage access limits, exceptions, constructor/resource sequences, distinct C++ overload/template instances and no padding/uninitialised-memory comparison. Validate production artefact identity separately from helper/fuzz/sanitised builds. Publish exact ABI, compiler and platform qualification.
 
 ## Stage 5: Java

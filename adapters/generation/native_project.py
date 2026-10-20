@@ -6,9 +6,10 @@ from pathlib import Path, PurePosixPath
 import re
 import shlex
 import shutil
+import tempfile
 
 from otelc_capture import strict_json
-import native_dependencies
+import native_frontend
 
 MAX_DATABASE_BYTES = 16 * 1024 * 1024
 MAX_COMMANDS = 10000
@@ -143,7 +144,10 @@ def argument(arguments: list[str], position: int, directory: Path, root: Path) -
 def semantic_argument(arguments: list[str], position: int, directory: Path, root: Path) -> tuple[str, list, int]:
     """Canonicalise local paths while retaining ordered defines and compiler semantics."""
     value = arguments[position]
-    option = next((item for item in PATH_OPTIONS if value.startswith(item)), None)
+    # Long driver options overlap, for example -include and -include-pch.
+    # Their path values must be separate; only -I has a joined spelling here.
+    option = next((item for item in PATH_OPTIONS if value == item
+                   or (item == '-I' and value.startswith('-I') and value != '-I-')), None)
     if option:
         path, next_position = option_value(arguments, position, option)
         path = contained(path, directory, root, exists=True)
@@ -253,12 +257,12 @@ def digest(path: Path) -> str:
         return hashlib.file_digest(stream, 'sha256').hexdigest()
 
 
-def prepare(root: Path, options: dict, language: str, compiler: Path, scanner: Path,
-            evidence: Path, execute) -> dict:
-    """Freeze selected commands, target ordering and the compiler's real input set."""
+def prepare(root: Path, options: dict, language: str, compiler: Path, evidence: Path, execute) -> dict:
+    """Freeze actual commands, project ASTs, read inputs and existence-only probes."""
     root = root.resolve()
     require(not evidence.resolve().is_relative_to(root), 'build evidence must be outside application source')
     targets = load(root, options, language, compiler)
+    frontend = native_frontend.build(compiler, evidence / 'frontend', root, execute)
     database = options['compilation_database']
     local = {database: digest(root / database)}
     units, resolved_targets, external = {}, [], {}
@@ -267,16 +271,17 @@ def prepare(root: Path, options: dict, language: str, compiler: Path, scanner: P
         for item in target['units']:
             key = hashlib.sha256(json.dumps(item, sort_keys=True).encode()).hexdigest()
             if key not in units:
-                dependencies = native_dependencies.inspect(item, root, compiler, scanner, evidence / key, execute)
-                merge_inputs(dependencies, local, external)
-                units[key] = {**item, 'dependencies': dependencies}
+                metadata = evidence / 'units' / key
+                document = native_frontend.inspect(item, root, frontend, evidence / 'frontend', metadata, execute)
+                inputs = native_frontend.input_state(document, item, root)
+                merge_inputs(inputs['dependencies'], local, external)
+                units[key] = {**item, **inputs, 'metadata_sha256': digest(metadata / 'metadata.json')}
             selected.append(key)
         resolved_targets.append({'name': target['name'], 'units': selected, 'link_flags': target['link_flags']})
     prepared = {'source_root': str(root), 'language': language, 'database': database,
-                'compiler': {'path': str(compiler), 'sha256': digest(compiler)},
-                'scanner': {'path': str(scanner), 'sha256': digest(scanner)},
+                'compiler': {'path': str(compiler), 'sha256': digest(compiler)}, 'frontend': frontend,
                 'targets': resolved_targets, 'units': units, 'local_inputs': local, 'external_inputs': external}
-    verify(prepared)
+    verify(prepared, evidence, execute)
     return prepared
 
 
@@ -294,10 +299,13 @@ def merge_inputs(dependencies: dict, local: dict, external: dict) -> None:
             external[logical] = record
 
 
-def verify(prepared: dict) -> None:
-    """Detect changed original commands, local headers, SDK inputs and tools."""
+def verify(prepared: dict, evidence: Path, execute) -> None:
+    """Detect changed bytes, path bindings and positive or negative search results."""
     root = Path(prepared['source_root'])
-    for unit in prepared['units'].values():
+    native_frontend.verify(prepared['frontend'], evidence / 'frontend')
+    for key, unit in prepared['units'].items():
+        require(digest(evidence / 'units' / key / 'metadata.json') == unit['metadata_sha256'],
+                'retained compiler metadata changed: ' + key)
         for logical, record in unit['dependencies'].items():
             path = Path(logical)
             require(path.is_file() and str(path.resolve()) == record['resolved'],
@@ -310,7 +318,13 @@ def verify(prepared: dict) -> None:
         path = Path(name)
         require(str(path.resolve()) == record['resolved'] and path.is_file() and digest(path) == record['sha256'],
                 'external build input changed: ' + name)
-    for name in ('compiler', 'scanner'):
-        record = prepared[name]
-        require(Path(record['path']).is_file() and digest(Path(record['path'])) == record['sha256'],
-                'selected build tool changed: ' + name)
+    record = prepared['compiler']
+    require(Path(record['path']).is_file() and digest(Path(record['path'])) == record['sha256'],
+            'selected compiler changed')
+    checks = Path(tempfile.mkdtemp(prefix='input-check-', dir=evidence))
+    for key, unit in prepared['units'].items():
+        document = native_frontend.inspect(unit, root, prepared['frontend'], evidence / 'frontend',
+                                           checks / key, execute, mode='inputs')
+        state = native_frontend.input_state(document, unit, root)
+        require(state == {name: unit[name] for name in ('dependencies', 'probes')},
+                'compiler inputs or preprocessor search results changed: ' + unit['source'])
