@@ -84,6 +84,8 @@ Rust requires the [standalone build/run provider API](docs/automatic-generation.
 
 The default generates up to three distinct scalar cases per function and compares two plain with two instrumented runs per case. Missing instrumentation, changed source, unstable observations, failed builds and selected blockers fail the gate. The report records tested inputs, state coverage, telemetry and gaps. Syntax discovery and scalar samples do not establish business preconditions.
 
+Go freezes its provider module manifest/checksums and the runtime/imported policy sources. Changing those inputs after planning invalidates execution; downloaded third-party module caches remain outside that identity scope.
+
 Use repeated `--language ID`, `--exclude 'qualified.pattern'` and `--cases 1` through `--cases 1024` on `plan` to select a supported scope. [The CLI reference](docs/cli-and-configuration.md#implemented-commands) lists every public command and flag.
 
 ### Replay, retain or incorporate

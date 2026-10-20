@@ -188,8 +188,8 @@ def artefacts(root, language, tools, *, rust_backend="compiler"):
     elif language == "java":
         paths += [root / "adapters/java/target/java-agent-0.1.0-agent.jar"]
     elif language == "go":
-        paths += [root / "adapters/go/build/otelc-go", root / "adapters/go/go.sum"]
-        trees += [(root / "adapters/go/runtime", {".go"})]
+        paths += [root / "adapters/go/build/otelc-go", root / "adapters/go/go.mod", root / "adapters/go/go.sum"]
+        trees += [(root / "adapters/go/runtime", {".go"}), (root / "adapters/go/policy", {".go"})]
     elif language in ("javascript", "typescript"):
         paths += [root / "target/debug/otelc_node_observer.node", root / "adapters/node/package-lock.json"]
         paths += native_typescript_executables(root)
