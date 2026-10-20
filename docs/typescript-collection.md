@@ -58,3 +58,9 @@ make generation-typescript-sequence-otelc \
 ```
 
 Actual qualification must name exact consumer/provider products and compiler/runtime versions. Implementation tests and development launches do not establish a different provider's compatibility. The result remains **equivalence over these tests and observations**.
+
+## Published qualification
+
+The [20 October record](qualification/typescript-collection-2026-10-20.json) names runtime `3f6bd8e`, its frozen executable and provider `266e1ba` on macOS ARM64/Node24.21. Microsoft source 6.0.3 and native 7.0.2 each completed 132 actual launches: five matching cases, one detected temporary mutation and one correctly inconclusive retained receiver. Both generated/exported frameworks, scalar reduction/replay, six altered-evidence controls and a changed-source refusal passed per emitter. Source inputs were preserved.
+
+The actual older `c65a35c` provider blocked all seven collection targets per emitter before application launch. The full local gate passed 339 regressions with Rust line coverage at 97.29% and the new provider module at 95%; exact-runtime remote checks passed with zero Sonar findings. The 272 raw capture folders include eight byte-identical preserved original shrink attempts; there were 264 actual launches.
