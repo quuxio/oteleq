@@ -2,7 +2,7 @@
 
 ## Implemented slice
 
-[Automatic generation](automatic-generation.md) creates deterministic scalar cases, diagnostic callers and a retained independent `unittest` suite for all eight languages. It implements explicit inventory gaps, configured repeated plain/instrumented execution (at least two each), supported state observations, replay and portable export. Explicit scalar domain cases and seeded budgets are configured through [the project policy](automatic-generation.md#project-policy-and-concrete-fixtures). [Scalar shrinking](counterexample-shrinking.md) uses declared independent domains and retains its original/trial/final evidence. Object factories, inferred or relational preconditions, property frameworks and action sequences remain future work.
+[Automatic generation](automatic-generation.md) creates deterministic scalar cases, diagnostic callers and a retained independent `unittest` suite for all eight languages. It implements explicit inventory gaps, configured repeated plain/instrumented execution (at least two each), supported state observations, replay and portable export. Explicit scalar domain cases and seeded budgets are configured through [the project policy](automatic-generation.md#project-policy-and-concrete-fixtures). [Scalar shrinking](counterexample-shrinking.md) uses declared independent domains and retains its original/trial/final evidence. Declared [plain Python/JavaScript/TypeScript receiver fixtures](receiver-fixtures.md) retain fixed construction inputs through generated tests, export, replay and scalar method-argument shrinking. General object factories, inferred or relational preconditions, property frameworks and action sequences remain future work.
 
 ## Current workspace
 

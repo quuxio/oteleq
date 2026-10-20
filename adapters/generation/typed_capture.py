@@ -1,6 +1,7 @@
 """Closed worker codecs for versioned boundary graphs; never evaluate target text."""
 import base64
 from typing import Any
+import node_receivers
 
 from otelc_capture import strict_json
 
@@ -140,7 +141,7 @@ def python_node(node: dict) -> dict:
     return {"type": type_, "fields": fields}
 
 
-def dynamic_graph(graph: dict, language: str) -> dict:
+def dynamic_graph(graph: dict, language: str, declared_prototypes: tuple[str, ...] = ()) -> dict:
     require(type(graph) is dict and set(graph) == {"roots", "nodes"}, "invalid dynamic graph")
     require(type(graph["roots"]) is dict and type(graph["nodes"]) is list, "invalid dynamic graph records")
     nodes = []
@@ -152,7 +153,7 @@ def dynamic_graph(graph: dict, language: str) -> dict:
             require(set(node) == {"type", "fields", "prototype", "extensible"}, "unexpected Node fields")
             require(type(node.get("extensible")) is bool, "missing object extensibility capture")
             prototype = node.get("prototype")
-            require(prototype in ("null", "Object", "Array", "Error", "TypeError", "RangeError", "SyntaxError", "ReferenceError", "URIError", "EvalError", "AggregateError"), "unsupported prototype")
+            require(prototype in ("null", "Object", "Array", "Error", "TypeError", "RangeError", "SyntaxError", "ReferenceError", "URIError", "EvalError", "AggregateError") or prototype in declared_prototypes, "unsupported prototype")
             fields = own_fields(node["fields"], language, True)
             fields["meta:extensible"] = {"kind": "boolean", "value": node["extensible"]}
             converted = {"type": "ecmascript." + node["type"] + ".prototype:" + prototype, "fields": fields}
@@ -398,8 +399,9 @@ def required_roots(entry: dict) -> list[str]:
         roots.append("arguments")
     if "receiver_fixture" in entry:
         roots.append("receiver")
-        roots.extend("static:" + entry["python_receiver_class"] + "." + item["name"]
-                     for item in entry.get("python_class_roots", []))
+        owner = entry["receiver_class"]
+        fields = entry.get("python_class_roots", []) if entry["language"] == "python" else entry["node_class_roots"]
+        roots.extend("static:" + owner + "." + item["name"] for item in fields)
     return roots
 
 
@@ -409,11 +411,12 @@ def observation(raw: bytes, entry: dict, contract: dict) -> dict[str, Any]:
         capture = strict_json(raw)
         require(type(capture) is dict and set(capture) == {"before", "outcome", "after"}, "invalid dynamic boundaries")
         require(type(capture["outcome"]) is dict and set(capture["outcome"]) == {"kind", "value"}, "invalid dynamic outcome fields")
-        before = dynamic_graph(capture["before"], language)
-        after = dynamic_graph(capture["after"], language)
+        declared = (node_receivers.prototype_label(entry),) if "receiver_fixture" in entry and language != "python" else ()
+        before = dynamic_graph(capture["before"], language, declared)
+        after = dynamic_graph(capture["after"], language, declared)
         kind = capture["outcome"]["kind"]
         require(kind in ("return", "error"), "invalid dynamic outcome")
-        outcome = {"kind": kind, "graph": dynamic_graph(capture["outcome"]["value"], language)}
+        outcome = {"kind": kind, "graph": dynamic_graph(capture["outcome"]["value"], language, declared)}
         if kind == "error":
             outcome["category"] = "exception"
     else:
