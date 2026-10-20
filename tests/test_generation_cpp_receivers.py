@@ -109,3 +109,8 @@ int main(){return __oteleq_cpp::access<sample::Counter>::run()==16?0:1;}
         source = SOURCE.replace("value_ += amount;", "static int hidden=0;hidden+=amount;value_+=amount;")
         with self.assertRaisesRegex(ValueError, "function-local static"):
             self.contract(source=source)
+
+    def test_thread_local_storage_is_a_visible_gap_before_factory_execution(self):
+        source = SOURCE + '\nthread_local int hidden=0;\n'
+        with self.assertRaisesRegex(ValueError, "thread-local"):
+            self.contract(source=source)

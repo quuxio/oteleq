@@ -124,7 +124,7 @@ class Inventory:
         if original and kind in ("TypeAliasDecl", "TypedefDecl"):
             type_ = node.get("type", {})
             self.aliases["::".join((*scope, name))] = type_.get("desugaredQualType", type_.get("qualType", "unknown"))
-        if original and kind == "VarDecl" and not inside:
+        if original and kind == "VarDecl" and not inside and not node.get("tls"):
             type_ = node.get("type", {})
             self.globals["::".join((*scope, name))] = {"scope": "::".join(scope),
                     "type": type_.get("desugaredQualType", type_.get("qualType", "unknown"))}

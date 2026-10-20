@@ -54,7 +54,7 @@ Clang's complete AST JSON currently has a 64 MiB discovery budget. Large standar
 
 Factories and targets must leave observed storage and pointer pointees live, correctly typed and initialised at every boundary. Explicit constructor field initialisers are checked, but that check does not prove arbitrary C++ memory validity, ownership, absence of races or future pointer lifetime. Arbitrary overlapping memory is outside this profile; location nodes describe equal starting addresses.
 
-Inheritance, virtual storage, unions, bitfields, volatile/atomic storage, foreign/opaque objects, header-defined classes, template classes, mutable object arguments, unbounded buffers and arbitrary resource/concurrent sequences need further adapters. Function-local statics and macro-expanded storage are visible blockers because this profile cannot observe them through its source access helper. Macro-generated C/C++ callables remain in the inventory with a build-aware fixture gap. General compilation databases and dependency/build variants remain open.
+Inheritance, virtual storage, unions, bitfields, volatile/atomic storage, foreign/opaque objects, header-defined classes, template classes, mutable object arguments, unbounded buffers and arbitrary resource/concurrent sequences need further adapters. Function-local statics, thread-local variables and macro-expanded storage are visible blockers because this profile cannot observe them through its source access helper. Taking a thread-local variable's address can itself invoke application initialisation; an ordinary field reader is insufficient. Macro-generated C/C++ callables remain in the inventory with a build-aware fixture gap. General compilation databases and dependency/build variants remain open.
 
 ## Validation
 

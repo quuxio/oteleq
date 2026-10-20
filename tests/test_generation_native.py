@@ -21,6 +21,24 @@ def entry(language, parameters=None, output="int", globals_=None):
 
 
 class NativeScalarTests(unittest.TestCase):
+    def test_thread_local_roots_cannot_trigger_application_initialisation_from_the_observer(self):
+        for language in ("c", "cpp"):
+            with self.subTest(language=language), tempfile.TemporaryDirectory() as temporary:
+                folder = Path(temporary)
+                path = folder / ("source.c" if language == "c" else "source.cpp")
+                source = "_Thread_local int hidden=0;\n" if language == "c" else (
+                    "int initialisations=0;int initialise(){return ++initialisations;}\n"
+                    "thread_local int hidden=initialise();\n")
+                path.write_text(source + "int selected(int value){return value;}\n")
+                def execute(command, cwd, **kwargs):
+                    return subprocess.run(command, cwd=cwd, capture_output=True, check=False, timeout=30)
+                data = discovery.discover(path, language, folder,
+                    {"clang++" if language == "cpp" else "clang": self.compiler(language)}, execute)
+                selected = next(item for item in data["functions"] if item["name"] == "selected")
+                candidate = {**selected, "path": path.name, "language": language, "globals": data["globals"]}
+                self.assertEqual(gen.qualify_entry(candidate, folder, 1), "blocked")
+                self.assertIn("thread-local", candidate["reason"])
+
     def test_macro_callables_and_storage_are_visible_gaps_in_both_languages(self):
         source = ("#define FUNCTION(name) int name(int value){return value;}\n"
                   "#define STORAGE(name) int name=0;\n"

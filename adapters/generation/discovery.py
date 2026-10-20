@@ -132,6 +132,9 @@ def native_storage(node: dict, scope: tuple[str, ...], inside: bool) -> dict | N
     location = original.get("expansionLoc", original)
     name = "::".join((*scope, node.get("name", ANONYMOUS)))
     type_ = node.get("type", {}).get("qualType", "unknown")
+    if node.get("tls"):
+        return {"name": "<thread-local:" + name + "@" + str(location["offset"]) + ">", "type": type_,
+                "inaccessible": True, "reason": "thread-local storage needs an explicit initialisation and thread fixture"}
     if inside and not (node.get("storageClass") == "static" or node.get("tls")):
         return None
     if "expansionLoc" in original:
