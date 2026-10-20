@@ -29,6 +29,8 @@
 
 oteleq generates diagnostic tests that compare application behaviour with and without [otelc](https://github.com/quuxio/otelc) instrumentation across C, C++, Rust, Python, Java, JavaScript, TypeScript and Go. It compares results, errors, stdout/stderr, supported global/object state and declared [filesystem boundaries](docs/filesystem-effects.md) and [HTTP fixtures](docs/http-fixtures.md), while accounting for emitted OpenTelemetry telemetry separately.
 
+The [HTTP qualification](docs/qualification/http-fixtures-2026-10-20.json) covers 18 cases and 544 actual launches across all eight languages, including same-return request differences, incomplete capture and scalar shrinking/replay.
+
 Fixed diagnostic corpora also qualify [Python and Java executor context](docs/eight-language-capture.md), [Python collection lifetimes](docs/eight-language-capture.md#python-collection-lifetime-workload), [fixed Python resource closes](docs/eight-language-capture.md#python-resource-close-workload) and the [optional native TypeScript emitter](docs/eight-language-capture.md#optional-native-typescript-workload) against the actual otelc adapters.
 
 The result is **equivalence over these tests and observations**. It is not a blanket proof that every function is identical.
