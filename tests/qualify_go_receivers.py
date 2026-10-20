@@ -37,14 +37,19 @@ func (value *Counter) MarshalJSON()([]byte,error){panic("APPLICATION_FORMATTER")
 func New(seed Number)*Counter{value:=&Counter{value:seed,label:"\xff\x00é😀",active:true,ratio:math.Float32frombits(0x80000000),wide:math.Float64frombits(0x7ff0000000000001),array:[2]uint64{18446744073709551615,0}};value.self=value;value.pointer=&value.value;shared=value;return value}
 func Nil(seed Number)*Counter{return nil}
 '''
-METHODS = ("Add", "InstanceDifference", "GlobalDifference", "Fail", "Copy", "Void", "Read")
+METHODS = ("Add", "InstanceDifference", "GlobalDifference", "Fail", "Copy", "Void", "Read", "Main")
+
+
+def selected(name: str) -> str:
+    """Source-qualified selectors keep the main and library callables distinct."""
+    return ("cmd.api.Counter." if name == "Main" else "counter.api.Counter.") + name
 
 
 def policy_text(methods: tuple[str, ...] = METHODS) -> str:
     """Explicit source selection and independent fixed construction inputs."""
-    text = 'schema_version=1\nlanguages=["go"]\n[adapters.go]\nmodule_roots=["."]\n[functions]\ninclude=' + json.dumps(["*.Counter." + name for name in methods]) + '\n'
+    text = 'schema_version=1\nlanguages=["go"]\n[adapters.go]\nmodule_roots=["."]\n[functions]\ninclude=' + json.dumps([selected(name) for name in methods]) + '\n'
     for name in methods:
-        text += '\n[[fixtures]]\nfunction="*.Counter.' + name + '"\ncases=[[3]]\nreceiver={factory="' + ("Nil" if name == "Read" else "New") + '",arguments=[10]}\n'
+        text += '\n[[fixtures]]\nfunction=' + json.dumps(selected(name)) + '\ncases=[[3]]\nreceiver={factory="' + ("Nil" if name == "Read" else "New") + '",arguments=[10]}\n'
         if name == "InstanceDifference":
             text += 'domains=[{kind="integer",minimum=0,maximum=3}]\n'
         if name == "Fail":
@@ -58,6 +63,9 @@ def prepare(cli: Path, provider: Path, folder: Path) -> Path:
     (source / "counter").mkdir(parents=True)
     (source / "go.mod").write_text("module example.test/receiver\n\ngo 1.27.2\n")
     (source / "counter/api.go").write_text(SOURCE)
+    (source / "cmd").mkdir()
+    (source / "cmd/api.go").write_text(SOURCE.replace("package counter", "package main")
+                                      + "\nfunc main(){}\nfunc (value Counter) Main(amount Number)Counter{value.value+=amount;return value}\n")
     policy = folder / "equivalence.toml"
     policy.write_text(policy_text())
     workspace = Path(command([cli, "plan", "--source", source, "--otelc-root", provider,
@@ -111,7 +119,27 @@ def state(graph: dict, method: str, argument: int, lane: str, *, after: bool) ->
     assert node(graph, fields["wide"])["value"]["bits"] == "7ff0000000000001"
 
 
-def check_report(path: Path, expected_cases: int = 7) -> int:
+def copied_result(graph: dict, argument: int) -> None:
+    """A value result copies slots but its internal pointers keep original aliases."""
+    result = graph["roots"]["result"]
+    receiver = graph["roots"]["receiver"]
+    assert result != receiver
+    fields = node(graph, result)
+    original = node(graph, node(graph, receiver)["value"])
+    assert set(fields) == set(original)
+    assert all(fields[name] != original[name] for name in fields)
+    assert number(graph, fields["value"]) == 10 + argument
+    assert node(graph, fields["self"])["value"] == receiver
+    assert node(graph, fields["pointer"])["value"] == original["value"]
+    array = node(graph, node(graph, fields["array"])["value"])
+    assert set(array) == {"item:0", "item:1"}
+    assert number(graph, array["item:0"]) == 18446744073709551615
+    assert number(graph, array["item:1"]) == 0
+    for name in ("label", "active", "ratio", "wide"):
+        assert node(graph, fields[name])["value"] == node(graph, original[name])["value"]
+
+
+def check_report(path: Path, expected_cases: int = 8) -> int:
     """Each actual lane/repeat must satisfy an independent complete fixture oracle."""
     report = json.loads(path.read_text())
     assert report["source_preserved"] and not report["blocked"] and len(report["cases"]) == expected_cases
@@ -138,6 +166,8 @@ def check_report(path: Path, expected_cases: int = 7) -> int:
                     result = outcome["graph"]["roots"]["result"]
                     if method == "Add":
                         assert result == outcome["graph"]["roots"]["receiver"]
+                    elif method == "Main":
+                        copied_result(outcome["graph"], case["arguments"][0])
                     elif method == "Void":
                         assert result == {"kind": "undefined"}
                     else:
@@ -159,7 +189,7 @@ def check_report(path: Path, expected_cases: int = 7) -> int:
 def framework(workspace: Path, folder: Path, label: str) -> int:
     outputs = command([sys.executable, workspace / "tests/test_equivalence.py"], folder, label, expected=1)
     reports = [json.loads(line) for line in outputs.splitlines()]
-    assert len(reports) == 7
+    assert len(reports) == 8
     return sum(check_report(Path(item["report"]), 1) for item in reports)
 
 
@@ -167,7 +197,7 @@ def source_guards(cli: Path, workspace: Path, folder: Path, case: dict) -> int:
     """Changed source/module/snapshot inputs refuse before another launch."""
     plan = json.loads((workspace / "plan.json").read_text())
     runs = set((workspace / "runs").iterdir())
-    paths = [Path(plan["source"]) / "go.mod", Path(plan["source"]) / "counter/api.go",
+    paths = [Path(plan["source"]) / "go.mod", Path(plan["source"]) / "counter/api.go", Path(plan["source"]) / "cmd/api.go",
              workspace / "snapshot/counter/api.go"]
     for index, path in enumerate(paths):
         original = path.read_bytes()
@@ -278,7 +308,7 @@ def main() -> None:
     unique = {hashlib.sha256(path.read_bytes()).hexdigest() for path in commands}
     assert len(unique) == launches
     result = {"claim": "equivalence over these tests and observations", "artefact_class": "diagnostic",
-              "cli_sha256": hashlib.sha256(cli.read_bytes()).hexdigest(), "cases": 7, "matching_cases": 5,
+              "cli_sha256": hashlib.sha256(cli.read_bytes()).hexdigest(), "cases": 8, "matching_cases": 6,
               "difference_controls": 2, "actual_application_launches": launches, "source_preserved": True,
               "prelaunch_source_refusals": controls, "retained_attempt_folders": len(commands), "unique_command_identities": len(unique),
               "fixture_refusals": refused,

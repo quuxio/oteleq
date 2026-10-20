@@ -162,6 +162,16 @@ func (value *Counter) Read(amount int64)int64{if value==nil{return amount};retur
         self.assertEqual(data["before"]["roots"]["receiver"], {"kind": "null"})
         self.assertEqual(data["outcome"]["graph"]["roots"]["result"]["value"], "3")
 
+    def test_main_package_receiver_retains_source_binding_and_runtime_type(self):
+        self.source.write_text(SOURCE.replace("package counter", "package main") + "\nfunc main(){}\n")
+        entry = self.entry()
+        result, path = self.worker(entry)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        data = go_graph.boundaries(path.read_bytes(), entry)
+        self.assertEqual(data["outcome"]["graph"]["roots"]["receiver"], data["outcome"]["graph"]["roots"]["result"])
+        self.assertEqual(entry["go_context"]["import_path"], "example.test/receiver/counter")
+        self.assertEqual(entry["go_receiver_type"], "*main.Counter")
+
     def test_observer_failures_do_not_produce_complete_capture(self):
         changes = [SOURCE.replace('value:=&Counter{', 'panic("bad factory");value:=&Counter{'),
                    SOURCE.replace("math.Float32frombits(0x80000000)", "math.Float32frombits(0x7f800001)"),
@@ -196,8 +206,9 @@ func (value *Counter) Read(amount int64)int64{if value==nil{return amount};retur
                 data["go_receiver_schema_version"] = True
             else:
                 data["outcome"]["kind"] = "unknown"
+            encoded = json.dumps(data).encode()
             with self.subTest(change=change), self.assertRaises(ValueError):
-                go_graph.boundaries(json.dumps(data).encode(), entry)
+                go_graph.boundaries(encoded, entry)
 
     def test_scalar_constants_and_panic_payloads_are_strict(self):
         self.assertEqual(go_receivers.scalar_input(True), {"kind": "boolean", "value": "true"})

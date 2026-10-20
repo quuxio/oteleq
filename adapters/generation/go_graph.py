@@ -3,6 +3,7 @@ from collections import deque
 
 from otelc_capture import strict_json
 
+STORAGE_PREFIX = "go.storage:"
 
 def require(condition: bool, reason: str) -> None:
     """A missing or unsupported observation cannot become an equivalence verdict."""
@@ -12,8 +13,20 @@ def require(condition: bool, reason: str) -> None:
 
 def hex_value(text: object, maximum: int) -> bool:
     """Only complete canonical lowercase byte encodings are admitted."""
-    return (type(text) is str and len(text) <= maximum and len(text) % 2 == 0
+    return (isinstance(text, str) and len(text) <= maximum and len(text) % 2 == 0
             and all(char in "0123456789abcdef" for char in text))
+
+
+def integer(value: dict, model: dict) -> None:
+    """Require a complete canonical decimal within its nominal storage width."""
+    require(set(value) == {"kind", "type", "value", "bits", "signed"}
+            and type(value["bits"]) is int and value["bits"] == model["bits"]
+            and type(value["signed"]) is bool and value["signed"] == model["signed"], "integer storage differs")
+    text, bits, signed = value["value"], model["bits"], model["signed"]
+    require(type(text) is str and 0 < len(text) <= 20, "invalid integer value")
+    number = int(text)
+    low, high = (-2**(bits-1), 2**(bits-1)-1) if signed else (0, 2**bits-1)
+    require(text == str(number) and low <= number <= high, "integer exceeds its declaration")
 
 
 def primitive(value: dict, name: str, model: dict) -> None:
@@ -22,14 +35,7 @@ def primitive(value: dict, name: str, model: dict) -> None:
     kind = model["kind"]
     require(value.get("kind") == kind, "primitive kind differs")
     if kind == "integer":
-        require(set(value) == {"kind", "type", "value", "bits", "signed"}
-                and type(value["bits"]) is int and value["bits"] == model["bits"]
-                and type(value["signed"]) is bool and value["signed"] == model["signed"], "integer storage differs")
-        text, bits, signed = value["value"], model["bits"], model["signed"]
-        require(type(text) is str and 0 < len(text) <= 20, "invalid integer value")
-        number = int(text)
-        low, high = (-2**(bits-1), 2**(bits-1)-1) if signed else (0, 2**bits-1)
-        require(text == str(number) and low <= number <= high, "integer exceeds its declaration")
+        integer(value, model)
     elif kind == "boolean":
         require(set(value) == {"kind", "type", "value"} and type(value["value"]) is bool, "invalid boolean")
     elif kind == "float":
@@ -86,15 +92,15 @@ class Schema:
             require(set(value) == {"kind", "node_id"} and value["kind"] == "reference"
                     and type(value["node_id"]) is str and value["node_id"] in nodes,
                     "missing storage reference")
-            require(nodes[value["node_id"]]["type"] == "go.storage:" + expected, "reference type differs")
+            require(nodes[value["node_id"]]["type"] == STORAGE_PREFIX + expected, "reference type differs")
         else:
             primitive(value, expected, model)
 
     def fields(self, node: dict) -> dict[str, str]:
         """Struct/array members are addressable slots, preserving interior aliases."""
         label = node["type"]
-        require(type(label) is str and label.startswith("go.storage:"), "unbound storage node")
-        name = label.removeprefix("go.storage:")
+        require(type(label) is str and label.startswith(STORAGE_PREFIX), "unbound storage node")
+        name = label.removeprefix(STORAGE_PREFIX)
         require(name in self.models, "node lacks a source storage declaration")
         model = self.models[name]
         if model["kind"] == "pointer":

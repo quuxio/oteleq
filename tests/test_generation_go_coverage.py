@@ -19,8 +19,8 @@ class GoCoverageTests(unittest.TestCase):
             for text in ("", "mode: set\n", "mode: count\n", prefix + ":1.1,2.1 1 0\n",
                          "mode: count\nother.go:1.1,2.1 100 1\n", prefix + ":1.1,2.1 -1 1\n",
                          prefix + ":1.1,2.1 1 1\n" + go_coverage.PRODUCT + ":1.1,2.1 1 1\n"):
+                path.write_text(text)
                 with self.subTest(text=text), self.assertRaises(ValueError):
-                    path.write_text(text)
                     go_coverage.coverage(path)
 
     def test_gate_copies_real_sources_and_runs_test_and_vet(self):

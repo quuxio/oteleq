@@ -173,6 +173,20 @@ func primitive(item reflect.Value, name string) value {
 	}
 }
 
+func storageValue(item reflect.Value, pointer bool) (reflect.Value, address) {
+	if pointer {
+		return item, address{item.Type(), item.Pointer()}
+	}
+	// Composite returns are values. Materialise their helper-owned copy so field
+	// slots can be traversed without inventing aliases to the original storage.
+	if !item.CanAddr() {
+		clone := reflect.New(item.Type()).Elem()
+		clone.Set(item)
+		item = clone
+	}
+	return item, address{item.Type(), item.Addr().Pointer()}
+}
+
 func (g *graph) encode(item reflect.Value, expected string, depth int) value {
 	require(item.IsValid() && typeName(item.Type()) == expected)
 	storage, ok := g.models[expected]
@@ -183,19 +197,7 @@ func (g *graph) encode(item reflect.Value, expected string, depth int) value {
 	if storage.Kind == "pointer" && item.IsNil() {
 		return value{"kind": "null"}
 	}
-	// Composite returns are values. Materialise their helper-owned copy so field
-	// slots can be traversed without inventing aliases to the original storage.
-	if storage.Kind != "pointer" && !item.CanAddr() {
-		copy := reflect.New(item.Type()).Elem()
-		copy.Set(item)
-		item = copy
-	}
-	key := address{item.Type(), 0}
-	if storage.Kind == "pointer" {
-		key.data = item.Pointer()
-	} else {
-		key.data = item.Addr().Pointer()
-	}
+	item, key := storageValue(item, storage.Kind == "pointer")
 	if prior, exists := g.seen[key]; exists {
 		return value{"kind": "reference", "node_id": prior}
 	}
@@ -250,6 +252,20 @@ func capture(models map[string]model, roots map[string]reflect.Value, result ref
 	return snapshot
 }
 
+func integerInput(value reflect.Value, text string) {
+	kind := value.Kind()
+	if kind >= reflect.Int && kind <= reflect.Int64 {
+		number, err := strconv.ParseInt(text, 10, 64)
+		require(err == nil && !value.OverflowInt(number))
+		value.SetInt(number)
+	} else {
+		require(kind >= reflect.Uint && kind <= reflect.Uintptr)
+		number, err := strconv.ParseUint(text, 10, 64)
+		require(err == nil && !value.OverflowUint(number))
+		value.SetUint(number)
+	}
+}
+
 func arguments(types []reflect.Type, inputs []input) []reflect.Value {
 	require(len(types) == len(inputs))
 	result := []reflect.Value{}
@@ -258,16 +274,7 @@ func arguments(types []reflect.Type, inputs []input) []reflect.Value {
 		value := reflect.New(kind).Elem()
 		switch item.Kind {
 		case "integer":
-			if kind.Kind() >= reflect.Int && kind.Kind() <= reflect.Int64 {
-				number, err := strconv.ParseInt(item.Value, 10, 64)
-				require(err == nil && !value.OverflowInt(number))
-				value.SetInt(number)
-			} else {
-				require(kind.Kind() >= reflect.Uint && kind.Kind() <= reflect.Uintptr)
-				number, err := strconv.ParseUint(item.Value, 10, 64)
-				require(err == nil && !value.OverflowUint(number))
-				value.SetUint(number)
-			}
+			integerInput(value, item.Value)
 		case "float":
 			require(kind.Kind() == reflect.Float32 || kind.Kind() == reflect.Float64)
 			bits, err := strconv.ParseUint(item.Value, 16, 64)

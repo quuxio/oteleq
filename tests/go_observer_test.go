@@ -63,11 +63,11 @@ func TestTypesAndStorage(t *testing.T) {
 	capture(models, map[string]reflect.Value{}, reflect.ValueOf(sample{}), name, true, false)
 	capture(models, map[string]reflect.Value{"receiver": reflect.ValueOf((*sample)(nil))}, reflect.Value{}, "void", true, false)
 	for _, change := range []string{"type", "kind", "tag", "field", "missing"} {
-		copy, _ := schema()
-		value := copy[name]
+		changed, _ := schema()
+		value := changed[name]
 		switch change {
 		case "type":
-			refuses(t, func() { checkType(reflect.TypeOf(s), "unbound", copy, map[reflect.Type]bool{}) })
+			refuses(t, func() { checkType(reflect.TypeOf(s), "unbound", changed, map[reflect.Type]bool{}) })
 			continue
 		case "kind":
 			value.Kind = "opaque"
@@ -76,12 +76,12 @@ func TestTypesAndStorage(t *testing.T) {
 		case "field":
 			value.Fields = value.Fields[:1]
 		case "missing":
-			delete(copy, name)
-			refuses(t, func() { checkType(reflect.TypeOf(s), "*"+name, copy, map[reflect.Type]bool{}) })
+			delete(changed, name)
+			refuses(t, func() { checkType(reflect.TypeOf(s), "*"+name, changed, map[reflect.Type]bool{}) })
 			continue
 		}
-		copy[name] = value
-		refuses(t, func() { checkType(reflect.TypeOf(s), "*"+name, copy, map[reflect.Type]bool{}) })
+		changed[name] = value
+		refuses(t, func() { checkType(reflect.TypeOf(s), "*"+name, changed, map[reflect.Type]bool{}) })
 	}
 	if typeName(reflect.TypeOf(map[string]int{})) != "map[string]int" {
 		t.Fatal("unexpected opaque type label")

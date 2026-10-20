@@ -89,7 +89,8 @@ def bind(entry: dict, discovered: dict, declaration: dict, concrete: Callable) -
             and entry["reason"] in ("", "instance method requires a receiver fixture")
             and not entry.get("go_variadic"), "requires an ordinary semantic source method")
     models, context = dict(discovered["go_types"]), entry["go_context"]
-    package, receiver = context["import_path"], entry["go_receiver"]
+    package = "main" if context["package"] == "main" else context["import_path"]
+    receiver = entry["go_receiver"]
     require(receiver in models, "receiver storage is unavailable")
     owner = models[receiver].get("element") if models[receiver]["kind"] == "pointer" else receiver
     require(owner in models and models[owner]["kind"] == "struct", "requires a named source struct receiver")
@@ -111,7 +112,7 @@ def bind(entry: dict, discovered: dict, declaration: dict, concrete: Callable) -
     # Addressable slots preserve aliases to a field, array element or package
     # variable as well as aliases between pointers to whole structs.
     slots = list(globals_.values())
-    for model in list(models.values()):
+    for model in models.values():
         if model["kind"] == "struct":
             slots.extend(field["type"] for field in model["fields"])
         elif model["kind"] == "array":

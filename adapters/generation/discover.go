@@ -180,13 +180,18 @@ type storageInventory struct {
 	types map[string]any
 }
 
-func storageName(value types.Type) string {
-	return types.TypeString(types.Unalias(value), func(pkg *types.Package) string { return pkg.Path() })
+func (inventory *storageInventory) packageName(pkg *types.Package) string {
+	// An executable's reflect.Type uses main, while the source build graph
+	// retains the full import path. Bind both through this checked owner.
+	if pkg == inventory.owner && pkg.Name() == "main" {
+		return "main"
+	}
+	return pkg.Path()
 }
 
 func (inventory *storageInventory) add(value types.Type) string {
 	value = types.Unalias(value)
-	name := storageName(value)
+	name := types.TypeString(value, inventory.packageName)
 	if _, exists := inventory.types[name]; exists {
 		return name
 	}
@@ -250,7 +255,7 @@ func (inventory *storageInventory) structure(entry map[string]any, value types.T
 		}
 		packagePath := ""
 		if !field.Exported() {
-			packagePath = field.Pkg().Path()
+			packagePath = inventory.packageName(field.Pkg())
 		}
 		fields = append(fields, map[string]any{"name": field.Name(), "type": inventory.add(field.Type()),
 			"embedded": field.Embedded(), "package": packagePath, "tag_hex": hex.EncodeToString([]byte(structure.Tag(index)))})

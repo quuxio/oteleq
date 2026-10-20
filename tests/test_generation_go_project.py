@@ -208,8 +208,9 @@ func unused()*Unused{return nil}
         self.assertNotIn(prefix + "Unused", entry["go_models"])
         self.assertEqual(entry["reason"], "")
         for invalid in ({"factory": "Missing", "arguments": []}, {"factory": "New", "arguments": [2**100]}):
+            candidate = self.entry(source, discovered, "Counter.Add")
             with self.subTest(invalid=invalid), self.assertRaises(ValueError):
-                go_receivers.bind(self.entry(source, discovered, "Counter.Add"), discovered, invalid, harness.concrete_arguments)
+                go_receivers.bind(candidate, discovered, invalid, harness.concrete_arguments)
 
     def test_startup_methods_and_inactive_build_files_remain_explicit_inventory(self):
         source = self.source("counter/api.go", "package counter\ntype Count int\nfunc init(){}\nfunc init(){}\nfunc (*Count) Read()int{return 0}\nfunc selected(v int)int{return v}\n")
