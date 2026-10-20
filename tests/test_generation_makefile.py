@@ -20,8 +20,9 @@ class QualificationRecipeTests(unittest.TestCase):
             for flag in ("--cli", "--comparator"):
                 if line.startswith("\t") and flag + " " in line:
                     targets[target] = flag
-        self.assertEqual(len(targets), 16)
+        self.assertEqual(len(targets), 17)
         self.assertIn("generation-http-otelc", targets)
+        self.assertIn("generation-java-receiver-otelc", targets)
         with tempfile.TemporaryDirectory() as temporary:
             base = Path(temporary)
             cargo = base / "cargo"

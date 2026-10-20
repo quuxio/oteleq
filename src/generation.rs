@@ -34,6 +34,18 @@ const RESOURCES: &[(&str, &str)] = &[
         include_str!("../adapters/generation/node_receivers.py"),
     ),
     (
+        "java_receivers.py",
+        include_str!("../adapters/generation/java_receivers.py"),
+    ),
+    (
+        "java_graph.py",
+        include_str!("../adapters/generation/java_graph.py"),
+    ),
+    (
+        "OteleqGraph.java",
+        include_str!("../adapters/generation/OteleqGraph.java"),
+    ),
+    (
         "typescript_provider.py",
         include_str!("../adapters/generation/typescript_provider.py"),
     ),

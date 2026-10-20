@@ -10,6 +10,7 @@ import struct
 import domains
 import go_project
 import node_receivers
+import java_receivers
 import python_project
 import sequences
 
@@ -538,6 +539,8 @@ func {worker}(){{
 
 
 def java_driver(entry, args):
+    if "receiver_fixture" in entry:
+        return java_receivers.driver(entry, args, java_literal)
     package = "package " + entry["package"] + ";\n" if entry["package"] else ""
     call = entry["name"] + "(" + ",".join(literal(v, t, "java") for v, t in zip(args, entry["parameters"])) + ")"
     invoked = call + ';s.append("return:void\\n");' if entry["output"] == "void" else 'java.lang.Object result=' + call + ';s.append("return:").append(value(result)).append("\\n");'
