@@ -18,7 +18,7 @@ async function collection(weak,step) {
     await turn();
     if(apply(dereference,weak,[])===undefined) {completed=true;rounds++;break;}
   }
-  for(let index=0;index<step.settle_turns;index++) await turn();
+  for(let index=0;index<step.settle_turns;index++) await turn(); // NOSONAR: each event-loop turn must complete before requesting the next.
   return {completed,rounds};
 }
 
@@ -31,7 +31,7 @@ export async function runSequence(record,call,roots,validBinding) {
   let weak,lastCall;
   for(const step of selected) {
     if(step.action==='call') {
-      const observed=await receiver.observe(step.arguments);
+      const observed=await receiver.observe(step.arguments); // NOSONAR: declared actions share one receiver and must execute in order.
       lastCall=observed.outcome;
       steps.push({id:step.id,action:step.action,gaps:[],...observed});
       continue;
@@ -42,7 +42,7 @@ export async function runSequence(record,call,roots,validBinding) {
     let collectionObservation;
     if(step.action==='release') weak=receiver.release(value=>new NativeWeakRef(value));
     else {
-      const observed=await collection(weak,step);
+      const observed=await collection(weak,step); // NOSONAR: collection follows the completed release action in the declared schedule.
       collectionObservation=observed;
       value=observed.completed;
       if(!value) gaps.push({phase:'after',path:'/collection',reason:'collection was not observed within the declared bound; no leak inference'});
@@ -51,5 +51,5 @@ export async function runSequence(record,call,roots,validBinding) {
     const after=receiver.snapshot();
     steps.push({id:step.id,action:step.action,gaps,before,outcome,after,...(collectionObservation?{collection:collectionObservation}:{})});
   }
-  writeObservation({before:steps[0].before,outcome:lastCall,after:steps[steps.length-1].after,steps});
+  writeObservation({before:steps[0].before,outcome:lastCall,after:steps.at(-1).after,steps});
 }

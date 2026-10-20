@@ -7,6 +7,13 @@ from typing import Any
 MAX_STEPS = 32
 
 
+def fixture(value: dict, expected_outcome: Callable) -> list[dict]:
+    """An action schedule always belongs to a declared independently built receiver."""
+    if "receiver" not in value:
+        raise ValueError("fixture.sequence requires a declared receiver")
+    return validate(value["sequence"], expected_outcome)
+
+
 def validate(value: Any, expected_outcome: Callable) -> list[dict]:
     """Require bounded calls followed by optional release and collection steps."""
     if not isinstance(value, list) or not 1 <= len(value) <= MAX_STEPS:
@@ -79,7 +86,7 @@ def concrete(entry: dict, arguments: list, coerce: Callable) -> list[dict]:
     return result
 
 
-def contracts(entry: dict, case: dict, roots: list[str]) -> list[dict]:
+def contracts(case: dict, roots: list[str]) -> list[dict]:
     """Step dimensions are independently requested before workers execute."""
     return [{"id": step["id"], "action": step["action"], "required_roots": roots,
              "expected_baseline": step.get("expected_baseline", {"kind": "return"})}

@@ -93,9 +93,7 @@ def fixture(value: Any, index: int) -> dict[str, Any]:
     if "receiver" in value:
         result["receiver"] = receiver(value["receiver"])
     if "sequence" in value:
-        if "receiver" not in result:
-            raise ValueError("fixture.sequence requires a declared receiver")
-        result["sequence"] = sequences.validate(value["sequence"], expected_baseline)
+        result["sequence"] = sequences.fixture(value, expected_baseline)
     return result
 
 

@@ -77,7 +77,7 @@ class SequenceTests(unittest.TestCase):
             roots = typed_capture.required_roots(entry)
             contract = {"case_id": case["id"], "function_id": entry["otelc_function"], "fixture_sha256": "b" * 64}
             typed = typed_capture.observation(output.read_bytes(), entry, contract)
-            self.assertEqual(len(sequences.contracts(entry, case, roots)), len(case["sequence"]))
+            self.assertEqual(len(sequences.contracts(case, roots)), len(case["sequence"]))
             return result, capture, typed, entry
 
     def test_calls_release_and_actual_collection_preserve_intermediate_state_and_aliases(self):
@@ -87,7 +87,7 @@ class SequenceTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(result.stdout, b"")
                 self.assertEqual([step["action"] for step in raw["steps"]], ["call", "call", "release", "collect"])
-                self.assertEqual(raw["steps"][-1]["collection"]["completed"], True)
+                self.assertTrue(raw["steps"][-1]["collection"]["completed"])
                 self.assertTrue(all(not step["gaps"] for step in typed["steps"]))
                 self.assertEqual(typed["steps"][2]["after"]["roots"]["receiver"], {"kind": "null"})
                 for step, expected in zip(typed["steps"][:2], (17, 19)):
@@ -104,7 +104,7 @@ class SequenceTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertFalse(raw["steps"][-1]["collection"]["completed"])
         self.assertIn("not observed", typed["steps"][-1]["gaps"][0]["reason"])
-        self.assertEqual(typed["steps"][-1]["outcome"]["graph"]["roots"]["result"]["value"], False)
+        self.assertFalse(typed["steps"][-1]["outcome"]["graph"]["roots"]["result"]["value"])
 
     def test_fixed_calls_and_schedule_are_frozen_and_missing_gc_cannot_succeed(self):
         result, capture, _, _ = self.worker(expose=False)

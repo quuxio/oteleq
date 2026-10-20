@@ -94,6 +94,15 @@ def sequence_functions(spans: Sequence[Any], target: str, calls: int, creator: s
                 raise ValueError("receiver construction invoked the selected sequence method")
 
 
+def linked_creator(span: Any, creators: Mapping[tuple[bytes, bytes], Any], required: bool) -> Any:
+    """Resolve the one actual source-factory link before checking the lifetime root."""
+    if not required:
+        return None
+    if len(span.links) != 1 or (span.links[0].trace_id, span.links[0].span_id) not in creators:
+        raise ValueError("JavaScript collection has no matching source factory creation link")
+    return creators[(span.links[0].trace_id, span.links[0].span_id)]
+
+
 def javascript(spans: Sequence[Any], report: Mapping[str, Any], spec: Mapping[str, Any]) -> tuple[dict[str, int], int]:
     """Validate actual JS collection roots; unavailable requested completion is a gap."""
     status = report.get("lifetimes")
@@ -108,11 +117,7 @@ def javascript(spans: Sequence[Any], report: Mapping[str, Any], spec: Mapping[st
     creators = {(span.trace_id, span.span_id): span for span in spans if span.name == spec.get("creator")}
     instances = set()
     for span in observed:
-        creator = None
-        if spec.get("creator") is not None:
-            if len(span.links) != 1 or (span.links[0].trace_id, span.links[0].span_id) not in creators:
-                raise ValueError("JavaScript collection has no matching source factory creation link")
-            creator = creators[(span.links[0].trace_id, span.links[0].span_id)]
+        creator = linked_creator(span, creators, spec.get("creator") is not None)
         lifetime_span(span, spec, creator, instances)
     result = {"lifetimes." + key: value for key, value in losses.items()}
     expected = {"admitted": spec["count"], "completed": spec["count"], "current_live": 0, "censored": 0,

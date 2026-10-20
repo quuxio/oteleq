@@ -177,6 +177,7 @@ def source_control(cli: Path, workspace: Path, folder: Path, case: dict) -> None
     plan = json.loads((workspace / "plan.json").read_text())
     path = Path(plan["source"]) / "identity.mjs"
     original = path.read_bytes()
+    (workspace / "runs").mkdir(exist_ok=True)
     runs = set((workspace / "runs").iterdir())
     try:
         path.write_bytes(original + b"\n// deliberate input alteration\n")

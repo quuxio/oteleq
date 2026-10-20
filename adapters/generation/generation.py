@@ -754,7 +754,7 @@ def compare_case(workspace, data, entry, case, destination, decoder):
                 "fixture_sha256": identity({"case": case, "source": entry["source_sha256"], "roots": roots}),
                 "required_roots": roots, "expected_baseline": case["expected_baseline"]}
     if "sequence" in case:
-        contract["steps"] = sequences.contracts(entry, case, roots)
+        contract["steps"] = sequences.contracts(case, roots)
     observed, typed_observed = capture_case(workspace, data, entry, case, destination, decoder, contract)
     selected = sequences.expected_functions(entry, observed["instrumented_on"][0]["witness"]["functions"])
     diagnostic = {"source": data["source_sha256"], "harness": manifest(workspace / "tests/harnesses" / case["id"]),
@@ -816,12 +816,8 @@ def run(args):
         except (ValueError, OSError, KeyError) as error:
             result = {"case": case["id"], "function": entry["otelc_function"], "arguments": case["arguments"], "exit_code": 4, "error": str(error)}
         result["argument_types"] = case["argument_types"]
-        if "arguments_requested" in case:
-            result["arguments_requested"] = case["arguments_requested"]
-        if "receiver_fixture" in case:
-            result["receiver_fixture"] = case["receiver_fixture"]
-        if "sequence" in case:
-            result["sequence"] = case["sequence"]
+        result.update({key: value for key, value in case.items()
+                       if key in ("arguments_requested", "receiver_fixture", "sequence")})
         results.append(result)
         write(destination / "partial-results.json", results)
     blocked = [e for e in data["inventory"] if e["status"] == "blocked"] if args.command == "run" else []
