@@ -82,7 +82,7 @@ def rank(value: Any, domain: dict) -> tuple:
     if domain["kind"] == "string":
         return len(value), tuple(domain["alphabet"].index(char) for char in value)
     if domain["kind"] == "boolean":
-        return (int(value),)
+        return int(value), 0
     negative_zero = int(type(value) is float and value == 0 and math.copysign(1, value) < 0)
     return abs(value - anchor(domain)), negative_zero
 
@@ -103,26 +103,35 @@ def reductions(value: Any, domain: dict, *, width: int = 64) -> Iterator[Any]:
         yield False
     elif kind == "string":
         yield from string_reductions(value, domain)
+    elif kind == "integer":
+        yield from integer_reductions(value, anchor(domain))
     else:
-        goal = anchor(domain)
-        yield goal
-        if kind == "integer":
-            distance = value - goal
-            step = abs(distance) // 2
-            while step >= 1:
-                yield value - step * (1 if distance >= 0 else -1)
-                step //= 2
-            yield value - (1 if value > goal else -1)
-        else:
-            goal = float(goal)
-            step = (value - goal) / 2
-            for _ in range(width):
-                yield value - step
-                step /= 2
-            if value != goal:
-                yield float_step(value, goal, width)
-            elif value == 0:
-                yield 0.0
+        yield from float_reductions(value, anchor(domain), width)
+
+
+def integer_reductions(value, goal) -> Iterator[Any]:
+    """Try progressively smaller exact integral deltas towards the domain anchor."""
+    yield goal
+    distance = value - goal
+    step = abs(distance) // 2
+    while step >= 1:
+        yield value - step * (1 if distance >= 0 else -1)
+        step //= 2
+    yield value - (1 if value > goal else -1)
+
+
+def float_reductions(value: float, goal, width: int) -> Iterator[float]:
+    """Keep binary deltas bounded and finish with a representable neighbour."""
+    yield goal
+    goal = float(goal)
+    step = (value - goal) / 2
+    for _ in range(width):
+        yield value - step
+        step /= 2
+    if value != goal:
+        yield float_step(value, goal, width)
+    elif value == 0:
+        yield 0.0
 
 
 def string_reductions(value: str, domain: dict) -> Iterator[str]:

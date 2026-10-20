@@ -84,11 +84,17 @@ def fixture(value: Any, index: int) -> dict[str, Any]:
     result = {"function": function, "source": source, "language": language, "cases": cases,
               "expected_baseline": expected_baseline(value.get("expected_baseline", {"kind": "return"}))}
     if "domains" in value:
-        if not isinstance(value["domains"], list):
-            raise ValueError(label + ".domains must be an array")
-        result["domains"] = [domains.validate(item) for item in value["domains"]]
-        for arguments in cases:
-            domains.arguments(arguments, result["domains"])
+        result["domains"] = fixture_domains(value["domains"], cases, label)
+    return result
+
+
+def fixture_domains(value: Any, cases: list[list[Any]], label: str) -> list[dict]:
+    """Validate domain declarations and every requested concrete fixture together."""
+    if not isinstance(value, list):
+        raise ValueError(label + ".domains must be an array")
+    result = [domains.validate(item) for item in value]
+    for arguments in cases:
+        domains.arguments(arguments, result)
     return result
 
 

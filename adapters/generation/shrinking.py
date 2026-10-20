@@ -158,6 +158,19 @@ def retained_evaluate(workflow, workspace: Path, destination: Path) -> tuple[dic
     return result, signature
 
 
+def fresh_candidates(entry: dict, current: list, seen: set[str]):
+    """Filter already evaluated concrete inputs before consuming trial budget."""
+    for candidate in candidates(entry, current):
+        token = domains.key(candidate)
+        if token not in seen:
+            yield token, candidate
+
+
+def incomplete_candidate(result: dict, signature: dict | None) -> bool:
+    """A blocked or unqualified experiment cannot support a minimality claim."""
+    return result["exit_code"] in (2, 3, 4) or result["exit_code"] == 1 and signature is None
+
+
 def search(workflow, workspace: Path, data: dict, entry: dict, original: list,
            wanted: dict, destination: Path, budget: int) -> tuple[list, list, str]:
     """Greedily restart deterministic rules after each accepted reduction."""
@@ -165,10 +178,7 @@ def search(workflow, workspace: Path, data: dict, entry: dict, original: list,
     incomplete = False
     while True:
         accepted = False
-        for candidate in candidates(entry, current):
-            token = domains.key(candidate)
-            if token in seen:
-                continue
+        for token, candidate in fresh_candidates(entry, current, seen):
             if len(trials) >= budget:
                 return current, trials, "budget_limited"
             seen.add(token)
@@ -176,7 +186,7 @@ def search(workflow, workspace: Path, data: dict, entry: dict, original: list,
             folder = destination / ("trial-" + str(len(trials)).zfill(4))
             result, signature = retained_evaluate(workflow, workspace, folder)
             same = signature == wanted
-            gap = result["exit_code"] in (2, 3, 4) or result["exit_code"] == 1 and signature is None
+            gap = incomplete_candidate(result, signature)
             incomplete |= gap
             trials.append({"arguments": candidate, "accepted": same, "incomplete": gap, "exit_code": result["exit_code"],
                            "report": str(folder / "report.json")})

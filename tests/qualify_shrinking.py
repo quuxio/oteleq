@@ -1,5 +1,6 @@
 """Qualify scalar shrinking through actual eight-language otelc execution."""
 import argparse
+import copy
 import hashlib
 import json
 import os
@@ -118,6 +119,27 @@ def check_reduction(spec, report):
         assert value == 7 and report["status"] == "candidate_rule_minimal"
 
 
+def witness_controls(cli, destination, bundle_path):
+    """Edited retained evidence must not replace a required actual witness."""
+    folder = destination / 'altered-retained-witness'
+    folder.mkdir()
+    source = json.loads(bundle_path.read_text())
+    for name in ('missing', 'pending', 'loss'):
+        document = copy.deepcopy(source)
+        execution = document['cases'][0]['instrumented_on'][0]['execution']
+        if name == 'missing':
+            execution['witness'] = None
+        elif name == 'pending':
+            execution['witness']['pending'] = 1
+        else:
+            key = next(iter(execution['witness']['losses']))
+            execution['witness']['losses'][key] = 1
+        path = folder / (name + '.json')
+        path.write_text(json.dumps(document))
+        command([cli, 'compare-observations', path], folder, name, expected=3)
+    (folder / 'KIND.txt').write_text('Deliberately edited retained witness controls; no new application execution.\n')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--otelc-root", type=Path, required=True)
@@ -127,6 +149,7 @@ def main():
     root, cli, destination = args.otelc_root.resolve(strict=True), args.cli.resolve(strict=True), args.report_dir.resolve()
     destination.mkdir(mode=0o700, exist_ok=False)
     os.environ["OTELEQ_PYTHON"] = sys.executable
+    os.environ["OTELEQ_CLI"] = str(cli)
     source, policy, specs = fixture(destination)
     workspace = Path(command([cli, 'plan', '--source', source, '--otelc-root', root, '--workspace-parent', destination,
                               '--config', policy], destination, 'plan'))
@@ -136,6 +159,7 @@ def main():
     assert len(original["cases"]) == len(specs) and all(case["exit_code"] == 1 for case in original["cases"])
     launches = check_report(destination / 'original-run/report.json', specs)
     reduced = []
+    exported = False
     for index, case in enumerate(original["cases"]):
         spec = spec_for(original, case, specs)
         folder = destination / ('shrink-' + str(index).zfill(2) + '-' + spec["language"])
@@ -152,12 +176,27 @@ def main():
         replay = json.loads(command([cli, 'replay', '--workspace', retained, '--case', retained_case],
                                     destination, 'replay-' + str(index), expected=1))
         launches += check_report(Path(replay["report"]), specs)
+        framework = json.loads(command([sys.executable, retained / 'tests/test_equivalence.py'],
+                                       destination, 'framework-' + str(index), expected=1))
+        launches += check_report(Path(framework['report']), specs)
+        if spec['language'] == 'python' and not exported:
+            export = destination / 'exported-python'
+            command([cli, 'export-tests', '--workspace', retained, '--destination', export], destination, 'export-dry-run')
+            assert not export.exists()
+            command([cli, 'export-tests', '--workspace', retained, '--destination', export, '--apply'], destination, 'export-apply')
+            replay_export = json.loads(command([cli, 'replay', '--workspace', export, '--case', retained_case],
+                                               destination, 'export-replay', expected=1))
+            launches += check_report(Path(replay_export['report']), specs)
+            witness_controls(cli, destination, folder / 'confirmation' / retained_case / 'typed-bundle.json')
+            exported = True
         reduced.append({"language": spec["language"], "function": spec["function"], "arguments": report["reduced_arguments"],
                         "trials": len(report["trials"]), "status": report["status"]})
     plan = json.loads((workspace / 'plan.json').read_text())
     print(json.dumps({"claim": "equivalence over these tests and observations", "artefact_class": "diagnostic",
                       "oteleq_cli_sha256": hashlib.sha256(cli.read_bytes()).hexdigest(), "languages": sorted(set(row["language"] for row in specs)),
                       "cases": len(specs), "actual_application_launches": launches, "reductions": reduced,
+                      "generated_unittest_runs": len(specs), "exported_replays": int(exported),
+                      "altered_retained_witness_controls_rejected": 3,
                       "source_sha256": plan["source_sha256"], "source_preserved": True,
                       "scope": "deliberately telemetry-sensitive fixtures, including Rust diagnostic SDK symbol presence; no shipping/object/sequence claim"}), flush=True)
 

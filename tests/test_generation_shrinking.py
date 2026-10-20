@@ -98,6 +98,7 @@ class DomainTests(unittest.TestCase):
             self.assertEqual([int(case[0]) for case in candidates], [0, 50, 75, 88, 94, 97, 99, 99])
         for value, domain in ((False, {"kind": "boolean"}), ("zabba", STRING), (-57, {**INTEGER, "minimum": -100}),
                               (57.25, FLOAT), (-0.0, FLOAT)):
+            self.assertEqual(len(domains.rank(value, domain)), 2)
             for candidate in domains.reductions(value, domain):
                 if domains.contains(candidate, domain) and domains.rank(candidate, domain) < domains.rank(value, domain):
                     self.assertNotEqual(domains.key([candidate]), domains.key([value]))
