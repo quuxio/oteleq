@@ -10,17 +10,17 @@
     "python": "3.12.15"
   },
   "runtime": {
-    "source_commit": "8c2f7f689122b82a74464785966d98c0d160b31b",
-    "source_tree": "77930c59616f449c845cb47fc662ff6f3231064a",
-    "cli_sha256": "4d8ab186cf3c67acea4da8eaa41e35610fbee770c5e652c92cec0cdde602d56d",
-    "source_archive_sha256": "955eaed490334ec182f142ae93459fa0ec517f471b252986f530089acda3febb",
+    "source_commit": "77400c7e72bf71b9229c9b676f499bea9a36fefb",
+    "source_tree": "c07e1d5571777baf143dd25638c1cd5a41c006a1",
+    "cli_sha256": "b08400792e1afac93237a0f94b0d8e7789dd259a4668e8a99051dd90e44bd253",
+    "source_archive_sha256": "b50b3160616ea8065382e1cbd0cf788f1032d61fd1e765a41fc60c4fdb18e6fc",
     "provider_commit": "d6d03b72026cde8962b11ce3cc184ff3ebcb60d4",
     "provider_manifest_sha256": "2a8dbf239c6444c0fb536dff049993beade7eaed6578c9654c1e2d7233e9431f",
-    "generator_sha256": "cf3f41e7990af77b3bd190b2904d7005d4bcb67a85cb49ce39110deda44d0caa",
-    "qualifier_sha256": "8a3ed0d9ed52da698c6df53f8a81dcaa7de9ca5d3488c9ccc9a4f588a391dd85"
+    "generator_sha256": "429ecb53e5ae4fdf67827b56e1532a7d0ac9796d2bf18feabc863694cf8e3cc2",
+    "qualifier_sha256": "cd496db8e521f95d403557dc9ed2e7ef35cfe7784395c3b5b8aa987210d61511"
   },
   "provider": {
-    "verified_at": "2026-10-20T20:39:30.527987+00:00",
+    "verified_at": "2026-10-20T22:18:05.716566+00:00",
     "provider_commit": "d6d03b72026cde8962b11ce3cc184ff3ebcb60d4",
     "provider_tree": "a577aa88d5d51f4e86bc0858bcd233be7b01c251",
     "manifest_sha256": "2a8dbf239c6444c0fb536dff049993beade7eaed6578c9654c1e2d7233e9431f",
@@ -47,17 +47,17 @@
     "blocked": 0
   },
   "results": {
-    "cases": 17,
-    "matching_cases": 14,
+    "cases": 19,
+    "matching_cases": 16,
     "difference_controls": 3,
-    "actual_application_launches": 299,
-    "qualified_application_launches": 292,
+    "actual_application_launches": 331,
+    "qualified_application_launches": 324,
     "incomplete_fixture_launches": 3,
     "initial_state_blocked_launches": 4,
-    "retained_attempt_folders": 303,
-    "unique_command_identities": 299,
-    "refusal_controls": 11,
-    "prelaunch_refusals": 7,
+    "retained_attempt_folders": 335,
+    "unique_command_identities": 331,
+    "refusal_controls": 13,
+    "prelaunch_refusals": 9,
     "incomplete_fixture_controls": 3,
     "initial_state_controls": 1,
     "source_preserved": true,
@@ -79,35 +79,36 @@
     },
     "profiles": {
       "receiver_cases": 9,
-      "binding_cases": 4,
-      "crlf_cases": 4
+      "binding_cases": 5,
+      "crlf_cases": 5
     }
   },
   "independent_verification": {
-    "source_files_verified": 218,
-    "qualified_reports_verified": 46,
-    "refusal_reports_verified": 11,
-    "qualified_retained_attempts_verified": 296,
-    "qualified_actual_launches": 292,
+    "source_files_verified": 221,
+    "qualified_reports_verified": 50,
+    "refusal_reports_verified": 13,
+    "qualified_retained_attempts_verified": 328,
+    "qualified_actual_launches": 324,
     "copied_original_shrink_attempts": 4,
     "original_copy_relationships_verified": 4,
-    "unique_application_launches": 299,
-    "raw_attempt_folders": 303,
+    "unique_application_launches": 331,
+    "raw_attempt_folders": 335,
     "refused_application_launches": 7,
-    "private_source_records_verified": 792,
-    "raw_records": 6008,
-    "raw_manifest_sha256": "26eae5fa106fb30f3c0d703070eda1fb6da36c740e6fcbad5248be6708abc1c4",
-    "runtime_commit": "8c2f7f689122b82a74464785966d98c0d160b31b",
+    "private_source_records_verified": 888,
+    "raw_records": 6654,
+    "raw_manifest_sha256": "694eab808c5c8eddc07c8debbd745de71c4b09075667aee10e8dd3cfd0bc82c4",
+    "runtime_commit": "77400c7e72bf71b9229c9b676f499bea9a36fefb",
     "source_preserved": true,
-    "verifier_sha256": "d50d341c72cb8afb0a7ac5c5610a1afbd5b7ee3b5857803cb9d4f99ca47cadc9",
-    "corrected_qualifier_sha256": "8a3ed0d9ed52da698c6df53f8a81dcaa7de9ca5d3488c9ccc9a4f588a391dd85",
+    "expected_application_output_verified": true,
+    "verifier_sha256": "9f28c0e8e1443b1ff46c41b10ba785bfee9ce766851250223f73d3fc5c138127",
+    "corrected_qualifier_sha256": "cd496db8e521f95d403557dc9ed2e7ef35cfe7784395c3b5b8aa987210d61511",
     "scope": "Frozen completed driver; full original/binding corpus, binary/source/tool checks and complete independent value oracles."
   },
   "validation": {
     "make_check": "passed at runtime commit",
-    "runtime_commit": "8c2f7f689122b82a74464785966d98c0d160b31b",
-    "unique_regressions": 501,
-    "python_regressions": 414,
+    "runtime_commit": "77400c7e72bf71b9229c9b676f499bea9a36fefb",
+    "unique_regressions": 512,
+    "python_regressions": 425,
     "rust_regressions": 66,
     "node_regressions": 17,
     "go_regressions": 4,
@@ -115,10 +116,11 @@
     "rust_product_line_coverage_percent": 97.29,
     "cpp_observer_line_coverage_percent": 100.0,
     "rendered_html_and_junit": "passed",
-    "unresolved_sonar_findings": 0
+    "unresolved_sonar_findings": 0,
+    "post_qualification_changes": "Documentation and strengthened test oracles only; product sources and frozen CLI unchanged."
   },
   "scope": {
-    "observed": "Declared source constructors/free/static factories, scalar method inputs, private source fields/statics, namespace roots, nested records/arrays, exact float bits, standard exception payloads, pointer cycles, interior aliases and returned references. Global source type names, C-linkage underscore identities, direct construction of small self-referential objects and CRLF source ranges are exercised separately.",
+    "observed": "Declared source constructors/free/static factories, scalar method inputs, private source fields/statics, namespace roots, nested records/arrays, exact float bits, standard exception payloads, pointer cycles, interior aliases and returned references. Global source type names, C-linkage underscore identities, direct construction of small self-referential objects and CRLF source ranges are exercised separately. Unicode field macros cannot invoke the application getter; its static counter remains zero. Thread-local and unresolved template storage are refused before application launch.",
     "private_observer_schema_version": 1,
     "witness": "Existing name-bound decoded function/span witness; invocation-scoped producer binding remains unavailable.",
     "not_qualified": [
@@ -133,7 +135,8 @@
       "allocation identity across destruction/address reuse",
       "arbitrary resource/action/concurrent sequences",
       "other platforms/toolchains",
-      "macro-expanded callables or storage beyond explicit refusal"
+      "macro-expanded callables or storage beyond explicit refusal",
+      "thread-local and unresolved template static storage beyond explicit refusal"
     ],
     "identity_limit": "Recorded source, selected tools and provider products; not a complete OS-library or shipping build closure."
   },
@@ -145,15 +148,15 @@
       "blocked": 0
     },
     "bindings": {
-      "callables": 5,
-      "ready": 4,
-      "excluded": 1,
+      "callables": 8,
+      "ready": 5,
+      "excluded": 3,
       "blocked": 0
     },
     "crlf": {
-      "callables": 5,
-      "ready": 4,
-      "excluded": 1,
+      "callables": 8,
+      "ready": 5,
+      "excluded": 3,
       "blocked": 0
     }
   },
@@ -161,5 +164,67 @@
     "exit_code": 0,
     "application_relaunches_for_retained_verification": 0,
     "shrink_accounting": "Fresh original replay counts once; four copied records do not count as additional launches."
+  },
+  "presentation": {
+    "rendered_browser_review": "passed",
+    "profiles": {
+      "cpp-presentation": {
+        "junit": {
+          "tests": "21",
+          "failures": "3",
+          "errors": "0",
+          "skipped": "12"
+        },
+        "files_sha256": {
+          "index.html": "07e84cfcc7caab3fcd9fd633216f6775434cb76cb9e651ff518f86f2914b717c",
+          "overview.png": "2c620b7a7d78ede84a45c4aa54b8d5ba6c6d6de62f76bc8738a2a6de7c7db63f",
+          "junit.xml": "3cefc9a856e020ce81386588771d089355e62576a412d7f16b523e3cd21b1697"
+        }
+      },
+      "cpp-binding-presentation": {
+        "junit": {
+          "tests": "8",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "3"
+        },
+        "files_sha256": {
+          "index.html": "b83aef6d52ff742cb7d1ab1260cd1d0c4a8b784061165131305ac7a38ec19bde",
+          "overview.png": "266df2b3a576f445ba98dae7578265938ce97cece1563481d3b46b4aa12ecfb2",
+          "junit.xml": "4a84b81e778059a42c884e651f877501e97d0fd045761d6d50037d6c974fe660"
+        }
+      },
+      "cpp-crlf-presentation": {
+        "junit": {
+          "tests": "8",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "3"
+        },
+        "files_sha256": {
+          "index.html": "a57333902db701dfd9c248a10f41d83a4908dae87a44c5e0461ba753ed70ab04",
+          "overview.png": "c97fe62cdd3f98b51ad7535871d9893546a3ef16aee1da212e42ff3b2919efe1",
+          "junit.xml": "75edc9ce7f975d6de422fec8a40773960583fc41474b5f67180acb692c5a7e8a"
+        }
+      }
+    },
+    "checks": [
+      "Main report visibly distinguishes 6 matches from 3 deliberate state/alias differences.",
+      "Alias detail retains /after/receiver/field:pointer_/value and /outcome/receiver/field:pointer_/value.",
+      "Both binding/CRLF reports show five matches and three excluded constructors/getters.",
+      "Unicode fixture retains input 3, constructor input 10 and required global:UnicodeCounter::calls_."
+    ],
+    "temporary_tab_closed": true,
+    "preview_server_stopped": true
+  },
+  "supplemental_maintained_oracles": {
+    "reports": 50,
+    "retained_attempts": 328,
+    "application_relaunches": 0,
+    "complete_expected_state_values_and_empty_application_output": true,
+    "maintained_qualifier_sha256": "ea822a31041123f4a138c71126bf2165d4fa39324255cf01162cb1fbe6107e02",
+    "verification_script_sha256": "a9f43864c779fd0445111d2d8deb1b6d9b58e49281eb0182e7d4d4049dc99fb5",
+    "raw_manifest_sha256": "694eab808c5c8eddc07c8debbd745de71c4b09075667aee10e8dd3cfd0bc82c4",
+    "scope": "Supplemental maintained checker; original runtime/source archive remains unchanged."
   }
 }

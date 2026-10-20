@@ -20,6 +20,23 @@ from test_generation_cpp_models import SOURCE
 
 
 class CppWorkerTests(unittest.TestCase):
+    def test_unicode_field_macro_cannot_invoke_an_application_getter(self):
+        source = '''class Counter {
+ int value_;
+ int& \u6570\u636e;
+ int& read_alias()const{++calls_;return \u6570\u636e;}
+public:
+ inline static int calls_=0;
+ explicit Counter(int seed):value_(seed),\u6570\u636e(value_){}
+ int add(int amount){value_+=amount;return value_;}
+};
+#define \u6570\u636e read_alias()
+'''
+        _, capture, _, _ = self.captured(source, method='Counter::add', factory='Counter')
+        for graph in (capture['before'], capture['outcome']['graph'], capture['after']):
+            calls = self.node(graph, graph['roots']['global:Counter::calls_'])
+            self.assertEqual(calls['fields']['value']['value'], '0')
+
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)

@@ -132,6 +132,9 @@ def native_storage(node: dict, scope: tuple[str, ...], inside: bool) -> dict | N
     location = original.get("expansionLoc", original)
     name = "::".join((*scope, node.get("name", ANONYMOUS)))
     type_ = node.get("type", {}).get("qualType", "unknown")
+    if node.get("tls"):
+        return {"name": "<thread-local:" + name + "@" + str(location["offset"]) + ">", "type": type_,
+                "inaccessible": True, "reason": "thread-local storage needs an explicit initialisation and thread fixture"}
     if inside and not (node.get("storageClass") == "static" or node.get("tls")):
         return None
     if "expansionLoc" in original:
@@ -140,7 +143,7 @@ def native_storage(node: dict, scope: tuple[str, ...], inside: bool) -> dict | N
     if inside:
         return {"name": "<static-local:" + name + "@" + str(location["offset"]) + ">", "type": type_,
                 "inaccessible": True, "reason": "function-local static storage needs a separate access fixture"}
-    return {"name": name, "type": type_}
+    return {"name": name, "type": type_, "source_offset": location['offset']}
 
 
 def native_positions(functions: list[dict], path: Path) -> None:
@@ -198,8 +201,11 @@ def attach_cpp_models(inventory: dict, document: dict, path: Path) -> None:
             function["parameters"] = bindings[key]["parameters"]
             function["output"] = bindings[key]["output"]
     inventory.update(models)
+    unbound = [{**item, 'inaccessible': True, 'reason': 'unresolved source global storage needs a compiler fixture'}
+               for item in inventory['globals']
+               if not item.get('inaccessible') and item['source_offset'] not in models['cpp_global_offsets']]
     inventory["globals"] = ([{"name": name, "type": type_} for name, type_ in models["cpp_globals"].items()]
-                            + [item for item in inventory["globals"] if item.get("inaccessible")])
+                            + [item for item in inventory["globals"] if item.get("inaccessible")] + unbound)
 
 
 def discover(path, language, root, tools, execute):

@@ -1,0 +1,113 @@
+{
+  "qualification_schema_version": 1,
+  "date": "2026-10-20",
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "platform": {
+    "os": "macOS",
+    "architecture": "ARM64",
+    "clang": "22.1.8",
+    "python": "3.12.15"
+  },
+  "runtime": {
+    "source_commit": "77400c7e72bf71b9229c9b676f499bea9a36fefb",
+    "source_tree": "c07e1d5571777baf143dd25638c1cd5a41c006a1",
+    "cli_sha256": "b08400792e1afac93237a0f94b0d8e7789dd259a4668e8a99051dd90e44bd253",
+    "source_archive_sha256": "b50b3160616ea8065382e1cbd0cf788f1032d61fd1e765a41fc60c4fdb18e6fc"
+  },
+  "provider": {
+    "verified_at": "2026-10-20T22:11:38.920759+00:00",
+    "provider_commit": "d6d03b72026cde8962b11ce3cc184ff3ebcb60d4",
+    "provider_tree": "a577aa88d5d51f4e86bc0858bcd233be7b01c251",
+    "manifest_sha256": "2a8dbf239c6444c0fb536dff049993beade7eaed6578c9654c1e2d7233e9431f",
+    "verified_records": 7360,
+    "counts": {
+      "source_sha256": 413,
+      "products_sha256": 586,
+      "dependencies": 6361
+    },
+    "symlinks": 11,
+    "external_tools_verified": 8,
+    "cli_sha256": "037fb837ea1a3e982e9cb0d62f00b8c70c9709f25178fe936b189c2c1721c486",
+    "profile_relocation": {
+      "original_sha256": "091b340d6ed90eaa54a025719fde13abb1420c85058f864dd6d69242013c97c7",
+      "retained_sha256": "425bf561b3c2772162d95e44773cdf6660e1522b62f8fed946714fe3d1737539"
+    },
+    "scope": "Content verified before and after the 32-launch native scalar corpus; no claim about later provider revisions.",
+    "verification_script_sha256": "5b2e4c5b12fc2ccb3b3181011db9c595f1ab75fe2d4010fff83547185c556ea5"
+  },
+  "inventory": {
+    "callables": 20,
+    "excluded": 7,
+    "ready": 6,
+    "blocked": 7
+  },
+  "results": {
+    "claim": "equivalence over these tests and observations",
+    "artefact_class": "diagnostic",
+    "scope": "eight witnessed C/C++ primitive/macro cases; aliases, thread-local and template storage remain visible blockers",
+    "oteleq_cli_sha256": "b08400792e1afac93237a0f94b0d8e7789dd259a4668e8a99051dd90e44bd253",
+    "otelc_cli_sha256": "037fb837ea1a3e982e9cb0d62f00b8c70c9709f25178fe936b189c2c1721c486",
+    "matching_cases": 8,
+    "matching_attempts": 32,
+    "blocked_callables": 7,
+    "blocked_object_aliases": 2,
+    "blocked_thread_local_callables": 3,
+    "blocked_template_callables": 1,
+    "blocked_other_declarations": 1,
+    "qualifier_sha256": "1e5520d3504696b5fce3eb3e7b798947c6bc0e2f4391bdcf38b50ca043d74bd5",
+    "strict_gate_exit": 3,
+    "source_preserved": true,
+    "native_scalar_value_oracles": true
+  },
+  "independent_verification": {
+    "runtime_commit": "77400c7e72bf71b9229c9b676f499bea9a36fefb",
+    "actual_application_launches": 32,
+    "matching_cases": 8,
+    "blocked_callables": 7,
+    "source_preserved": true,
+    "private_source_records_verified": 256,
+    "raw_records": 799,
+    "raw_manifest_sha256": "30c666e840df6bbc6ed65779e7f717adfe1e30801faeb6135c53f3fe4aa29e1d",
+    "verifier_sha256": "d206dd70e9db60f3866fd2c3dc8abfbb27b270711d4b8fde302facf2fdd831e9",
+    "qualifier_sha256": "1e5520d3504696b5fce3eb3e7b798947c6bc0e2f4391bdcf38b50ca043d74bd5",
+    "complete_value_oracles_verified": true,
+    "frozen_source_files_verified": 221
+  },
+  "local_gate": {
+    "exit_code": 0,
+    "source_commit": "77400c7e72bf71b9229c9b676f499bea9a36fefb",
+    "source_tree": "c07e1d5571777baf143dd25638c1cd5a41c006a1",
+    "log_sha256": "e5ce62b6189b4a53037ec252d7c07adce99e8bd69a7e9f887a5d1673278f1bad",
+    "command": "make check",
+    "unique_regressions": 512,
+    "python_regressions": 425,
+    "rust_regressions": 66,
+    "node_regressions": 17,
+    "go_regressions": 4,
+    "additional_compiled_cpp_observer_probe": true,
+    "rust_product_line_coverage_percent": 97.29,
+    "scope": "Complete local documentation, regression, observer and Rust coverage gates."
+  },
+  "presentation": {
+    "browser_review": "passed",
+    "junit": {
+      "tests": "22",
+      "failures": "0",
+      "errors": "7",
+      "skipped": "7"
+    },
+    "files_sha256": {
+      "index.html": "66d6cfd91c1f6a82a872c617c4a326ab56f05b98bed200fbf84b5f30d33827a0",
+      "overview.png": "cadb07a2c833613e62259d408bda72f343d424686c5ed07544034eac56c354b7",
+      "blocked-tls.png": "2fee6d2562f8b43e64f36fa17599b7390a9dc34f99d0e0f14547cb3be4a71e47",
+      "junit.xml": "0311a9913630d8c42035c48c75783f3b3fa1c4f1cc2d453a573ec63e86f991a9"
+    }
+  },
+  "limits": [
+    "Standalone fixed C/C++ scalar fixtures; no general native build/dependency context.",
+    "Thread-local and unresolved template/global storage remain visible blockers.",
+    "Decoded telemetry is name-bound; invocation-scoped attribution remains unavailable.",
+    "No shipping-artefact or other platform qualification."
+  ]
+}

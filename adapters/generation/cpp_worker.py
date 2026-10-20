@@ -1,9 +1,9 @@
 """Generate compiler-checked passive access in the private C++ translation unit."""
 import json
-import re
 
 import cpp_receivers
 import cpp_models
+import native_names
 
 
 NEXT_DEPTH = "depth+1"
@@ -137,8 +137,7 @@ bool ok=std::fputs("{\"cpp_receiver_schema_version\":1,\"before\":",output)>=0 &
 return std::fclose(output)==0 && ok?0:92;}
 ''')
         generated = "namespace __oteleq_cpp {\n" + aliases + forwards + access + writers + main + "}\n"
-        macros = set(re.findall(r"[A-Za-z_]\w*", generated, re.ASCII))
-        clean = cpp_receivers.sanitise_identifiers(self.contract) + "\n".join("#undef " + name for name in sorted(macros)) + "\n"
+        clean = cpp_receivers.sanitise_identifiers(self.contract) + native_names.undefinitions(generated)
         return clean + generated + '\nint main(){try{return __oteleq_cpp::access<::' + owner + '>::run();}\n' + '''
 catch(const __oteleq_cpp::capture_failure& error){std::fprintf(stderr,"C++ observation incomplete: %s\\n",error.reason);return 91;}
 catch(...){std::fputs("C++ fixture or exception needs another codec\\n",stderr);return 91;}}

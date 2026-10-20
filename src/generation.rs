@@ -6,6 +6,10 @@ use syn::{spanned::Spanned, visit::Visit};
 
 const RESOURCES: &[(&str, &str)] = &[
     (
+        "native_names.py",
+        include_str!("../adapters/generation/native_names.py"),
+    ),
+    (
         "GENERATED-LICENSE.txt",
         include_str!("../adapters/generation/GENERATED-LICENSE.txt"),
     ),

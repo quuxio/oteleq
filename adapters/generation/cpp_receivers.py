@@ -1,8 +1,8 @@
 """Bind ordinary source C++ receiver factories and private diagnostic access."""
 from collections.abc import Callable
-import re
 
 import cpp_models
+import native_names
 
 
 HELPER_NAMESPACE = "__oteleq_cpp"
@@ -148,6 +148,5 @@ def sanitise_identifiers(contract: dict) -> str:
                    "template", "class", "struct", "static", "return", "auto", "void", "typename", "decltype"}
     names = [*contract["records"], contract["factory"]["name"], contract["method"]["name"]]
     names.extend(field["name"] for item in contract["records"].values() for field in [*item["fields"], *item["statics"]])
-    for name in names:
-        identifiers.update(re.findall(r"[A-Za-z_]\w*", name, re.ASCII))
+    identifiers.update(native_names.identifiers('', names))
     return "\n".join("#undef " + name for name in sorted(identifiers)) + "\n"

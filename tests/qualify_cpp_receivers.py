@@ -55,8 +55,20 @@ public:
 extern "C" int plain(int value){return value+1;}
 extern "C" int _named(int value){return value+1;}
 extern "C" int _Zbad(int value){return value+1;}
+class UnicodeCounter {
+ int value_;
+ int& \u6570\u636e;
+ int& read_alias()const{++calls_;return \u6570\u636e;}
+public:
+ inline static int calls_=0;
+ explicit UnicodeCounter(int seed):value_(seed),\u6570\u636e(value_){}
+ int add(int amount){value_+=amount;return value_;}
+};
+#define \u6570\u636e read_alias()
 '''
-BINDING_FUNCTIONS = ("Graph::add(short)", "plain", "_named", "_Zbad")
+BINDING_FUNCTIONS = ("Graph::add(short)", "plain", "_named", "_Zbad", "UnicodeCounter::add(int)")
+BINDING_FACTORIES = {BINDING_FUNCTIONS[0]: 'Graph', BINDING_FUNCTIONS[4]: 'UnicodeCounter'}
+BINDING_STATIC = 'global:UnicodeCounter::calls_'
 
 
 def function(name: str) -> str:
@@ -142,6 +154,7 @@ def check_report(path: Path, expected_cases: int) -> tuple[int, dict]:
             for attempt in bundle[lane]:
                 launches += 1
                 observed = attempt["observation"]
+                assert all(attempt['execution']['channels'][name] == [] for name in ('stdout', 'stderr'))
                 assert not observed["gaps"]
                 amount, active = case["arguments"][0], int(lane == "instrumented_on")
                 check_state(observed["before"], 10, 0, amount)
@@ -204,6 +217,8 @@ def refusals(cli: Path, provider: Path, folder: Path) -> tuple[int, int]:
         ("opaque", SOURCE.replace("Count value_,other_;", "std::exception opaque_;Count value_,other_;").replace("value_(seed),", "opaque_{},value_(seed),"), None, 3),
         ("local-static", SOURCE.replace("int fail(Count amount){", "int fail(Count amount){static int hidden=0;++hidden;"), None, 3),
         ("macro-storage", '#define STORAGE(name) int name=0;\nSTORAGE(hidden)\n' + SOURCE, None, 3),
+        ("thread-local", SOURCE + '\nthread_local int hidden=0;\n', None, 3),
+        ("template-storage", SOURCE + '\ntemplate<class T>struct Holder{inline static int state=0;};\n', None, 3),
         ("virtual", SOURCE.replace("public:", "public: virtual ~Counter(){}"), None, 3),
         ("collision", SOURCE + "\n// __oteleq_cpp\n", None, 3),
         ("budget", SOURCE.replace("int array_[2];", "int array_[4096];"), None, 4),
@@ -251,34 +266,53 @@ def check_bindings(path: Path, expected_cases: int) -> int:
     for case in report["cases"]:
         assert case["function"] in BINDING_FUNCTIONS and case["exit_code"] == 0 and case["arguments"] == [3]
         bundle = json.loads((path.parent / case["case"] / "typed-bundle.json").read_text())["cases"][0]
-        receiver = case["function"] == BINDING_FUNCTIONS[0]
-        assert set(bundle["contract"]["required_roots"]) == ({"receiver", "argument:0"} if receiver else set())
+        receiver = case["function"] in BINDING_FACTORIES
+        assert set(bundle["contract"]["required_roots"]) == ({"receiver", "argument:0", BINDING_STATIC} if receiver else {BINDING_STATIC})
         for lane in ("baseline", "instrumented_on"):
             assert len(bundle[lane]) == 2
             for attempt in bundle[lane]:
                 launches += 1
                 observed = attempt["observation"]
+                assert all(attempt['execution']['channels'][name] == [] for name in ('stdout', 'stderr'))
                 assert not observed["gaps"] and observed["outcome"]["kind"] == "return"
                 outcome = observed["outcome"]["graph"]
                 if receiver:
-                    assert case["receiver_fixture"]["arguments"] == [10]
-                    for graph, expected in ((observed["before"], 10), (outcome, 13), (observed["after"], 13)):
-                        fields = node(graph, graph["roots"]["receiver"])["fields"]
-                        assert set(fields) == {"location", "field:value_", "field:self_"}
-                        scalar(graph, fields["field:value_"], expected, short=True)
-                        scalar(graph, graph["roots"]["argument:0"], 3, short=True)
-                        assert node(graph, fields["field:self_"])["fields"]["value"] == graph["roots"]["receiver"]
-                    assert node(outcome, outcome["roots"]["result"])["fields"]["value"] == outcome["roots"]["receiver"]
+                    check_binding_receiver(observed, case)
                 else:
-                    assert observed["before"] == observed["after"] == {"roots": {}, "nodes": []}
-                    assert outcome == {"nodes": [], "roots": {"result": {"kind": "integer", "type": "cpp.int", "value": "4", "bits": 32, "signed": True}}}
+                    zero = {'kind': 'integer', 'type': 'cpp.int', 'value': '0', 'bits': 32, 'signed': True}
+                    assert observed["before"] == observed["after"] == {"roots": {BINDING_STATIC: zero}, "nodes": []}
+                    assert outcome == {"nodes": [], "roots": {BINDING_STATIC: zero,
+                        "result": {"kind": "integer", "type": "cpp.int", "value": "4", "bits": 32, "signed": True}}}
                 if lane == "instrumented_on":
                     assert attempt["execution"]["witness"]["functions"] == {case["function"]: 1}
     return launches
 
 
+def check_binding_receiver(observed: dict, case: dict) -> None:
+    """Getters remain uncalled; narrow values, references and return copies are exact."""
+    assert case['receiver_fixture']['arguments'] == [10]
+    short = case['function'] == BINDING_FUNCTIONS[0]
+    outcome = observed['outcome']['graph']
+    for graph, expected in ((observed['before'], 10), (outcome, 13), (observed['after'], 13)):
+        fields = node(graph, graph['roots']['receiver'])['fields']
+        extra = 'field:self_' if short else 'field:\u6570\u636e'
+        assert set(fields) == {'location', 'field:value_', extra}
+        scalar(graph, fields['field:value_'], expected, short=short)
+        scalar(graph, graph['roots']['argument:0'], 3, short=short)
+        scalar(graph, graph['roots'][BINDING_STATIC], 0)
+        expected_alias = graph['roots']['receiver'] if short else fields['field:value_']
+        assert node(graph, fields[extra])['fields']['value'] == expected_alias
+    if short:
+        assert node(outcome, outcome['roots']['result'])['fields']['value'] == outcome['roots']['receiver']
+    else:
+        scalar(outcome, outcome['roots']['result'], 13)
+        returned = node(outcome, outcome['roots']['result'])
+        fields = node(outcome, outcome['roots']['receiver'])['fields']
+        assert returned['fields']['location'] != node(outcome, fields['field:value_'])['fields']['location']
+
+
 def binding_controls(cli: Path, provider: Path, folder: Path, source_text: str = BINDING_SOURCE) -> int:
-    """Exercise both fixed naming defects over every retained/exported route."""
+    """Exercise source names, Unicode macro guards and receiver return semantics."""
     destination = folder / "bindings"
     destination.mkdir()
     source = destination / "application"
@@ -288,8 +322,8 @@ def binding_controls(cli: Path, provider: Path, folder: Path, source_text: str =
     text = 'schema_version=1\nlanguages=["cpp"]\n[functions]\ninclude=' + json.dumps(BINDING_FUNCTIONS) + '\n'
     for name in BINDING_FUNCTIONS:
         text += '\n[[fixtures]]\nfunction=' + json.dumps(name) + '\ncases=[[3]]\n'
-        if name == BINDING_FUNCTIONS[0]:
-            text += 'receiver={factory="Graph",arguments=[10]}\n'
+        if name in BINDING_FACTORIES:
+            text += 'receiver={factory=' + json.dumps(BINDING_FACTORIES[name]) + ',arguments=[10]}\n'
     policy.write_text(text)
     workspace = Path(command([cli, "plan", "--source", source, "--otelc-root", provider,
                               "--workspace-parent", destination, "--config", policy], destination, "plan"))
