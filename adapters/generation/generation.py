@@ -17,6 +17,7 @@ import discovery
 import harness
 import otelc_capture as capture
 import policy as project_policy
+import python_project
 import shrinking
 import typed_capture
 
@@ -248,6 +249,11 @@ def inventory_entry(function, discovered, name, language, source_hash, snapshot,
     if language == "go":
         entry["go_shadowed_recovery"] = any(function["name"] in ("recover", "panic")
                                           for function in discovered["functions"])
+    if language == "python" and not excluded and args.configuration["adapters"]["python"]["import_roots"]:
+        try:
+            entry["python_import"] = python_project.context(snapshot, name, args.configuration["adapters"]["python"]["import_roots"])
+        except ValueError as error:
+            entry["reason"] = entry["reason"] or str(error)
     fixture = project_policy.matching_fixture(entry, args.configuration) if not excluded else None
     entry["expected_baseline"] = fixture["expected_baseline"] if fixture else {"kind": "return"}
     if fixture is not None:
@@ -351,7 +357,7 @@ def decoder_files():
 
 def generator_identity():
     here = Path(__file__).parent
-    names = ("generation.py", "policy.py", "domains.py", "shrinking.py", "discovery.py", "harness.py", "observe.py", "node_observe.mjs", "typed_capture.py", "discover.mjs", "discover.go", "Discover.java")
+    names = ("generation.py", "policy.py", "domains.py", "shrinking.py", "python_project.py", "discovery.py", "harness.py", "observe.py", "node_observe.mjs", "typed_capture.py", "discover.mjs", "discover.go", "Discover.java")
     files = {name: capture.file_digest(here / name) for name in names}
     files["host-python"] = capture.file_digest(Path(sys.executable))
     files["host-version"] = sys.version

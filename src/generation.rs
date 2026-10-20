@@ -22,6 +22,10 @@ const RESOURCES: &[(&str, &str)] = &[
         include_str!("../adapters/generation/harness.py"),
     ),
     (
+        "python_project.py",
+        include_str!("../adapters/generation/python_project.py"),
+    ),
+    (
         "policy.py",
         include_str!("../adapters/generation/policy.py"),
     ),
