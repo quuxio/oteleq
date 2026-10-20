@@ -134,7 +134,7 @@ class Reader:
         return value
 
 
-def request(reader: Reader, settings_: dict, remaining: int) -> dict:
+def request_line(reader: Reader, settings_: dict) -> tuple[bytes, bytes, bytes, int]:
     line = reader.line(settings_["max_header_bytes"])
     parts = line.split(b" ")
     if len(parts) != 3 or not TOKEN.fullmatch(parts[0]) or parts[2] not in (b"HTTP/1.0", b"HTTP/1.1"):
@@ -142,7 +142,11 @@ def request(reader: Reader, settings_: dict, remaining: int) -> dict:
     method, target, version = parts
     if method == b"CONNECT" or not (target.startswith(b"/") or method == b"OPTIONS" and target == b"*") or any(byte < 33 or byte > 126 for byte in target):
         raise CaptureGap("HTTP request target requires origin form or OPTIONS asterisk form")
-    used, fields, captured = len(line) + 2, {}, []
+    return method, target, version, len(line) + 2
+
+
+def request_headers(reader: Reader, settings_: dict, used: int) -> tuple[dict, list[str]]:
+    fields, captured = {}, []
     while True:
         line = reader.line(settings_["max_header_bytes"] - used)
         used += len(line) + 2
@@ -155,15 +159,24 @@ def request(reader: Reader, settings_: dict, remaining: int) -> dict:
         fields.setdefault(key, []).append(value.strip(b" \t"))
         if key in settings_["headers"]:
             captured.append(line.hex())
+    return fields, captured
+
+
+def body_length(fields: dict, version: bytes, remaining: int) -> int:
     if version == b"HTTP/1.1" and (len(fields.get("host", [])) != 1 or not fields["host"][0]):
         raise CaptureGap("HTTP/1.1 requires exactly one nonempty Host field")
     if "transfer-encoding" in fields or "expect" in fields or "upgrade" in fields:
         raise CaptureGap("HTTP transfer coding, expect/continue and upgrades require another profile")
     lengths = fields.get("content-length", [])
-    if len(lengths) > 1 or lengths and (not re.fullmatch(rb"[0-9]{1,20}", lengths[0]) or int(lengths[0]) > remaining):
+    if len(lengths) > 1 or lengths and (not re.fullmatch(rb"\d{1,20}", lengths[0]) or int(lengths[0]) > remaining):
         raise CaptureGap("HTTP body framing/byte budget exceeded")
-    length = int(lengths[0]) if lengths else 0
-    body = reader.body(length)
+    return int(lengths[0]) if lengths else 0
+
+
+def request(reader: Reader, settings_: dict, remaining: int) -> dict:
+    method, target, version, used = request_line(reader, settings_)
+    fields, captured = request_headers(reader, settings_, used)
+    body = reader.body(body_length(fields, version, remaining))
     return {"method": method.decode("ascii"), "target_hex": target.hex(), "version": version.decode("ascii"),
             "header_lines_hex": captured, "body_hex": body.hex()}
 

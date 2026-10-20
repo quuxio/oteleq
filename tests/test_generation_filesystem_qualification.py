@@ -6,7 +6,9 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-import qualify_filesystem as qualifier
+import qualify_filesystem
+
+qualifier = qualify_filesystem.qualification
 
 
 class FilesystemQualificationTests(unittest.TestCase):
@@ -14,7 +16,7 @@ class FilesystemQualificationTests(unittest.TestCase):
         folder = base / "runs/replay/case/baseline-0"
         project = folder / "project"
         project.mkdir(parents=True)
-        for name in ("command.json", "filesystem-controls.json", "filesystem-data.json", "typed-observation.json", "http-capture.json"):
+        for name in ("command.json", "typed-observation.json", "http-capture.json", *qualifier.sidecars):
             (folder / name).write_text("{}")
         (folder / "working-directory.json").write_text(json.dumps(str(project)))
         return folder

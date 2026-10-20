@@ -251,9 +251,10 @@ class WorkflowTests(unittest.TestCase):
         config.write_text('schema_version=1\n[functions]\ninclude=["*sample*"]\n'
                           '[[fixtures]]\nfunction="*sample*"\ncases=[[]]\n')
         before = set(self.base.glob("oteleq-run-*"))
+        request = args("plan", source=self.source, otelc_root=self.root,
+                       workspace_parent=self.base, language=None, exclude=[], cases=1, config=config)
         with self.assertRaisesRegex(ValueError, "matches no selected callable"):
-            gen.plan(args("plan", source=self.source, otelc_root=self.root,
-                          workspace_parent=self.base, language=None, exclude=[], cases=1, config=config))
+            gen.plan(request)
         created = set(self.base.glob("oteleq-run-*")) - before
         self.assertEqual(len(created), 1)
         workspace = created.pop()

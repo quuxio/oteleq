@@ -188,28 +188,32 @@ class HttpEffectTests(unittest.TestCase):
             effects.Fixture(selected)
         broken.close.assert_called_once()
         with tempfile.TemporaryDirectory() as temporary, effects.fixtures(configured) as fixtures:
+            capture = effects.Capture(fixtures[0], Path(temporary), 65536)
             with self.assertRaisesRegex(ValueError, "worker failed"):
-                with effects.observe(fixtures, Path(temporary), 65536) as captures:
+                with capture:
                     raise ValueError("worker failed")
-            self.assertFalse(captures[0].thread.is_alive())
+            self.assertFalse(capture.thread.is_alive())
             self.assertTrue((Path(temporary) / "http-service.json").is_file())
 
     def test_unexpected_receiver_failure_is_a_tool_error_with_raw_records(self):
         with tempfile.TemporaryDirectory() as temporary, effects.fixtures(configuration()) as fixtures:
+            capture = effects.Capture(fixtures[0], Path(temporary), 65536)
             with patch.object(effects.select, "select", side_effect=RuntimeError("receiver failed")), self.assertRaisesRegex(ValueError, "capture failed"):
-                with effects.observe(fixtures, Path(temporary), 65536) as captures:
-                    self.assertEqual(len(captures), 1)
-            self.assertFalse(captures[0].thread.is_alive())
+                with capture:
+                    pass  # The receiver thread's injected failure is raised on exit.
+            self.assertFalse(capture.thread.is_alive())
             self.assertFalse(json.loads((Path(temporary) / "http-service.json").read_text())["complete"])
 
     def test_cleanup_bound_cannot_report_success_when_a_receiver_does_not_stop(self):
         with tempfile.TemporaryDirectory() as temporary, effects.fixtures(configuration()) as fixtures:
             thread = MagicMock(); thread.is_alive.return_value = True
-            with patch.object(effects.threading, "Thread", return_value=thread), self.assertRaisesRegex(ValueError, "capture failed"):
-                with effects.observe(fixtures, Path(temporary), 65536) as captures:
-                    captures[0].active = MagicMock()
-                    self.assertEqual(len(captures), 1)
-            captures[0].active.close.assert_called_once()
+            with patch.object(effects.threading, "Thread", return_value=thread):
+                capture = effects.Capture(fixtures[0], Path(temporary), 65536)
+            capture.active = MagicMock()
+            with self.assertRaisesRegex(ValueError, "capture failed"):
+                with capture:
+                    pass  # The fake live receiver exercises bounded cleanup on exit.
+            capture.active.close.assert_called_once()
             self.assertFalse(json.loads((Path(temporary) / "http-service.json").read_text())["complete"])
 
     def test_failed_response_delivery_and_undrained_traffic_cannot_qualify(self):

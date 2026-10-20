@@ -6,7 +6,9 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-import qualify_http as qualifier
+import qualify_http
+
+qualifier = qualify_http.qualification
 
 
 class HttpQualificationTests(unittest.TestCase):
@@ -14,7 +16,7 @@ class HttpQualificationTests(unittest.TestCase):
         folder = base / "runs/replay/case/baseline-0"
         project = folder / "project"
         project.mkdir(parents=True)
-        for name in ("command.json", "http-controls.json", "http-service.json", "typed-observation.json", "http-capture.json"):
+        for name in ("command.json", "typed-observation.json", "http-capture.json", *qualifier.sidecars):
             (folder / name).write_text("{}")
         (folder / "working-directory.json").write_text(json.dumps(str(project)))
         return folder
