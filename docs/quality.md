@@ -140,6 +140,10 @@ The [ordered-sequence record](qualification/ordered-sequences-2026-10-20.json) q
 
 The full local gate passed 332 regression tests with Rust product line coverage at 97.29%; every required module passed its 80% floor. Node sequence checks exercise actual bounded collection. Three sequential-await analysis exceptions have local `NOSONAR` explanations: receiver actions and event-loop turns must finish in order. They do not permit parallel action execution or a suppressed functional failure. Collection retry counts stay raw; unobserved collection and incomplete lifetime telemetry remain inconclusive.
 
+## Filesystem effect implementation checks
+
+`filesystem_effects.py` has an independent 80% coverage floor. Regressions check frozen declarations, exclusive no-follow seeding, exact binary bytes, file/directory/mode changes, unsupported objects, disappearing entries and reached limits. Real plain workers exercise all eight language IDs; typed comparator controls require the named channel and complete capture. The maintained `generation-filesystem-otelc` target separately checks actual paired SDK execution, generated/exported suites and reduction/replay. Final exact-revision filesystem qualification is pending; development evidence is not a shipping claim.
+
 ## TypeScript collection emitter qualification
 
 The [exact-revision record](qualification/typescript-collection-2026-10-20.json) qualifies runtime `3f6bd8e` against frozen provider `266e1ba`, separately through Microsoft source 6.0.3 and native 7.0.2. Each emitter completed 132 actual launches across `.ts`, `.mts` and `.cts`: five matching cases, one intermediate mutation restored before the last boundary, and one correctly inconclusive retained receiver. Source factories/creation links, awaited methods, expected errors and an application finalizer are observed. Generated/exported suites, scalar shrinking and replay preserve those outcomes. Six altered-evidence controls and a prelaunch source refusal passed per emitter. The older actual provider refused 14 selected collection requests with no application launches.

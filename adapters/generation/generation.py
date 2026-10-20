@@ -15,6 +15,7 @@ import uuid
 
 import discovery
 import go_project
+import filesystem_effects
 import harness
 import node_receivers
 import otelc_capture as capture
@@ -360,6 +361,7 @@ def inventory_tree(contents, root, snapshot, workspace, args):
         discovered["entrypoints"] = [function for function in discovered["functions"] if is_entrypoint(function, language)]
         for function in discovered["functions"]:
             entry = inventory_entry(function, discovered, name, language, sha, snapshot, args)
+            filesystem_effects.bind(entry, args.configuration)
             typescript_provider.bind(entry, root, workspace, tools.get(language, {}), execute, policy)
             inventory.append(entry)
     return tools, artefacts, inventory
@@ -443,7 +445,7 @@ def decoder_files():
 
 def generator_identity():
     here = Path(__file__).parent
-    names = ("generation.py", "policy.py", "domains.py", "shrinking.py", "sequences.py", "typescript_provider.py", "python_project.py", "go_project.py", "node_receivers.py", "discovery.py", "harness.py", "observe.py", "node_observe.mjs", "node_sequence.mjs", "typed_capture.py", "discover.mjs", "discover.go", "Discover.java")
+    names = ("generation.py", "policy.py", "filesystem_effects.py", "domains.py", "shrinking.py", "sequences.py", "typescript_provider.py", "python_project.py", "go_project.py", "node_receivers.py", "discovery.py", "harness.py", "observe.py", "node_observe.mjs", "node_sequence.mjs", "typed_capture.py", "discover.mjs", "discover.go", "Discover.java")
     files = {name: capture.file_digest(here / name) for name in names}
     files["host-python"] = capture.file_digest(Path(sys.executable))
     files["host-version"] = sys.version
@@ -679,13 +681,14 @@ def validate_private_sources(project, immutable, folder):
               for name in ("plain", "instrumented") if (project / name).is_file()})
 
 
-def qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, decoder):
+def qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, decoder, *, extra_channels=None, capture_complete=True):
     if errors or result.returncode:
         raise ValueError("application exit or OTLP capture failed; inspect retained stdout/stderr")
     observation = folder / "observation"
     if not observation.is_file() or observation.stat().st_size > MAX_OUTPUT:
         raise ValueError("missing or oversized typed observation")
-    if len(result.stdout) + len(result.stderr) + observation.stat().st_size > data["configuration"]["limits"]["max_capture_bytes"]:
+    extra_channels = extra_channels or {}
+    if len(result.stdout) + len(result.stderr) + observation.stat().st_size + sum(map(len, extra_channels.values())) > data["configuration"]["limits"]["max_capture_bytes"]:
         raise ValueError("case observation exceeds comparator channel budget")
     witness = None
     if lane == "baseline":
@@ -694,8 +697,8 @@ def qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, 
     else:
         witness = telemetry(bodies, read(folder / "runtime.json"), entry, service, decoder)
     return {"source_sha256_before": data["source_sha256"], "source_sha256_after": data["source_sha256"],
-            "termination": {"kind": "exit", "code": 0}, "capture_complete": True,
-            "channels": {"stdout": list(result.stdout), "stderr": list(result.stderr), "state-and-outcome": list(observation.read_bytes())}, "witness": witness}
+            "termination": {"kind": "exit", "code": 0}, "capture_complete": capture_complete,
+            "channels": {"stdout": list(result.stdout), "stderr": list(result.stderr), "state-and-outcome": list(observation.read_bytes()), **extra_channels}, "witness": witness}
 
 
 
@@ -731,11 +734,17 @@ def attempt(workspace, data, entry, case, lane, folder, decoder):
         write(folder / "command.json", [str(p) for p in command])
         working_directory = project / entry["go_context"]["module_root"] if "go_context" in entry else project
         write(folder / "working-directory.json", str(working_directory))
+        effects, effect_environment = filesystem_effects.prepare(folder, data["configuration"], working_directory=working_directory)
+        env.update(effect_environment)
+        if effects:
+            write(folder / "filesystem-controls.json", {"declarations": filesystem_effects.selected(data["configuration"]), "environment": effect_environment})
         result = execute(command, working_directory, env, folder, timeout=data["configuration"]["limits"]["case_timeout_ms"] / 1000)
     capture.retain_http(folder, bodies, errors)
+    effect_channels, complete = filesystem_effects.finish(effects, folder)
     validate_private_sources(project, immutable, folder)
     capture.stable(root, language, tools, data["artefacts"][language], rust_backend=entry.get("rust_backend", "compiler"))
-    return qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, decoder)
+    return qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, decoder,
+                           extra_channels=effect_channels, capture_complete=complete)
 
 def capture_case(workspace, data, entry, case, destination, decoder, contract):
     """Keep raw evidence and bounded typed observations for every actual launch."""
@@ -748,12 +757,12 @@ def capture_case(workspace, data, entry, case, destination, decoder, contract):
             execution = attempt(workspace, data, entry, case, lane, folder, decoder)
             typed = typed_capture.observation(bytes(execution["channels"]["state-and-outcome"]), entry, contract)
             size = len(json.dumps(typed, ensure_ascii=True).encode())
-            size += sum(len(execution["channels"][name]) for name in ("stdout", "stderr"))
+            size += sum(len(value) for name, value in execution["channels"].items() if name != "state-and-outcome")
             if size > data["configuration"]["limits"]["max_capture_bytes"]:
                 raise ValueError("typed observation exceeds comparator channel budget")
             write(folder / "typed-observation.json", typed)
             observed[lane].append(execution)
-            typed_execution = {**execution, "channels": {name: execution["channels"][name] for name in ("stdout", "stderr")}}
+            typed_execution = {**execution, "channels": {name: value for name, value in execution["channels"].items() if name != "state-and-outcome"}}
             typed_observed[lane].append({"execution": typed_execution, "observation": typed})
     return observed, typed_observed
 
@@ -764,6 +773,8 @@ def compare_case(workspace, data, entry, case, destination, decoder):
     contract = {"observation_schema_version": 1, "case_id": case["id"], "function_id": entry.get("otelc_runtime_function", entry["otelc_function"]),
                 "fixture_sha256": identity({"case": case, "source": entry["source_sha256"], "roots": roots}),
                 "required_roots": roots, "expected_baseline": case["expected_baseline"]}
+    if filesystem_effects.selected(data["configuration"]):
+        contract["fixture_sha256"] = identity({"fixture": contract["fixture_sha256"], "effects": data["configuration"]["effects"]})
     if "sequence" in case:
         contract["steps"] = sequences.contracts(case, roots)
     observed, typed_observed = capture_case(workspace, data, entry, case, destination, decoder, contract)
@@ -773,14 +784,16 @@ def compare_case(workspace, data, entry, case, destination, decoder):
     scope = {"language": entry["language"], "artefact_class": "diagnostic", "source_sha256": data["source_sha256"],
              "baseline_artefact_sha256": identity(diagnostic), "instrumented_artefact_sha256": identity({**diagnostic, "adapter": data["artefacts"][entry["language"]]}),
              "policy_sha256": identity({"otelc": policy(entry, "receiver"), "generation": data["configuration"]}), "observer": "oteleq configured scalar generator v1; independently one selected root, recursive span counts observed",
-             "channels": ["stdout", "stderr", "state-and-outcome"],
-             "gaps": ["scalar corpus; business preconditions and branch exhaustiveness not established", "diagnostic access/entrypoint helpers; not shipping artefact evidence", "artefact digests aggregate diagnostic inputs and qualified tools/adapters; emitted runtime compiler/loader outputs are outside those digests", "no filesystem/network, imported-module globals, instrumented-off or concurrent-schedule qualification", "exception traceback/stack and Java/C++ extra exception fields are unobserved", "compiler sysroots and OS libraries are outside content identity", "trusted local execution; no hostile-code sandbox"]}
+             "channels": ["stdout", "stderr", "state-and-outcome", *filesystem_effects.channels(data["configuration"])],
+             "gaps": ["scalar corpus; business preconditions and branch exhaustiveness not established", "diagnostic access/entrypoint helpers; not shipping artefact evidence", "artefact digests aggregate diagnostic inputs and qualified tools/adapters; emitted runtime compiler/loader outputs are outside those digests", "no network, imported-module globals, instrumented-off or concurrent-schedule qualification", "exception traceback/stack and Java/C++ extra exception fields are unobserved", "compiler sysroots and OS libraries are outside content identity", "trusted local execution; no hostile-code sandbox"]}
+    scope["gaps"].append("filesystem boundary bytes/kinds/permissions only; timestamps, inode/link identity, transient activity and undeclared paths are unobserved"
+                         if filesystem_effects.selected(data["configuration"]) else "filesystem effects are unobserved")
     bundle = {"workload_schema_version": 1, "scope": scope, "cases": [{"case_id": case["id"], "corpus_sha256": identity(case),
               "expected_functions": selected, "expected_spans": sum(selected.values()), **observed}]}
     write(destination / "bundle.json", bundle)
     typed_case = {"contract": contract, "corpus_sha256": identity(case), "expected_functions": selected,
                   "expected_spans": sum(selected.values()), **typed_observed}
-    typed_scope = {**scope, "channels": ["stdout", "stderr"],
+    typed_scope = {**scope, "channels": ["stdout", "stderr", *filesystem_effects.channels(data["configuration"])],
                    "observer": "oteleq typed boundary codecs v1; captured globals/arguments and initial-state checks; name-only decoded invocation witness"}
     typed_scope["gaps"] = [*scope["gaps"], "graph identities are local to each boundary; cross-boundary replacement, weakref and finalizer effects are unobserved"]
     write(destination / TYPED_BUNDLE, {"typed_schema_version": 1, "scope": typed_scope, "cases": [typed_case]})

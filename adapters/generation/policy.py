@@ -9,6 +9,7 @@ import tomllib
 from typing import Any
 
 import domains
+import filesystem_effects
 import go_project
 import python_project
 import sequences
@@ -27,6 +28,7 @@ DEFAULTS = {
     "limits": {"case_timeout_ms": 60000, "baseline_repeats": 2,
                "instrumented_repeats": 2, "max_capture_bytes": MAX_CHANNEL_BYTES},
     "fixtures": [],
+    "effects": {"filesystem": []},
     "adapters": {"rust": {"backend": "compiler"}, "python": {"import_roots": []},
                  "go": {"module_roots": [], "build_tags": []}, "typescript": {"backend": "source"}},
 }
@@ -180,6 +182,7 @@ def validate(document: Mapping[str, Any]) -> dict[str, Any]:
         raise ValueError("fixtures must be an array of tables")
     result["fixtures"] = [fixture(value, index) for index, value in enumerate(fixtures)]
     result["adapters"] = adapters(document.get("adapters", {}))
+    result["effects"] = filesystem_effects.settings(document.get("effects", {}), keys, integer)
     return result
 
 
