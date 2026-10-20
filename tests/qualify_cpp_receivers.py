@@ -154,6 +154,7 @@ def check_report(path: Path, expected_cases: int) -> tuple[int, dict]:
             for attempt in bundle[lane]:
                 launches += 1
                 observed = attempt["observation"]
+                assert all(attempt['execution']['channels'][name] == [] for name in ('stdout', 'stderr'))
                 assert not observed["gaps"]
                 amount, active = case["arguments"][0], int(lane == "instrumented_on")
                 check_state(observed["before"], 10, 0, amount)
@@ -272,6 +273,7 @@ def check_bindings(path: Path, expected_cases: int) -> int:
             for attempt in bundle[lane]:
                 launches += 1
                 observed = attempt["observation"]
+                assert all(attempt['execution']['channels'][name] == [] for name in ('stdout', 'stderr'))
                 assert not observed["gaps"] and observed["outcome"]["kind"] == "return"
                 outcome = observed["outcome"]["graph"]
                 if receiver:
