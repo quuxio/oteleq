@@ -10,6 +10,8 @@ import sys
 
 
 def command(arguments, folder, name, expected=0, timeout=900):
+    if sys.flags.optimize:
+        raise ValueError("qualification requires Python assertion checks; disable -O/PYTHONOPTIMIZE")
     result = subprocess.run([str(p) for p in arguments], capture_output=True, check=False, timeout=timeout)
     (folder / (name + ".stdout")).write_bytes(result.stdout)
     (folder / (name + ".stderr")).write_bytes(result.stderr)
