@@ -10,6 +10,16 @@ import qualify_rust_build as qualifier
 
 
 class RustQualificationFixtureTests(unittest.TestCase):
+    def test_literal_return_oracle_rejects_numeric_prefixes_and_extra_text(self):
+        case = {"function": "wide.logical_source_length", "arguments": []}
+        with patch.object(qualifier, "check_build"):
+            for raw in (b"return:usize:70\n", b"prefix return:usize:7\n", b"return:usize:7suffix\n"):
+                attempt = {"channels": {"stdout": [], "stderr": [], "state-and-outcome": list(raw)}}
+                with self.subTest(raw=raw), self.assertRaises(AssertionError):
+                    qualifier.check_attempt(case, Path("unused"), "compiler", None, "baseline", 0, attempt)
+            valid = {"channels": {"stdout": [], "stderr": [], "state-and-outcome": list(b"header\nreturn:usize:7\nafter\n")}}
+            qualifier.check_attempt(case, Path("unused"), "compiler", None, "baseline", 0, valid)
+
     def test_default_compiler_routes_check_all_framework_and_exported_cases(self):
         with tempfile.TemporaryDirectory() as temporary:
             folder = Path(temporary)

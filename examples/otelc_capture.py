@@ -170,6 +170,23 @@ def typescript_backend(root, language, spec, policy):
     return selected
 
 
+def rust_inputs(root: Path, tools: dict[str, Path], backend: str) -> list[Path]:
+    """Enumerate only the explicitly selected Rust profile and its inputs."""
+    paths = [root / "target/debug/otelc-rust-adapter", root / "Cargo.lock"]
+    if backend == "llvm":
+        return paths + rust_llvm_inputs(root, tools)
+    rust_flags(backend)
+    profile = root / RUST_COMPILER_PROFILE_FILENAME
+    if profile.exists() or profile.is_symlink():
+        from otelc_rust_build import inputs
+        return paths + inputs(root, tools)
+    dependencies = root / "target/debug/deps"
+    paths += [root / "target/debug/libquux_otelc_rust.rlib"]
+    paths += sorted(path for pattern in ("*.rlib", "*.dylib", "*.so", "*.dll")
+                    for path in dependencies.glob(pattern))
+    return paths
+
+
 def artefacts(root, language, tools, *, rust_backend="compiler"):
     """Re-enumerate executable adapter inputs so additions/removals are visible."""
     paths = [root / OTELC_CLI_PATH]
@@ -179,20 +196,7 @@ def artefacts(root, language, tools, *, rust_backend="compiler"):
                   root / "target/debug/otelc-llvm-toolchain.json",
                   root / "target/debug/libotelc_pass.dylib"]
     elif language == "rust":
-        paths += [root / "target/debug/otelc-rust-adapter", root / "Cargo.lock"]
-        if rust_backend == "llvm":
-            paths += rust_llvm_inputs(root, tools)
-        elif ((root / RUST_COMPILER_PROFILE_FILENAME).exists()
-              or (root / RUST_COMPILER_PROFILE_FILENAME).is_symlink()):
-            from otelc_rust_build import inputs
-            rust_flags(rust_backend)
-            paths += inputs(root, tools)
-        else:
-            rust_flags(rust_backend)
-            paths += [root / "target/debug/libquux_otelc_rust.rlib"]
-            dependencies = root / "target/debug/deps"
-            paths += sorted(path for pattern in ("*.rlib", "*.dylib", "*.so", "*.dll")
-                            for path in dependencies.glob(pattern))
+        paths += rust_inputs(root, tools, rust_backend)
     elif language == "java":
         paths += [root / "adapters/java/target/java-agent-0.1.0-agent.jar"]
     elif language == "go":
@@ -309,6 +313,16 @@ def rust_llvm_inputs(root: Path, tools: dict[str, Path]) -> list[Path]:
     return paths
 
 
+def rust_compiler_fields(metadata: dict) -> None:
+    """Legacy and original-source compiler manifests have separate closed fields."""
+    fields = {"schema_version", "language", "executable_sha256", "plan_sha256", "adapter_sha256", "sdk_sha256",
+              "source", "source_sha256", "source_root", "baseline_flags", "compiler"}
+    if metadata["schema_version"] == 3:
+        fields |= {"backend", "compiler_driver"}
+    if set(metadata) != fields or metadata["schema_version"] == 3 and metadata["backend"] != "compiler":
+        raise ValueError("Rust compiler manifest fields or backend are unqualified")
+
+
 def rust_metadata(bundle: Path, backend: str = "compiler") -> dict:
     """Read only fixed bundle files and reject an unqualified schema/flag contract."""
     for name in ("application", PLAN_FILENAME, BUILD_FILENAME):
@@ -329,12 +343,7 @@ def rust_metadata(bundle: Path, backend: str = "compiler") -> dict:
             "source", "source_sha256", "source_root", "baseline_flags", "compiler", "compiler_hook"}):
         raise ValueError("Rust LLVM manifest fields or backend are unqualified")
     if backend == "compiler":
-        fields = {"schema_version", "language", "executable_sha256", "plan_sha256", "adapter_sha256", "sdk_sha256",
-                  "source", "source_sha256", "source_root", "baseline_flags", "compiler"}
-        if metadata["schema_version"] == 3:
-            fields |= {"backend", "compiler_driver"}
-        if set(metadata) != fields or metadata["schema_version"] == 3 and metadata["backend"] != "compiler":
-            raise ValueError("Rust compiler manifest fields or backend are unqualified")
+        rust_compiler_fields(metadata)
     return metadata
 
 

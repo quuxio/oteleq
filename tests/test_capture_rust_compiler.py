@@ -260,11 +260,12 @@ class RustCompilerBuildTests(unittest.TestCase):
             original = path.with_name(path.name + ".original")
             path.rename(original)
             path.symlink_to(original)
+            if path.suffix == ".rmeta":
+                verifier = lambda: compiler_build.inputs(self.root, self.tools)
+            else:
+                verifier = self.verify
             with self.subTest(path=path), self.assertRaises(ValueError):
-                if path.suffix == ".rmeta":
-                    compiler_build.inputs(self.root, self.tools)
-                else:
-                    self.verify()
+                verifier()
             path.unlink()
             original.rename(path)
             self.assertEqual(path.read_bytes(), saved)

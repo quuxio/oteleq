@@ -105,7 +105,7 @@ def check_attempt(case, folder, backend, column, lane, index, attempt):
     token, expected_stderr = expected_channels(case, column)
     assert bytes(attempt["channels"]["stdout"]) == b""
     assert bytes(attempt["channels"]["stderr"]) == expected_stderr
-    assert token in bytes(attempt["channels"]["state-and-outcome"])
+    assert token in bytes(attempt["channels"]["state-and-outcome"]).splitlines()
     check_build(folder / f"{lane}-{index}", backend, case["function"], lane)
 
 
