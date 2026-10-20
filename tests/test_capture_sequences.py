@@ -51,6 +51,15 @@ class SequenceWitnessTests(unittest.TestCase):
         nodes[1].links = self.life.links
         with self.assertRaises(ValueError):self.witness(nodes, status, spec)
 
+    def test_typescript_collection_preserves_original_class_roots_and_incomplete_accounting(self):
+        status = copy.deepcopy(self.status); status["language"] = "typescript"
+        actual = capture.witness([(capture.TRACE_PATH, b"verified")], status, self.spec, "expected", decoder(self.nodes), "typescript")
+        self.assertEqual(actual["functions"], self.spec["functions"])
+        self.assertFalse(any(actual["losses"].values()))
+        status["lifetimes"]["censored"] = 1
+        actual = capture.witness([(capture.TRACE_PATH, b"verified")], status, self.spec, "expected", decoder(self.nodes), "typescript", allow_incomplete=True)
+        self.assertEqual(actual["losses"]["lifetimes.requested.censored"], 1)
+
     def test_missing_collection_retains_explicit_losses_and_never_qualifies_strictly(self):
         nodes = [self.creator, self.method]
         status = copy.deepcopy(self.status)

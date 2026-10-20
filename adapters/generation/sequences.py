@@ -65,8 +65,9 @@ def configure(entry: dict, value: list[dict], coerce: Callable) -> None:
     """Requested unavailable adapters remain named inventory blockers."""
     if entry["language"] not in ("javascript", "typescript") or "receiver_fixture" not in entry:
         raise ValueError("sequences require a declared JavaScript/TypeScript receiver fixture")
-    if entry["language"] != "javascript" and any(step["action"] == "collect" for step in value):
-        raise ValueError("TypeScript collection lifetimes require separate emitter qualification")
+    if (entry["language"] == "typescript" and any(step["action"] == "collect" for step in value)
+            and entry.get("typescript_backend") not in ("source", "native")):
+        raise ValueError("TypeScript collection requires an explicitly selected emitter")
     for step in value:
         if step["action"] == "call" and step["arguments"] != "case":
             coerce(entry, step["arguments"])

@@ -2,7 +2,7 @@
 
 The generator supports declared receivers for ordinary instance methods on plain Python, JavaScript and TypeScript classes. Each attempt constructs a fresh instance, binds the selected source method, then captures its supported instance state, own declared class data roots and module globals before and after the call. The shared graph protocol preserves aliases and cycles, including a method returning its receiver.
 
-Other language receivers, inherited classes, private/dunder Python methods, private class data, slots/native storage, arbitrary mutable arguments and Python asynchronous calls remain unsupported. Node supports awaiting an ordinary async method and [ordered calls/release with bounded JavaScript collection](ordered-sequences.md); arbitrary targets, scheduler and iteration sequences remain open. They remain visible gaps rather than passing skipped tests.
+Other language receivers, inherited classes, private/dunder Python methods, private class data, slots/native storage, arbitrary mutable arguments and Python asynchronous calls remain unsupported. Node supports awaiting an ordinary async method and [ordered calls/release with bounded Node collection](ordered-sequences.md); arbitrary targets, scheduler and iteration sequences remain open. They remain visible gaps rather than passing skipped tests.
 
 ## Declare a constructor
 
@@ -66,7 +66,7 @@ export class Counter {
 function make_counter(start) { return new Counter(start); }
 ```
 
-A TypeScript source can annotate the constructor/method parameters with `: number`. Constructor or factory inputs are frozen separately from method `cases`; both use the adapter's concrete scalar representations. A synchronous same-module factory can return the exact selected class. The factory and class bindings are checked before and after construction and each observed call boundary. Construction must not itself invoke the selected target. Ordinary async methods are awaited; generators, async factories and arbitrary action targets remain unsupported. See [ordered sequences](ordered-sequences.md) for supported method/release/collection steps.
+A TypeScript source can annotate the constructor/method parameters with `: number`. Constructor or factory inputs are frozen separately from method `cases`; both use the adapter's concrete scalar representations. A synchronous same-module factory can return the exact selected class. The factory and class bindings are checked before and after construction and each observed call boundary. Construction must not itself invoke the selected target. Ordinary async methods are awaited; generators, async factories and arbitrary action targets remain unsupported. See [ordered sequences](ordered-sequences.md) for supported method/release/collection steps and [TypeScript emitter qualification](typescript-collection.md) for its explicit backend/provider gate.
 
 The private source copy gains an observer import and a first class static block which captures source method descriptors before original static initialisers. This changes reflective class source text and is an explicit diagnostic access-helper delta. Original method bodies and target files remain unchanged; it does not qualify a shipping artefact. Replaced methods, changed prototype shapes/extensibility, inheritance, private/computed/literal members, accessors/decorators, generic/abstract classes and constructors returning replacement objects are refused. An implicit constructor or a bare/`this` return is supported.
 

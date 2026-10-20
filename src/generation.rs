@@ -34,6 +34,10 @@ const RESOURCES: &[(&str, &str)] = &[
         include_str!("../adapters/generation/node_receivers.py"),
     ),
     (
+        "typescript_provider.py",
+        include_str!("../adapters/generation/typescript_provider.py"),
+    ),
+    (
         "sequences.py",
         include_str!("../adapters/generation/sequences.py"),
     ),

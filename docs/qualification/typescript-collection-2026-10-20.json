@@ -1,0 +1,320 @@
+{
+  "qualification_schema_version": 1,
+  "date": "2026-10-20",
+  "platform": {
+    "os": "macOS",
+    "architecture": "ARM64",
+    "node": "24.21.0",
+    "python": "3.12.15",
+    "typescript_source": "6.0.3",
+    "typescript_native": "7.0.2"
+  },
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "runtime": {
+    "commit": "3f6bd8e040aa1422727031e5f7595a5ff73e5027",
+    "cli_sha256": "132ab405ec2059cbb72c4f8e5efdbab9704a1b03671a462a753509d1f91d6227",
+    "qualification_script_sha256": "6d8e3376ee896efeb84b57112f95df32c811672218956b67418f087f11f2839f",
+    "shared_qualification_script_sha256": "98a877e680442b15824318a34eaf71caca353f12265e0d40ca60b356aaa9ff83"
+  },
+  "provider": {
+    "source": "266e1ba62928c2b89e3095d59f48f2e6b4cc8478",
+    "tree": "cf5e784bd34272089a387d773d72de4004110f86",
+    "root": "/private/tmp/otelc-typescript-provider-266e1ba-frozen",
+    "manifest_sha256": "cc9bb006e0187c7e8874f3681f40d7c4ad330067023188548d641a2354805d45",
+    "source_and_products_verified": 388,
+    "dependency_records_verified": 5032,
+    "products": {
+      "cli": {
+        "path": "target/debug/quux-otelc",
+        "sha256": "557c6a360ea3508324c819c83c901f87eb43cd2975cf5eb08ede266a2c811401"
+      },
+      "observer": {
+        "path": "target/debug/otelc_node_observer.node",
+        "sha256": "e9300ba1ae5ff6fe62d36555c3e4e1efb61462c7d1aef154f3e8937006cd056a"
+      }
+    },
+    "status": "Independently reverified immutable provider; application qualification remains separate."
+  },
+  "unsupported_provider": {
+    "source_commit": "c65a35c375ce0b3b82b79526ba86e4cfd454a15b",
+    "manifest_sha256": "a22a813281aa87e4761413a09f7b92695fde28a58d3f0af1a3a4ad606fdee53f",
+    "public_resolver_exit_code": 1,
+    "execution_available": false,
+    "selected_targets_blocked": 14,
+    "application_launches": 0
+  },
+  "results": {
+    "claim": "equivalence over these tests and observations",
+    "artefact_class": "diagnostic",
+    "cli_sha256": "132ab405ec2059cbb72c4f8e5efdbab9704a1b03671a462a753509d1f91d6227",
+    "results": [
+      {
+        "backend": "source",
+        "cases": 7,
+        "matching_cases": 5,
+        "transient_difference_controls": 1,
+        "retained_collection_inconclusive_controls": 1,
+        "actual_application_launches": 132,
+        "evidence_refusal_controls": 6,
+        "prelaunch_source_refusals": 1,
+        "old_provider_refusal": {
+          "backend": "source",
+          "selected_blocked": 7,
+          "application_launches": 0
+        },
+        "source_preserved": true
+      },
+      {
+        "backend": "native",
+        "cases": 7,
+        "matching_cases": 5,
+        "transient_difference_controls": 1,
+        "retained_collection_inconclusive_controls": 1,
+        "actual_application_launches": 132,
+        "evidence_refusal_controls": 6,
+        "prelaunch_source_refusals": 1,
+        "old_provider_refusal": {
+          "backend": "native",
+          "selected_blocked": 7,
+          "application_launches": 0
+        },
+        "source_preserved": true
+      }
+    ],
+    "actual_application_launches": 264,
+    "source_preserved": true,
+    "scope": "Ordinary source-bound TypeScript receivers and original collection roots through explicit source/native emitters; ts/mts/cts, factories, awaited methods, transient mutation, errors, finalizers, retained objects, generated/exported suites and scalar replay; no timing/leak/shipping proof."
+  },
+  "backend_records": [
+    {
+      "backend": "source",
+      "initial_strict_exit_code": 3,
+      "inventory": {
+        "excluded": 36,
+        "ready": 7
+      },
+      "callables": [
+        {
+          "function": "async_factory.Counter.later",
+          "arguments": [
+            7.0
+          ],
+          "exit_code": 0,
+          "actions": [
+            "call",
+            "call",
+            "release",
+            "collect"
+          ]
+        },
+        {
+          "function": "expected_error.Counter.fail",
+          "arguments": [
+            7.0
+          ],
+          "exit_code": 0,
+          "actions": [
+            "call",
+            "call",
+            "release",
+            "collect"
+          ]
+        },
+        {
+          "function": "finalized.Counter.identity",
+          "arguments": [
+            7.0
+          ],
+          "exit_code": 0,
+          "actions": [
+            "call",
+            "call",
+            "release",
+            "collect"
+          ]
+        },
+        {
+          "function": "identity.Counter.identity",
+          "arguments": [
+            7.0
+          ],
+          "exit_code": 0,
+          "actions": [
+            "call",
+            "call",
+            "release",
+            "collect"
+          ]
+        },
+        {
+          "function": "identity_cts.Counter.identity",
+          "arguments": [
+            7.0
+          ],
+          "exit_code": 0,
+          "actions": [
+            "call",
+            "call",
+            "release",
+            "collect"
+          ]
+        },
+        {
+          "function": "retained.Counter.identity",
+          "arguments": [
+            7.0
+          ],
+          "exit_code": 3,
+          "actions": [
+            "call",
+            "call",
+            "release",
+            "collect"
+          ]
+        },
+        {
+          "function": "transient.Counter.transient",
+          "arguments": [
+            7.0
+          ],
+          "exit_code": 1,
+          "actions": [
+            "call",
+            "call",
+            "release",
+            "collect"
+          ]
+        }
+      ]
+    },
+    {
+      "backend": "native",
+      "initial_strict_exit_code": 3,
+      "inventory": {
+        "excluded": 36,
+        "ready": 7
+      },
+      "callables": [
+        {
+          "function": "async_factory.Counter.later",
+          "arguments": [
+            7.0
+          ],
+          "exit_code": 0,
+          "actions": [
+            "call",
+            "call",
+            "release",
+            "collect"
+          ]
+        },
+        {
+          "function": "expected_error.Counter.fail",
+          "arguments": [
+            7.0
+          ],
+          "exit_code": 0,
+          "actions": [
+            "call",
+            "call",
+            "release",
+            "collect"
+          ]
+        },
+        {
+          "function": "finalized.Counter.identity",
+          "arguments": [
+            7.0
+          ],
+          "exit_code": 0,
+          "actions": [
+            "call",
+            "call",
+            "release",
+            "collect"
+          ]
+        },
+        {
+          "function": "identity.Counter.identity",
+          "arguments": [
+            7.0
+          ],
+          "exit_code": 0,
+          "actions": [
+            "call",
+            "call",
+            "release",
+            "collect"
+          ]
+        },
+        {
+          "function": "identity_cts.Counter.identity",
+          "arguments": [
+            7.0
+          ],
+          "exit_code": 0,
+          "actions": [
+            "call",
+            "call",
+            "release",
+            "collect"
+          ]
+        },
+        {
+          "function": "retained.Counter.identity",
+          "arguments": [
+            7.0
+          ],
+          "exit_code": 3,
+          "actions": [
+            "call",
+            "call",
+            "release",
+            "collect"
+          ]
+        },
+        {
+          "function": "transient.Counter.transient",
+          "arguments": [
+            7.0
+          ],
+          "exit_code": 1,
+          "actions": [
+            "call",
+            "call",
+            "release",
+            "collect"
+          ]
+        }
+      ]
+    }
+  ],
+  "validation": {
+    "regression_tests": 339,
+    "rust_tests": 65,
+    "capture_tests": 117,
+    "generation_tests": 140,
+    "node_tests": 17,
+    "rust_product_line_coverage_percent": 97.29,
+    "typescript_provider_line_coverage_percent": 95,
+    "required_module_coverage_floor_percent": 80,
+    "runtime_ci": 39379298977,
+    "sonar_unresolved_issues": 0
+  },
+  "retention": {
+    "archive": "/Users/sclarke/Documents/oteleq-qualification/2026-10-20/typescript-collection-3f6bd8e",
+    "development_application_launches": 56,
+    "raw_attempt_folders": 272,
+    "actual_application_launches": 264,
+    "copied_original_shrink_attempts": 8
+  },
+  "limits": [
+    "Ordinary source-bound receivers; producer support for private fields/parameter properties does not qualify their consumer codecs.",
+    "ts fixtures use an unchanged explicit module manifest; arbitrary package/build context remains open.",
+    "Only selected-method calls followed by release/collection, with scalar argument shrinking; no arbitrary scheduler/resource/action-order shrinking.",
+    "Named roots/creation links are observed; invocation-scoped producer rendezvous remains open.",
+    "GC retry count stays raw outside typed equality; no timing/leak/destruction/shipping proof.",
+    "The full 21-row completion checklist remains open."
+  ]
+}
