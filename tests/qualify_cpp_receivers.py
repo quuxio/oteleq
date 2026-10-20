@@ -221,6 +221,15 @@ def refusals(cli: Path, provider: Path, folder: Path) -> tuple[int, int]:
     return launches, len(controls)
 
 
+def verify_launches(folder: Path, expected: int) -> dict:
+    """Fresh original replay counts once; its copied shrink evidence counts zero."""
+    raw = [path for path in folder.rglob("command.json")
+           if path.parent.name.startswith(("baseline-", "instrumented_on-"))]
+    unique = {hashlib.sha256(path.read_bytes()).hexdigest() for path in raw}
+    assert len(unique) == expected and len(raw) == expected + 4
+    return {"unique_application_launches": len(unique), "raw_attempt_folders": len(raw)}
+
+
 def main() -> None:
     """Retain an external actual-provider corpus; this does not qualify shipping builds."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -250,14 +259,10 @@ def main() -> None:
     launches += reduction(cli, workspace, folder, report)
     refused_launches, controls = refusals(cli, provider, folder)
     launches += refused_launches
-    commands = list(folder.rglob("command.json"))
-    raw = [path for path in commands if path.parent.name.startswith(("baseline-", "instrumented_on-"))]
-    unique = {hashlib.sha256(path.read_bytes()).hexdigest() for path in raw}
-    # The original shrink report copies four existing attempts into the retained run.
-    assert len(raw) == launches and len(unique) == launches - 4
+    counts = verify_launches(folder, launches)
     summary = {"claim": "equivalence over these tests and observations", "artefact_class": "diagnostic",
                "matching_cases": len(METHODS)-len(DIFFERENCES), "different_cases": len(DIFFERENCES),
-               "unique_application_launches": len(unique), "raw_attempt_folders": len(raw),
+               **counts,
                "all_routes": True, "scalar_shrinking_and_replay": True, "source_preserved": True,
                "refusal_controls": controls, "refused_application_launches": refused_launches,
                "oteleq_cli_sha256": hashlib.sha256(cli.read_bytes()).hexdigest(),

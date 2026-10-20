@@ -50,6 +50,16 @@ class CppQualificationTests(unittest.TestCase):
     def test_every_method_and_both_lanes_have_complete_independent_value_oracles(self):
         self.assertEqual(qualification.check_report(self.report, len(self.cases))[0], 36)
 
+    def test_original_shrink_copies_do_not_inflate_unique_launch_count(self):
+        for index in range(4):
+            for phase in ("actual", "copied-original"):
+                folder = self.folder / phase / ("baseline-" + str(index))
+                folder.mkdir(parents=True)
+                (folder / "command.json").write_text(json.dumps(["application-" + str(index)]))
+        self.assertEqual(qualification.verify_launches(self.folder, 4), {"unique_application_launches": 4, "raw_attempt_folders": 8})
+        with self.assertRaises(AssertionError):
+            qualification.verify_launches(self.folder, 8)
+
     def test_equal_wrong_fields_widths_arguments_float_bits_and_aliases_are_rejected(self):
         original = self.bundles["identity"]
         target = self.folder / "identity/typed-bundle.json"

@@ -11,6 +11,7 @@ import unittest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "adapters/generation"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "examples"))
 import generation as gen
+import discovery
 import harness
 
 
@@ -20,6 +21,20 @@ def entry(language, parameters=None, output="int", globals_=None):
 
 
 class NativeScalarTests(unittest.TestCase):
+    def test_c_function_local_static_is_accounted_as_unobserved_storage(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            path = folder / "source.c"
+            path.write_text("int selected(int amount){static int hidden=0;hidden+=amount;return 7;}\n")
+            def execute(command, cwd, **kwargs):
+                return subprocess.run(command, cwd=cwd, capture_output=True, check=False, timeout=30)
+            data = discovery.discover(path, "c", folder, {"clang": self.compiler("c")}, execute)
+            candidate = {**data["functions"][0], "path": "source.c", "language": "c", "globals": data["globals"]}
+            self.assertEqual(len(candidate["globals"]), 1)
+            self.assertTrue(candidate["globals"][0]["inaccessible"])
+            self.assertEqual(gen.qualify_entry(candidate, folder, 1), "blocked")
+            self.assertIn("static-local", candidate["reason"])
+
     def compiler(self, language):
         variable, executable = ("OTELC_CLANG", "clang") if language == "c" else ("OTELC_CLANGXX", "clang++")
         compiler = os.environ.get(variable) or shutil.which(executable)

@@ -1,0 +1,140 @@
+{
+  "qualification_schema_version": 1,
+  "date": "2026-10-20",
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "platform": {
+    "os": "macOS",
+    "architecture": "ARM64",
+    "clang": "22.1.8",
+    "python": "3.12.15"
+  },
+  "runtime": {
+    "source_commit": "499933944fd635ee8a9508f73ea6faa7d3d2ab5f",
+    "source_tree": "d0e99afba73f24c96d4cfae99ff7fff6e363f6e6",
+    "cli_sha256": "5b335b0fd3bf1f7e09a3947f620a550e3690fe56804967cc1c7254c6b4b8cde2",
+    "source_archive_sha256": "856d925511f159a3c454e89a0df6bcc018405abaf8f17251332ed6d6c9c72851",
+    "provider_commit": "d6d03b72026cde8962b11ce3cc184ff3ebcb60d4",
+    "provider_manifest_sha256": "2a8dbf239c6444c0fb536dff049993beade7eaed6578c9654c1e2d7233e9431f",
+    "generator_sha256": "6a21dd76b66798dad27ed2e2d3b1ee71ad69e221733f6028f360f7bfea85b9f6",
+    "frozen_qualifier_sha256": "1d42752df521b8952d3d112a09b6ffc6d6a17f47c8fc736b41b9140aee8af5cb",
+    "maintained_qualifier_sha256": "dde840da3d7b36a043019e70236ec64c5845c1a76e5a19fff37a20f636d2714b"
+  },
+  "provider": {
+    "verified_at": "2026-10-20T19:29:28.662202+00:00",
+    "provider_commit": "d6d03b72026cde8962b11ce3cc184ff3ebcb60d4",
+    "provider_tree": "a577aa88d5d51f4e86bc0858bcd233be7b01c251",
+    "manifest_sha256": "2a8dbf239c6444c0fb536dff049993beade7eaed6578c9654c1e2d7233e9431f",
+    "verified_records": 7360,
+    "counts": {
+      "source_sha256": 413,
+      "products_sha256": 586,
+      "dependencies": 6361
+    },
+    "symlinks": 11,
+    "external_tools_verified": 8,
+    "cli_sha256": "037fb837ea1a3e982e9cb0d62f00b8c70c9709f25178fe936b189c2c1721c486",
+    "profile_relocation": {
+      "original_sha256": "091b340d6ed90eaa54a025719fde13abb1420c85058f864dd6d69242013c97c7",
+      "retained_sha256": "425bf561b3c2772162d95e44773cdf6660e1522b62f8fed946714fe3d1737539"
+    },
+    "scope": "Content verified before/after this corpus; frozen d6d03b7 identity, not a claim about later producer revisions.",
+    "verification_script_sha256": "5b2e4c5b12fc2ccb3b3181011db9c595f1ab75fe2d4010fff83547185c556ea5"
+  },
+  "inventory": {
+    "callables": 21,
+    "ready": 9,
+    "excluded": 12,
+    "blocked": 0
+  },
+  "results": {
+    "cases": 9,
+    "matching_cases": 6,
+    "difference_controls": 3,
+    "actual_application_launches": 171,
+    "qualified_application_launches": 164,
+    "incomplete_fixture_launches": 3,
+    "initial_state_blocked_launches": 4,
+    "retained_attempt_folders": 175,
+    "unique_command_identities": 171,
+    "refusal_controls": 10,
+    "prelaunch_refusals": 6,
+    "incomplete_fixture_controls": 3,
+    "initial_state_controls": 1,
+    "source_preserved": true,
+    "routes": [
+      "run",
+      "generated",
+      "exported-run",
+      "exported-framework",
+      "shrink",
+      "replay"
+    ],
+    "scalar_shrink": {
+      "original": [
+        3
+      ],
+      "reduced": [
+        0
+      ]
+    }
+  },
+  "accounting_revalidation": {
+    "frozen_driver_exit_code": 1,
+    "failure_stage": "aggregate launch counting after all behavioural/refusal checks",
+    "correction": "Count the fresh original replay once and its four copied shrink records zero times.",
+    "application_relaunches_for_revalidation": 0,
+    "counter_regression": "passed"
+  },
+  "independent_verification": {
+    "source_files_verified": 217,
+    "qualified_reports_verified": 26,
+    "refusal_reports_verified": 10,
+    "qualified_retained_attempts_verified": 168,
+    "qualified_actual_launches": 164,
+    "copied_original_shrink_attempts": 4,
+    "original_copy_relationships_verified": 4,
+    "unique_application_launches": 171,
+    "raw_attempt_folders": 175,
+    "refused_application_launches": 7,
+    "private_source_records_verified": 504,
+    "raw_records": 3578,
+    "raw_manifest_sha256": "063ba86565fd0f59cc075b0957869483fc0722d465d9807999f267dfdc804862",
+    "runtime_commit": "499933944fd635ee8a9508f73ea6faa7d3d2ab5f",
+    "source_preserved": true,
+    "verifier_sha256": "a9bbcaf716e5f5c2c566e91b2d136e3172abf212730ba947c3c248bf24405d9a",
+    "corrected_qualifier_sha256": "dde840da3d7b36a043019e70236ec64c5845c1a76e5a19fff37a20f636d2714b",
+    "scope": "Retained revalidation after the frozen driver aggregate accounting assertion; no application relaunches."
+  },
+  "validation": {
+    "make_check": "passed at runtime commit",
+    "runtime_commit": "499933944fd635ee8a9508f73ea6faa7d3d2ab5f",
+    "unique_regressions": 492,
+    "python_regressions": 405,
+    "rust_regressions": 66,
+    "node_regressions": 17,
+    "go_regressions": 4,
+    "additional_native_cpp_observer_probe": "passed",
+    "rust_product_line_coverage_percent": 97.29,
+    "cpp_observer_line_coverage_percent": 100.0
+  },
+  "scope": {
+    "observed": "Declared source constructors/free/static factories, scalar method inputs, private source fields/statics, namespace roots, nested records/arrays, exact float bits, standard exception payloads, pointer cycles, interior aliases and returned references.",
+    "private_observer_schema_version": 1,
+    "witness": "Existing name-bound decoded function/span witness; invocation-scoped producer binding remains unavailable.",
+    "not_qualified": [
+      "shipping artefacts",
+      "general compilation databases/dependency/build variants",
+      "header-defined or template classes",
+      "inheritance/virtual storage/unions/bitfields/volatile/atomic/opaque storage",
+      "function-local statics",
+      "arbitrary mutable arguments/buffers/external factories",
+      "arbitrary object ownership, memory validity or races",
+      "arbitrary overlapping memory",
+      "allocation identity across destruction/address reuse",
+      "arbitrary resource/action/concurrent sequences",
+      "other platforms/toolchains"
+    ],
+    "identity_limit": "Recorded source, selected tools and provider products; not a complete OS-library or shipping build closure."
+  }
+}
