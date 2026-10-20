@@ -1,0 +1,79 @@
+{
+  "qualification_schema_version": 1,
+  "date": "2026-10-20",
+  "platform": {
+    "os": "macOS",
+    "architecture": "ARM64",
+    "go": "1.27.2",
+    "python": "3.12.15"
+  },
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "runtime": {
+    "commit": "9e8b182a7a43228ecd48d4e83348be4969cab8ad",
+    "cli_sha256": "55f0a5bda5c38d6d6e3eb0a31288fb8a2025f756e95875f8fefb338055239718"
+  },
+  "provider": {
+    "source_commit": "8a7689a6d6779ed8621bbe852188eeb56e6fafad",
+    "status": "Private unmerged provider candidate; separate Go-only copy",
+    "receipt_sha256": "a8b9e1e6a387fd6f25bdb52fe35d1c81234bc33a7d145a8267ef715a985f076c",
+    "frozen_inputs": {
+      "adapters/go/build/otelc-go": "02d268e425667fb81e2beb1dd3f406e968ee3861fb716c8751ea491996a80f0a",
+      "adapters/go/go.mod": "c9fbe1f46c99c926e06e74ba53e5fbb8a2c9dba762c742c1fa02073246136e1e",
+      "adapters/go/go.sum": "dc09be66044d70962d831c6de817351ec5bf4d68b5a57130cc90818a602ac6ee",
+      "adapters/go/policy/policy.go": "86acc90033d39ce047ee941b768294904585b99d06671713257d36f21b83f443",
+      "adapters/go/policy/policy_test.go": "e8079c881c46d1d9afdc5916bd4c74ea62927f3f757e7262f664d7990624fcd4",
+      "adapters/go/runtime/control.go": "5f2942d35fe80a2cb77c7d5bb15e549654badf920f00797e8757bd65d22f1c14",
+      "adapters/go/runtime/critical_review_test.go": "30aec00ed16f6ff1a5db7472f3de267737c1b3fcb95cf05f0be3acb00e53028d",
+      "adapters/go/runtime/export.go": "6709fb361693a4be208affa78152ccacd9c7d600e2ff6e7d822173bce5dab8ad",
+      "adapters/go/runtime/export_health_test.go": "23a4c232f776b7cd8f49decf70b1d30db4d6d4861456e417642d10d8b9d0ebd3",
+      "adapters/go/runtime/runtime.go": "0e179da1dde826e905a1764966b6bca484402b0d7fad6e3197a6e31c08913350",
+      "adapters/go/runtime/runtime_test.go": "6204c0794b6eb24d65a7e5d9678203ddc3dddf8e1d55256de12a56fa7aea2c1c",
+      "adapters/go/runtime/trace_export.go": "b4f6a78ab317ea72fa89f45b2741726bd7ba8466673327d35c541a0b5d7f29cb",
+      "adapters/go/runtime/trace_export_test.go": "fb44052b6961994ca4dac94585d7fc10f64aa7a145f61cdc7ab8eb4a989dbd83",
+      "adapters/go/runtime/trace_scope.go": "a10c30ef480d5d1d155db1c7fa7c3919d4da516a1024646d24eb01ffeded8ffc",
+      "adapters/go/runtime/trace_scope_test.go": "976fe93d9523e37abd35d199188eb2566b629b4e67b58998470022c9ccc6abaf",
+      "adapters/go/runtime/trace_store_test.go": "8a62e10298ebb28d1c0749096298807923266f0801cd267df90185675dff8a2e",
+      "adapters/go/runtime/traces.go": "87ec50a2f3512b5502ae620c9b647d32d0e2c26ed79a94002183219d96fcc37e",
+      "target/debug/quux-otelc": "4f11a98a7628411000c6a9992c907a8068d56156b29e51558b070ee57a972ecf",
+      "tool:go": "fc32e163235c4b98a67a7caae7cbd60c73f706cbd6138ff7bcf6c9d60d5e3312"
+    }
+  },
+  "results": {
+    "cases": 1,
+    "actual_application_launches": 8,
+    "generated_unittest_runs": 1,
+    "changed_input_refusals": [
+      {
+        "name": "module-edit",
+        "exit_code": 4,
+        "application_launches": 0
+      },
+      {
+        "name": "policy-edit",
+        "exit_code": 4,
+        "application_launches": 0
+      },
+      {
+        "name": "policy-addition",
+        "exit_code": 4,
+        "application_launches": 0
+      },
+      {
+        "name": "module-missing",
+        "exit_code": 4,
+        "application_launches": 0
+      }
+    ],
+    "source_preserved": true,
+    "provider_restored": true,
+    "scope": "Standalone Go scalar with exact module/runtime/policy inputs; no project, third-party cache or shipping qualification."
+  },
+  "independent_oracle": "Concrete argument 7 returns integer 8 in both repeated lanes and the generated unittest; each tamper control refuses before application execution.",
+  "retention": "Complete raw observations, OTLP, commands, stdout/stderr, plan, generated suite, private provider, exact source and executable are retained privately with byte verification.",
+  "limits": [
+    "One standalone Go scalar case; no arbitrary Go package/module graph qualification.",
+    "Downloaded third-party module caches and compiler/sysroot content remain outside these input hashes.",
+    "No separate Go build/run API, invocation authentication, off/fault lanes or shipping-artefact claim."
+  ]
+}
