@@ -437,7 +437,6 @@ def rename_main(source, entries, language):
 
 def rust_driver(entry, args, source):
     call = entry["name"] + "(" + ",".join(literal(v, t, "rust") for v, t in zip(args, entry["parameters"])) + ")"
-    output = scalar_type(entry["output"])
     state_lines = []
     for global_ in entry["globals"]:
         expression = "unsafe {" + global_["name"] + "}"
