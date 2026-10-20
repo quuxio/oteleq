@@ -42,6 +42,10 @@ const RESOURCES: &[(&str, &str)] = &[
         include_str!("../adapters/generation/sequences.py"),
     ),
     (
+        "filesystem_effects.py",
+        include_str!("../adapters/generation/filesystem_effects.py"),
+    ),
+    (
         "policy.py",
         include_str!("../adapters/generation/policy.py"),
     ),

@@ -29,6 +29,8 @@ Generation execution exits are `0` complete, `1` observed difference, `2` argume
 
 The Rust-only [report renderer](reporting.md) needs no Python, provider or original workspace. It exits `0` for complete matches, `1` for differences, `2` for arguments, `3` for gaps and `4` for invalid input/output. It retains whole-inventory gaps from partial replay and refuses existing output directories.
 
+`[[effects.filesystem]]` declares independent private application directories, initial file bytes/modes, environment bindings and bounded before/after capture. See [filesystem effects](filesystem-effects.md) for the accepted fields, limits and unobserved dimensions. These channels are required through generated tests, replay/export and scalar shrinking.
+
 The implemented generation policy accepts `[adapters.rust] backend = "compiler"` (default) or `"llvm"`. LLVM requires the separately matched compiler/profile/build evidence described in [automatic generation](automatic-generation.md#project-policy-and-concrete-fixtures), including the fixed frontend and emitted-symbol checks for profile2/inventory3. Profile1/inventory2 remains supported. Unsupported adapter fields and backend values are rejected. This does not enable the proposed general build recipes below.
 
 `[adapters.typescript] backend = "source"` (default) or `"native"` freezes the actual emitter for both lanes. [TypeScript collection](typescript-collection.md) and native-emitter targets require a successful public schema-2 provider capability query during planning; its actual request/response is retained. Native compiler availability is checked without backend fallback.

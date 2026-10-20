@@ -1,0 +1,211 @@
+{
+  "qualification_schema_version": 1,
+  "date": "2026-10-20",
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "cli_sha256": "ed676c873f4c8194171bbd378e6d8345e5d568413dcd79e5ef271199bdbbad61",
+  "cases": 18,
+  "matching_cases": 8,
+  "same_return_filesystem_difference_cases": 8,
+  "incomplete_effect_cases": 2,
+  "actual_application_launches": 544,
+  "source_preserved": true,
+  "altered_evidence_controls": 16,
+  "reductions": [
+    {
+      "function": "JvmCase.write_difference(int)",
+      "arguments": [
+        1
+      ]
+    },
+    {
+      "function": "write_difference",
+      "arguments": [
+        1
+      ]
+    },
+    {
+      "function": "write_difference(int)",
+      "arguments": [
+        1
+      ]
+    },
+    {
+      "function": "go_case.write_difference",
+      "arguments": [
+        1
+      ]
+    },
+    {
+      "function": "js_case.write_difference",
+      "arguments": [
+        1.0
+      ]
+    },
+    {
+      "function": "py_case.write_difference",
+      "arguments": [
+        1
+      ]
+    },
+    {
+      "function": "rs_case.write_difference",
+      "arguments": [
+        1
+      ]
+    },
+    {
+      "function": "ts_case.write_difference",
+      "arguments": [
+        1.0
+      ]
+    }
+  ],
+  "raw_attempt_folders": 576,
+  "unique_command_identities": 544,
+  "scope": "Eight-language seeded filesystem boundary bytes/kinds/permissions, matched relative bindings, generated/exported suites and scalar reduction/replay; no atomic/transient/network/hidden-identity/shipping proof.",
+  "consumer": {
+    "runtime_commit": "3413e76033353ae94a61684ddd81f89da1c804a1",
+    "cli_sha256": "ed676c873f4c8194171bbd378e6d8345e5d568413dcd79e5ef271199bdbbad61",
+    "initial_qualifier_sha256": "ec76e19748db2c499b8d68195cfa6725495eefb4805cfae40935f0ce0412e062",
+    "executed_resume_qualifier_commit": "a9f84dff308210f65808b627191a57cc27836eb5",
+    "executed_resume_qualifier_sha256": "851e580b0d42a2371faa057330bf308d5e56a4b0716299f01ee9969451c6b4a4",
+    "shared_qualifier_sha256": "91452c3231a8df00587cfa81cc98f5b5681d310ebb759c83beda2f0e91416964",
+    "product_code_unchanged_by_checker_correction": true
+  },
+  "provider": {
+    "repository": "quuxio/otelc",
+    "merged_source_commit": "0419a51af9aa5b86cabcc21690eda48b987b80d1",
+    "source_tree": "cf5e784bd34272089a387d773d72de4004110f86",
+    "manifest_sha256": "a02a87ab7c2a9b54326e5259b73186e84d333c2a5bc2ab37e4b3907c49d9be55",
+    "verified_source_records": 386,
+    "verified_product_records": 519,
+    "verified_dependency_records": 7478,
+    "verified_tool_records": 8,
+    "cli_sha256": "7965f812ff04b8a330d7e399b84dcebf268e14db141245ff21d8659a42adf460"
+  },
+  "platform": {
+    "system": "Darwin",
+    "release": "27.0.0",
+    "architecture": "arm64",
+    "rust_backend": "compiler",
+    "typescript_backend": "source",
+    "tools": {
+      "rustc": {
+        "sha256": "766eda9d8f53afd6fc7f27b3cd2e444dd22afacb5afa710a5625fc8e45b8c941",
+        "version": "rustc 1.98.1 (48a229cea 2026-09-01)\nbinary: rustc\ncommit-hash: 48a229ceaefd4985c50990b14116b6d856af0985\ncommit-date: 2026-09-01\nhost: aarch64-apple-darwin\nrelease: 1.98.1\nLLVM version: 22.1.8"
+      },
+      "cargo": {
+        "sha256": "6e17e865f3a20dd55a1d212f849f58b77124179f0de7c52973096d84ba34118d",
+        "version": "cargo 1.98.1 (797e8a9bc 2026-08-05)"
+      },
+      "node": {
+        "sha256": "798d7f9c0d38051608d11ba87a12fbb01e92bfa457cd77ec612b5bad2a73a05e",
+        "version": "v24.21.0"
+      },
+      "java": {
+        "sha256": "d7ab2ea6a7e731a8a2cee7d722046c9f7d8c5f184cd769b9954a392592337770",
+        "version": "openjdk version \"21.0.12.1\" 2026-08-18\nOpenJDK Runtime Environment Homebrew (build 21.0.12.1)\nOpenJDK 64-Bit Server VM Homebrew (build 21.0.12.1, mixed mode, sharing)"
+      },
+      "go": {
+        "sha256": "fc32e163235c4b98a67a7caae7cbd60c73f706cbd6138ff7bcf6c9d60d5e3312",
+        "version": "go version go1.27.2 darwin/arm64"
+      },
+      "clang": {
+        "sha256": "68bb87f784f09da01b7aea0f70952fb23f606242cdc4f6ff3cc26c372af0706f",
+        "version": "Homebrew clang version 22.1.8\nTarget: arm64-apple-darwin27.0.0\nThread model: posix\nInstalledDir: /opt/homebrew/Cellar/llvm@22/22.1.8/bin\nConfiguration file: /opt/homebrew/Cellar/llvm@22/22.1.8/etc/clang/arm64-apple-darwin27.cfg"
+      },
+      "clang++": {
+        "sha256": "68bb87f784f09da01b7aea0f70952fb23f606242cdc4f6ff3cc26c372af0706f",
+        "version": "Homebrew clang version 22.1.8\nTarget: arm64-apple-darwin27.0.0\nThread model: posix\nInstalledDir: /opt/homebrew/Cellar/llvm@22/22.1.8/bin\nConfiguration file: /opt/homebrew/Cellar/llvm@22/22.1.8/etc/clang/arm64-apple-darwin27.cfg"
+      },
+      "python": {
+        "sha256": "c4e9f06cb179ae4b3728c748990fbbef7f30580ea42c0eb9c702ebc7c7861c89",
+        "version": "Python 3.12.15"
+      }
+    }
+  },
+  "corpus": {
+    "languages": [
+      "c",
+      "cpp",
+      "rust",
+      "python",
+      "java",
+      "javascript",
+      "typescript",
+      "go"
+    ],
+    "source_files": 8,
+    "inventoried_callables": 27,
+    "selected_callables": 18,
+    "excluded_helpers": 9,
+    "repeats": {
+      "baseline": 2,
+      "instrumented_on": 2
+    },
+    "initial_file_hex": "00ff",
+    "matching_output_file_hex": "00ff676f6f64",
+    "different_output_file_hex": "00ff626164",
+    "all_returns": 7,
+    "matching_outcomes": 8,
+    "same_return_file_differences": 8,
+    "incomplete_controls": [
+      "python symlink",
+      "python byte overflow"
+    ],
+    "routes": {
+      "direct": 72,
+      "generated_framework": 72,
+      "exported": 72,
+      "exported_framework": 72
+    },
+    "reductions": {
+      "cases": 8,
+      "actual_launches": 256,
+      "input_from": 7,
+      "input_to": 1,
+      "status": "candidate_rule_minimal",
+      "generated_reduced_framework_and_replay": true
+    }
+  },
+  "checker_correction": {
+    "initial_session_terminal": true,
+    "initial_actual_launches": 312,
+    "initial_raw_attempt_folders": 316,
+    "issue": "Copied original shrink evidence retains its actual worker path; initial checker expected a path below the copy.",
+    "revalidated_actual_launches_without_execution": 312,
+    "completed_initial_routes_repeated": false,
+    "regressions": [
+      "direct/copied worker identity",
+      "changed copies and unexpected rebinding",
+      "missing initial routes cannot launch resume commands"
+    ]
+  },
+  "validation": {
+    "full_regressions": 357,
+    "components": {
+      "rust": 66,
+      "capture_python": 117,
+      "generation_python": 157,
+      "node": 17
+    },
+    "rust_product_line_coverage_percent": 97.29,
+    "filesystem_module_line_coverage_percent": 99,
+    "required_per_module_floor_percent": 80
+  },
+  "development": {
+    "separate_uncommitted_cli_sha256": "231a4f37be86a05db56ef8f970f6bb8ddc7594e36649b4761d640a36f6e5decd",
+    "actual_launches": 72,
+    "altered_evidence_controls": 16,
+    "included_in_final_launch_count": false
+  },
+  "limitations": [
+    "Diagnostic access/entrypoint helpers; no production/shipping artefact qualification.",
+    "Filesystem observations cover whole-worker startup/calls/shutdown, not intermediate ordered steps.",
+    "Application already accepts the declared environment binding; hardcoded paths and scalar argument paths are not redirected.",
+    "No atomic snapshot, transient write-and-restore, inode/hardlink identity, ownership, ACL, xattr, undeclared path, network or general resource observation.",
+    "No hostile-code sandbox; compiler sysroots/OS libraries and other backend/project/platform combinations remain outside this qualification.",
+    "Name-bound decoded invocation witness; no general invocation-scoped producer rendezvous."
+  ]
+}

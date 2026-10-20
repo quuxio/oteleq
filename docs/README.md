@@ -6,6 +6,7 @@ Updated 20 October 2026, `quux-oteleq compare-workload` runs the Rust comparator
 | --- | --- |
 | [Automatic generation](automatic-generation.md) | Generate, run, replay and retain the implemented scalar suite |
 | [Go build bundles](go-build-bundles.md) | Retain matched executables, compiler evidence and detached replay |
+| [Filesystem effects](filesystem-effects.md) | Seed independent directories and compare declared bytes, kinds and permissions |
 | [Receiver fixtures](receiver-fixtures.md) | Declare independently constructed Python/Node instances and observed state |
 | [Counterexample shrinking](counterexample-shrinking.md) | Reduce a qualified scalar difference and retain its replay suite and trial evidence |
 | [Typed comparison](typed-comparison.md) | Compare versioned boundary graphs, aliases/cycles and precise field differences |
