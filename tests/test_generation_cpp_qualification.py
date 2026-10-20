@@ -7,6 +7,7 @@ import unittest
 
 import qualify_cpp_receivers as qualification
 import test_generation_cpp_workers as workers
+import typed_capture
 
 
 class CppQualificationTests(unittest.TestCase):
@@ -35,6 +36,18 @@ class CppQualificationTests(unittest.TestCase):
                                               "baseline": [baseline, baseline], "instrumented_on": [instrumented, instrumented]}]}
             cls.cases.append({"case": method, "function": qualification.function(method), "arguments": [3],
                               "exit_code": int(method in qualification.DIFFERENCES), "receiver_fixture": {"arguments": [10]}})
+        cls.binding_bundles, cls.binding_cases = {}, []
+        for index, name in enumerate(qualification.BINDING_FUNCTIONS):
+            receiver = index == 0
+            entry, result, raw, _ = worker.worker(qualification.BINDING_SOURCE,
+                method="Graph::add" if receiver else name, factory="Graph" if receiver else None)
+            worker.assertEqual(result.returncode, 0, result.stderr)
+            capture = typed_capture.observation(raw, entry, {"case_id": str(index), "function_id": name, "fixture_sha256": "a"*64})
+            attempt = {"observation": capture, "execution": {"witness": {"functions": {name: 1}}}}
+            cls.binding_bundles[str(index)] = {"cases": [{"contract": {"required_roots": ["receiver", "argument:0"] if receiver else []},
+                "baseline": [attempt, attempt], "instrumented_on": [attempt, attempt]}]}
+            cls.binding_cases.append({"case": str(index), "function": name, "arguments": [3], "exit_code": 0,
+                                      "receiver_fixture": {"arguments": [10]} if receiver else None})
 
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
@@ -49,6 +62,24 @@ class CppQualificationTests(unittest.TestCase):
 
     def test_every_method_and_both_lanes_have_complete_independent_value_oracles(self):
         self.assertEqual(qualification.check_report(self.report, len(self.cases))[0], 36)
+
+    def test_binding_oracles_check_global_record_and_all_c_linkage_returns(self):
+        self.report.write_text(json.dumps({"source_preserved": True, "blocked": [], "cases": self.binding_cases}))
+        for name, bundle in self.binding_bundles.items():
+            folder = self.folder / name
+            folder.mkdir()
+            (folder / "typed-bundle.json").write_text(json.dumps(bundle))
+        self.assertEqual(qualification.check_bindings(self.report, 4), 16)
+        for name in ("1", "2", "3"):
+            bundle = copy.deepcopy(self.binding_bundles[name])
+            for lane in ("baseline", "instrumented_on"):
+                for attempt in bundle["cases"][0][lane]:
+                    attempt["observation"]["outcome"]["graph"]["roots"]["result"]["value"] = "40"
+            target = self.folder / name / "typed-bundle.json"
+            target.write_text(json.dumps(bundle))
+            with self.subTest(case=name), self.assertRaises(AssertionError):
+                qualification.check_bindings(self.report, 4)
+            target.write_text(json.dumps(self.binding_bundles[name]))
 
     def test_original_shrink_copies_do_not_inflate_unique_launch_count(self):
         for index in range(4):

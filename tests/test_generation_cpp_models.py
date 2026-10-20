@@ -38,6 +38,18 @@ Counter make(Count seed) { return Counter(seed); }
 
 
 class CppModelTests(unittest.TestCase):
+    def test_c_linkage_names_use_ir_identity_without_losing_application_underscores(self):
+        data, path = self.model('extern "C" int plain(int value){return value;}\nextern "C" int _named(int value){return value;}\nextern "C" int _Zbad(int value){return value;}\n')
+        compiler = Path(os.environ.get("OTELC_CLANGXX") or shutil.which("clang++"))
+        demangler = compiler.resolve().with_name("llvm-cxxfilt")
+        if not demangler.is_file():
+            demangler = Path(shutil.which("llvm-cxxfilt") or shutil.which("c++filt"))
+        def execute(command, cwd, input_data):
+            return subprocess.run(command, cwd=cwd, input=input_data, capture_output=True, check=False, timeout=30)
+        cpp_models.bind_symbols(data, demangler, path.parent, execute)
+        self.assertEqual({item["name"]:item["compiler_identity"] for item in data["cpp_functions"]},
+                         {"plain":"plain", "_named":"_named", "_Zbad":"_Zbad"})
+
     def test_demangler_retains_actual_alias_domains_and_const_method_identity(self):
         data, path = self.model()
         demangler = Path(os.environ.get("OTELC_CLANGXX", "/opt/homebrew/opt/llvm@22/bin/clang++")).with_name("llvm-cxxfilt")

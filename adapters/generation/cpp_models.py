@@ -1,5 +1,6 @@
 """Freeze C++ source declarations and passive storage from Clang's checked AST."""
 import re
+import sys
 from pathlib import Path
 
 
@@ -17,9 +18,14 @@ def bind_symbols(inventory: dict, demangler: Path, directory: Path, execute) -> 
         return
     if any(any(char.isspace() for char in symbol) for symbol in symbols):
         raise ValueError("C++ symbol contains invalid framing")
-    result = execute([demangler], directory, input_data=("\n".join(symbols) + "\n").encode())
+    # AST linkage names carry Mach-O's prefix; LLVM IR names do not. cxxfilt's
+    # strip option leaves unmangled C names unchanged, so normalise before it.
+    ir_symbols = [symbol.removeprefix("_") if sys.platform == "darwin" else symbol for symbol in symbols]
+    result = execute([demangler, "--no-strip-underscore"], directory, input_data=("\n".join(ir_symbols) + "\n").encode())
     names = result.stdout.decode("utf-8", errors="strict").splitlines()
-    unresolved = any(symbol.lstrip("_").startswith("Z") and name == symbol for symbol, name in zip(symbols, names))
+    unmangled = {item["symbol"] for item in functions if (item["symbol"].removeprefix("_") if sys.platform == "darwin" else item["symbol"]) == item["name"].rsplit("::", 1)[-1]}
+    unresolved = any(original not in unmangled and symbol.startswith("_Z") and name == symbol
+                     for original, symbol, name in zip(symbols, ir_symbols, names))
     if result.returncode or len(names) != len(symbols) or unresolved or any(not name or len(name) > 4096 for name in names):
         raise ValueError("C++ compiler symbol resolution failed")
     identities = dict(zip(symbols, names))

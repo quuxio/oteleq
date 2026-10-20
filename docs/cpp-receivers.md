@@ -38,7 +38,9 @@ domains = [{ kind = "integer", minimum = 0, maximum = 3 }]
 
 Use the normal `plan --config`, `generate`, `run`, `replay` and `export-tests` commands. The factory can be the source class, an existing ordinary free function or an existing same-class static function returning the exact source class by value. Private source fields, methods, constructors and same-class static factories use legal friend access. A constructor fixture currently requires one unique explicit constructor; source declarations and out-of-line definitions are joined by their actual compiler symbol. Factory inputs remain fixed while scalar method inputs are shrunk.
 
-The inventory and build share C++17, optimisation and threading flags. The selected LLVM compiler's sibling `llvm-cxxfilt` supplies the actual instrumentation identity. For example, a `short` alias resolves to `sample::Counter::add(short)`, and a const method retains its `const` qualifier. Exact typed member pointers bind overloaded methods; inventory accounts for declarations and excluded functions separately.
+Constructor fixtures create the receiver at its final address inside the friend worker. An extra helper return can introduce ABI copies of small trivial classes and invalidate self pointers. Existing application factories retain their own return semantics and the declared live-storage precondition. Generated type names resolve to the global source declaration, including an application class named `Graph`.
+
+The inventory and build share C++17, optimisation and threading flags. The selected LLVM compiler's sibling `llvm-cxxfilt` supplies the actual instrumentation identity. For example, a `short` alias resolves to `sample::Counter::add(short)`, and a const method retains its `const` qualifier. Mach-O linkage prefixes are removed before resolution so C-linkage names preserve the application's own underscores. Exact typed member pointers bind overloaded methods; inventory accounts for declarations and excluded functions separately.
 
 ## Storage and capture limits
 

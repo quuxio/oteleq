@@ -3,6 +3,7 @@ import json
 import re
 
 import cpp_receivers
+import cpp_models
 
 
 def quoted(value: str) -> str:
@@ -20,6 +21,21 @@ class Worker:
         self.ids = {name: index for index, name in enumerate(sorted(self.models))}
         self.arguments = arguments
         self.literal = literal
+
+    def type_name(self, name: str) -> str:
+        """Source records always resolve globally, never to an observer helper."""
+        if name == "void" or name in cpp_models.BUILTINS:
+            return name
+        model = self.models[name]
+        kind = model["kind"]
+        if kind == "record":
+            return "::" + name
+        if kind == "qualified":
+            return "const " + self.type_name(model["element"])
+        if kind in ("pointer", "reference"):
+            return self.type_name(model["element"]) + (" *" if kind == "pointer" else " &")
+        dimensions = cpp_models.ARRAY.fullmatch(name)
+        return self.type_name(dimensions[1]) + "[" + dimensions[2] + "]" + dimensions[3]
 
     def view(self, name: str, address: str, depth: str = "0") -> str:
         """Register a view without dereferencing it or calling an overloaded address."""
@@ -46,12 +62,9 @@ class Worker:
         factory = ""
         if name == self.contract["owner"]:
             method = self.contract["method"]
-            fixture = self.contract["factory"]
-            inputs = ",".join(self.literal(value, type_, "cpp") for value, type_ in zip(fixture["arguments"], fixture["parameters"]))
-            method_type = method["output"] + " (::" + name + "::*)(" + ",".join(method["parameters"]) + ") " + method["qualifiers"]
-            factory = ("static ::" + name + " make(){return ::" + fixture["name"] + "(" + inputs + ");}\n"
-                       + "using target_type=" + method_type + ";\nstatic target_type target(){return static_cast<target_type>(&::"
-                       + method["name"] + ");}\n")
+            method_type = self.type_name(method["output"]) + " (::" + name + "::*)(" + ",".join(self.type_name(item) for item in method["parameters"]) + ") " + method["qualifiers"]
+            factory = ("using target_type=" + method_type + ";\nstatic target_type target(){return static_cast<target_type>(&::"
+                       + method["name"] + ");}\nstatic int run();\n")
         return ("template<> struct access<::" + name + ">{\nstatic void fields(Graph& g,const ::" + name
                 + "* value,unsigned depth){" + "\n".join(fields) + "}\n" + "\n".join(statics) + factory + "};\n")
 
@@ -89,12 +102,12 @@ class Worker:
 
     def source(self) -> str:
         """Construct independently and retain the returned value through all boundaries."""
-        aliases = "\n".join("using type_" + str(index) + "=" + name + ";" for name, index in self.ids.items())
+        aliases = "\n".join("using type_" + str(index) + "=" + self.type_name(name) + ";" for name, index in self.ids.items())
         forwards = "\n".join("static void write_" + str(index) + "(Graph&,const void*,unsigned);" for index in self.ids.values())
         access = "\n".join(self.access(name, record) for name, record in self.contract["records"].items())
         writers = "\n".join(self.writer(name, model) for name, model in self.models.items())
         owner, method = self.contract["owner"], self.contract["method"]
-        arguments = "\n".join(type_ + " argument_" + str(index) + "=" + self.literal(value, type_, "cpp") + ";"
+        arguments = "\n".join(self.type_name(type_) + " argument_" + str(index) + "=" + self.literal(value, type_, "cpp") + ";"
                               for index, (type_, value) in enumerate(zip(method["parameters"], self.arguments)))
         target = "static_cast<::" + owner + "&&>(receiver)" if "&&" in method["qualifiers"].split() else "receiver"
         call = "(" + target + ".*access<::" + owner + ">::target())(" + ",".join("argument_" + str(i) for i in range(len(self.arguments))) + ")"
@@ -106,7 +119,12 @@ class Worker:
                       + "g.finish();{Graph& g=after;g.begin();" + roots + "g.finish();}}"
                       + "catch(const std::exception& error){error_outcome=true;Graph& g=outcome;g.begin();" + roots
                       + 'g.field("\\\"error\\\"");g.error(error);g.finish();{Graph& g=after;g.begin();' + roots + "g.finish();}}")
-        main = ("int run(){Graph before,outcome,after;bool error_outcome=false;auto receiver=access<::" + owner + ">::make();"
+        fixture = self.contract["factory"]
+        inputs = ",".join(self.literal(value, type_, "cpp") for value, type_ in zip(fixture["arguments"], fixture["parameters"]))
+        # Construct inside the friend. Returning a small trivial source object
+        # through another helper can introduce ABI copies and dangling self pointers.
+        creation = self.type_name(owner) + " receiver=::" + fixture["name"] + "(" + inputs + ");"
+        main = ("int access<::" + owner + ">::run(){Graph before,outcome,after;bool error_outcome=false;" + creation
                 + arguments + "{Graph& g=before;g.begin();" + roots + "g.finish();}" + invocation + r'''
 std::FILE* output=std::fopen(std::getenv("OTELEQ_OBSERVATION"),"wb");if(!output)return 90;
 __oteleq_abi(output);
@@ -118,8 +136,7 @@ return std::fclose(output)==0 && ok?0:92;}
         generated = "namespace __oteleq_cpp {\n" + aliases + forwards + access + writers + main + "}\n"
         macros = set(re.findall(r"[A-Za-z_][A-Za-z0-9_]*", generated))
         clean = cpp_receivers.sanitise_identifiers(self.contract) + "\n".join("#undef " + name for name in sorted(macros)) + "\n"
-        return clean + generated + '''
-int main(){try{return __oteleq_cpp::run();}
+        return clean + generated + '\nint main(){try{return __oteleq_cpp::access<::' + owner + '>::run();}\n' + '''
 catch(const __oteleq_cpp::capture_failure& error){std::fprintf(stderr,"C++ observation incomplete: %s\\n",error.reason);return 91;}
 catch(...){std::fputs("C++ fixture or exception needs another codec\\n",stderr);return 91;}}
 '''

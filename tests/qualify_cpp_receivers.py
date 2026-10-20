@@ -45,6 +45,18 @@ Counter make(Count seed){return Counter(seed);}
 '''
 METHODS = ("identity", "read", "array", "touch", "secret", "instance", "static_only", "alias", "fail")
 DIFFERENCES = {"instance", "static_only", "alias"}
+BINDING_SOURCE = '''class Graph {
+ short value_;
+ Graph* self_;
+public:
+ explicit Graph(short seed):value_(seed),self_(this){}
+ Graph& add(short amount){value_+=amount;return *this;}
+};
+extern "C" int plain(int value){return value+1;}
+extern "C" int _named(int value){return value+1;}
+extern "C" int _Zbad(int value){return value+1;}
+'''
+BINDING_FUNCTIONS = ("Graph::add(short)", "plain", "_named", "_Zbad")
 
 
 def function(name: str) -> str:
@@ -230,6 +242,71 @@ def verify_launches(folder: Path, expected: int) -> dict:
     return {"unique_application_launches": len(unique), "raw_attempt_folders": len(raw)}
 
 
+def check_bindings(path: Path, expected_cases: int) -> int:
+    """Global source types and C ABI names must call the actual intended function."""
+    report = json.loads(path.read_text())
+    assert report["source_preserved"] and not report["blocked"] and len(report["cases"]) == expected_cases
+    launches = 0
+    for case in report["cases"]:
+        assert case["function"] in BINDING_FUNCTIONS and case["exit_code"] == 0 and case["arguments"] == [3]
+        bundle = json.loads((path.parent / case["case"] / "typed-bundle.json").read_text())["cases"][0]
+        receiver = case["function"] == BINDING_FUNCTIONS[0]
+        assert set(bundle["contract"]["required_roots"]) == ({"receiver", "argument:0"} if receiver else set())
+        for lane in ("baseline", "instrumented_on"):
+            assert len(bundle[lane]) == 2
+            for attempt in bundle[lane]:
+                launches += 1
+                observed = attempt["observation"]
+                assert not observed["gaps"] and observed["outcome"]["kind"] == "return"
+                outcome = observed["outcome"]["graph"]
+                if receiver:
+                    assert case["receiver_fixture"]["arguments"] == [10]
+                    for graph, expected in ((observed["before"], 10), (outcome, 13), (observed["after"], 13)):
+                        fields = node(graph, graph["roots"]["receiver"])["fields"]
+                        assert set(fields) == {"location", "field:value_", "field:self_"}
+                        scalar(graph, fields["field:value_"], expected, short=True)
+                        scalar(graph, graph["roots"]["argument:0"], 3, short=True)
+                        assert node(graph, fields["field:self_"])["fields"]["value"] == graph["roots"]["receiver"]
+                    assert node(outcome, outcome["roots"]["result"])["fields"]["value"] == outcome["roots"]["receiver"]
+                else:
+                    assert observed["before"] == observed["after"] == {"roots": {}, "nodes": []}
+                    assert outcome == {"nodes": [], "roots": {"result": {"kind": "integer", "type": "cpp.int", "value": "4", "bits": 32, "signed": True}}}
+                if lane == "instrumented_on":
+                    assert attempt["execution"]["witness"]["functions"] == {case["function"]: 1}
+    return launches
+
+
+def binding_controls(cli: Path, provider: Path, folder: Path) -> int:
+    """Exercise both fixed naming defects over every retained/exported route."""
+    destination = folder / "bindings"
+    destination.mkdir()
+    source = destination / "application"
+    source.mkdir()
+    (source / "app.cpp").write_text(BINDING_SOURCE)
+    policy = destination / "equivalence.toml"
+    text = 'schema_version=1\nlanguages=["cpp"]\n[functions]\ninclude=' + json.dumps(BINDING_FUNCTIONS) + '\n'
+    for name in BINDING_FUNCTIONS:
+        text += '\n[[fixtures]]\nfunction=' + json.dumps(name) + '\ncases=[[3]]\n'
+        if name == BINDING_FUNCTIONS[0]:
+            text += 'receiver={factory="Graph",arguments=[10]}\n'
+    policy.write_text(text)
+    workspace = Path(command([cli, "plan", "--source", source, "--otelc-root", provider,
+                              "--workspace-parent", destination, "--config", policy], destination, "plan"))
+    command([cli, "generate", "--workspace", workspace], destination, "generate")
+    launches = 0
+    for name, suite in (("generated", workspace), ("exported", destination / "exported")):
+        if name == "exported":
+            command([cli, "export-tests", "--workspace", workspace, "--destination", suite, "--apply"], destination, "export-apply")
+        report_dir = destination / (name + "-comparison")
+        command([cli, "run", "--workspace", suite, "--report-dir", report_dir], destination, name + "-run")
+        launches += check_bindings(report_dir / "report.json", len(BINDING_FUNCTIONS))
+        output = command([sys.executable, suite / "tests/test_equivalence.py"], destination, name + "-framework")
+        summaries = [json.loads(line) for line in output.splitlines()]
+        assert len(summaries) == len(BINDING_FUNCTIONS)
+        launches += sum(check_bindings(Path(item["report"]), 1) for item in summaries)
+    return launches
+
+
 def main() -> None:
     """Retain an external actual-provider corpus; this does not qualify shipping builds."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -259,12 +336,15 @@ def main() -> None:
     launches += reduction(cli, workspace, folder, report)
     refused_launches, controls = refusals(cli, provider, folder)
     launches += refused_launches
+    binding_launches = binding_controls(cli, provider, folder)
+    launches += binding_launches
     counts = verify_launches(folder, launches)
     summary = {"claim": "equivalence over these tests and observations", "artefact_class": "diagnostic",
-               "matching_cases": len(METHODS)-len(DIFFERENCES), "different_cases": len(DIFFERENCES),
+               "matching_cases": len(METHODS)-len(DIFFERENCES)+len(BINDING_FUNCTIONS), "different_cases": len(DIFFERENCES),
                **counts,
                "all_routes": True, "scalar_shrinking_and_replay": True, "source_preserved": True,
                "refusal_controls": controls, "refused_application_launches": refused_launches,
+               "binding_cases": len(BINDING_FUNCTIONS), "binding_application_launches": binding_launches,
                "oteleq_cli_sha256": hashlib.sha256(cli.read_bytes()).hexdigest(),
                "otelc_cli_sha256": hashlib.sha256((provider / "target/debug/quux-otelc").read_bytes()).hexdigest(),
                "qualifier_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest()}

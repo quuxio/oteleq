@@ -37,7 +37,8 @@ class CppWorkerTests(unittest.TestCase):
         data = discovery.discover(path, "cpp", project, {"clang++": self.compiler}, execute)
         function = next(item for item in data["functions"] if item["name"] == method and item.get("cpp_function", {}).get("has_body"))
         entry = {**function, "path": "app.cpp", "language": "cpp", "globals": data["globals"]}
-        generation.receiver_fixture(entry, data, {"factory": factory, "arguments": [10]})
+        if factory is not None:
+            generation.receiver_fixture(entry, data, {"factory": factory, "arguments": [10]})
         self.assertEqual(entry["reason"], "")
         driver = harness.materialise(project, entry, [3] if arguments is None else arguments)
         binary = project / "application"
@@ -83,6 +84,29 @@ class CppWorkerTests(unittest.TestCase):
         _, capture, _, _ = self.captured(method="sample::Counter::read", arguments=[], factory="sample::make")
         graph = capture["outcome"]["graph"]
         self.assertEqual(self.node(graph, graph["roots"]["result"])["fields"]["value"]["value"], "10")
+
+    def test_global_record_name_does_not_resolve_to_the_generated_helper(self):
+        source = '''class Graph {
+short value_;
+public:explicit Graph(short seed):value_(seed){}
+Graph& add(short amount){value_+=amount;return *this;}
+};
+'''
+        _, capture, _, _ = self.captured(source, method="Graph::add", factory="Graph")
+        graph = capture["after"]
+        self.assertEqual(self.field(graph, graph["roots"]["receiver"], "value_")["fields"]["value"]["value"], "13")
+
+    def test_constructor_fixture_does_not_return_small_self_referential_objects(self):
+        source = '''class Small {
+short value_;Small* self_;
+explicit Small(short seed):value_(seed),self_(this){}
+public:int add(short amount){value_+=amount;return value_;}
+};
+'''
+        _, capture, _, _ = self.captured(source, method="Small::add", factory="Small")
+        for graph in (capture["before"], capture["outcome"]["graph"], capture["after"]):
+            root = graph["roots"]["receiver"]
+            self.assertEqual(self.field(graph, root, "self_")["fields"]["value"], root)
 
     def test_out_of_line_constructor_and_private_static_factory(self):
         source = SOURCE.replace('explicit Counter(Count seed) : value_(seed), self_(this), pointer_(&value_), child_{}, array_{} {}',
