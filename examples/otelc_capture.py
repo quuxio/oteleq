@@ -511,7 +511,9 @@ def rust_llvm_manifest(root: Path, workspace: Path, source: Path, bundle: Path, 
 
 
 def rust_manifest(root: Path, workspace: Path, source: Path, bundle: Path, tools: dict[str, Path], *,
-                  backend: str = "compiler", expected_function: str | None = None, environment: dict | None = None) -> dict:
+                  backend: str = "compiler", expected_function: str | tuple[str, ...] | None = None,
+                  environment: dict | None = None, requested_selection: dict | None = None,
+                  future_functions: tuple[str, ...] = ()) -> dict:
     """Verify all source/build/provider hashes using only caller-selected paths."""
     metadata = rust_metadata(bundle, backend)
     if backend == "compiler":
@@ -532,13 +534,14 @@ def rust_manifest(root: Path, workspace: Path, source: Path, bundle: Path, tools
     hook = rust_llvm_manifest(root, workspace, source, bundle, metadata, tools, assets, expected_function, environment) if assets else {}
     if backend == "compiler" and metadata["schema_version"] == 3:
         from otelc_rust_build import validate
-        hook = validate(root, workspace, source, bundle, metadata, tools, expected_function, environment)
+        hook = validate(root, workspace, source, bundle, metadata, tools, expected_function, environment,
+                        requested_selection, future_functions)
     return {**expected, "manifest_sha256": file_digest(bundle / BUILD_FILENAME),
             "baseline_flags": list(rust_flags(backend)), "compiler": compiler, **hook}
 
 
 def rust_command(root, workspace, source, policy, tools, environment, evidence, output, lane, *,
-                 backend="compiler", expected_function=None):
+                 backend="compiler", expected_function=None, future_functions=()):
     """Build only the selected lane; application launch never invokes rustc."""
     prefix = [root / OTELC_CLI_PATH, "--config", policy, "--language", "rust"]
     relative = source.relative_to(workspace)
@@ -552,8 +555,14 @@ def rust_command(root, workspace, source, policy, tools, environment, evidence, 
         bundle = output / "rust-bundle"
         build(prefix + ["rust", "--build", relative, "--output-dir", bundle], workspace,
               environment, evidence / "instrumented-build.log")
+        requested = None
+        if backend == "compiler" and (root / RUST_COMPILER_PROFILE_FILENAME).exists():
+            configured = tomllib.loads(policy.read_text())
+            requested = {key: {"include": configured[key]["include"], "exclude": configured[key].get("exclude", [])}
+                         for key in ("sources", "functions")}
         identities = rust_manifest(root, workspace, source, bundle, tools, backend=backend,
-                                   expected_function=expected_function, environment=environment)
+                                   expected_function=expected_function, environment=environment,
+                                   requested_selection=requested, future_functions=future_functions)
         command = prefix + ["rust", "--run", bundle]
     (evidence / (lane + "-build-identities.json")).write_text(json.dumps(identities, indent=2) + "\n")
     return command
@@ -749,7 +758,8 @@ def go_commands(root, request, policy, tools, environment, evidence):
     return prefix + ["go", "--run-baseline", bundle], prefix + ["go", "--run", bundle]
 
 
-def commands(root, workspace, language, source, policy, tools, environment, evidence):
+def commands(root, workspace, language, source, policy, tools, environment, evidence, *,
+             expected_functions=None, future_functions=()):
     prefix = [root / OTELC_CLI_PATH, "--config", policy, "--language", language]
     if language in ("c", "cpp"):
         tool = "clang++" if language == "cpp" else "clang"
@@ -759,7 +769,8 @@ def commands(root, workspace, language, source, policy, tools, environment, evid
         build(prefix + [tool, *flags, source, "-o", instrumented], workspace, environment, evidence / "instrumented-build.log")
         return [plain], prefix + ["run", instrumented]
     if language == "rust":
-        return tuple(rust_command(root, workspace, source, policy, tools, environment, evidence, workspace, lane)
+        return tuple(rust_command(root, workspace, source, policy, tools, environment, evidence, workspace, lane,
+                                  expected_function=expected_functions, future_functions=future_functions)
                      for lane in ("baseline", "instrumented_on"))
     if language == "go":
         request = {"workspace": workspace, "target": source, "sources": [source], "project": workspace}
@@ -867,6 +878,15 @@ def require_runtime_identity(report, language):
     elif (type(report.get("schema_version")) is not int or report["schema_version"] != 1
           or report.get("language") != language):
         raise ValueError("unsupported or mismatched runtime report")
+
+
+def rust_future_health(report: dict) -> None:
+    """The MIR registry must finish even when trace counters appear drained."""
+    future = report.get("future_observers")
+    if (type(future) is not dict or set(future) != {"pending", "admission_exhausted"}
+            or type(future["pending"]) is not int or future["pending"] != 0
+            or future["admission_exhausted"] is not False):
+        raise ValueError("Rust compiler future observers are missing, pending or exhausted")
 
 
 def loss_diagnostics(report, language):

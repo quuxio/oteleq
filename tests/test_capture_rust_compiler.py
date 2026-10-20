@@ -108,12 +108,95 @@ class RustCompilerBuildTests(unittest.TestCase):
             "inventory_sha256": capture.file_digest(self.bundle / "inventory.json")}
         self.write(self.bundle / "build.json", self.metadata)
 
-    def verify(self, *, function: str | None = "app.selected", environment: dict | None = None) -> dict:
+    def verify(self, *, function: str | tuple[str, ...] | None = "app.selected", environment: dict | None = None,
+               requested: dict | None = None, futures: tuple[str, ...] = ()) -> dict:
         result = subprocess.CompletedProcess([], 0, (self.version + "\n").encode(), b"")
         with patch.object(compiler_build, "execute", return_value=result):
             return capture.rust_manifest(self.root, self.workspace, self.source, self.bundle, self.tools,
                                          expected_function=function,
-                                         environment=self.environment if environment is None else environment)
+                                         environment=self.environment if environment is None else environment,
+                                         requested_selection=requested, future_functions=futures)
+
+    def multiple_targets(self) -> dict:
+        self.source.write_text("fn selected(value:i32)->i32{value}\nfn other()->i32{7}\nfn main(){}\n")
+        self.declarations = []
+        offset = 0
+        for index, line in enumerate(self.source.read_text().splitlines(), 1):
+            name = ("selected", "other", "main")[index - 1]
+            self.declarations.append({"file": str(self.source), "name": "app." + name, "leaf": name, "suffix": name,
+                                      "unsupported": "", "selected": index < 3, "startup": index == 3,
+                                      "header_start": offset, "header_end": offset + line.index("{"),
+                                      "body_start_line": index, "body_start_column": line.index("{") + 1,
+                                      "body_end_line": index, "body_end_column": len(line),
+                                      "declaration_start_line": index, "declaration_start_column": 1,
+                                      "declaration_end_line": index, "declaration_end_column": len(line) + 1})
+            offset += len(line) + 1
+        self.plan["functions"] = {"include": ["app.*"], "exclude": []}
+        self.request["policy"] = {key: self.plan[key] for key in compiler_build.POLICY_FIELDS}
+        self.request["declarations"] = self.declarations
+        sources = {str(self.source): capture.file_digest(self.source)}
+        self.request["sources"] = self.inventory["sources"] = sources
+        self.metadata["source_sha256"] = sources[str(self.source)]
+        self.inventory["functions"] = [{**row, "compiler_name": row["leaf"], "compiler_expansion": False,
+                                        "compiled_symbol": "symbol-" + str(index), "emitted": True}
+                                       for index, row in enumerate(self.declarations)]
+        self.seal()
+        return {key: self.plan[key] for key in ("sources", "functions")}
+
+    def test_fixed_workload_binds_every_expected_target_and_the_caller_selectors(self) -> None:
+        requested = self.multiple_targets()
+        result = self.verify(function=("app.selected", "app.other"), requested=requested)
+        self.assertEqual(result["selected_functions"], ["app.other", "app.selected"])
+        self.assertEqual(result["selected_symbols"], {"app.selected": "symbol-0", "app.other": "symbol-1"})
+        for function in ((), ("app.selected",), ("app.other",), ("app.selected", "app.selected"),
+                         ("app.selected", "app.unknown"), ("app.selected", 1)):
+            with self.subTest(function=function), self.assertRaises(ValueError):
+                self.verify(function=function, requested=requested)
+        changed = copy.deepcopy(requested)
+        changed["functions"]["include"] = ["wrong.*"]
+        with self.assertRaises(ValueError):
+            self.verify(function=("app.selected", "app.other"), requested=changed)
+
+    def test_only_explicit_fixed_future_declarations_can_use_compiler_completion(self) -> None:
+        requested = self.multiple_targets()
+        self.request["declarations"][1]["unsupported"] = compiler_build.ASYNC_UNSUPPORTED
+        self.seal()
+        targets = ("app.selected", "app.other")
+        with self.assertRaises(ValueError):
+            self.verify(function=targets, requested=requested)
+        self.verify(function=targets, requested=requested, futures=("app.other",))
+        for futures in (("app.unknown",), ("app.other", "app.other"), ("app.main",), (1,)):
+            with self.subTest(futures=futures), self.assertRaises(ValueError):
+                self.verify(function=targets, requested=requested, futures=futures)
+        self.request["declarations"][1]["unsupported"] = "other unsupported storage"
+        self.seal()
+        with self.assertRaises(ValueError):
+            self.verify(function=targets, requested=requested, futures=("app.other",))
+
+    def test_future_health_requires_empty_typed_registry_and_available_admission(self) -> None:
+        capture.rust_future_health({"future_observers": {"pending": 0, "admission_exhausted": False}})
+        for value in (None, {}, {"pending": False, "admission_exhausted": False},
+                      {"pending": 1, "admission_exhausted": False}, {"pending": 0, "admission_exhausted": True},
+                      {"pending": 0, "admission_exhausted": 0},
+                      {"pending": 0, "admission_exhausted": False, "unknown": 0}):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                capture.rust_future_health({"future_observers": value})
+
+    def test_build_recipe_forwards_the_actual_caller_policy_and_multiple_targets(self) -> None:
+        self.multiple_targets()
+        destination = self.base / "rust-bundle"
+        self.bundle.rename(destination)
+        self.bundle = destination
+        policy = self.base / "policy.toml"
+        policy.write_text('[sources]\ninclude=["**"]\n[functions]\ninclude=["app.*"]\n')
+        version = subprocess.CompletedProcess([], 0, self.version.encode(), b"")
+        with patch.object(capture, "build"), patch.object(compiler_build, "execute", return_value=version):
+            result = capture.rust_command(self.root, self.workspace, self.source, policy, self.tools,
+                                           self.environment, self.base, self.base, "instrumented_on",
+                                           expected_function=("app.selected", "app.other"))
+        self.assertEqual(result[-3:], ["rust", "--run", self.bundle])
+        actual = json.loads((self.base / "instrumented_on-build-identities.json").read_text())
+        self.assertEqual(actual["selected_functions"], ["app.other", "app.selected"])
 
     def test_exact_compiler_profile_recipe_and_emitted_roles_qualify(self) -> None:
         result = self.verify()

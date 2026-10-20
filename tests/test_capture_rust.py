@@ -104,3 +104,10 @@ class RustBuildTests(unittest.TestCase):
             result = capture.commands(self.root, self.project, "rust", self.source, self.base / "policy", self.tools, {}, self.evidence)
         self.assertEqual(result, (["plain"], ["on"]))
         self.assertEqual([call.args[-1] for call in recipe.call_args_list], ["baseline", "instrumented_on"])
+
+    def test_fixed_capture_forwards_its_independent_expected_function_set(self):
+        expected = ("app.parent", "app.leaf", "app.fails")
+        with patch.object(capture, "rust_command", side_effect=(["plain"], ["on"])) as recipe:
+            capture.commands(self.root, self.project, "rust", self.source, self.base / "policy",
+                             self.tools, {}, self.evidence, expected_functions=expected)
+        self.assertEqual([call.kwargs["expected_function"] for call in recipe.call_args_list], [expected, expected])

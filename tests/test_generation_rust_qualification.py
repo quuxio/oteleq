@@ -1,13 +1,33 @@
 """Qualification fixtures keep valid panic expectations and instability separate."""
 from pathlib import Path
+import json
 import tempfile
 import tomllib
 import unittest
+from unittest.mock import patch
 
 import qualify_rust_build as qualifier
 
 
 class RustQualificationFixtureTests(unittest.TestCase):
+    def test_default_compiler_routes_check_all_framework_and_exported_cases(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            replay = folder / "replay/report.json"
+            replay.parent.mkdir()
+            replay.write_text(json.dumps({"source_preserved": True, "cases": [{"case": "one"}]}))
+            exported = folder / "export-comparison/report.json"
+            exported.parent.mkdir()
+            exported.write_text(json.dumps({"source_preserved": True, "cases": [{"case": str(index)} for index in range(4)]}))
+            framework = '\n'.join(json.dumps({"report": str(replay)}) for _ in range(4))
+            with patch.object(qualifier, "command", return_value=framework) as command, patch.object(qualifier, "check_case") as checked:
+                count = qualifier.compiler_retained_routes(folder / "cli", folder / "workspace", folder)
+            self.assertEqual(count, 72)
+            self.assertEqual(checked.call_count, 12)
+            self.assertEqual([call.args[2] for call in command.call_args_list],
+                             ["framework", "export", "export-run", "export-framework"])
+            self.assertTrue(all(call.args[2:] == ("compiler", None) for call in checked.call_args_list))
+
     def test_frontend_provenance_controls_are_scoped_to_schema3(self):
         legacy = {"schema_version": 2, "functions": [{"selected": True}]}
         self.assertEqual(qualifier.frontend_manifest_controls(legacy), [])

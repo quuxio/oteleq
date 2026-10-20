@@ -4,8 +4,7 @@ from pathlib import Path
 from otelc_capture import (RUST_BASELINE_FLAGS, RUST_COMPILER_PROFILE_FILENAME,
                            build_document, execute,
                            file_digest, rust_frontend_function,
-                           rust_frontend_rows, rust_llvm_function,
-                           rust_llvm_rows)
+                           rust_frontend_rows, rust_llvm_function)
 
 
 PROFILE_FILENAME = RUST_COMPILER_PROFILE_FILENAME
@@ -17,6 +16,7 @@ REQUEST_FIELDS = {"schema_version", "root", "entry", "policy", "sources",
                   "declarations", "protected_source_roots", "discovery_argv"}
 INSTANCE_FIELDS = {"compiler_name", "compiler_expansion", "compiled_symbol",
                    "emitted"}
+ASYNC_UNSUPPORTED = "async compiler bodies require future-completion qualification"
 
 
 def require(condition: bool, reason: str) -> None:
@@ -107,21 +107,28 @@ def recipe(compiler: dict, source: Path, workspace: Path,
     return discovery
 
 
-def selection(plan: dict, source: Path, workspace: Path, function: str) -> None:
-    """A diagnostic bundle selects one requested callable in the original file."""
+def selection(plan: dict, source: Path, workspace: Path, functions: tuple[str, ...],
+              requested: dict | None) -> None:
+    """Freeze caller-owned selectors alongside the exact expected emitted set."""
     relative = source.relative_to(workspace).as_posix()
+    if requested is None:
+        requested = {"functions": {"include": list(functions), "exclude": []},
+                     "sources": plan.get("sources")}
+        require(requested["sources"] in ({"include": [relative], "exclude": []},
+                                          {"include": ["**"], "exclude": []}),
+                "standalone source selection differs")
     require(type(plan.get("schema_version")) is int and plan["schema_version"] == 2
             and plan.get("language") == "rust" and plan.get("backend") == "compiler"
             and plan.get("execution_available") is True and plan.get("unavailable") == []
-            and plan.get("functions") == {"include": [function], "exclude": []}
-            and plan.get("sources") in ({"include": [relative], "exclude": []},
-                                        {"include": ["**"], "exclude": []})
+            and set(requested) == {"functions", "sources"}
+            and all(plan.get(key) == value for key, value in requested.items())
             and POLICY_FIELDS <= plan.keys(),
             "retained plan differs from the requested standalone selection")
 
 
 def records(request: dict, inventory: dict, plan: dict, descriptor: dict,
-            workspace: Path, source: Path, function: str, discovery: list[str]) -> dict:
+            workspace: Path, source: Path, functions: tuple[str, ...], discovery: list[str],
+            futures: tuple[str, ...]) -> dict:
     """Bind the compiler request and both emitted roles to original source."""
     sources = {str(source.resolve()): regular_digest(source.resolve())}
     require(set(request) == REQUEST_FIELDS and type(request["schema_version"]) is int
@@ -134,31 +141,56 @@ def records(request: dict, inventory: dict, plan: dict, descriptor: dict,
     require(set(inventory) == {"schema_version", "functions", "sources", "discovery_argv"}
             and inventory["sources"] == sources and inventory["discovery_argv"] == discovery,
             "compiler inventory source or discovery binding differs")
-    selected, startup = rust_llvm_rows(inventory, 3)
+    rows = inventory.get("functions")
+    require(type(inventory.get("schema_version")) is int and inventory["schema_version"] == 3
+            and type(rows) is list and len(rows) <= 65536
+            and all(type(row) is dict and type(row.get("selected")) is bool
+                    and type(row.get("startup")) is bool for row in rows),
+            "compiler inventory roles are malformed")
+    selected = [row for row in rows if row["selected"]]
+    startup = [row for row in rows if row["startup"]]
+    require(all(type(row.get("name")) is str for row in selected)
+            and len(startup) == 1 and not startup[0]["selected"]
+            and len(selected) == len(functions) and not any(row["startup"] for row in selected)
+            and {row.get("name") for row in selected} == set(functions),
+            "expected target set or independent startup differs")
     rust_frontend_rows(inventory)
     declarations = request["declarations"]
     require(type(declarations) is list and 0 < len(declarations) <= 65536
             and all(type(row) is dict for row in declarations),
             "request declarations are missing or exceed their bound")
     identity = str(source.relative_to(workspace).with_suffix("")).replace("/", ".")
-    for row, name in ((selected[0], function), (startup[0], identity + ".main")):
+    for row in [*selected, startup[0]]:
+        name = identity + ".main" if row["startup"] else row["name"]
         original = {key: value for key, value in row.items() if key not in INSTANCE_FIELDS}
-        require(sum(item == original for item in declarations) == 1,
+        candidates = declarations
+        if name in futures:
+            candidates = [{**item, "unsupported": ""} for item in declarations
+                          if item.get("name") == name and item.get("unsupported") == ASYNC_UNSUPPORTED]
+        require(sum(item == original for item in candidates) == 1,
                 "emitted callable lacks one exact original declaration")
         rust_llvm_function(original, {**row, "kind": "function", "source_sha256": sources[str(source.resolve())]}, source, name)
         rust_frontend_function(row, row, name, identity)
-    require(selected[0]["compiled_symbol"] != startup[0]["compiled_symbol"],
-            "target and startup cannot share an emitted symbol")
-    return {"selected_function": function, "selected_symbol": selected[0]["compiled_symbol"],
-            "selected_compiler_name": selected[0]["compiler_name"], "compiler_expansion": False,
-            "resolution_phase": "mir", "loaded_sources": sources}
+    common = {"compiler_expansion": False, "resolution_phase": "mir", "loaded_sources": sources}
+    if len(selected) == 1:
+        return {"selected_function": selected[0]["name"], "selected_symbol": selected[0]["compiled_symbol"],
+                "selected_compiler_name": selected[0]["compiler_name"], **common}
+    return {"selected_functions": sorted(functions),
+            "selected_symbols": {row["name"]: row["compiled_symbol"] for row in selected}, **common}
 
 
 def validate(root: Path, workspace: Path, source: Path, bundle: Path, metadata: dict,
-             tools: dict[str, Path], function: str | None, environment: dict | None) -> dict:
+             tools: dict[str, Path], function: str | tuple[str, ...] | None, environment: dict | None,
+             requested: dict | None = None, futures: tuple[str, ...] = ()) -> dict:
     """Verify schema3 without relaxing legacy compiler or LLVM evidence contracts."""
-    require(type(function) is str and bool(function.strip()),
-            "an explicit expected callable identity is required")
+    functions = (function,) if type(function) is str else function
+    require(type(functions) is tuple and 0 < len(functions) <= 65536
+            and all(type(name) is str and 0 < len(name) <= 1024 and bool(name.strip()) for name in functions)
+            and len(set(functions)) == len(functions),
+            "an explicit unique expected callable set is required")
+    require(type(futures) is tuple and all(type(name) is str for name in futures)
+            and len(set(futures)) == len(futures) and set(futures) <= set(functions),
+            "fixed future declarations differ from the expected callable set")
     descriptor, assets = profile(root, tools)
     retained = build_document(bundle / "profile.json", limit=65536)
     hashes = {"profile_sha256": regular_digest(root / PROFILE_FILENAME),
@@ -170,8 +202,8 @@ def validate(root: Path, workspace: Path, source: Path, bundle: Path, metadata: 
             "retained profile, driver or compiler evidence identity differs")
     discovery = recipe(metadata["compiler"], source, workspace, assets, environment)
     plan = build_document(bundle / "plan.json")
-    selection(plan, source, workspace, function)
+    selection(plan, source, workspace, functions, requested)
     request = build_document(bundle / "compiler-request.json", limit=8 * 1024 * 1024)
     inventory = build_document(bundle / "inventory.json")
-    observed = records(request, inventory, plan, descriptor, workspace, source, function, discovery)
+    observed = records(request, inventory, plan, descriptor, workspace, source, functions, discovery, futures)
     return {"backend": "compiler", "compiler_driver": hashes, **observed}
