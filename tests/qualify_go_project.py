@@ -130,10 +130,22 @@ def check_report(path: Path, expected_cases: int = 6) -> int:
                 inputs = identities["source_inputs"]
                 assert len(inputs) >= (1 if tagged else 2)
                 assert identities["compiler"]["environment"]["GOFLAGS"] == "-tags=oteleq_selected"
-                recipe = json.loads((folder / "go-bundle/recipe.json").read_text())
-                assert Path(recipe["source_root"]) == folder / "project" / entry["go_context"]["module_root"]
-                assert Path(json.loads((folder / "working-directory.json").read_text())) == Path(recipe["source_root"])
+                check_build_context(folder, entry, case["case"], inputs)
     return launches
+
+
+def check_build_context(folder: Path, entry: dict, case_id: str, inputs: dict) -> None:
+    """Copied shrink evidence keeps its original build and working-directory provenance."""
+    recipe = json.loads((folder / "go-bundle/recipe.json").read_text())
+    module = Path(entry["go_context"]["module_root"])
+    working_directory = Path(json.loads((folder / "working-directory.json").read_text()))
+    project = working_directory
+    for _ in module.parts:
+        project = project.parent
+    assert project.is_absolute() and project.name == "project" and project.parent.name == folder.name
+    assert project.parent.parent.name == case_id
+    assert Path(recipe["source_root"]) == working_directory == project / module
+    assert all(str(project / name) in inputs for name in entry["go_context"]["files"])
 
 
 def framework(workspace: Path, folder: Path, name: str) -> int:
