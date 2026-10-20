@@ -1,5 +1,6 @@
 """Validate source-bound Java graphs without executing application codecs."""
 from collections import deque
+from typing import cast
 
 from otelc_capture import strict_json
 
@@ -27,10 +28,11 @@ def require(condition: bool, reason: str) -> None:
 
 def hex_units(value: object, multiple: int, maximum: int) -> bool:
     """Only complete, canonical lowercase units are accepted."""
-    if not isinstance(value, str) or type(value) is not str:
+    if type(value) is not str:
         return False
-    return (len(value) <= maximum and len(value) % multiple == 0
-            and all(char in "0123456789abcdef" for char in value))
+    text = cast(str, value)
+    return (len(text) <= maximum and len(text) % multiple == 0
+            and all(char in "0123456789abcdef" for char in text))
 
 
 def primitive(value: dict, expected: str) -> None:

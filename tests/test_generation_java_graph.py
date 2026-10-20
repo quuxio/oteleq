@@ -67,6 +67,12 @@ class JavaGraphTests(unittest.TestCase):
             def __len__(self):
                 raise AssertionError("application length must not run")
 
+        class CallbackObject:
+            @property
+            def __class__(self):
+                raise AssertionError("application class property must not run")
+
+        self.assertFalse(java_graph.hex_units(CallbackObject(), 4, 16))
         self.assertFalse(java_graph.hex_units(CallbackString("0000"), 4, 16))
         for name, (bits, signed) in java_graph.INTEGERS.items():
             for number in ((-2**(bits-1), 2**(bits-1)-1) if signed else (0, 2**bits-1)):
