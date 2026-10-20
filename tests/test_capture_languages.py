@@ -453,7 +453,7 @@ class LanguageArtefactTests(unittest.TestCase):
             "cpp": ("target/debug/libquux_otelc_runtime.a", "target/debug/otelc-llvm-toolchain.json", "target/debug/libotelc_pass.dylib"),
             "rust": ("target/debug/otelc-rust-adapter", "target/debug/libquux_otelc_rust.rlib", "Cargo.lock", "target/debug/deps/original.rlib"),
             "java": ("adapters/java/target/java-agent-0.1.0-agent.jar",),
-            "go": ("adapters/go/build/otelc-go", "adapters/go/go.sum", "adapters/go/runtime/runtime.go"),
+            "go": ("adapters/go/build/otelc-go", "adapters/go/go.mod", "adapters/go/go.sum", "adapters/go/policy/policy.go", "adapters/go/runtime/runtime.go"),
             "javascript": ("target/debug/otelc_node_observer.node", "adapters/node/package-lock.json", "adapters/node/runtime.mjs"),
             "typescript": ("target/debug/otelc_node_observer.node", "adapters/node/package-lock.json", "adapters/node/runtime.mjs"),
             "python": ("adapters/python/requirements.txt", "adapters/python/monitor.py", ".venv/lib/python3.12/site-packages/sdk.py")}
@@ -484,6 +484,32 @@ class LanguageArtefactTests(unittest.TestCase):
                 (root / "tool").unlink()
                 with self.assertRaises(FileNotFoundError):
                     capture.stable(root, language, tools, identities)
+
+    def test_go_module_and_imported_policy_sources_are_frozen(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            files = ("target/debug/quux-otelc", "adapters/go/build/otelc-go", "adapters/go/go.mod",
+                     "adapters/go/go.sum", "adapters/go/runtime/runtime.go", "adapters/go/policy/policy.go")
+            for name in files:
+                path = root / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(b"original")
+            expected = capture.artefacts(root, "go", {})
+            for name in ("adapters/go/go.mod", "adapters/go/policy/policy.go"):
+                self.assertIn(name, expected)
+                path = root / name
+                path.write_bytes(b"modified")
+                with self.subTest(file=name), self.assertRaisesRegex(ValueError, "changed"):
+                    capture.stable(root, "go", {}, expected)
+                path.write_bytes(b"original")
+            added = root / "adapters/go/policy/extra.go"
+            added.write_text("package policy")
+            with self.assertRaises(ValueError):
+                capture.stable(root, "go", {}, expected)
+            added.unlink()
+            (root / "adapters/go/go.mod").unlink()
+            with self.assertRaises(FileNotFoundError):
+                capture.stable(root, "go", {}, expected)
 
     def test_rust_sdk_shared_libraries_are_content_identified(self):
         with tempfile.TemporaryDirectory() as temporary:
