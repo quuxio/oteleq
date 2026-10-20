@@ -2,7 +2,7 @@
 
 The generator supports declared receivers for ordinary instance methods on plain Python, JavaScript and TypeScript classes. Each attempt constructs a fresh instance, binds the selected source method, then captures its supported instance state, own declared class data roots and module globals before and after the call. The shared graph protocol preserves aliases and cycles, including a method returning its receiver.
 
-Other language receivers, inherited classes, private/dunder Python methods, private class data, slots/native storage, arbitrary mutable arguments, Python asynchronous calls and action sequences remain unsupported. Node supports awaiting an ordinary async method to completion; it does not generate scheduler or iteration sequences. They remain visible gaps rather than passing skipped tests.
+Other language receivers, inherited classes, private/dunder Python methods, private class data, slots/native storage, arbitrary mutable arguments and Python asynchronous calls remain unsupported. Node supports awaiting an ordinary async method and [ordered calls/release with bounded JavaScript collection](ordered-sequences.md); arbitrary targets, scheduler and iteration sequences remain open. They remain visible gaps rather than passing skipped tests.
 
 ## Declare a constructor
 
@@ -47,7 +47,7 @@ Regular source packages use the same [explicit import-root policy](python-packag
 
 A policy can also name one existing ordinary synchronous function in the selected module, such as `receiver = { factory = "make_counter", arguments = [10] }`. Its declaration, concrete arguments and source body are frozen. It must return an instance of exactly the selected source class. Decorated, ambiguous, replaced or unsupported factories remain blockers. External fixture files and general factories for arbitrary argument types remain open.
 
-Construction executes inside each private application worker. It must complete successfully without invoking the selected method; missing construction, wrong classes and missing method witnesses cannot qualify. Construction failures are incomplete fixture evidence, not matching method outcomes. This mode does not yet compare constructor/action sequences as separate test targets.
+Construction executes inside each private application worker. It must complete successfully without invoking the selected method; missing construction, wrong classes and missing method witnesses cannot qualify. Construction failures are incomplete fixture evidence, not matching method outcomes. Python does not yet compare constructor/action sequences as separate targets. Node can opt into the ordered method/release mode below.
 
 ## JavaScript and TypeScript
 
@@ -66,7 +66,7 @@ export class Counter {
 function make_counter(start) { return new Counter(start); }
 ```
 
-A TypeScript source can annotate the constructor/method parameters with `: number`. Constructor or factory inputs are frozen separately from method `cases`; both use the adapter's concrete scalar representations. A synchronous same-module factory can return the exact selected class. The factory and class bindings are checked before and after construction and each observed call boundary. Construction must not itself invoke the selected target. Ordinary async methods are awaited; generators, async factories and action sequences remain unsupported.
+A TypeScript source can annotate the constructor/method parameters with `: number`. Constructor or factory inputs are frozen separately from method `cases`; both use the adapter's concrete scalar representations. A synchronous same-module factory can return the exact selected class. The factory and class bindings are checked before and after construction and each observed call boundary. Construction must not itself invoke the selected target. Ordinary async methods are awaited; generators, async factories and arbitrary action targets remain unsupported. See [ordered sequences](ordered-sequences.md) for supported method/release/collection steps.
 
 The private source copy gains an observer import and a first class static block which captures source method descriptors before original static initialisers. This changes reflective class source text and is an explicit diagnostic access-helper delta. Original method bodies and target files remain unchanged; it does not qualify a shipping artefact. Replaced methods, changed prototype shapes/extensibility, inheritance, private/computed/literal members, accessors/decorators, generic/abstract classes and constructors returning replacement objects are refused. An implicit constructor or a bare/`this` return is supported.
 

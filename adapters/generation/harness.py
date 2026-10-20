@@ -11,6 +11,7 @@ import domains
 import go_project
 import node_receivers
 import python_project
+import sequences
 
 NATIVE_INTEGERS = {
     "int", "long", "short", "signed", "signed int", "long long", "unsigned", "unsigned int",
@@ -315,7 +316,8 @@ JS_OBSERVER = Path(__file__).with_name("node_observe.mjs").read_text()
 
 def js_driver(entry, args, source):
     if "receiver_fixture" in entry:
-        return node_receivers.driver(entry, args, source)
+        sequence = sequences.concrete(entry, args, concrete_arguments) if "sequence_configuration" in entry else None
+        return node_receivers.driver(entry, args, source, sequence)
     roots = "".join(json.dumps("global:" + g["name"]) + ":" + g["name"] + "," for g in entry["globals"])
     # Capture the hoisted declaration before application statements can rebind
     # it, retaining hashbang/directive syntax at the parser-selected position.
@@ -609,5 +611,7 @@ def materialise(project, entry, args):
         emit = {"javascript": js_driver, "typescript": js_driver, "rust": rust_driver, "go": go_driver}[language]
         if language in ("javascript", "typescript"):
             (generated / "node_observe.mjs").write_text(JS_OBSERVER)
+            if "sequence_configuration" in entry:
+                (generated / "node_sequence.mjs").write_bytes(Path(__file__).with_name("node_sequence.mjs").read_bytes())
         driver.write_text(emit(entry, args, original))
     return driver

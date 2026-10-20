@@ -14,7 +14,7 @@ pub enum ErrorCategory {
     Exception,
     Panic,
 }
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum ExpectedOutcome {
     Return,
@@ -32,6 +32,8 @@ pub struct Contract {
     pub fixture_sha256: String,
     pub required_roots: Vec<String>,
     pub expected_baseline: ExpectedOutcome,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub steps: Vec<crate::sequence::Contract>,
 }
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(tag = "status", rename_all = "snake_case", deny_unknown_fields)]
@@ -112,6 +114,8 @@ pub struct Observation {
     pub before: Snapshot,
     pub outcome: Outcome,
     pub after: Snapshot,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub steps: Vec<crate::sequence::Observation>,
 }
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -147,7 +151,7 @@ impl Contract {
                 return Err("expected error requires a qualified payload type".into());
             }
         }
-        Ok(())
+        crate::sequence::validate(self)
     }
 }
 fn roots(
@@ -163,7 +167,7 @@ fn roots(
     (expected != actual)
         .then(|| format!("{lane} {phase}: requested roots {expected:?}, captured {actual:?}"))
 }
-fn inspect(
+pub(crate) fn inspect(
     observation: &Observation,
     contract: &Contract,
     lane: &str,
@@ -205,6 +209,7 @@ fn inspect(
         );
         gaps.extend(roots(graph, &contract.required_roots, result, lane, phase));
     }
+    gaps.extend(crate::sequence::inspect(observation, contract, lane)?);
     Ok(gaps)
 }
 fn value_type<'a>(value: &'a Value, graph: &'a Snapshot) -> Option<&'a str> {
@@ -287,6 +292,15 @@ pub fn compare(
     right: &Observation,
     contract: &Contract,
 ) -> Result<Comparison, String> {
+    compare_boundaries(left, right, contract, true)
+}
+
+pub(crate) fn compare_boundaries(
+    left: &Observation,
+    right: &Observation,
+    contract: &Contract,
+    initial_fixture: bool,
+) -> Result<Comparison, String> {
     contract.validate()?;
     let mut reasons = inspect(left, contract, "baseline")?;
     reasons.extend(inspect(right, contract, "instrumented_on")?);
@@ -317,7 +331,13 @@ pub fn compare(
         result.reasons.push("baseline outcome violates its declared contract; provide valid inputs or an explicit expected-error fixture".into());
         result.verdict = Verdict::Blocked;
     }
-    changed(&left.before, &right.before, "before", &mut result, true)?;
+    changed(
+        &left.before,
+        &right.before,
+        "before",
+        &mut result,
+        initial_fixture,
+    )?;
     let known_initial = [&left.before, &right.before].iter().all(|snapshot| {
         roots(
             snapshot,
@@ -334,7 +354,7 @@ pub fn compare(
         .all(|gap| gap.phase != Phase::Before)
         && graph::inspect(&left.before, "baseline")?.is_empty()
         && graph::inspect(&right.before, "instrumented_on")?.is_empty();
-    if known_initial && !result.initial_differences.is_empty() {
+    if initial_fixture && known_initial && !result.initial_differences.is_empty() {
         result.reasons.push(
             "initial fixtures differ; function equivalence cannot be assessed from this pair"
                 .into(),
@@ -360,7 +380,10 @@ pub fn compare(
             instrumented_on: None,
         });
     }
-    result.verdict = if !result.reasons.is_empty() {
+    crate::sequence::compare(left, right, contract, &mut result)?;
+    result.verdict = if result.verdict == Verdict::Blocked {
+        Verdict::Blocked
+    } else if !result.reasons.is_empty() {
         Verdict::Inconclusive
     } else if !result.differences.is_empty() {
         Verdict::DifferentObserved
@@ -381,5 +404,9 @@ pub(crate) fn stable(left: &Observation, right: &Observation) -> Result<bool, St
         (None, None) => true,
         _ => false,
     };
-    Ok(before && after && outcome && left.outcome.label() == right.outcome.label())
+    Ok(before
+        && after
+        && outcome
+        && left.outcome.label() == right.outcome.label()
+        && crate::sequence::stable(left, right)?)
 }

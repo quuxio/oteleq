@@ -37,6 +37,8 @@ Generated tests live in a new private directory outside the application reposito
 
 **Status: automatic scalar test generation, AST inventory and repeated actual otelc execution are implemented for all eight languages.** Supported functions receive frozen concrete inputs; unsupported callables and state remain visible blockers. Python and Node capture supported object graphs; other adapters capture scalar results and accessible scalar globals. Native scalar types are checked by the compiler; unresolved native aliases remain visible blockers. Generated access/entrypoint helpers produce diagnostic evidence. Shipping-artefact qualification and application-specific fixtures remain future work.
 
+Declared [ordered Node receiver calls/release](docs/ordered-sequences.md) retain intermediate state, with bounded JavaScript collection observations and [148-launch qualification](docs/qualification/ordered-sequences-2026-10-20.json). Missing collection stays inconclusive.
+
 Start with [automatic generation](docs/automatic-generation.md), [fixed eight-language workloads](docs/eight-language-capture.md) or [workload comparison](docs/workload-comparison.md). See [usefulness and limits](docs/adoption.md), the [design](docs/design.md) and [roadmap](docs/roadmap.md).
 
 Observers refuse unsupported application formatters and exception accessors. Such capture failures remain incomplete evidence; see the [qualified codec limits](docs/automatic-generation.md#selection-and-inputs).
@@ -88,7 +90,9 @@ Go requires the [retained build/run provider API](docs/go-build-bundles.md). Eac
 
 Python can use explicit [source package import roots](docs/python-package-context.md), including regular packages and `src` layouts. Relative imports and package initialisers use their real module context; unsupported package contexts remain blockers.
 
-[Declared receiver fixtures](docs/receiver-fixtures.md) test ordinary Python, JavaScript and TypeScript instance methods using existing constructors or same-module factories. They capture supported instance graphs and declared class statics, with independently reconstructed state for every attempt. Node methods can await declared async completion; inherited/private/native storage and action sequences remain unsupported. The [Node receiver qualification](docs/qualification/node-receivers-2026-10-20.json) records both language IDs, 186 actual launches and detected same-return instance/static mutation controls.
+[Declared receiver fixtures](docs/receiver-fixtures.md) test ordinary Python, JavaScript and TypeScript instance methods using existing constructors or same-module factories. They capture supported instance graphs and declared class statics, with independently reconstructed state for every attempt. Node methods can await declared async completion; inherited/private/native storage and arbitrary action targets remain unsupported. The [Node receiver qualification](docs/qualification/node-receivers-2026-10-20.json) records both language IDs, 186 actual launches and detected same-return instance/static mutation controls.
+
+Node receivers can opt into [ordered call/release sequences](docs/ordered-sequences.md), with intermediate typed observations and optional bounded JavaScript collection checks. Missing actions or unobserved collection remain incomplete; GC timing is excluded from equality. TypeScript collection still requires separate emitter qualification.
 
 Use repeated `--language ID`, `--exclude 'qualified.pattern'` and `--cases 1` through `--cases 1024` on `plan` to select a supported scope. [The CLI reference](docs/cli-and-configuration.md#implemented-commands) lists every public command and flag.
 

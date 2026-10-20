@@ -99,8 +99,15 @@ struct Case {
     argument_types: Vec<String>,
     arguments_requested: Option<Box<RawValue>>,
     receiver_fixture: Option<Box<RawValue>>,
+    sequence: Option<Box<RawValue>>,
     comparison: Option<Comparison>,
     error: Option<String>,
+}
+#[derive(Deserialize)]
+struct DeclaredStep {
+    id: String,
+    action: crate::sequence::Action,
+    expected_baseline: Option<crate::observation::ExpectedOutcome>,
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -129,6 +136,36 @@ enum Comparison {
     Typed(TypedComparison),
 }
 impl Comparison {
+    fn validate_sequence(&self, case: &Case) -> Result<(), String> {
+        let steps = match self {
+            Self::Typed(value) => value.cases[0].contract.steps.as_slice(),
+            Self::Bytes(_) => &[],
+        };
+        let Some(raw) = &case.sequence else {
+            return if steps.is_empty() {
+                Ok(())
+            } else {
+                Err("ordered contract is missing its declared sequence".into())
+            };
+        };
+        let declared: Vec<DeclaredStep> = serde_json::from_str(raw.get())
+            .map_err(|error| format!("sequence metadata: {error}"))?;
+        if declared.is_empty()
+            || declared.len() != steps.len()
+            || declared.iter().zip(steps).any(|(item, step)| {
+                item.id != step.id
+                    || item.action != step.action
+                    || item
+                        .expected_baseline
+                        .as_ref()
+                        .unwrap_or(&crate::observation::ExpectedOutcome::Return)
+                        != &step.expected_baseline
+            })
+        {
+            return Err("declared sequence differs from the typed step contract".into());
+        }
+        Ok(())
+    }
     fn verdict(&self) -> Verdict {
         match self {
             Self::Bytes(value) => value.verdict,
@@ -199,6 +236,7 @@ impl Comparison {
             return Err("case comparison identity or verdict is inconsistent".into());
         }
         self.validate_receiver(case)?;
+        self.validate_sequence(case)?;
         match self {
             Self::Bytes(value) => validate_byte_case(&value.cases[0]),
             Self::Typed(value) => validate_typed_case(&value.cases[0], entry.runtime_function()?),
@@ -376,7 +414,7 @@ fn case_details(case: &Case, comparison: &Comparison) -> Result<String, String> 
     let scope = serde_json::to_string_pretty(comparison.scope())
         .map_err(|error| format!("render scope: {error}"))?;
     Ok(format!(
-        "Argument types: {:?}\nActual arguments: {}\nRequested arguments: {}\nReceiver fixture: {}\n{}\n{}\n{}",
+        "Argument types: {:?}\nActual arguments: {}\nRequested arguments: {}\nReceiver fixture: {}\nSequence: {}\n{}\n{}\n{}",
         case.argument_types,
         case.arguments.get(),
         case.arguments_requested
@@ -385,6 +423,7 @@ fn case_details(case: &Case, comparison: &Comparison) -> Result<String, String> 
         case.receiver_fixture
             .as_ref()
             .map_or("none", |value| value.get()),
+        case.sequence.as_ref().map_or("none", |value| value.get()),
         comparison.description(),
         detail,
         scope

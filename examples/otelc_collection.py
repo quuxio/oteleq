@@ -41,12 +41,13 @@ def attributes(span: Any) -> dict[str, str]:
 def lifetime_span(span: Any, spec: Mapping[str, Any], creator: Any, instances: set[str], *, boundary: str = "collection") -> None:
     """Validate one collection root and its link to the actual creation call."""
     if (span.parent_span_id or span.kind != 1 or span.dropped_links_count
-            or span.dropped_attributes_count or len(span.links) != 1):
+            or span.dropped_attributes_count or len(span.links) != int(creator is not None)):
         raise ValueError("collection lifetime must be a complete linked standalone root")
-    link = span.links[0]
-    if (link.dropped_attributes_count
-            or (link.trace_id, link.span_id) != (creator.trace_id, creator.span_id)):
-        raise ValueError("collection lifetime creation link does not match creator")
+    if creator is not None:
+        link = span.links[0]
+        if (link.dropped_attributes_count
+                or (link.trace_id, link.span_id) != (creator.trace_id, creator.span_id)):
+            raise ValueError("collection lifetime creation link does not match creator")
     values = attributes(span)
     instance = values.get("otelc.lifetime.instance", "")
     if (values.get("code.type.name") != spec["type"]
@@ -73,3 +74,57 @@ def verify(spans: Sequence[Any], report: Mapping[str, Any], spec: Mapping[str, A
                                      for key in ("count", "unwinds"))):
         raise ValueError("collection creator runtime observations differ")
     return lifetime_status(report, spec["count"])
+
+
+def sequence_functions(spans: Sequence[Any], target: str, calls: int, creator: str | None) -> None:
+    """Check named invocation roots, allowing recursion within each real call tree."""
+    roots = [span.name for span in spans if not span.parent_span_id and span.name in (target, creator)]
+    if roots.count(target) != calls or creator is not None and roots.count(creator) != 1:
+        raise ValueError("sequence method/factory invocation roots differ from declared actions")
+    if creator is None:
+        return
+    parents = {(span.trace_id, span.span_id): span for span in spans}
+    for span in spans:
+        if span.name != target:
+            continue
+        parent = span
+        while parent.parent_span_id:
+            parent = parents[(parent.trace_id, parent.parent_span_id)]
+            if parent.name == creator:
+                raise ValueError("receiver construction invoked the selected sequence method")
+
+
+def linked_creator(span: Any, creators: Mapping[tuple[bytes, bytes], Any], required: bool) -> Any:
+    """Resolve the one actual source-factory link before checking the lifetime root."""
+    if not required:
+        return None
+    if len(span.links) != 1 or (span.links[0].trace_id, span.links[0].span_id) not in creators:
+        raise ValueError("JavaScript collection has no matching source factory creation link")
+    return creators[(span.links[0].trace_id, span.links[0].span_id)]
+
+
+def javascript(spans: Sequence[Any], report: Mapping[str, Any], spec: Mapping[str, Any]) -> tuple[dict[str, int], int]:
+    """Validate actual JS collection roots; unavailable requested completion is a gap."""
+    status = report.get("lifetimes")
+    fields = ("admitted", "completed", "current_live", "censored", "tracked_instances", "tracked_constructors", "failed_initialisations")
+    if (not isinstance(status, dict) or any(type(status.get(key)) is not int or status[key] < 0 for key in fields)
+            or status["admitted"] != status["completed"] + status["current_live"]):
+        raise ValueError("invalid JavaScript lifetime accounting")
+    losses = status.get("losses")
+    if not isinstance(losses, dict) or any(not isinstance(key, str) or not key.strip() or type(value) is not int or value < 0 for key, value in losses.items()):
+        raise ValueError("invalid JavaScript lifetime losses")
+    observed = [span for span in spans if span.name == spec["span"]]
+    creators = {(span.trace_id, span.span_id): span for span in spans if span.name == spec.get("creator")}
+    instances = set()
+    for span in observed:
+        creator = linked_creator(span, creators, spec.get("creator") is not None)
+        lifetime_span(span, spec, creator, instances)
+    result = {"lifetimes." + key: value for key, value in losses.items()}
+    expected = {"admitted": spec["count"], "completed": spec["count"], "current_live": 0, "censored": 0,
+                "tracked_instances": 0, "tracked_constructors": 0, "failed_initialisations": 0}
+    for name, count in expected.items():
+        if status[name] != count:
+            result["lifetimes.requested." + name] = 1
+    if len(observed) != spec["count"] or len(observed) != status["completed"]:
+        result["lifetimes.requested.spans"] = 1
+    return result, len(observed)

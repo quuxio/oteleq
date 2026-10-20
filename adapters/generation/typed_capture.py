@@ -405,22 +405,56 @@ def required_roots(entry: dict) -> list[str]:
     return roots
 
 
+def dynamic_boundaries(capture: dict, entry: dict) -> dict:
+    """Use one closed codec for whole cases and ordered action boundaries."""
+    language = entry["language"]
+    require(type(capture["outcome"]) is dict and set(capture["outcome"]) == {"kind", "value"}, "invalid dynamic outcome fields")
+    declared = (node_receivers.prototype_label(entry),) if "receiver_fixture" in entry and language != "python" else ()
+    kind = capture["outcome"]["kind"]
+    require(kind in ("return", "error"), "invalid dynamic outcome")
+    outcome = {"kind": kind, "graph": dynamic_graph(capture["outcome"]["value"], language, declared)}
+    if kind == "error":
+        outcome["category"] = "exception"
+    return {"before": dynamic_graph(capture["before"], language, declared),
+            "outcome": outcome, "after": dynamic_graph(capture["after"], language, declared)}
+
+
+def dynamic_steps(capture: dict, entry: dict) -> list[dict]:
+    """Collection retry counts remain raw evidence outside typed equality."""
+    require(type(capture) is dict and type(capture.get("steps")) is list and len(capture["steps"]) <= 32, "invalid dynamic sequence")
+    result = []
+    for step in capture["steps"]:
+        require(type(step) is dict, "dynamic action must be an object")
+        required = {"id", "action", "gaps", "before", "outcome", "after"}
+        allowed = required | ({"collection"} if step.get("action") == "collect" else set())
+        require(required <= set(step) <= allowed and type(step["gaps"]) is list, "invalid dynamic action fields")
+        boundaries = dynamic_boundaries(step, entry)
+        if step.get("action") == "collect":
+            metadata = step.get("collection")
+            require(type(metadata) is dict and set(metadata) == {"completed", "rounds"}
+                    and type(metadata["completed"]) is bool and type(metadata["rounds"]) is int
+                    and 1 <= metadata["rounds"] <= 256, "invalid collection scheduling evidence")
+            bound = next((item["gc_rounds"] for item in entry["sequence_configuration"] if item["action"] == "collect"), 0)
+            require(metadata["rounds"] <= bound and boundaries["outcome"]["kind"] == "return"
+                    and boundaries["outcome"]["graph"]["roots"].get("result") == dynamic_value({"type": "boolean", "value": metadata["completed"]}, entry["language"])
+                    and (metadata["completed"] or bool(step["gaps"])), "collection evidence contradicts its outcome, gap or declared bound")
+        result.append({"id": step["id"], "action": step["action"], "gaps": step["gaps"], **boundaries})
+    return result
+
+
 def observation(raw: bytes, entry: dict, contract: dict) -> dict[str, Any]:
     language = entry["language"]
     if language in ("python", "javascript", "typescript"):
         capture = strict_json(raw)
-        require(type(capture) is dict and set(capture) == {"before", "outcome", "after"}, "invalid dynamic boundaries")
-        require(type(capture["outcome"]) is dict and set(capture["outcome"]) == {"kind", "value"}, "invalid dynamic outcome fields")
-        declared = (node_receivers.prototype_label(entry),) if "receiver_fixture" in entry and language != "python" else ()
-        before = dynamic_graph(capture["before"], language, declared)
-        after = dynamic_graph(capture["after"], language, declared)
-        kind = capture["outcome"]["kind"]
-        require(kind in ("return", "error"), "invalid dynamic outcome")
-        outcome = {"kind": kind, "graph": dynamic_graph(capture["outcome"]["value"], language, declared)}
-        if kind == "error":
-            outcome["category"] = "exception"
+        allowed = {"before", "outcome", "after"} | ({"steps"} if "sequence_configuration" in entry else set())
+        require(type(capture) is dict and set(capture) <= allowed and {"before", "outcome", "after"} <= set(capture), "invalid dynamic boundaries")
+        boundaries = dynamic_boundaries(capture, entry)
     else:
         before, outcome, after = scalar_capture(raw, entry)
-    return {"observation_schema_version": 1, "case_id": contract["case_id"], "function_id": contract["function_id"],
+        boundaries = {"before": before, "outcome": outcome, "after": after}
+    result = {"observation_schema_version": 1, "case_id": contract["case_id"], "function_id": contract["function_id"],
             "fixture_sha256": contract["fixture_sha256"], "fixture": {"status": "ready"}, "gaps": [],
-            "before": before, "outcome": outcome, "after": after}
+            **boundaries}
+    if "sequence_configuration" in entry:
+        result["steps"] = dynamic_steps(capture, entry) if "steps" in capture else []
+    return result

@@ -7,4 +7,5 @@ pub mod generation;
 pub mod graph;
 pub mod observation;
 pub mod reporting;
+pub mod sequence;
 pub mod typed;

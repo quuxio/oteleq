@@ -120,7 +120,7 @@ export function __oteleqGraph(roots,declared) {
 }
 
 /** Observe one selected call; capture errors remain outside its application catch. */
-export async function run(target,arguments_,roots,asynchronous,validBinding,declared) {
+export async function observeCall(target,arguments_,roots,asynchronous,validBinding,declared) {
   if(!validBinding()) throw new NativeError('selected function binding differs from its frozen declaration');
   const before=__oteleqGraph(roots(),declared);
   let result,error,failed=false;
@@ -128,7 +128,17 @@ export async function run(target,arguments_,roots,asynchronous,validBinding,decl
   catch(error_) {failed=true;error=error_;}
   const outcome={kind:failed?'error':'return',value:__oteleqGraph({...roots(),[failed?'error':'result']:failed?error:result},declared)};
   const after=__oteleqGraph(roots(),declared);
-  writeFileSync(process.env.OTELEQ_OBSERVATION,NativeJSON.stringify({before,outcome,after}));
+  return {before,outcome,after};
+}
+
+/** Retain the complete encoded observation without invoking application formatters. */
+export function writeObservation(observation) {
+  writeFileSync(process.env.OTELEQ_OBSERVATION,NativeJSON.stringify(observation));
+}
+
+/** Observe the legacy single-call worker through the same boundary codec. */
+export async function run(target,arguments_,roots,asynchronous,validBinding,declared) {
+  writeObservation(await observeCall(target,arguments_,roots,asynchronous,validBinding,declared));
 }
 
 function dataDescriptor(object,name) {
@@ -176,7 +186,7 @@ function staticRoots(record) {
 }
 
 /** Construct a fresh receiver and observe one source-bound instance method. */
-export async function runReceiver(record,call,roots,validBinding) {
+export function prepareReceiver(record,call,roots,validBinding) {
   const {factory,fixture,method,arguments:arguments_,asynchronous}=call;
   validateClass(record);
   if(!validBinding()) throw new NativeError('source class or factory binding changed');
@@ -192,10 +202,26 @@ export async function runReceiver(record,call,roots,validBinding) {
   if(ownDescriptor(receiver,method)) throw new NativeError('receiver shadows the selected source method');
   const target=dataDescriptor(record.prototype,method).value;
   const declared=new NativeMap([[record.prototype,'declared:'+record.metadata.label]]);
+  let currentArguments=arguments_;
   const observedRoots=()=>{
     validateClass(record);
     if(!validBinding()) throw new NativeError('source class or factory binding changed');
-    return {...roots(),receiver,...staticRoots(record)};
+    return {...roots(),arguments:currentArguments,receiver,...staticRoots(record)};
   };
-  await run((...values)=>NativeReflect.apply(target,receiver,values),arguments_,observedRoots,asynchronous,validBinding,declared);
+  return {
+    snapshot:()=>__oteleqGraph(observedRoots(),declared),
+    outcome:value=>({kind:'return',value:__oteleqGraph({...observedRoots(),result:value},declared)}),
+    observe:async values=>{
+      if(receiver===null||ownDescriptor(receiver,method)) throw new NativeError('released receiver or shadowed source method');
+      currentArguments=values;
+      return observeCall((...items)=>NativeReflect.apply(target,receiver,items),values,observedRoots,asynchronous,validBinding,declared);
+    },
+    release:makeWeak=>{const weak=makeWeak(receiver);receiver=null;return weak;}
+  };
+}
+
+/** Construct a fresh receiver and observe one source-bound instance method. */
+export async function runReceiver(record,call,roots,validBinding) {
+  const receiver=prepareReceiver(record,call,roots,validBinding);
+  writeObservation(await receiver.observe(call.arguments));
 }

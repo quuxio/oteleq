@@ -884,17 +884,19 @@ def lifetime_diagnostics(bodies, report, spec, service, decoder, language):
     if not selected:
         return {}, 0
     kind = selected[0]
-    if len(selected) != 1 or language != "python":
+    if len(selected) != 1 or language not in ("python", "javascript") or language == "javascript" and kind != "collection":
         raise ValueError(f"{kind} qualification requires Python and a distinct workload")
     spans = [span for path, body in bodies if path == TRACE_PATH
              for span in service_spans(decoder.FromString(body), service)]
+    if language == "javascript":
+        return otelc_collection.javascript(spans, report, spec[kind])
     verify = {"collection": otelc_collection.verify, "resource": otelc_resource.verify}[kind]
     if kind == "resource":
         otelc_resource.metric_values(bodies, service, spec[kind], otelc_resource.metric_decoder())
     return verify(spans, report, spec[kind]), spec[kind]["count"]
 
 
-def witness(bodies, report, spec, service, decoder, language):
+def witness(bodies, report, spec, service, decoder, language, *, allow_incomplete=False):
     require_runtime_identity(report, language)
     names, raw, roots, errors = decode(bodies, service, decoder)
     if names != spec["functions"] or roots != spec["trees"] or errors != spec["errors"]:
@@ -904,7 +906,9 @@ def witness(bodies, report, spec, service, decoder, language):
     losses.update(lifetime_losses)
     function_calls = sum(names.values()) - lifetime_count
     if report.get("export_finished") is not True or report.get("drained", True) is not True:
-        raise ValueError("missing or unfinished export status")
+        if not allow_incomplete:
+            raise ValueError("missing or unfinished export status")
+        losses["transport.unfinished"] = 1
     traces = report["traces"]
     try:
         pending_counters = [traces[key] for key in ("active_trees", "queued_trees")]
@@ -916,8 +920,11 @@ def witness(bodies, report, spec, service, decoder, language):
     require_counters(counters)
     losses["transport.export"] = sum(export)
     pending = sum(pending_counters)
-    if (any(losses.values()) or pending or traces.get("completed_trees") != roots
-            or report.get("function_calls") != function_calls):
+    if traces.get("completed_trees") != roots:
+        losses["runtime.completed_trees"] = 1
+    if report.get("function_calls") != function_calls:
+        losses["runtime.function_calls"] = 1
+    if (any(losses.values()) or pending) and not allow_incomplete:
         raise ValueError("lossy, incomplete or mismatched runtime report")
     raw_digest = hashlib.sha256()
     for body in raw:

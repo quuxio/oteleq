@@ -23,7 +23,7 @@ def factory(entry: dict, discovered: dict, name: str) -> tuple[dict, str]:
     raise ValueError("Node receiver factory requires a source constructor or ordinary synchronous function")
 
 
-def driver(entry: dict, arguments: list, source: str) -> str:
+def driver(entry: dict, arguments: list, source: str, sequence: list | None = None) -> str:
     """Capture class bindings before original static initialisers can change them."""
     owner = entry["node_receiver_class"]
     method = entry["name"].rsplit(".", 1)[-1]
@@ -31,8 +31,14 @@ def driver(entry: dict, arguments: list, source: str) -> str:
     helper = helper if helper.startswith(".") else "./" + helper
     fixture = entry["receiver_fixture"]
     factory_name = fixture["factory"] if fixture["kind"] == "function" else "undefined"
-    bootstrap = (";import * as __oteleqObserver from " + json.dumps(helper)
-                 + ";let __oteleqClass;const __oteleqFactory=" + factory_name + ";\n")
+    commonjs = Path(entry["path"]).suffix in (".cjs", ".cts")
+    observer = ("const __oteleqObserver=require(" + json.dumps(helper) + ");" if commonjs
+                else "import * as __oteleqObserver from " + json.dumps(helper) + ";")
+    bootstrap = ";" + observer + "let __oteleqClass;const __oteleqFactory=" + factory_name + ";\n"
+    if sequence is not None:
+        sequence_helper = helper.replace("node_observe.mjs", "node_sequence.mjs")
+        bootstrap += ("const __oteleqSequence=require(" + json.dumps(sequence_helper) + ");\n" if commonjs
+                      else "import * as __oteleqSequence from " + json.dumps(sequence_helper) + ";\n")
     metadata = {"label": entry["node_class_label"], "owner": owner,
                 "methods": entry["node_class_methods"],
                 "statics": [item["name"] for item in entry["node_class_roots"]]}
@@ -47,12 +53,15 @@ def driver(entry: dict, arguments: list, source: str) -> str:
     valid_binding = owner + "===__oteleqClass.constructor"
     if fixture["kind"] == "function":
         valid_binding += "&&" + factory_name + "===__oteleqFactory"
-    return raw.decode() + f'''
+    invoke = ("__oteleqSequence.runSequence" if sequence is not None else "__oteleqObserver.runReceiver") + "(__oteleqClass,__oteleqCall,__oteleqRoots,()=>" + valid_binding + ")"
+    start = "void(async()=>{\n" if commonjs else ""
+    finish = "})();\n" if commonjs else ""
+    return raw.decode() + start + f'''
 const __oteleqArguments={json.dumps(arguments)};
 const __oteleqRoots=()=>({{{globals_}arguments:__oteleqArguments}});
-const __oteleqCall={{factory:__oteleqFactory,fixture:{json.dumps(fixture)},method:{json.dumps(method)},arguments:__oteleqArguments,asynchronous:{str(bool(entry.get("async"))).lower()}}};
-await __oteleqObserver.runReceiver(__oteleqClass,__oteleqCall,__oteleqRoots,()=>{valid_binding});
-'''
+const __oteleqCall={{factory:__oteleqFactory,fixture:{json.dumps(fixture)},method:{json.dumps(method)},arguments:__oteleqArguments,asynchronous:{str(bool(entry.get("async"))).lower()},sequence:{json.dumps(sequence)}}};
+await {invoke};
+''' + finish
 
 
 def prototype_label(entry: dict) -> str:
