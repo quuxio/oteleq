@@ -56,13 +56,166 @@ struct Case {
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-struct Comparison {
+struct ByteComparison {
     workload_schema_version: u32,
     claim: String,
     comparison: String,
     verdict: Verdict,
     scope: Scope,
     cases: Vec<CaseReport>,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct TypedComparison {
+    typed_schema_version: u32,
+    claim: String,
+    comparison: String,
+    verdict: Verdict,
+    scope: Scope,
+    cases: Vec<crate::typed::TypedCaseReport>,
+}
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum Comparison {
+    Bytes(ByteComparison),
+    Typed(TypedComparison),
+}
+impl Comparison {
+    fn verdict(&self) -> Verdict {
+        match self {
+            Self::Bytes(value) => value.verdict,
+            Self::Typed(value) => value.verdict,
+        }
+    }
+    fn scope(&self) -> &Scope {
+        match self {
+            Self::Bytes(value) => &value.scope,
+            Self::Typed(value) => &value.scope,
+        }
+    }
+    fn description(&self) -> &str {
+        match self {
+            Self::Bytes(value) => &value.comparison,
+            Self::Typed(value) => &value.comparison,
+        }
+    }
+    fn detail(&self) -> Result<String, serde_json::Error> {
+        match self {
+            Self::Bytes(value) => serde_json::to_string_pretty(&value.cases[0]),
+            Self::Typed(value) => serde_json::to_string_pretty(&value.cases[0]),
+        }
+    }
+    fn validate(&self, case: &Case, entry: &Callable, report: &RunReport) -> Result<(), String> {
+        let (version, claim, count, id, verdict) = match self {
+            Self::Bytes(value) => (
+                value.workload_schema_version,
+                value.claim.as_str(),
+                value.cases.len(),
+                value.cases.first().map(|row| row.case_id.as_str()),
+                value.cases.first().map(|row| row.verdict),
+            ),
+            Self::Typed(value) => (
+                value.typed_schema_version,
+                value.claim.as_str(),
+                value.cases.len(),
+                value.cases.first().map(|row| row.case_id.as_str()),
+                value.cases.first().map(|row| row.verdict),
+            ),
+        };
+        if version != 1
+            || claim != CLAIM
+            || count != 1
+            || id != Some(case.case.as_str())
+            || verdict != Some(self.verdict())
+            || self.verdict().exit_code() != case.exit_code
+            || self.scope().source_sha256 != report.source_sha256
+            || self.scope().language != entry.language
+            || !matches!(self.scope().artefact_class, ArtefactClass::Diagnostic)
+        {
+            return Err("case comparison identity or verdict is inconsistent".into());
+        }
+        match self {
+            Self::Bytes(value) => validate_byte_case(&value.cases[0]),
+            Self::Typed(value) => validate_typed_case(&value.cases[0], &case.function),
+        }
+    }
+}
+fn qualified(verdict: Verdict) -> bool {
+    matches!(
+        verdict,
+        Verdict::EquivalentObserved | Verdict::DifferentObserved
+    )
+}
+fn validate_byte_case(result: &CaseReport) -> Result<(), String> {
+    if qualified(result.verdict)
+        && ((!result.differences.is_empty()) != (result.verdict == Verdict::DifferentObserved)
+            || !result.reasons.is_empty()
+            || !(2..=100).contains(&result.baseline_attempts)
+            || !(2..=100).contains(&result.instrumented_attempts))
+    {
+        return Err("qualified verdict contradicts differences, gaps or repeat counts".into());
+    }
+    Ok(())
+}
+fn validate_typed_case(
+    result: &crate::typed::TypedCaseReport,
+    function: &str,
+) -> Result<(), String> {
+    let execution = &result.execution;
+    result.contract.validate()?;
+    validate_byte_case(execution)?;
+    if result.contract.function_id != function
+        || result.contract.case_id != result.case_id
+        || execution.case_id != result.case_id
+        || execution.baseline_attempts > 100
+        || execution.instrumented_attempts > 100
+    {
+        return Err("typed case identity or repeat limit is inconsistent".into());
+    }
+    let expected: BTreeSet<_> =
+        if execution.baseline_attempts == 0 || execution.instrumented_attempts == 0 {
+            BTreeSet::new()
+        } else {
+            (0..execution.instrumented_attempts)
+                .map(|index| (0, index))
+                .chain((1..execution.baseline_attempts).map(|index| (index, 0)))
+                .collect()
+        };
+    let actual: BTreeSet<_> = result
+        .pairs
+        .iter()
+        .map(|pair| (pair.baseline_attempt, pair.instrumented_attempt))
+        .collect();
+    if actual != expected || actual.len() != result.pairs.len() {
+        return Err("typed comparison pairs are missing, duplicated or out of range".into());
+    }
+    let mut difference = execution.verdict == Verdict::DifferentObserved;
+    for pair in &result.pairs {
+        let comparison = &pair.comparison;
+        if qualified(comparison.verdict)
+            && (!comparison.reasons.is_empty()
+                || !comparison.initial_differences.is_empty()
+                || (!comparison.differences.is_empty())
+                    != (comparison.verdict == Verdict::DifferentObserved))
+        {
+            return Err("typed pair verdict contradicts differences or gaps".into());
+        }
+        difference |= comparison.verdict == Verdict::DifferentObserved;
+    }
+    if qualified(result.verdict)
+        && (!qualified(execution.verdict)
+            || !result.reasons.is_empty()
+            || result
+                .pairs
+                .iter()
+                .any(|pair| !qualified(pair.comparison.verdict))
+            || difference != (result.verdict == Verdict::DifferentObserved))
+    {
+        return Err(
+            "qualified typed verdict contradicts its complete execution/pair evidence".into(),
+        );
+    }
+    Ok(())
 }
 #[derive(Clone, Copy, PartialEq)]
 enum Outcome {
@@ -151,9 +304,10 @@ fn validate_inventory(report: &RunReport) -> Result<BTreeMap<&str, &Callable>, S
     Ok(inventory)
 }
 fn case_details(case: &Case, comparison: &Comparison) -> Result<String, String> {
-    let detail = serde_json::to_string_pretty(&comparison.cases[0])
+    let detail = comparison
+        .detail()
         .map_err(|error| format!("render comparison: {error}"))?;
-    let scope = serde_json::to_string_pretty(&comparison.scope)
+    let scope = serde_json::to_string_pretty(comparison.scope())
         .map_err(|error| format!("render scope: {error}"))?;
     Ok(format!(
         "Argument types: {:?}\nActual arguments: {}\nRequested arguments: {}\n{}\n{}\n{}",
@@ -162,7 +316,7 @@ fn case_details(case: &Case, comparison: &Comparison) -> Result<String, String> 
         case.arguments_requested
             .as_ref()
             .map_or("not separately configured", |value| value.get()),
-        comparison.comparison,
+        comparison.description(),
         detail,
         scope
     ))
@@ -173,36 +327,8 @@ fn case_row(case: &Case, entry: &Callable, report: &RunReport) -> Result<Row, St
     }
     let (outcome, details) = match (&case.comparison, &case.error) {
         (Some(comparison), None) => {
-            if comparison.workload_schema_version != 1
-                || comparison.claim != CLAIM
-                || comparison.verdict.exit_code() != case.exit_code
-                || comparison.cases.len() != 1
-                || comparison.cases[0].case_id != case.case
-                || comparison.cases[0].verdict != comparison.verdict
-                || comparison.scope.source_sha256 != report.source_sha256
-                || comparison.scope.language != entry.language
-                || !matches!(comparison.scope.artefact_class, ArtefactClass::Diagnostic)
-            {
-                return Err("case comparison identity or verdict is inconsistent".into());
-            }
-            let result = &comparison.cases[0];
-            if matches!(
-                comparison.verdict,
-                Verdict::EquivalentObserved | Verdict::DifferentObserved
-            ) {
-                let has_differences = !result.differences.is_empty();
-                let expected_differences = comparison.verdict == Verdict::DifferentObserved;
-                if has_differences != expected_differences
-                    || !result.reasons.is_empty()
-                    || result.baseline_attempts < 2
-                    || result.instrumented_attempts < 2
-                {
-                    return Err(
-                        "qualified verdict contradicts differences, gaps or repeat counts".into(),
-                    );
-                }
-            }
-            let outcome = match comparison.verdict {
+            comparison.validate(case, entry, report)?;
+            let outcome = match comparison.verdict() {
                 Verdict::EquivalentObserved => Outcome::Match,
                 Verdict::DifferentObserved => Outcome::Difference,
                 _ => Outcome::Error,

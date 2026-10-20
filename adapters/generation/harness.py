@@ -2,6 +2,7 @@
 import json
 import ctypes
 import math
+import posixpath
 from pathlib import Path
 import random
 import struct
@@ -284,68 +285,23 @@ Path(os.environ["OTELEQ_OBSERVATION"]).write_text(json.dumps({{"before": before,
 '''
 
 
-JS_OBSERVER = '''
-const __oteleqIsProxy=(await import('node:util')).types.isProxy;
-// Labels come from known prototype identities, never application getters.
-const __oteleqErrorPrototypes=new Map([
-  [Error.prototype,'Error'],[TypeError.prototype,'TypeError'],
-  [RangeError.prototype,'RangeError'],[SyntaxError.prototype,'SyntaxError'],
-  [ReferenceError.prototype,'ReferenceError'],[URIError.prototype,'URIError'],
-  [EvalError.prototype,'EvalError'],[AggregateError.prototype,'AggregateError']
-]);
-function __oteleqGraph(roots) {
-  const seen = new Map(), nodes = [];
-  function value(v, depth=0) {
-    if(depth>32 || nodes.length>=512) throw new Error('observation graph limit');
-    if(v===null) return {type:'null'};
-    if(typeof v==='number') { const b=Buffer.alloc(8); b.writeDoubleBE(v); return {type:'float64',bits:b.toString('hex')}; }
-    if(['boolean','string','undefined','bigint'].includes(typeof v)) return {type:typeof v,value:typeof v==='bigint'?v.toString():v};
-    if(typeof v!=='object') throw new Error('opaque value: '+typeof v);
-    if(__oteleqIsProxy(v)) throw new Error('proxy state requires a fixture');
-    if(seen.has(v)) return {ref:seen.get(v)};
-    const id=nodes.length; seen.set(v,id);
-    const prototype=Object.getPrototypeOf(v);
-    const errorType=__oteleqErrorPrototypes.get(prototype);
-    const isError=errorType!==undefined;
-    if(![Object.prototype,Array.prototype,null].includes(prototype) && !isError) throw new Error('opaque object prototype');
-    const n={type:isError?errorType:Array.isArray(v)?'array':'object',fields:[]}; nodes.push(n);
-    for(const key of Reflect.ownKeys(v)) {
-      if(isError && key==='stack') continue;
-      if(typeof key!=='string') throw new Error('symbol state requires a fixture');
-      const d=Object.getOwnPropertyDescriptor(v,key);
-      if(!Object.hasOwn(d,'value')) throw new Error('accessor state requires a fixture');
-      n.fields.push([key,value(d.value,depth+1),d.writable,d.enumerable,d.configurable]);
-    }
-    return {ref:id};
-  }
-  return {roots:Object.fromEntries(Object.keys(roots).sort().map(k=>[k,value(roots[k])])),nodes};
-}
-'''
+JS_OBSERVER = Path(__file__).with_name("node_observe.mjs").read_text()
 
 
 def js_driver(entry, args, source):
     roots = "".join(json.dumps("global:" + g["name"]) + ":" + g["name"] + "," for g in entry["globals"])
-    call = "__oteleqSelected(...__oteleqArguments)"
-    if entry.get("async"):
-        call = "await " + call
     # Capture the hoisted declaration before application statements can rebind
     # it, retaining hashbang/directive syntax at the parser-selected position.
     raw = source.encode()
     position = entry.get("binding_capture_offset", 0)
-    capture = (";const __oteleqSelected=" + entry["name"] + ";\n").encode()
+    helper = posixpath.relpath("_oteleq_generated/node_observe.mjs", str(Path(entry["path"]).parent))
+    helper = helper if helper.startswith(".") else "./" + helper
+    capture = (";const __oteleqSelected=" + entry["name"] + ";\nconst __oteleqObserver=await import(" + json.dumps(helper) + ");\n").encode()
     source = (raw[:position] + capture + raw[position:]).decode()
-    return source + JS_OBSERVER + f'''
-if(typeof __oteleqSelected!=='function' || {entry['name']}!==__oteleqSelected) throw new Error('selected function binding differs from its frozen declaration');
+    return source + f'''
 const __oteleqArguments={json.dumps(args)};
 const __oteleqRoots=()=>({{{roots}arguments:__oteleqArguments}});
-const __oteleqBefore=__oteleqGraph(__oteleqRoots());
-let __oteleqOutcome, __oteleqResult, __oteleqFailed=false;
-try {{ __oteleqResult={call}; }}
-catch(error) {{ __oteleqFailed=true; __oteleqOutcome={{kind:'error',value:__oteleqGraph({{error,...__oteleqRoots()}})}}; }}
-if(!__oteleqFailed) __oteleqOutcome={{kind:'return',value:__oteleqGraph({{result:__oteleqResult,...__oteleqRoots()}})}};
-const __oteleqAfter=__oteleqGraph(__oteleqRoots());
-const __oteleqFs=await import('node:fs');
-__oteleqFs.writeFileSync(process.env.OTELEQ_OBSERVATION,JSON.stringify({{before:__oteleqBefore,outcome:__oteleqOutcome,after:__oteleqAfter}}));
+await __oteleqObserver.run(__oteleqSelected,__oteleqArguments,__oteleqRoots,{str(bool(entry.get('async'))).lower()},()=>typeof __oteleqSelected==='function' && {entry['name']}===__oteleqSelected);
 '''
 
 
@@ -364,12 +320,16 @@ template<class T> constexpr bool __oteleq_scalar =
 #define __oteleq_assert_value(v) __oteleq_assert_scalar(decltype(v))
 static bool __oteleq_error(FILE* out,const std::exception& error){
   const std::type_info& kind=typeid(error);
-  if(kind!=typeid(std::exception) && kind!=typeid(std::runtime_error) &&
-     kind!=typeid(std::logic_error) && kind!=typeid(std::invalid_argument) &&
-     kind!=typeid(std::domain_error) && kind!=typeid(std::length_error) &&
-     kind!=typeid(std::out_of_range) && kind!=typeid(std::range_error) &&
-     kind!=typeid(std::overflow_error) && kind!=typeid(std::underflow_error)) return false;
-  fprintf(out,"error:%s:%s\n",kind.name(),error.what());
+  const char* label=nullptr;
+#define __oteleq_exception(T) if(kind==typeid(T)) label=#T;
+  __oteleq_exception(std::exception) __oteleq_exception(std::runtime_error)
+  __oteleq_exception(std::logic_error) __oteleq_exception(std::invalid_argument)
+  __oteleq_exception(std::domain_error) __oteleq_exception(std::length_error)
+  __oteleq_exception(std::out_of_range) __oteleq_exception(std::range_error)
+  __oteleq_exception(std::overflow_error) __oteleq_exception(std::underflow_error)
+#undef __oteleq_exception
+  if(!label) return false;
+  fprintf(out,"error:%s\t%s\n",label,error.what());
   return true;
 }
 '''
@@ -398,6 +358,15 @@ typedef double __oteleq_double;
 '''
 
 
+def native_abi() -> str:
+    """Emit actual compiler representation metadata before application macros."""
+    types = sorted(NATIVE_INTEGERS | {"float", "double"})
+    fields = ",".join(json.dumps(name) + ":%zu" for name in types)
+    format_ = 'abi:{"byte_order":"%s","char_signed":%s,"char_bits":%d,"ieee754":%s,"bits":{' + fields + '}}\n'
+    arguments = ','.join('sizeof(' + name + ')*CHAR_BIT' for name in types)
+    return '#include <limits.h>\n#include <float.h>\nstatic void __oteleq_abi(FILE* out){unsigned int one=1;\nfprintf(out,' + json.dumps(format_) + ',*((unsigned char*)&one)?"little":"big",((char)-1<0)?"true":"false",CHAR_BIT,(FLT_RADIX==2 && FLT_MANT_DIG==24 && DBL_MANT_DIG==53 && FLT_MAX_EXP==128 && DBL_MAX_EXP==1024)?"true":"false",' + arguments + ');}\n'
+
+
 def native_driver(entry, args):
     parameters = ", ".join(literal(v, t, entry["language"]) for v, t in zip(args, entry["parameters"]))
     output = scalar_type(entry["output"])
@@ -411,7 +380,7 @@ def native_driver(entry, args):
     arguments_checked = "\n".join("__oteleq_assert_scalar(" + type_ + ");" for type_ in entry["parameters"])
     return headers + '''#include <stdio.h>
 #include <stdlib.h>
-''' + native_guards(entry["language"]) + '''
+''' + native_guards(entry["language"]) + native_abi() + '''
 static void __oteleq_raw_bytes(FILE* out,const char* label,const void* v,size_t n){
   const unsigned char* p=(const unsigned char*)v; fprintf(out,"%s:",label);
   for(size_t i=0;i<n;i++) fprintf(out,"%02x",p[i]); fputc('\\n',out);
@@ -424,6 +393,7 @@ static void __oteleq_raw_bytes(FILE* out,const char* label,const void* v,size_t 
 #include ''' + json.dumps(entry["path"]) + '''
 #undef main
 int main(void){ FILE* out=fopen(getenv("OTELEQ_OBSERVATION"),"wb"); if(!out)return 90;
+__oteleq_abi(out);
 fputs("before\\n",out);
 ''' + arguments_checked + '\n' + state + '\n' + invocation + '\nfputs("after\\n",out);\n' + state + '\nreturn fclose(out)!=0;}\n'
 
@@ -444,17 +414,16 @@ def rename_main(source, entries, language):
 
 def rust_driver(entry, args, source):
     call = entry["name"] + "(" + ",".join(literal(v, t, "rust") for v, t in zip(args, entry["parameters"])) + ")"
-    output = scalar_type(entry["output"])
     state_lines = []
     for global_ in entry["globals"]:
         expression = "unsafe {" + global_["name"] + "}"
-        state_lines.append('s.push_str(&__oteleq_std::format!(' + json.dumps(global_["name"] + ':' + global_["type"] + ':{}\n') + ',__oteleq_value(&' + expression + ')));')
+        state_lines.append('s.push_str(&__oteleq_std::format!(' + json.dumps(global_["name"] + ':{}\n') + ',__oteleq_value(&' + expression + ')));')
     state = "\n".join(state_lines)
     return rename_main(source, entry["file_functions"], "rust") + rust_codec() + f'''
 fn main() {{
-    let mut s=__oteleq_std::string::String::from("before\\n"); {state}
+    let mut s=__oteleq_std::format!("abi:{{{{\\\"pointer_bits\\\":{{}}}}}}\\nbefore\\n",__oteleq_std::mem::size_of::<__oteleq_std::primitive::usize>()*8); {state}
     match __oteleq_std::panic::catch_unwind(|| {call}) {{
-      Ok(v)=>s.push_str(&__oteleq_std::format!("return:{output}:{{}}\\n",__oteleq_value(&v))),
+      Ok(v)=>s.push_str(&__oteleq_std::format!("return:{{}}\\n",__oteleq_value(&v))),
       Err(payload)=>{{
         if let Some(v)=payload.downcast_ref::<__oteleq_std::string::String>() {{ s.push_str(&__oteleq_std::format!("error:string:{{:?}}\\n",v)); }}
         else if let Some(v)=payload.downcast_ref::<&__oteleq_std::primitive::str>() {{ s.push_str(&__oteleq_std::format!("error:str:{{:?}}\\n",v)); }}
@@ -473,25 +442,25 @@ def rust_codec() -> str:
 extern crate std as __oteleq_std;
 #[allow(non_camel_case_types)]
 trait __oteleq_Value { fn capture(&self)->__oteleq_std::string::String; }
-macro_rules! __oteleq_scalar {($($kind:ty),*)=>{$(
+macro_rules! __oteleq_scalar {($(($label:ident,$kind:ty)),*)=>{$(
   impl __oteleq_Value for $kind {
-    fn capture(&self)->__oteleq_std::string::String {__oteleq_std::format!("{:?}",self)}
+    fn capture(&self)->__oteleq_std::string::String {__oteleq_std::format!("{}:{:?}",__oteleq_std::stringify!($label),self)}
   }
 )*}}
-__oteleq_scalar!(__oteleq_std::primitive::bool,__oteleq_std::primitive::char,
-  __oteleq_std::primitive::i8,__oteleq_std::primitive::i16,__oteleq_std::primitive::i32,
-  __oteleq_std::primitive::i64,__oteleq_std::primitive::i128,__oteleq_std::primitive::isize,
-  __oteleq_std::primitive::u8,__oteleq_std::primitive::u16,__oteleq_std::primitive::u32,
-  __oteleq_std::primitive::u64,__oteleq_std::primitive::u128,__oteleq_std::primitive::usize,
-  __oteleq_std::string::String,&__oteleq_std::primitive::str,());
+__oteleq_scalar!((bool,__oteleq_std::primitive::bool),(char,__oteleq_std::primitive::char),
+  (i8,__oteleq_std::primitive::i8),(i16,__oteleq_std::primitive::i16),(i32,__oteleq_std::primitive::i32),
+  (i64,__oteleq_std::primitive::i64),(i128,__oteleq_std::primitive::i128),(isize,__oteleq_std::primitive::isize),
+  (u8,__oteleq_std::primitive::u8),(u16,__oteleq_std::primitive::u16),(u32,__oteleq_std::primitive::u32),
+  (u64,__oteleq_std::primitive::u64),(u128,__oteleq_std::primitive::u128),(usize,__oteleq_std::primitive::usize),
+  (String,__oteleq_std::string::String),(str,&__oteleq_std::primitive::str),(unit,()));
 impl __oteleq_Value for __oteleq_std::primitive::f32 {
   fn capture(&self)->__oteleq_std::string::String {
-    __oteleq_std::format!("{:x}",__oteleq_std::primitive::f32::to_bits(*self))
+    __oteleq_std::format!("f32:{:08x}",__oteleq_std::primitive::f32::to_bits(*self))
   }
 }
 impl __oteleq_Value for __oteleq_std::primitive::f64 {
   fn capture(&self)->__oteleq_std::string::String {
-    __oteleq_std::format!("{:x}",__oteleq_std::primitive::f64::to_bits(*self))
+    __oteleq_std::format!("f64:{:016x}",__oteleq_std::primitive::f64::to_bits(*self))
   }
 }
 fn __oteleq_value<T:__oteleq_Value>(value:&T)->__oteleq_std::string::String {value.capture()}
@@ -512,11 +481,12 @@ func __oteleqValue(v interface{{}}) string {{
  x:=__oteleq_reflect.ValueOf(v)
  if !x.IsValid(){{return "<nil>:<nil>"}}
  kind:=x.Type().String()+":"
+ if x.Type().String()!=x.Kind().String(){{kind="@"+x.Kind().String()+"|"+kind}}
  switch x.Kind() {{
  case __oteleq_reflect.Float32:
   bits:=__oteleq_reflect.ValueOf(__oteleq_math.Float32bits).Call([]__oteleq_reflect.Value{{x.Convert(__oteleq_reflect.TypeOf(__oteleq_math.Float32frombits(0)))}})[0].Uint()
-  return "float32:"+__oteleq_fmt.Sprintf("%x",bits)
- case __oteleq_reflect.Float64:return "float64:"+__oteleq_fmt.Sprintf("%x",__oteleq_math.Float64bits(x.Float()))
+  return kind+__oteleq_fmt.Sprintf("%08x",bits)
+ case __oteleq_reflect.Float64:return kind+__oteleq_fmt.Sprintf("%016x",__oteleq_math.Float64bits(x.Float()))
  case __oteleq_reflect.Bool:return kind+__oteleq_fmt.Sprintf("%#v",x.Bool())
  case __oteleq_reflect.String:return kind+__oteleq_fmt.Sprintf("%#v",x.String())
  case __oteleq_reflect.Int,__oteleq_reflect.Int8,__oteleq_reflect.Int16,__oteleq_reflect.Int32,__oteleq_reflect.Int64:return kind+__oteleq_fmt.Sprintf("%#v",x.Int())
@@ -525,7 +495,7 @@ func __oteleqValue(v interface{{}}) string {{
  }}
 }}
 func main(){{
- s:="before\\n"; {state}
+ s:=__oteleq_fmt.Sprintf(`abi:{{"pointer_bits":%d}}`+"\\nbefore\\n",__oteleq_reflect.TypeOf(0).Bits()); {state}
  func(){{defer func(){{if p:=recover();__oteleq_reflect.ValueOf(p).IsValid(){{s+="error:"+__oteleqValue(p)+"\\n"}}}}();{invoked}}}()
  s+="after\\n"; {state}
  if err:=__oteleq_os.WriteFile(__oteleq_os.Getenv("OTELEQ_OBSERVATION"),[]byte(s),0600);__oteleq_reflect.ValueOf(err).IsValid(){{panic(err)}}
@@ -536,7 +506,7 @@ func main(){{
 def java_driver(entry, args):
     package = "package " + entry["package"] + ";\n" if entry["package"] else ""
     call = entry["name"] + "(" + ",".join(literal(v, t, "java") for v, t in zip(args, entry["parameters"])) + ")"
-    invoked = call + ';s.append("return:void\\n");' if entry["output"] == "void" else 's.append("return:").append(value(' + call + ')).append("\\n");'
+    invoked = call + ';s.append("return:void\\n");' if entry["output"] == "void" else 'java.lang.Object result=' + call + ';s.append("return:").append(value(result)).append("\\n");'
     state = "\n".join('s.append(' + json.dumps(g["name"] + ':') + ').append(value(' + g["name"] + ')).append("\\n");' for g in entry["globals"])
     return package + '''class OteleqDriver {
 static java.lang.String value(java.lang.Object v){
@@ -587,5 +557,7 @@ def materialise(project, entry, args):
     else:
         driver = source
         emit = {"javascript": js_driver, "typescript": js_driver, "rust": rust_driver, "go": go_driver}[language]
+        if language in ("javascript", "typescript"):
+            (generated / "node_observe.mjs").write_text(JS_OBSERVER)
         driver.write_text(emit(entry, args, original))
     return driver

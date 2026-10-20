@@ -30,6 +30,14 @@ const RESOURCES: &[(&str, &str)] = &[
         include_str!("../adapters/generation/observe.py"),
     ),
     (
+        "node_observe.mjs",
+        include_str!("../adapters/generation/node_observe.mjs"),
+    ),
+    (
+        "typed_capture.py",
+        include_str!("../adapters/generation/typed_capture.py"),
+    ),
+    (
         "discover.mjs",
         include_str!("../adapters/generation/discover.mjs"),
     ),

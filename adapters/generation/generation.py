@@ -17,6 +17,7 @@ import discovery
 import harness
 import otelc_capture as capture
 import policy as project_policy
+import typed_capture
 
 VERSION = 1
 MAX_FILE = 8 * 1024 * 1024
@@ -25,6 +26,7 @@ MAX_OUTPUT = 4 * 1024 * 1024
 OWNED_MARKER = '.oteleq-owned.json'
 PLAN_FILE = 'plan.json'
 GENERATED_MANIFEST = 'generated-manifest.json'
+TYPED_BUNDLE = 'typed-bundle.json'
 BUILD_IDENTITIES = 'build-identities.json'
 README_FILE = 'README.txt'
 COMMANDS = ("plan", "generate", "run", "replay", "clean", "export-tests")
@@ -243,9 +245,10 @@ def inventory_entry(function, discovered, name, language, source_hash, snapshot,
     if language == "go":
         entry["go_shadowed_recovery"] = any(function["name"] in ("recover", "panic")
                                           for function in discovered["functions"])
-    configured = project_policy.concrete_cases(entry, args.configuration) if not excluded else None
-    if configured is not None:
-        entry["input_cases"] = configured
+    fixture = project_policy.matching_fixture(entry, args.configuration) if not excluded else None
+    entry["expected_baseline"] = fixture["expected_baseline"] if fixture else {"kind": "return"}
+    if fixture is not None:
+        entry["input_cases"] = fixture["cases"]
     entry["status"] = "excluded" if excluded else qualify_entry(entry, snapshot, args.cases)
     return entry
 
@@ -342,7 +345,7 @@ def decoder_files():
 
 def generator_identity():
     here = Path(__file__).parent
-    names = ("generation.py", "policy.py", "discovery.py", "harness.py", "observe.py", "discover.mjs", "discover.go", "Discover.java")
+    names = ("generation.py", "policy.py", "discovery.py", "harness.py", "observe.py", "node_observe.mjs", "typed_capture.py", "discover.mjs", "discover.go", "Discover.java")
     files = {name: capture.file_digest(here / name) for name in names}
     files["host-python"] = capture.file_digest(Path(sys.executable))
     files["host-version"] = sys.version
@@ -378,7 +381,8 @@ def generate(args):
         if entry["status"] == "ready":
             for index, values in enumerate(harness.corpus(entry, data["cases_per_function"])):
                 case = {"id": entry["id"] + "-" + str(index), "function_id": entry["id"],
-                        "arguments": values, "argument_types": entry["parameters"]}
+                        "arguments": values, "argument_types": entry["parameters"],
+                        "expected_baseline": entry["expected_baseline"]}
                 if "input_cases" in entry:
                     case["arguments_requested"] = entry["input_cases"][index]
                 cases.append(case)
@@ -567,13 +571,34 @@ def attempt(workspace, data, entry, case, lane, folder, decoder):
     capture.stable(root, language, tools, data["artefacts"][language])
     return qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, decoder)
 
-def compare_case(workspace, data, entry, case, destination, decoder):
-    write(destination / "corpus.json", case)
+def capture_case(workspace, data, entry, case, destination, decoder, contract):
+    """Keep raw evidence and bounded typed observations for every actual launch."""
     observed = {"baseline": [], "instrumented_on": []}
+    typed_observed = {"baseline": [], "instrumented_on": []}
     for lane in observed:
         key = "baseline_repeats" if lane == "baseline" else "instrumented_repeats"
         for repeat in range(data["configuration"]["limits"][key]):
-            observed[lane].append(attempt(workspace, data, entry, case, lane, destination / f"{lane}-{repeat}", decoder))
+            folder = destination / f"{lane}-{repeat}"
+            execution = attempt(workspace, data, entry, case, lane, folder, decoder)
+            typed = typed_capture.observation(bytes(execution["channels"]["state-and-outcome"]), entry, contract)
+            size = len(json.dumps(typed, ensure_ascii=True).encode())
+            size += sum(len(execution["channels"][name]) for name in ("stdout", "stderr"))
+            if size > data["configuration"]["limits"]["max_capture_bytes"]:
+                raise ValueError("typed observation exceeds comparator channel budget")
+            write(folder / "typed-observation.json", typed)
+            observed[lane].append(execution)
+            typed_execution = {**execution, "channels": {name: execution["channels"][name] for name in ("stdout", "stderr")}}
+            typed_observed[lane].append({"execution": typed_execution, "observation": typed})
+    return observed, typed_observed
+
+
+def compare_case(workspace, data, entry, case, destination, decoder):
+    write(destination / "corpus.json", case)
+    roots = typed_capture.required_roots(entry)
+    contract = {"observation_schema_version": 1, "case_id": case["id"], "function_id": entry["otelc_function"],
+                "fixture_sha256": identity({"case": case, "source": entry["source_sha256"], "roots": roots}),
+                "required_roots": roots, "expected_baseline": case["expected_baseline"]}
+    observed, typed_observed = capture_case(workspace, data, entry, case, destination, decoder, contract)
     selected = observed["instrumented_on"][0]["witness"]["functions"]
     diagnostic = {"source": data["source_sha256"], "harness": manifest(workspace / "tests/harnesses" / case["id"]),
                   "tools": {name: sha for name, sha in data["artefacts"][entry["language"]].items() if name.startswith("tool:")}}
@@ -585,7 +610,15 @@ def compare_case(workspace, data, entry, case, destination, decoder):
     bundle = {"workload_schema_version": 1, "scope": scope, "cases": [{"case_id": case["id"], "corpus_sha256": identity(case),
               "expected_functions": selected, "expected_spans": sum(selected.values()), **observed}]}
     write(destination / "bundle.json", bundle)
-    result = execute([os.environ["OTELEQ_EXECUTABLE"], "compare-workload", destination / "bundle.json"], workspace,
+    typed_case = {"contract": contract, "corpus_sha256": identity(case), "expected_functions": selected,
+                  "expected_spans": sum(selected.values()), **typed_observed}
+    typed_scope = {**scope, "channels": ["stdout", "stderr"],
+                   "observer": "oteleq typed boundary codecs v1; captured globals/arguments and initial-state checks; name-only decoded invocation witness"}
+    typed_scope["gaps"] = [*scope["gaps"], "graph identities are local to each boundary; cross-boundary replacement, weakref and finalizer effects are unobserved"]
+    write(destination / TYPED_BUNDLE, {"typed_schema_version": 1, "scope": typed_scope, "cases": [typed_case]})
+    if (destination / TYPED_BUNDLE).stat().st_size > 16 * 1024 * 1024:
+        raise ValueError("typed bundle exceeds comparator input limit; lower repeats or capture budget")
+    result = execute([os.environ["OTELEQ_EXECUTABLE"], "compare-observations", destination / TYPED_BUNDLE], workspace,
                      folder=destination / "comparator")
     (destination / "comparison.json").write_bytes(result.stdout)
     return {"case": case["id"], "function": entry["otelc_function"], "exit_code": result.returncode,
@@ -631,7 +664,9 @@ def run(args):
     blocked = [e for e in data["inventory"] if e["status"] == "blocked"] if args.command == "run" else []
     load_workspace(workspace, generated=True)
     codes = {r["exit_code"] for r in results}
-    code = next((c for c in (4, 2, 1, 3) if c in codes), 3 if blocked or not results else 0)
+    if blocked or not results:
+        codes.add(3)
+    code = next((c for c in (4, 2, 3, 1) if c in codes), 0)
     report = {"schema_version": VERSION, "claim": "equivalence over these tests and observations", "exit_code": code,
               "cases": results, "blocked": blocked, "inventory": data["inventory"], "source_sha256": data["source_sha256"],
               "source_preserved": True, "workspace": str(workspace), "artefact_class": "diagnostic"}

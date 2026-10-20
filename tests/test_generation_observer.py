@@ -175,12 +175,15 @@ class NodePassiveObserverTests(unittest.TestCase):
         self.assertIsNotNone(node)
         prologue = "#!/usr/bin/env node\n'use strict';"
         source = prologue + "\n// unicode: \U0001f600\nfunction sample(value){return value+1;}\n"
-        entry = {"name": "sample", "globals": [], "binding_capture_offset": len(prologue.encode())}
+        entry = {"name": "sample", "path": "driver.mjs", "globals": [], "binding_capture_offset": len(prologue.encode())}
         for rebound in (False, True):
             with tempfile.TemporaryDirectory() as folder:
                 observation = Path(folder) / "observation.json"
                 script = Path(folder) / "driver.mjs"
                 body = source + ("sample=(value)=>99;\n" if rebound else "")
+                generated = Path(folder) / "_oteleq_generated"
+                generated.mkdir()
+                (generated / "node_observe.mjs").write_text(harness.JS_OBSERVER)
                 script.write_text(harness.js_driver(entry, [7], body))
                 result = subprocess.run([node, script], capture_output=True, check=False, timeout=30,
                                         env={**os.environ, "OTELEQ_OBSERVATION": str(observation)})

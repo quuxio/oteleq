@@ -6,7 +6,7 @@ oteleq generates repeatable tests and compares an application's behaviour with a
 
 Updated 19 October 2026. The [Rust workload comparator](workload-comparison.md) and [scalar generator](automatic-generation.md) are implemented. Rust owns the CLI, Rust syntax inventory, byte-channel and typed graph comparators, and standalone HTML/JUnit presentation; an embedded Python adapter host coordinates language-specific syntax discovery, harness materialisation, state capture and execution. Generated tests use standard `unittest` for all eight languages. A validated project policy freezes selection, scalar fixtures, seeded samples and execution budgets. The implementation retains workspaces until explicit cleanup and exports frozen snapshots through `export-tests`.
 
-The remaining sections describe the broader design. Full semantic/build-aware adapters, arbitrary receiver factories, stateful sequences, generated-worker integration with the versioned graph protocol, off/fault lanes, shrinking and production qualification remain proposed. Use the [implemented CLI reference](cli-and-configuration.md#implemented-commands) for runnable commands.
+The remaining sections describe the broader design. Full semantic/build-aware adapters, arbitrary receiver factories, stateful sequences, richer generated object/factory codecs, off/fault lanes, shrinking and production qualification remain proposed. Use the [implemented CLI reference](cli-and-configuration.md#implemented-commands) for runnable commands.
 
 ## Requirements
 
@@ -29,7 +29,7 @@ Language adapters own semantic discovery, harness generation and observation. Th
 
 Use typed ASTs, semantic compiler data and declared build context rather than regular expressions to recognise functions. Prefer official toolchain APIs. A syntax parser can produce an inventory candidate but cannot certify types, build inclusion, visibility or safe invocation alone.
 
-The implemented Rust modules are `generation`, `protocol`, `compare` and `reporting`, with CLI dispatch in `main`. The proposed full application boundaries are `cli`, `plan`, `workspace`, `corpus`, `executor`, `compare`, `report` and `otelc-provider`. Keep these as modules until a real packaging boundary warrants separate crates. A shared versioned adapter subprocess contract remains proposed.
+The implemented Rust modules are `generation`, `protocol`, `compare`, `graph`, `observation`, `typed` and `reporting`, with CLI dispatch in `main`. The proposed full application boundaries are `cli`, `plan`, `workspace`, `corpus`, `executor`, `compare`, `report` and `otelc-provider`. Keep these as modules until a real packaging boundary warrants separate crates. A shared versioned adapter subprocess contract remains proposed.
 
 ## Proposed full execution flow
 

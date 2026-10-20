@@ -22,6 +22,8 @@ pub enum Value {
         r#type: String,
     },
     Boolean {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        r#type: Option<String>,
         value: bool,
     },
     Integer {
@@ -76,15 +78,16 @@ pub struct Snapshot {
     pub roots: BTreeMap<String, Value>,
     pub nodes: Vec<Node>,
 }
-#[derive(Debug, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct Difference {
     pub path: String,
     pub reason: String,
     pub baseline: Option<Value>,
     pub instrumented_on: Option<Value>,
 }
-#[derive(Clone, Debug, Serialize)]
-#[serde(tag = "kind", rename_all = "snake_case")]
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Gap {
     Opaque {
         lane: String,
@@ -97,7 +100,7 @@ pub enum Gap {
         limit: ComparisonLimit,
     },
 }
-#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ComparisonLimit {
     Differences,
@@ -205,6 +208,7 @@ fn string(encoding: &Encoding, value: &str) -> bool {
 fn valid_value(value: &Value, nodes: &BTreeMap<&str, &Node>) -> bool {
     match value {
         Value::Unit { r#type } => name(r#type),
+        Value::Boolean { r#type, .. } => r#type.as_deref().is_none_or(name),
         Value::Integer {
             r#type,
             value,
@@ -230,6 +234,7 @@ fn valid_value(value: &Value, nodes: &BTreeMap<&str, &Node>) -> bool {
 fn value_size(value: &Value) -> usize {
     match value {
         Value::Unit { r#type } => r#type.len(),
+        Value::Boolean { r#type, .. } => 1 + r#type.as_ref().map_or(0, String::len),
         Value::Integer { r#type, value, .. } | Value::String { r#type, value, .. } => {
             r#type.len() + value.len()
         }

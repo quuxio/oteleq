@@ -166,7 +166,8 @@ class HarnessTests(unittest.TestCase):
                 source.write_text("package main\n" if language=="go" else "// original\n" if language!="python" else "# original\n")
                 driver=harness.materialise(project,entry,[0])
                 self.assertTrue(driver.is_file())
-                self.assertIn("OTELEQ_OBSERVATION",driver.read_text())
+                observation_source = (project / "_oteleq_generated/node_observe.mjs") if language in ("javascript", "typescript") else driver
+                self.assertIn("OTELEQ_OBSERVATION",observation_source.read_text())
                 if language in ("c","cpp","java","python"):
                     self.assertTrue(source.read_text().endswith("original\n") or language=="java")
                 entry["globals"]=[{"name":"opaque","type":"Database"}]
@@ -174,7 +175,7 @@ class HarnessTests(unittest.TestCase):
                     self.assertEqual(harness.global_gaps(entry),["opaque"])
                 entry["globals"]=[{"name":"<destructured>","type":"unknown"}]
                 self.assertEqual(harness.global_gaps(entry),["<destructured>"])
-        self.assertIn("await __oteleqSelected",harness.js_driver(self.entry("javascript",**{"async":True}),[],""))
+        self.assertIn("__oteleqRoots,true,",harness.js_driver(self.entry("javascript",**{"async":True}),[],""))
         self.assertIn("return:void",harness.native_driver(self.entry("c",output="void"),[]))
         self.assertIn("return:void",harness.go_driver(self.entry("go",output="void"),[],"package main\n"))
         self.assertIn("return:void",harness.java_driver(self.entry("java",output="void",package="example"),[]))
@@ -471,8 +472,14 @@ class WorkflowTests(unittest.TestCase):
         entry=next(e for e in data["inventory"] if e["status"]=="ready")
         case=gen.read(self.workspace/"tests/corpus.json")[0]
         destination=self.base/"compare";destination.mkdir()
-        attempt={"witness":{"functions":{"source.sample":1}},"channels":{"stdout":[],"stderr":[],"state-and-outcome":[1]}}
-        with patch.object(gen,"attempt",return_value=attempt),patch.object(gen,"execute",return_value=subprocess.CompletedProcess([],1,b'{"verdict":"different_observed"}',b"")):
+        roots={"arguments":[], "global:state":[]}
+        raw=json.dumps({"before":observe.graph(roots),"after":observe.graph(roots),
+                        "outcome":{"kind":"return","value":observe.graph({**roots,"result":1})}}).encode()
+        attempt={"witness":{"functions":{"source.sample":1}},"channels":{"stdout":[],"stderr":[],"state-and-outcome":list(raw)}}
+        def captured(*arguments):
+            arguments[5].mkdir(exist_ok=True)
+            return attempt
+        with patch.object(gen,"attempt",side_effect=captured),patch.object(gen,"execute",return_value=subprocess.CompletedProcess([],1,b'{"verdict":"different_observed"}',b"")):
             result=gen.compare_case(self.workspace,data,entry,case,destination,None)
         self.assertEqual(result["exit_code"],1)
         self.assertEqual(gen.read(destination/"corpus.json"),case)
@@ -480,8 +487,11 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(bundle["scope"]["artefact_class"],"diagnostic")
         self.assertEqual(len(bundle["cases"][0]["baseline"]),2)
         self.assertIn("state-and-outcome",bundle["scope"]["channels"])
+        typed=gen.read(destination/"typed-bundle.json")
+        self.assertEqual(typed["scope"]["channels"],["stdout","stderr"])
+        self.assertEqual(typed["cases"][0]["contract"]["expected_baseline"],{"kind":"return"})
         data["artefacts"]["python"]["tool:python"]="changed executable content at the same path"
-        with patch.object(gen,"attempt",return_value=attempt),patch.object(gen,"execute",return_value=subprocess.CompletedProcess([],1,b'{"verdict":"different_observed"}',b"")):
+        with patch.object(gen,"attempt",side_effect=captured),patch.object(gen,"execute",return_value=subprocess.CompletedProcess([],1,b'{"verdict":"different_observed"}',b"")):
             gen.compare_case(self.workspace,data,entry,case,destination,None)
         self.assertNotEqual(bundle["scope"]["baseline_artefact_sha256"],gen.read(destination/"bundle.json")["scope"]["baseline_artefact_sha256"])
         data["configuration"]["limits"]["max_capture_bytes"] = 1

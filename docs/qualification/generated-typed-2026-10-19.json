@@ -1,0 +1,79 @@
+{
+  "date": "2026-10-19",
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "runtime_revision": "162ae7ca03726428b0ce2f6971bcab3e58733426",
+  "cli_sha256": "b1477dec43b1cde95a7e5b1023e7a0e0d4d8c983101242854042f6a5fb8c008a",
+  "host": {
+    "system": "Darwin",
+    "machine": "arm64"
+  },
+  "provider": {
+    "revision": "8a7689a6d6779ed8621bbe852188eeb56e6fafad",
+    "cli_sha256": "4f11a98a7628411000c6a9992c907a8068d56156b29e51558b070ee57a972ecf",
+    "status": "immutable private candidate, not merged-main qualification"
+  },
+  "captures": {
+    "default": {
+      "cli_sha256": "b1477dec43b1cde95a7e5b1023e7a0e0d4d8c983101242854042f6a5fb8c008a",
+      "languages": [
+        "c",
+        "cpp",
+        "go",
+        "java",
+        "javascript",
+        "python",
+        "rust",
+        "typescript"
+      ],
+      "matching_cases": 24,
+      "matching_attempts": 96,
+      "framework_cases": 8,
+      "export_replay_cases": 1,
+      "same_return_mutation_cases": 3,
+      "source_preserved": true,
+      "rebound_callable_with_startup_witness_rejected": true,
+      "static_observer_callback_controls_refused": 3,
+      "typed_fixture_contract_controls": 3,
+      "node_helper_lexical_shadow_cases": 2,
+      "claim": "equivalence over these tests and observations",
+      "artefact_class": "diagnostic"
+    },
+    "policy": {
+      "claim": "equivalence over these tests and observations",
+      "artefact_class": "diagnostic",
+      "cli_sha256": "b1477dec43b1cde95a7e5b1023e7a0e0d4d8c983101242854042f6a5fb8c008a",
+      "languages": [
+        "c",
+        "cpp",
+        "go",
+        "java",
+        "javascript",
+        "python",
+        "rust",
+        "typescript"
+      ],
+      "configured_cases": 38,
+      "matching_attempts": 228,
+      "repeats_per_lane": 3,
+      "unicode_utf16_and_signed_unsigned_extremes": true,
+      "altered_unicode_control_rejected": true,
+      "altered_typed_unicode_control_rejected": true,
+      "source_preserved": true,
+      "configuration_sha256": "38adfd376c69f6db35d528cf313cd1deccd3600776867f639460f6d666115340"
+    }
+  },
+  "fixture_control_scope": [
+    "Matching unexpected ValueError is blocked.",
+    "Explicitly expected ValueError matches.",
+    "Different known module initial state is blocked despite matching return."
+  ],
+  "codec_regression_scope": "Compiler/unit checks cover actual workers in all eight languages, including aliases/cycles, exact primitive encodings and named Go boolean types; these do not qualify arbitrary object/build contexts.",
+  "raw_evidence": "Retained outside the repository in the exact-revision qualification archive, with frozen CLI/source, complete captures, raw observations, OTLP and local gates.",
+  "limits": [
+    "Generated scalar diagnostic fixtures and the declared Python/Node graph scope.",
+    "Graph identity is local to each capture boundary; cross-boundary replacement, weakrefs and finalizers are unobserved.",
+    "Name-only decoded invocation witness; proposed invocation-scoped control protocol is not implemented.",
+    "No arbitrary factories, project build graphs, new platform, shipping-artefact or application overhead qualification."
+  ]
+}

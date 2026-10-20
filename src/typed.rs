@@ -33,15 +33,18 @@ pub struct Bundle {
     pub scope: Scope,
     pub cases: Vec<Case>,
 }
-#[derive(Debug, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct PairReport {
     pub baseline_attempt: usize,
     pub instrumented_attempt: usize,
     pub comparison: observation::Comparison,
 }
-#[derive(Debug, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct TypedCaseReport {
     pub case_id: String,
+    pub contract: Contract,
     pub verdict: Verdict,
     pub execution: CaseReport,
     pub reasons: Vec<String>,
@@ -160,6 +163,7 @@ fn compare_case(case: &Case, execution: CaseReport) -> Result<TypedCaseReport, S
     );
     Ok(TypedCaseReport {
         case_id: case.contract.case_id.clone(),
+        contract: case.contract.clone(),
         verdict: result,
         execution,
         reasons,
