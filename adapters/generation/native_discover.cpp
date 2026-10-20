@@ -34,7 +34,9 @@ struct State {
   std::size_t bytes = 0;
   std::set<std::string> files;
   llvm::json::Array probes;
-  llvm::json::Array declarations;
+  // Growing the retained inventory must not deep-copy entire declaration
+  // graphs.
+  std::vector<std::unique_ptr<llvm::json::Value>> declarations;
 
   void account(std::size_t size) {
     bytes += size;
@@ -277,7 +279,8 @@ public:
         break;
       }
       annotate(*value, types.annotations);
-      state.declarations.push_back(std::move(*value));
+      state.declarations.push_back(
+          std::make_unique<llvm::json::Value>(std::move(*value)));
     }
   }
 };
@@ -336,6 +339,10 @@ int main(int argc, char **argv) {
   llvm::json::Array inputs;
   for (const auto &file : state.files)
     inputs.push_back(file);
+  llvm::json::Array declarations;
+  declarations.reserve(state.declarations.size());
+  for (auto &declaration : state.declarations)
+    declarations.push_back(std::move(*declaration));
   llvm::json::Object output{
       {"schema_version", 1},
       {"clang_major", CLANG_VERSION_MAJOR},
@@ -343,7 +350,7 @@ int main(int argc, char **argv) {
       {"files", std::move(inputs)},
       {"probes", std::move(state.probes)},
       {"ast", llvm::json::Object{{"kind", "TranslationUnitDecl"},
-                                 {"inner", std::move(state.declarations)}}}};
+                                 {"inner", std::move(declarations)}}}};
   std::string encoded =
       llvm::formatv("{0}", llvm::json::Value(std::move(output)));
   if (encoded.size() > MAX_METADATA_BYTES) {

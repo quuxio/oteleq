@@ -109,6 +109,19 @@ class NativeFrontendTests(unittest.TestCase):
         self.assertTrue(conversion['reason'])
         self.assertEqual(conversion['cpp_function']['kind'], 'CXXConversionDecl')
 
+    def test_retained_namespace_graphs_survive_repeated_inventory_growth(self):
+        source = ''.join('namespace unit' + str(index) + ' {struct Value{int state;}; '
+                         'int selected(short value){return value;} }\n' for index in range(65))
+        data = self.inspect(source, cpp=True)
+        inventory = discovery.native_inventory(data['ast'], self.project / 'app.cpp', cpp=True)
+        self.assertEqual({item['name'] for item in inventory['functions']},
+                         {'unit' + str(index) + '::selected' for index in range(65)})
+        self.assertEqual(len(inventory['cpp_records']), 65)
+        self.assertTrue(all(item['parameters'] == ['short'] and item['output'] == 'int'
+                            for item in inventory['functions']))
+        self.assertTrue(all(item['physical'] and item['fields'][0]['canonical'] == 'int'
+                            for item in inventory['cpp_records'].values()))
+
     def test_discovery_never_executes_application_static_initialisers(self):
         marker = self.project / 'INITIALISER_RAN'
         source = ('#include <cstdio>\nint initialise(){auto f=std::fopen("INITIALISER_RAN","w");'
