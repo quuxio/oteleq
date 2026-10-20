@@ -1,0 +1,143 @@
+{
+  "schema_version": 1,
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "captured_date_utc": "2026-10-20",
+  "consumer": {
+    "runtime_revision": "4db9bb9e47b99957ca26b47a0e2de0627070c940",
+    "cli_sha256": "a9111ab6d252e8059e4029ffc15ee8c8aa337b95d120273df445860b1fb9f3ca",
+    "qualification_script_sha256": "6979d582306ca578be5bbe01226f8d304356e95954b3c292468d1dbe0b7e0228"
+  },
+  "platform": {
+    "os": "macOS",
+    "architecture": "ARM64",
+    "compiler": "rustc 1.101.0-nightly d080e7dff",
+    "compiler_llvm": "23.1.1",
+    "plugin_llvm": "23.1.3"
+  },
+  "groups": [
+    {
+      "name": "foundation-final-profile1",
+      "provider_revision": "5657bfc420e587cea52ef8f84ac59069aa4ccdf4",
+      "provider_tree": "7af60b44c1efc58c7a6f3befcd1ac4afd37dfbc5",
+      "products": {
+        "cli": "b2ff5369495d732591a125bd2d01afadd4eda9152175a44547bff358a1d598da",
+        "adapter": "50131cee77c56b7c2edc4fbbbcba6aff324b4dfcf8aa50ed9e28f41042c5c8b0",
+        "profile": "aeefb988ff0aafc2ee15e80641420de39620757e1d929248302380d1edbacd83",
+        "sdk": "de887609c42698a75a254f50efd09bbb469ca0453c8f7c351706a350c2641e01",
+        "plugin": "6bf70148325d6c1208e4f92dfab4c73be225f0aba91642d319e094b5067bb068"
+      },
+      "private_profile_sha256": "1646746729d87def8df3a32b9192868759459061be926114d7e2f2e2a2cf1385",
+      "original_handoff_sha256": "9c55f33adc1461867fb6745f3f32c4d6abe420cd35ffa54aa14f195d8c5d1b5e",
+      "result": {
+        "claim": "equivalence over these tests and observations",
+        "artefact_class": "diagnostic",
+        "scope": "Rust-only standalone-source build/run contract; no Cargo, async or eight-language LLVM claim",
+        "backend": "llvm",
+        "oteleq_cli_sha256": "a9111ab6d252e8059e4029ffc15ee8c8aa337b95d120273df445860b1fb9f3ca",
+        "provider_artefacts_sha256": "6269c6c5d8ecbd3be26f3a8bba5addc8f1df1f4c1b47edd7981e16d85dfd7f32",
+        "cases": 7,
+        "attempts": 42,
+        "matching_cases": 6,
+        "matching_attempts": 36,
+        "unstable_panic_negative_cases": 1,
+        "strict_gate_exit": 3,
+        "excluded_panic_hook_helpers": 1,
+        "source_preserved": true,
+        "build_warnings_separate": true,
+        "raw_and_typed_stderr_controls_rejected": true,
+        "retained_manifest_controls_rejected": 11,
+        "llvm_column_and_expected_panic_controls": true
+      },
+      "retention": {
+        "directory": "/Users/sclarke/Documents/oteleq-qualification/2026-10-20/rust-main67-final-4db9bb9",
+        "verified_corpora": [
+          {
+            "corpus": "oteleq-llvm-provider-main67-b2ff536",
+            "files": 574,
+            "receipt_sha256": "17c5a7d4de1ff60b1cb461750dba25edfebebde010774ec02bae8aeb38672630"
+          },
+          {
+            "corpus": "oteleq-rust-main67-final-4db9bb9-evidence",
+            "files": 952,
+            "receipt_sha256": "e427721b3a2445c3d0560ee8163d385cc1ff2450f148b0fb8ba36b87418ded64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "repaired-frontend-profile2",
+      "provider_revision": "9e6eb9e3e7d367794c90fffc0053ceda88e673df",
+      "provider_tree": "1284efd1debc5753ccb727c6a83b9552b8e1fbac",
+      "products": {
+        "cli": "3ea71833124f85b530281351e57a370918735934144a1b5a69e3dac895d52788",
+        "adapter": "8d668bff33b8542561d1b0cc54769ef5fa11328a711ccd8b9c6e72fd4c9d733c",
+        "profile": "280a3830aa2a01c757171903c610a5a932dbd599855169a0c7f9cff9689a321e",
+        "sdk": "dd27dd26404916abb80ea1186623afa32f88578fb7c3cb1b5b4a37e1f44fe403",
+        "plugin": "69ab38afbb48515e64b1d790f728cf3bb12aa0d98fbb7c16b4a35cc4d7513de8",
+        "frontend": "286d4b681fc24ae20bdbe0c3f7e964012e1d17a2fb46a4c8145c290e0f6b17a2"
+      },
+      "private_profile_sha256": "97732090b9affe6810419b9bf439c65c8653dacbb6cced46472fe6334348e258",
+      "original_handoff_sha256": "217cc3dc07b0862796e091235c4f137e078a87bd2711997d91c105fd00b70255",
+      "result": {
+        "claim": "equivalence over these tests and observations",
+        "artefact_class": "diagnostic",
+        "scope": "Rust-only standalone-source build/run contract; no Cargo, async or eight-language LLVM claim",
+        "backend": "llvm",
+        "oteleq_cli_sha256": "a9111ab6d252e8059e4029ffc15ee8c8aa337b95d120273df445860b1fb9f3ca",
+        "provider_artefacts_sha256": "6a5999f7057fe87ad452b8ecd8197915fd26a601ef7a8965be7b6daa13baefd0",
+        "cases": 7,
+        "attempts": 42,
+        "matching_cases": 6,
+        "matching_attempts": 36,
+        "unstable_panic_negative_cases": 1,
+        "strict_gate_exit": 3,
+        "excluded_panic_hook_helpers": 1,
+        "source_preserved": true,
+        "build_warnings_separate": true,
+        "raw_and_typed_stderr_controls_rejected": true,
+        "retained_manifest_controls_rejected": 15,
+        "llvm_column_and_expected_panic_controls": true
+      },
+      "retention": {
+        "directory": "/Users/sclarke/Documents/oteleq-qualification/2026-10-20/rust-frontend-9e6-4db9bb9",
+        "verified_corpora": [
+          {
+            "corpus": "oteleq-llvm-provider-frontend-9e6eb9e",
+            "files": 583,
+            "receipt_sha256": "53bfbdb500ed770e21dc8d9c570d7a82e8dd82dabfca5720bd389fff6454e4e5"
+          },
+          {
+            "corpus": "oteleq-rust-frontend-9e6-4db9bb9-evidence",
+            "files": 956,
+            "receipt_sha256": "9fc33678613c68eb7df3f92d7ec6dd1dd07cedcf3cfb5335d04df421f32b7822"
+          },
+          {
+            "corpus": "oteleq-llvm-provider-frontend-7001e81",
+            "files": 582,
+            "receipt_sha256": "b3c03d353e6fed260731d651fdfd06edbaca43a7623a3688f3120f20336b1b4f"
+          },
+          {
+            "corpus": "oteleq-rust-frontend-7001-4db9bb9-evidence",
+            "files": 425,
+            "receipt_sha256": "cf8f9c96dcb79a87cc82712580dc71c043082865a4d4b0ca0eaec90769994d99"
+          }
+        ]
+      }
+    }
+  ],
+  "limits": [
+    "Ordinary generated standalone scalar callers only; not generated macro/generic, Cargo or async consumer coverage.",
+    "Six matching cases do not qualify the whole inventory: one unstable panic remains inconclusive and its hook closure is explicitly excluded.",
+    "Producer full gates and required checks are separate from this consumer qualification.",
+    "Name-based trusted-producer witness; no invocation nonce authentication or shipping artefact claim."
+  ],
+  "failed_predecessor": {
+    "revision": "7001e81a4b4582cafe0241b559c81687b5f873e7",
+    "baseline_launches": 21,
+    "instrumented_launches": 0,
+    "reason": "Expression-macro closure body crossed physical compiler inputs; producer regression and source mapping repaired in 9e6eb9e.",
+    "status": "incomplete qualification; no metadata controls ran",
+    "retained_with": "repaired-frontend-profile2"
+  }
+}
