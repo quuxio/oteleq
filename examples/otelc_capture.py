@@ -767,12 +767,17 @@ def go_commands(root, request, policy, tools, environment, evidence):
     return prefix + ["go", "--run-baseline", bundle], prefix + ["go", "--run", bundle]
 
 
+def native_flags(language: str) -> list[str]:
+    """Inventory and paired native builds share language mode and feature macros."""
+    return ["-O2", "-pthread", "-std=c++17"] if language == "cpp" else ["-O1", "-pthread"]
+
+
 def commands(root, workspace, language, source, policy, tools, environment, evidence, *,
              expected_functions=None, future_functions=()):
     prefix = [root / OTELC_CLI_PATH, "--config", policy, "--language", language]
     if language in ("c", "cpp"):
         tool = "clang++" if language == "cpp" else "clang"
-        flags = ["-O2", "-pthread", "-std=c++17"] if language == "cpp" else ["-O1", "-pthread"]
+        flags = native_flags(language)
         plain, instrumented = workspace / "plain", workspace / "instrumented"
         build([tools[tool], *flags, source, "-o", plain], workspace, environment, evidence / "plain-build.log")
         build(prefix + [tool, *flags, source, "-o", instrumented], workspace, environment, evidence / "instrumented-build.log")
@@ -1011,7 +1016,10 @@ def selected_tools(root, language):
         configured = llvm["bindir"]
         if not isinstance(configured, str) or str(selected.parent.resolve()) != configured:
             raise ValueError("selected compiler does not match otelc LLVM metadata; set " + variable)
-        return {compiler: selected}
+        tools = {compiler: selected}
+        if language == "cpp":
+            tools["cpp-demangler"] = tool_path(str(selected.parent / "llvm-cxxfilt"))
+        return tools
     if language == "rust":
         return {"rustc": tool_path(os.environ.get("OTELC_RUSTC", "rustc"))}
     names = {"python": sys.executable, "java": os.environ.get("OTELC_JAVA", "java"),

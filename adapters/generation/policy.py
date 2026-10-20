@@ -109,7 +109,8 @@ def receiver(value: Any) -> dict[str, Any]:
     """Declare a same-module constructor/factory; application code runs in workers."""
     keys(value, {"factory", "arguments"}, "fixture.receiver")
     factory, arguments = value.get("factory"), value.get("arguments", [])
-    if not isinstance(factory, str) or not factory.isidentifier() or keyword.iskeyword(factory):
+    parts = factory.split("::") if isinstance(factory, str) else []
+    if not parts or not all(part.isidentifier() for part in parts) or len(parts) == 1 and keyword.iskeyword(factory):
         raise ValueError("receiver.factory requires one ordinary same-module class or function name")
     if not scalar_arguments(arguments):
         raise ValueError("receiver.arguments requires finite scalar constructor inputs")

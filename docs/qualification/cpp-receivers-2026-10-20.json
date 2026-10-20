@@ -1,0 +1,165 @@
+{
+  "qualification_schema_version": 1,
+  "date": "2026-10-20",
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "platform": {
+    "os": "macOS",
+    "architecture": "ARM64",
+    "clang": "22.1.8",
+    "python": "3.12.15"
+  },
+  "runtime": {
+    "source_commit": "8c2f7f689122b82a74464785966d98c0d160b31b",
+    "source_tree": "77930c59616f449c845cb47fc662ff6f3231064a",
+    "cli_sha256": "4d8ab186cf3c67acea4da8eaa41e35610fbee770c5e652c92cec0cdde602d56d",
+    "source_archive_sha256": "955eaed490334ec182f142ae93459fa0ec517f471b252986f530089acda3febb",
+    "provider_commit": "d6d03b72026cde8962b11ce3cc184ff3ebcb60d4",
+    "provider_manifest_sha256": "2a8dbf239c6444c0fb536dff049993beade7eaed6578c9654c1e2d7233e9431f",
+    "generator_sha256": "cf3f41e7990af77b3bd190b2904d7005d4bcb67a85cb49ce39110deda44d0caa",
+    "qualifier_sha256": "8a3ed0d9ed52da698c6df53f8a81dcaa7de9ca5d3488c9ccc9a4f588a391dd85"
+  },
+  "provider": {
+    "verified_at": "2026-10-20T20:39:30.527987+00:00",
+    "provider_commit": "d6d03b72026cde8962b11ce3cc184ff3ebcb60d4",
+    "provider_tree": "a577aa88d5d51f4e86bc0858bcd233be7b01c251",
+    "manifest_sha256": "2a8dbf239c6444c0fb536dff049993beade7eaed6578c9654c1e2d7233e9431f",
+    "verified_records": 7360,
+    "counts": {
+      "source_sha256": 413,
+      "products_sha256": 586,
+      "dependencies": 6361
+    },
+    "symlinks": 11,
+    "external_tools_verified": 8,
+    "cli_sha256": "037fb837ea1a3e982e9cb0d62f00b8c70c9709f25178fe936b189c2c1721c486",
+    "profile_relocation": {
+      "original_sha256": "091b340d6ed90eaa54a025719fde13abb1420c85058f864dd6d69242013c97c7",
+      "retained_sha256": "425bf561b3c2772162d95e44773cdf6660e1522b62f8fed946714fe3d1737539"
+    },
+    "scope": "Content verified before/after this corpus; frozen d6d03b7 identity, not a claim about later producer revisions.",
+    "verification_script_sha256": "5b2e4c5b12fc2ccb3b3181011db9c595f1ab75fe2d4010fff83547185c556ea5"
+  },
+  "inventory": {
+    "callables": 21,
+    "ready": 9,
+    "excluded": 12,
+    "blocked": 0
+  },
+  "results": {
+    "cases": 17,
+    "matching_cases": 14,
+    "difference_controls": 3,
+    "actual_application_launches": 299,
+    "qualified_application_launches": 292,
+    "incomplete_fixture_launches": 3,
+    "initial_state_blocked_launches": 4,
+    "retained_attempt_folders": 303,
+    "unique_command_identities": 299,
+    "refusal_controls": 11,
+    "prelaunch_refusals": 7,
+    "incomplete_fixture_controls": 3,
+    "initial_state_controls": 1,
+    "source_preserved": true,
+    "routes": [
+      "run",
+      "generated",
+      "exported-run",
+      "exported-framework",
+      "shrink",
+      "replay"
+    ],
+    "scalar_shrink": {
+      "original": [
+        3
+      ],
+      "reduced": [
+        0
+      ]
+    },
+    "profiles": {
+      "receiver_cases": 9,
+      "binding_cases": 4,
+      "crlf_cases": 4
+    }
+  },
+  "independent_verification": {
+    "source_files_verified": 218,
+    "qualified_reports_verified": 46,
+    "refusal_reports_verified": 11,
+    "qualified_retained_attempts_verified": 296,
+    "qualified_actual_launches": 292,
+    "copied_original_shrink_attempts": 4,
+    "original_copy_relationships_verified": 4,
+    "unique_application_launches": 299,
+    "raw_attempt_folders": 303,
+    "refused_application_launches": 7,
+    "private_source_records_verified": 792,
+    "raw_records": 6008,
+    "raw_manifest_sha256": "26eae5fa106fb30f3c0d703070eda1fb6da36c740e6fcbad5248be6708abc1c4",
+    "runtime_commit": "8c2f7f689122b82a74464785966d98c0d160b31b",
+    "source_preserved": true,
+    "verifier_sha256": "d50d341c72cb8afb0a7ac5c5610a1afbd5b7ee3b5857803cb9d4f99ca47cadc9",
+    "corrected_qualifier_sha256": "8a3ed0d9ed52da698c6df53f8a81dcaa7de9ca5d3488c9ccc9a4f588a391dd85",
+    "scope": "Frozen completed driver; full original/binding corpus, binary/source/tool checks and complete independent value oracles."
+  },
+  "validation": {
+    "make_check": "passed at runtime commit",
+    "runtime_commit": "8c2f7f689122b82a74464785966d98c0d160b31b",
+    "unique_regressions": 501,
+    "python_regressions": 414,
+    "rust_regressions": 66,
+    "node_regressions": 17,
+    "go_regressions": 4,
+    "additional_native_cpp_observer_probe": "passed",
+    "rust_product_line_coverage_percent": 97.29,
+    "cpp_observer_line_coverage_percent": 100.0,
+    "rendered_html_and_junit": "passed",
+    "unresolved_sonar_findings": 0
+  },
+  "scope": {
+    "observed": "Declared source constructors/free/static factories, scalar method inputs, private source fields/statics, namespace roots, nested records/arrays, exact float bits, standard exception payloads, pointer cycles, interior aliases and returned references. Global source type names, C-linkage underscore identities, direct construction of small self-referential objects and CRLF source ranges are exercised separately.",
+    "private_observer_schema_version": 1,
+    "witness": "Existing name-bound decoded function/span witness; invocation-scoped producer binding remains unavailable.",
+    "not_qualified": [
+      "shipping artefacts",
+      "general compilation databases/dependency/build variants",
+      "header-defined or template classes",
+      "inheritance/virtual storage/unions/bitfields/volatile/atomic/opaque storage",
+      "function-local statics",
+      "arbitrary mutable arguments/buffers/external factories",
+      "arbitrary object ownership, memory validity or races",
+      "arbitrary overlapping memory",
+      "allocation identity across destruction/address reuse",
+      "arbitrary resource/action/concurrent sequences",
+      "other platforms/toolchains",
+      "macro-expanded callables or storage beyond explicit refusal"
+    ],
+    "identity_limit": "Recorded source, selected tools and provider products; not a complete OS-library or shipping build closure."
+  },
+  "profile_inventories": {
+    "receivers": {
+      "callables": 21,
+      "ready": 9,
+      "excluded": 12,
+      "blocked": 0
+    },
+    "bindings": {
+      "callables": 5,
+      "ready": 4,
+      "excluded": 1,
+      "blocked": 0
+    },
+    "crlf": {
+      "callables": 5,
+      "ready": 4,
+      "excluded": 1,
+      "blocked": 0
+    }
+  },
+  "driver": {
+    "exit_code": 0,
+    "application_relaunches_for_retained_verification": 0,
+    "shrink_accounting": "Fresh original replay counts once; four copied records do not count as additional launches."
+  }
+}

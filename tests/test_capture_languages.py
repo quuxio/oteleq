@@ -357,7 +357,7 @@ class CaptureBoundaryTests(unittest.TestCase):
             with patch.object(capture, "tool_path", side_effect=lambda name: Path(name)), \
                  patch.dict(os.environ, {"OTELC_NODE": "/qualified/node", "OTELC_JAVA": "/qualified/java", "OTELC_RUSTC": "/qualified/rustc", "OTELC_GO": "/qualified/go", "OTELC_CLANG": "/qualified/llvm/clang", "OTELC_CLANGXX": "/qualified/llvm/clang++"}):
                 self.assertEqual(capture.selected_tools(root, "c"), {"clang": Path("/qualified/llvm/clang")})
-                self.assertEqual(capture.selected_tools(root, "cpp"), {"clang++": Path("/qualified/llvm/clang++")})
+                self.assertEqual(capture.selected_tools(root, "cpp"), {"clang++": Path("/qualified/llvm/clang++"), "cpp-demangler": Path("/qualified/llvm/llvm-cxxfilt")})
                 self.assertEqual(capture.selected_tools(root, "rust"), {"rustc": Path("/qualified/rustc")})
                 for language in ("python", "java", "go", "javascript", "typescript"):
                     tools = capture.selected_tools(root, language)
