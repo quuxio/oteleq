@@ -12,6 +12,17 @@ import otelc_capture as capture
 BUNDLE_FILENAME = "bundle.json"
 
 
+def runtime_report(root: Path, language: str, path: Path, folder: Path) -> dict:
+    """Retain the actual report only after its profile-specific health checks."""
+    if not path.is_file():
+        raise ValueError(f"runtime report missing; inspect {folder / 'stderr'}")
+    report = capture.strict_json(path.read_text())
+    if language == "rust" and (root / capture.RUST_COMPILER_PROFILE_FILENAME).exists():
+        capture.rust_future_health(report)
+    (folder / "runtime.json").write_text(json.dumps(report, indent=2) + "\n")
+    return report
+
+
 def attempt(root, spec, language, destination, lane, repeat, originals, tools, identities, decoder):
     capture.stable(root, language, tools, identities)
     folder = destination / f"{lane}-{repeat}"
@@ -33,7 +44,9 @@ def attempt(root, spec, language, destination, lane, repeat, originals, tools, i
             policy = workspace / "policy.toml"
             configured = capture.configure(originals["policy"], endpoint)
             policy.write_bytes(configured)
-            baseline, instrumented = capture.commands(root, workspace, language, source, policy, tools, env, folder)
+            expected = {"expected_functions": tuple(spec["functions"]),
+                        "future_functions": tuple(spec.get("asynchronous_functions", ()))} if language == "rust" else {}
+            baseline, instrumented = capture.commands(root, workspace, language, source, policy, tools, env, folder, **expected)
             if lane == "instrumented_on":
                 env["OTELC_REPORT_PATH"] = str(report_path)
             command = baseline if lane == "baseline" else instrumented
@@ -58,10 +71,7 @@ def attempt(root, spec, language, destination, lane, repeat, originals, tools, i
                     "channels": {"stdout": list(result.stdout), "stderr": list(result.stderr)},
                     "capture_complete": True, "witness": None}
         if lane == "instrumented_on":
-            if not report_path.is_file():
-                raise ValueError(f"runtime report missing; inspect {folder / 'stderr'}")
-            report = capture.strict_json(report_path.read_text())
-            (folder / "runtime.json").write_text(json.dumps(report, indent=2) + "\n")
+            report = runtime_report(root, language, report_path, folder)
             observed["witness"] = capture.witness(bodies, report, spec, service, decoder, language)
         elif bodies:
             raise ValueError("uninstrumented baseline unexpectedly exported telemetry")

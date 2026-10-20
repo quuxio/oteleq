@@ -30,6 +30,11 @@
   "rust": {
     "source": "examples/apps/rust_trace_app.rs",
     "policy": "examples/rust-traces.toml",
+    "asynchronous_functions": [
+      "examples.apps.rust_trace_app.child",
+      "examples.apps.rust_trace_app.parent",
+      "examples.apps.rust_trace_app.cancelled"
+    ],
     "trees": 4,
     "errors": 2,
     "functions": {

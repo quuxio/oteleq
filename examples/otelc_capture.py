@@ -170,6 +170,23 @@ def typescript_backend(root, language, spec, policy):
     return selected
 
 
+def rust_inputs(root: Path, tools: dict[str, Path], backend: str) -> list[Path]:
+    """Enumerate only the explicitly selected Rust profile and its inputs."""
+    paths = [root / "target/debug/otelc-rust-adapter", root / "Cargo.lock"]
+    if backend == "llvm":
+        return paths + rust_llvm_inputs(root, tools)
+    rust_flags(backend)
+    profile = root / RUST_COMPILER_PROFILE_FILENAME
+    if profile.exists() or profile.is_symlink():
+        from otelc_rust_build import inputs
+        return paths + inputs(root, tools)
+    dependencies = root / "target/debug/deps"
+    paths += [root / "target/debug/libquux_otelc_rust.rlib"]
+    paths += sorted(path for pattern in ("*.rlib", "*.dylib", "*.so", "*.dll")
+                    for path in dependencies.glob(pattern))
+    return paths
+
+
 def artefacts(root, language, tools, *, rust_backend="compiler"):
     """Re-enumerate executable adapter inputs so additions/removals are visible."""
     paths = [root / OTELC_CLI_PATH]
@@ -179,15 +196,7 @@ def artefacts(root, language, tools, *, rust_backend="compiler"):
                   root / "target/debug/otelc-llvm-toolchain.json",
                   root / "target/debug/libotelc_pass.dylib"]
     elif language == "rust":
-        paths += [root / "target/debug/otelc-rust-adapter", root / "Cargo.lock"]
-        if rust_backend == "llvm":
-            paths += rust_llvm_inputs(root, tools)
-        else:
-            rust_flags(rust_backend)
-            paths += [root / "target/debug/libquux_otelc_rust.rlib"]
-            dependencies = root / "target/debug/deps"
-            paths += sorted(path for pattern in ("*.rlib", "*.dylib", "*.so", "*.dll")
-                            for path in dependencies.glob(pattern))
+        paths += rust_inputs(root, tools, rust_backend)
     elif language == "java":
         paths += [root / "adapters/java/target/java-agent-0.1.0-agent.jar"]
     elif language == "go":
@@ -210,7 +219,7 @@ def artefacts(root, language, tools, *, rust_backend="compiler"):
                   and "tests" not in p.relative_to(tree).parts]
     identities = {str(p.relative_to(root)): file_digest(p) for p in paths}
     identities.update({"tool:" + name: file_digest(path) for name, path in tools.items()})
-    for name in ("otelc_capture.py", "otelc_collection.py", "otelc_resource.py", "capture_otelc_languages.py", "otelc-workloads.json", "otelc-worker-workloads.json", "otelc-typescript-native-workloads.json", "otelc-collection-workloads.json", "otelc-resource-workloads.json"):
+    for name in ("otelc_capture.py", "otelc_rust_build.py", "otelc_collection.py", "otelc_resource.py", "capture_otelc_languages.py", "otelc-workloads.json", "otelc-worker-workloads.json", "otelc-typescript-native-workloads.json", "otelc-collection-workloads.json", "otelc-resource-workloads.json"):
         identities["observer:" + name] = file_digest(Path(__file__).with_name(name))
     return identities
 
@@ -236,6 +245,7 @@ def build(command, workspace, environment, output):
 RUST_BASELINE_FLAGS = ("--edition=2024", "-O", "-g")
 RUST_LLVM_BASELINE_FLAGS = (*RUST_BASELINE_FLAGS, "-Zmir-enable-passes=-Inline,-ForceInline", "-Ccodegen-units=1")
 RUST_PROFILE_FILENAME = "target/debug/otelc-rust-llvm.json"
+RUST_COMPILER_PROFILE_FILENAME = "target/debug/otelc-rust-compiler.json"
 PLAN_FILENAME = "plan.json"
 
 
@@ -248,11 +258,11 @@ def rust_flags(backend: str) -> tuple[str, ...]:
     raise ValueError("unsupported Rust backend")
 
 
-def build_document(path: Path) -> dict:
+def build_document(path: Path, *, limit: int = 4 * 1024 * 1024) -> dict:
     """Read fixed, bounded regular files with the shared strict JSON parser."""
     if path.is_symlink() or not path.is_file():
         raise ValueError("Build evidence requires regular files")
-    if path.stat().st_size > 4 * 1024 * 1024:
+    if path.stat().st_size > limit:
         raise ValueError("Build evidence exceeds its size limit")
     document = strict_json(path.read_bytes())
     if not isinstance(document, dict):
@@ -303,6 +313,16 @@ def rust_llvm_inputs(root: Path, tools: dict[str, Path]) -> list[Path]:
     return paths
 
 
+def rust_compiler_fields(metadata: dict) -> None:
+    """Legacy and original-source compiler manifests have separate closed fields."""
+    fields = {"schema_version", "language", "executable_sha256", "plan_sha256", "adapter_sha256", "sdk_sha256",
+              "source", "source_sha256", "source_root", "baseline_flags", "compiler"}
+    if metadata["schema_version"] == 3:
+        fields |= {"backend", "compiler_driver"}
+    if set(metadata) != fields or metadata["schema_version"] == 3 and metadata["backend"] != "compiler":
+        raise ValueError("Rust compiler manifest fields or backend are unqualified")
+
+
 def rust_metadata(bundle: Path, backend: str = "compiler") -> dict:
     """Read only fixed bundle files and reject an unqualified schema/flag contract."""
     for name in ("application", PLAN_FILENAME, BUILD_FILENAME):
@@ -313,8 +333,8 @@ def rust_metadata(bundle: Path, backend: str = "compiler") -> dict:
     if metadata_path.stat().st_size > 4 * 1024 * 1024:
         raise ValueError("Rust build metadata exceeds its size limit")
     metadata = strict_json(metadata_path.read_text())
-    version = 2 if backend == "llvm" else 1
-    if (not isinstance(metadata, dict) or type(metadata.get("schema_version")) is not int or metadata["schema_version"] != version
+    versions = (2,) if backend == "llvm" else (1, 3)
+    if (not isinstance(metadata, dict) or type(metadata.get("schema_version")) is not int or metadata["schema_version"] not in versions
             or metadata.get("language") != "rust"
             or metadata.get("baseline_flags") != list(rust_flags(backend))):
         raise ValueError("Rust build flags or manifest schema require separate qualification")
@@ -322,6 +342,8 @@ def rust_metadata(bundle: Path, backend: str = "compiler") -> dict:
             "schema_version", "language", "backend", "executable_sha256", "plan_sha256", "adapter_sha256", "sdk_sha256",
             "source", "source_sha256", "source_root", "baseline_flags", "compiler", "compiler_hook"}):
         raise ValueError("Rust LLVM manifest fields or backend are unqualified")
+    if backend == "compiler":
+        rust_compiler_fields(metadata)
     return metadata
 
 
@@ -498,9 +520,15 @@ def rust_llvm_manifest(root: Path, workspace: Path, source: Path, bundle: Path, 
 
 
 def rust_manifest(root: Path, workspace: Path, source: Path, bundle: Path, tools: dict[str, Path], *,
-                  backend: str = "compiler", expected_function: str | None = None, environment: dict | None = None) -> dict:
+                  backend: str = "compiler", expected_function: str | tuple[str, ...] | None = None,
+                  environment: dict | None = None, requested_selection: dict | None = None,
+                  future_functions: tuple[str, ...] = ()) -> dict:
     """Verify all source/build/provider hashes using only caller-selected paths."""
     metadata = rust_metadata(bundle, backend)
+    if backend == "compiler":
+        profile_path = root / RUST_COMPILER_PROFILE_FILENAME
+        if (profile_path.exists() or profile_path.is_symlink()) != (metadata["schema_version"] == 3):
+            raise ValueError("Rust compiler profile and manifest versions require separate qualification")
     compiler = rust_compiler(metadata, tools, backend)
     assets = rust_profile(root, tools) if backend == "llvm" else None
     expected = {"executable_sha256": file_digest(bundle / "application"),
@@ -513,12 +541,16 @@ def rust_manifest(root: Path, workspace: Path, source: Path, bundle: Path, tools
             or metadata.get("source_root") != str(workspace.resolve())):
         raise ValueError("Rust build source, executable, policy or provider identity changed")
     hook = rust_llvm_manifest(root, workspace, source, bundle, metadata, tools, assets, expected_function, environment) if assets else {}
+    if backend == "compiler" and metadata["schema_version"] == 3:
+        from otelc_rust_build import validate
+        hook = validate(root, workspace, source, bundle, metadata, tools, expected_function, environment,
+                        requested_selection, future_functions)
     return {**expected, "manifest_sha256": file_digest(bundle / BUILD_FILENAME),
             "baseline_flags": list(rust_flags(backend)), "compiler": compiler, **hook}
 
 
 def rust_command(root, workspace, source, policy, tools, environment, evidence, output, lane, *,
-                 backend="compiler", expected_function=None):
+                 backend="compiler", expected_function=None, future_functions=()):
     """Build only the selected lane; application launch never invokes rustc."""
     prefix = [root / OTELC_CLI_PATH, "--config", policy, "--language", "rust"]
     relative = source.relative_to(workspace)
@@ -532,8 +564,14 @@ def rust_command(root, workspace, source, policy, tools, environment, evidence, 
         bundle = output / "rust-bundle"
         build(prefix + ["rust", "--build", relative, "--output-dir", bundle], workspace,
               environment, evidence / "instrumented-build.log")
+        requested = None
+        if backend == "compiler" and (root / RUST_COMPILER_PROFILE_FILENAME).exists():
+            configured = tomllib.loads(policy.read_text())
+            requested = {key: {"include": configured[key]["include"], "exclude": configured[key].get("exclude", [])}
+                         for key in ("sources", "functions")}
         identities = rust_manifest(root, workspace, source, bundle, tools, backend=backend,
-                                   expected_function=expected_function, environment=environment)
+                                   expected_function=expected_function, environment=environment,
+                                   requested_selection=requested, future_functions=future_functions)
         command = prefix + ["rust", "--run", bundle]
     (evidence / (lane + "-build-identities.json")).write_text(json.dumps(identities, indent=2) + "\n")
     return command
@@ -729,7 +767,8 @@ def go_commands(root, request, policy, tools, environment, evidence):
     return prefix + ["go", "--run-baseline", bundle], prefix + ["go", "--run", bundle]
 
 
-def commands(root, workspace, language, source, policy, tools, environment, evidence):
+def commands(root, workspace, language, source, policy, tools, environment, evidence, *,
+             expected_functions=None, future_functions=()):
     prefix = [root / OTELC_CLI_PATH, "--config", policy, "--language", language]
     if language in ("c", "cpp"):
         tool = "clang++" if language == "cpp" else "clang"
@@ -739,7 +778,8 @@ def commands(root, workspace, language, source, policy, tools, environment, evid
         build(prefix + [tool, *flags, source, "-o", instrumented], workspace, environment, evidence / "instrumented-build.log")
         return [plain], prefix + ["run", instrumented]
     if language == "rust":
-        return tuple(rust_command(root, workspace, source, policy, tools, environment, evidence, workspace, lane)
+        return tuple(rust_command(root, workspace, source, policy, tools, environment, evidence, workspace, lane,
+                                  expected_function=expected_functions, future_functions=future_functions)
                      for lane in ("baseline", "instrumented_on"))
     if language == "go":
         request = {"workspace": workspace, "target": source, "sources": [source], "project": workspace}
@@ -847,6 +887,15 @@ def require_runtime_identity(report, language):
     elif (type(report.get("schema_version")) is not int or report["schema_version"] != 1
           or report.get("language") != language):
         raise ValueError("unsupported or mismatched runtime report")
+
+
+def rust_future_health(report: dict) -> None:
+    """The MIR registry must finish even when trace counters appear drained."""
+    future = report.get("future_observers")
+    if (type(future) is not dict or set(future) != {"pending", "admission_exhausted"}
+            or type(future["pending"]) is not int or future["pending"] != 0
+            or future["admission_exhausted"] is not False):
+        raise ValueError("Rust compiler future observers are missing, pending or exhausted")
 
 
 def loss_diagnostics(report, language):

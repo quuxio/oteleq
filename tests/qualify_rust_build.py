@@ -105,7 +105,7 @@ def check_attempt(case, folder, backend, column, lane, index, attempt):
     token, expected_stderr = expected_channels(case, column)
     assert bytes(attempt["channels"]["stdout"]) == b""
     assert bytes(attempt["channels"]["stderr"]) == expected_stderr
-    assert token in bytes(attempt["channels"]["state-and-outcome"])
+    assert token in bytes(attempt["channels"]["state-and-outcome"]).splitlines()
     check_build(folder / f"{lane}-{index}", backend, case["function"], lane)
 
 
@@ -134,6 +134,37 @@ def altered_channels(cli, destination, folder):
         path.write_text(json.dumps(altered))
         command([cli, comparator, path], control, kind, expected=1)
     (control / "KIND.txt").write_text("Deliberately altered retained evidence; no new target execution.\n")
+
+
+def compiler_retained_routes(cli: Path, workspace: Path, destination: Path) -> int:
+    """Run every default compiler case through independent retained/exported suites."""
+    def inspect_report(path: Path) -> int:
+        report = json.loads(path.read_text())
+        assert report["source_preserved"] and len(report["cases"]) == 4
+        for case in report["cases"]:
+            check_case(case, path.parent, "compiler", None)
+        return len(report["cases"]) * 6
+
+    def framework(source: Path, name: str) -> int:
+        text = command([sys.executable, source / "tests/test_equivalence.py"], destination, name)
+        reports = [json.loads(line) for line in text.splitlines()]
+        assert len(reports) == 4
+        count = 0
+        for item in reports:
+            report = Path(item["report"])
+            data = json.loads(report.read_text())
+            assert data["source_preserved"] and len(data["cases"]) == 1
+            check_case(data["cases"][0], report.parent, "compiler", None)
+            count += 6
+        return count
+
+    launches = framework(workspace, "framework")
+    exported = destination / "exported"
+    command([cli, "export-tests", "--workspace", workspace, "--destination", exported, "--apply"], destination, "export")
+    report = destination / "export-comparison"
+    command([cli, "run", "--workspace", exported, "--report-dir", report], destination, "export-run")
+    launches += inspect_report(report / "report.json")
+    return launches + framework(exported, "export-framework")
 
 
 def check_unstable_panic(case, report_root):
@@ -265,13 +296,15 @@ def main():
     folder = report_root / case["case"]
     altered_channels(cli, destination, folder)
     controls = manifest_controls(destination, root, plan, case, folder) if args.backend == "llvm" else 0
+    retained_launches = compiler_retained_routes(cli, workspace, destination) if args.backend == "compiler" else 0
     artefacts = plan["artefacts"]["rust"]
     print(json.dumps({"claim": "equivalence over these tests and observations", "artefact_class": "diagnostic",
                       "scope": "Rust-only standalone-source build/run contract; no Cargo, async or eight-language LLVM claim",
                       "backend": args.backend, "oteleq_cli_sha256": hashlib.sha256(cli.read_bytes()).hexdigest(),
                       "provider_artefacts_sha256": hashlib.sha256(json.dumps(artefacts, sort_keys=True).encode()).hexdigest(),
-                      "cases": count, "attempts": count * 6, "matching_cases": count - int(args.backend == "llvm"),
-                      "matching_attempts": (count - int(args.backend == "llvm")) * 6,
+                      "cases": count, "attempts": count * 6 + retained_launches, "matching_cases": count - int(args.backend == "llvm"),
+                      "matching_attempts": (count - int(args.backend == "llvm")) * 6 + retained_launches,
+                      "routes": ["run", "generated unittest/replay", "exported run", "exported unittest/replay"] if retained_launches else ["run"],
                       "unstable_panic_negative_cases": int(args.backend == "llvm"), "strict_gate_exit": expected_exit,
                       "excluded_panic_hook_helpers": len(excluded),
                       "source_preserved": True,

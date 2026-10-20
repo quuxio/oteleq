@@ -33,6 +33,8 @@ The [HTTP qualification](docs/qualification/http-fixtures-2026-10-20.json) cover
 
 Fixed diagnostic corpora also qualify [Python and Java executor context](docs/eight-language-capture.md), [Python collection lifetimes](docs/eight-language-capture.md#python-collection-lifetime-workload), [fixed Python resource closes](docs/eight-language-capture.md#python-resource-close-workload) and the [optional native TypeScript emitter](docs/eight-language-capture.md#optional-native-typescript-workload) against the actual otelc adapters.
 
+The [original-source Rust compiler corpus](docs/rust-build-bundles.md) qualifies four generated scalar cases through generated/exported suites and fixed completion/cancellation/unwind and aliased-module diagnostics: 108 candidate-provider launches, 24 legacy compatibility launches and 14 altered build-record refusals. General Cargo, generated async and receiver support remain open.
+
 The result is **equivalence over these tests and observations**. It is not a blanket proof that every function is identical.
 
 Generated tests live in a new private directory outside the application repository. Selection, scalar domain fixtures, seeded inputs and execution budgets use a [validated project policy](docs/automatic-generation.md#project-policy-and-concrete-fixtures). Users can retain or explicitly export them, using Python's standard `unittest` suite independently of the application's existing framework.
@@ -84,7 +86,7 @@ Render a retained run as [standalone HTML and JUnit XML](docs/reporting.md):
   --output-dir /absolute/path/to/new-presentation
 ```
 
-Rust requires the [standalone build/run provider API](docs/automatic-generation.md#discovery-and-build-boundary); combined compile-and-launch providers are unsupported. The default `compiler` backend and opt-in `llvm` profile use separate matched flag and provenance contracts. LLVM accepts the original profile1/inventory2 pair or the compiler frontend profile2/inventory3 pair, with its fixed frontend asset and emitted-symbol checks. The [frontend record](docs/qualification/rust-frontend-2026-10-20.json) names exact qualified revisions and gaps; format support alone does not qualify a new provider.
+Rust requires the [standalone build/run provider API](docs/rust-build-bundles.md); combined compile-and-launch providers are unsupported. The default `compiler` backend and opt-in `llvm` profile use separate matched flag and provenance contracts. The original-source compiler schema3 validator additionally binds its fixed profile, MIR driver, request and emitted inventory; actual replacement-provider qualification is pending. LLVM accepts the original profile1/inventory2 pair or the compiler frontend profile2/inventory3 pair, with its fixed frontend asset and emitted-symbol checks. The [frontend record](docs/qualification/rust-frontend-2026-10-20.json) names exact qualified revisions and gaps; format support alone does not qualify a new provider.
 
 The default generates up to three distinct scalar cases per function and compares two plain with two instrumented runs per case. Missing instrumentation, changed source, unstable observations, failed builds and selected blockers fail the gate. The report records tested inputs, state coverage, telemetry and gaps. Syntax discovery and scalar samples do not establish business preconditions.
 

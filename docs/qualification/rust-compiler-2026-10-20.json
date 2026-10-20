@@ -1,0 +1,139 @@
+{
+  "qualification_schema_version": 1,
+  "date": "2026-10-20",
+  "platform": {
+    "os": "macOS",
+    "architecture": "ARM64",
+    "rustc": "1.98.1",
+    "rustc_commit": "48a229ceaefd4985c50990b14116b6d856af0985",
+    "LLVM": "22.1.8"
+  },
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "runtime": {
+    "runtime_commit": "ed09f136b090c50e062ff2ff678194c959be6c1a",
+    "tree": "278a2a20e350901742e9d0977cc9f80b48711fa6",
+    "cli_sha256": "fae339462d0286d54fe828726f06b4870b511d5bc9e510e648efa3f438827e9b",
+    "source_archive_sha256": "8ef7d8e1ae172aae171b7c7d4aec7c08ed9987cc22019b0561578dadbdcecd61",
+    "qualifier_sha256": "62929ed31f09e0ce3ff4ee0255643cb67c9af65fa9c4b088c14eecef494d2a52",
+    "semantic_qualifier_sha256": "960bcf57f9fa74767ef0176af0104c0870887b82b387a95b4db30ddf44ce72da"
+  },
+  "provider": {
+    "verified_at": "2026-10-20T15:21:54.741698+00:00",
+    "commit": "aca9d5adc103e40dbda5db2725ff23fa9f998053",
+    "manifest_sha256": "fd4459f1c5cbabe2c05a1f3d3e9e00b5c7ab6bd468dc4774e6fd03896a8889fe",
+    "records": 950,
+    "kinds": {
+      "source": 413,
+      "product": 536,
+      "relocated-profile": 1
+    },
+    "compiler_sha256": "766eda9d8f53afd6fc7f27b3cd2e444dd22afacb5afa710a5625fc8e45b8c941",
+    "provider_cli_sha256": "ca579577595a9f7fd3dccccdfbd8e931d25e41ac2f5fbd19076872cb8b4d4664",
+    "all_recorded_bytes_unchanged": true,
+    "status": "Immutable Rust-only candidate; this record does not qualify later producer commits or a release."
+  },
+  "results": {
+    "actual_application_launches": 132,
+    "candidate_provider_launches": 108,
+    "legacy_compatibility_launches": 24,
+    "generated_cases": 4,
+    "generated_case_executions": 16,
+    "generated_launches": 96,
+    "generated_routes": [
+      "run",
+      "generated unittest/replay",
+      "exported run",
+      "exported unittest/replay"
+    ],
+    "fixed_workload_launches": 4,
+    "semantic_workload_launches": 4,
+    "aliased_module_launches": 4,
+    "retained_bundle_refusals": 14,
+    "refusal_application_launches": 0,
+    "source_preserved": true,
+    "complete_record_value_oracles": true,
+    "build_warnings_separate": true,
+    "raw_and_typed_stderr_controls_rejected": true
+  },
+  "semantic_observations": {
+    "column": 31,
+    "caller": 566935683090,
+    "closure_layout": 68719476744,
+    "future_layout": 171798691848,
+    "never_polled_drops": 1,
+    "result": 42,
+    "pending_drops": 0,
+    "ready_drops": 1,
+    "completed_drops": 1,
+    "cancel_pending_drops": 0,
+    "cancelled_drops": 1,
+    "panic_payload": 17,
+    "panic_pending_drops": 0,
+    "unwind_drops": 1,
+    "panic_dropped": 1
+  },
+  "witness": {
+    "standard": {
+      "spans": 8,
+      "trees": 4,
+      "errors": 2
+    },
+    "semantics": {
+      "spans": 6,
+      "trees": 6,
+      "errors": 2
+    },
+    "aliases": {
+      "spans": 2,
+      "trees": 2,
+      "errors": 0
+    },
+    "future_registry": {
+      "pending": 0,
+      "admission_exhausted": false
+    },
+    "identity": "name-bound decoded spans and emitted original-source declarations; no invocation-scoped producer binding"
+  },
+  "legacy_provider": {
+    "commit": "0419a51af9aa5b86cabcc21690eda48b987b80d1",
+    "manifest_sha256": "a02a87ab7c2a9b54326e5259b73186e84d333c2a5bc2ab37e4b3907c49d9be55",
+    "build_schema": 1
+  },
+  "independent_verification": {
+    "runtime_commit": "ed09f136b090c50e062ff2ff678194c959be6c1a",
+    "actual_application_launches": 132,
+    "candidate_launches": 108,
+    "legacy_launches": 24,
+    "generated_case_executions": 16,
+    "generated_application_launches": 96,
+    "unique_command_identities": 132,
+    "retained_record_controls": 14,
+    "control_application_launches": 0,
+    "exact_value_oracles_rechecked": true,
+    "matching_generated_reports": 10,
+    "raw_files_and_links": 2845,
+    "raw_manifest_sha256": "725c23d7509a15f3dcca881c245277ab734b12d6574c6cb92c1acf455c85f32d",
+    "verification_script_sha256": "0d3aa54b540ed2c12b3870fb58f96b01aea855ee968864d37201ab502be8032c",
+    "application_reruns": 0,
+    "source_preserved": true,
+    "limit": "Fixed standard capture retains identities/channels, not detached build directories. Compiler sysroot and OS libraries are outside the content manifest."
+  },
+  "scope": {
+    "generated": "Standalone synchronous scalar callers using matched original-source compiler recipes.",
+    "fixed": "Curated SDK-free semantics, explicit future declarations, ordinary recursion/errors and read-only logical module aliases.",
+    "preservation": "Provider source/product/profile records and selected compiler bytes independently rehashed after execution; source/links/permissions retained in raw evidence.",
+    "not_qualified": [
+      "shipping artefacts",
+      "general Cargo/features or module/build graphs",
+      "generated asynchronous targets and schedules",
+      "generic/macro instances",
+      "Rust receiver/mutable object argument codecs",
+      "compiler sysroot/OS library content closure",
+      "invocation-scoped probe authentication",
+      "disabled recording/export or exporter fault lanes",
+      "other platforms/toolchains"
+    ],
+    "standard_fixed_retention": "Raw channels, telemetry and build identities remain; private fixed-workload executables are not retained for detached replay."
+  }
+}

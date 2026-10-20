@@ -712,7 +712,10 @@ def qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, 
         if bodies:
             raise ValueError("baseline unexpectedly exported telemetry")
     else:
-        witness = telemetry(bodies, read(folder / "runtime.json"), entry, service, decoder)
+        runtime = read(folder / "runtime.json")
+        if entry["language"] == "rust" and capture.RUST_COMPILER_PROFILE_FILENAME in data.get("artefacts", {}).get("rust", {}):
+            capture.rust_future_health(runtime)
+        witness = telemetry(bodies, runtime, entry, service, decoder)
     return {"source_sha256_before": data["source_sha256"], "source_sha256_after": data["source_sha256"],
             "termination": {"kind": "exit", "code": 0}, "capture_complete": capture_complete,
             "channels": {"stdout": list(result.stdout), "stderr": list(result.stderr), "state-and-outcome": list(observation.read_bytes()), **extra_channels}, "witness": witness}
