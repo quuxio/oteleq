@@ -387,7 +387,7 @@ class CaptureBoundaryTests(unittest.TestCase):
 
     def test_managed_execution_recipes_keep_the_original_source(self):
         workspace, root, policy, source = map(Path, ("/tmp/work", "/tmp/otelc", "/tmp/policy", "/tmp/source"))
-        for language in ("python", "java", "go", "javascript", "typescript"):
+        for language in ("python", "java", "javascript", "typescript"):
             with self.subTest(language=language), patch.object(capture, "build"):
                 tools = {language: Path("/qualified/tool")}
                 plain, on = capture.commands(root, workspace, language, source, policy, tools, {}, workspace)

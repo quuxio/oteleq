@@ -270,8 +270,8 @@ class RustLlvmTests(unittest.TestCase):
         for raw in (b"[]", b" " * (4 * 1024 * 1024 + 1)):
             path.write_bytes(raw)
             with self.assertRaises(ValueError):
-                capture.rust_document(path)
+                capture.build_document(path)
         path.unlink()
         path.symlink_to(self.source)
         with self.assertRaises(ValueError):
-            capture.rust_document(path)
+            capture.build_document(path)

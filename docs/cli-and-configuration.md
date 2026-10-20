@@ -35,6 +35,8 @@ The implemented generation policy accepts `[adapters.rust] backend = "compiler"`
 
 `[[fixtures]] receiver = { factory = "Counter", arguments = [10] }` declares an existing Python, JavaScript or TypeScript source constructor or ordinary same-module factory for a selected instance method. Method `cases` exclude the implicit receiver. [Receiver fixtures](receiver-fixtures.md) retain construction inputs and source bindings, require typed receiver/class-data roots and reconstruct independently during generated tests, replay/export and scalar method-argument shrinking. Unsupported languages or callable/storage forms fail visibly.
 
+Go execution requires the [retained build/run provider API](go-build-bundles.md), with strict schema-1 bundle, selected compiler/source/SDK bindings, separate compiler bytes and fixed build-time trace selection. Both replay lanes use the same validated pair. Private compiler/module caches remain external to the target repository. This does not enable the proposed arbitrary Go package/build recipes.
+
 ## Proposed extensions
 
 The broader design adds a `doctor` capability command, build recipes and object/receiver factories, richer promotion planning, stateful inputs and a versioned graph/worker protocol. `doctor`, `promote`, `--keep-workspace`, `--dry-run` and replay `--bundle` are proposal names, not available CLI options. Current retention uses `export-tests` and explicit `clean`.

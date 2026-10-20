@@ -196,7 +196,7 @@ def discover_file(name, language, root, snapshot, workspace, tools, artefacts, r
             tools[language], artefacts[language] = selected, qualified
         def discover_execute(command, cwd, input_data=None):
             environment = capture.environment(snapshot, tools[language], "oteleq-discovery", root)
-            environment.update({"GOCACHE": str(workspace / "go-cache"), "GOTOOLCHAIN": "local",
+            environment.update({"GOCACHE": str(workspace / "go-cache/build"), "GOMODCACHE": str(workspace / "go-cache/modules"), "GOTOOLCHAIN": "local",
                                 "OTELEQ_EXECUTABLE": os.environ["OTELEQ_EXECUTABLE"]})
             return execute(command, cwd, environment, input_data=input_data)
         return discovery.discover(snapshot / name, language, root, tools[language], discover_execute)
@@ -568,6 +568,8 @@ def build_command(root, project, entry, driver, config, tools, env, folder, scra
                 shutil.copyfile(folder / (lane + "-build-identities.json"), folder / BUILD_IDENTITIES)
                 return command
             plain, on = capture.commands(root, project, language, driver, config, tools, env, folder)
+            if language == "go":
+                shutil.copyfile(folder / "go-build-identities.json", folder / BUILD_IDENTITIES)
         finally:
             capture.execute = old_execute
         command = plain if lane == "baseline" else on
@@ -633,7 +635,7 @@ def attempt(workspace, data, entry, case, lane, folder, decoder):
     env = capture.environment(project, tools, service, root)
     scratch = folder / "scratch"
     scratch.mkdir()
-    env.update({"TMPDIR": str(scratch), "HOME": str(scratch), "GOCACHE": str(workspace / "go-cache"), "GOTOOLCHAIN": "local",
+    env.update({"TMPDIR": str(scratch), "HOME": str(scratch), "GOCACHE": str(workspace / "go-cache/build"), "GOMODCACHE": str(workspace / "go-cache/modules"), "GOTOOLCHAIN": "local",
                 "OTELEQ_OBSERVATION": str(folder / "observation"), "OTELC_REPORT_PATH": str(folder / "runtime.json")})
     immutable = manifest(project)
     with capture.receiver() as (endpoint, bodies, errors):
