@@ -4,6 +4,8 @@ from collections import deque
 from otelc_capture import strict_json
 
 STORAGE_PREFIX = "go.storage:"
+LOCATION_TYPE = "go.location"
+LOCATION_REFERENCE = "@location"
 
 def require(condition: bool, reason: str) -> None:
     """A missing or unsupported observation cannot become an equivalence verdict."""
@@ -83,28 +85,38 @@ class Schema:
         if expected == "void":
             require(value == {"kind": "undefined"}, "invalid void result")
             return
+        if expected == LOCATION_REFERENCE:
+            self.reference(value, LOCATION_TYPE, nodes)
+            return
         require(expected in self.models, "storage type is unbound")
         model = self.models[expected]
         if model["kind"] in ("pointer", "array", "struct"):
             if value == {"kind": "null"}:
                 require(model["kind"] == "pointer", "absent non-pointer storage")
                 return
-            require(set(value) == {"kind", "node_id"} and value["kind"] == "reference"
-                    and type(value["node_id"]) is str and value["node_id"] in nodes,
-                    "missing storage reference")
-            require(nodes[value["node_id"]]["type"] == STORAGE_PREFIX + expected, "reference type differs")
+            self.reference(value, STORAGE_PREFIX + expected, nodes)
         else:
             primitive(value, expected, model)
+
+    @staticmethod
+    def reference(value: dict, label: str, nodes: dict) -> None:
+        """Typed pointer views share a separate address-identity node."""
+        require(set(value) == {"kind", "node_id"} and value["kind"] == "reference"
+                and type(value["node_id"]) is str and value["node_id"] in nodes,
+                "missing storage reference")
+        require(nodes[value["node_id"]]["type"] == label, "reference type differs")
 
     def fields(self, node: dict) -> dict[str, str]:
         """Struct/array members are addressable slots, preserving interior aliases."""
         label = node["type"]
+        if label == LOCATION_TYPE:
+            return {}
         require(type(label) is str and label.startswith(STORAGE_PREFIX), "unbound storage node")
         name = label.removeprefix(STORAGE_PREFIX)
         require(name in self.models, "node lacks a source storage declaration")
         model = self.models[name]
         if model["kind"] == "pointer":
-            return {"value": model["element"]}
+            return {"value": model["element"], "location": LOCATION_REFERENCE}
         if model["kind"] == "struct":
             return {field["name"]: "*" + field["type"] for field in model["fields"]}
         require(model["kind"] == "array", "primitive cannot substitute a storage node")
@@ -148,7 +160,7 @@ def boundaries(raw: bytes, entry: dict) -> dict:
     require(len(raw) <= 3*262144+1024, "capture budget exceeded")
     capture = strict_json(raw)
     require(type(capture) is dict and set(capture) == {"go_receiver_schema_version", "before", "outcome", "after"}
-            and type(capture["go_receiver_schema_version"]) is int and capture["go_receiver_schema_version"] == 1,
+            and type(capture["go_receiver_schema_version"]) is int and capture["go_receiver_schema_version"] == 2,
             "unsupported receiver envelope")
     outcome = capture["outcome"]
     require(type(outcome) is dict and set(outcome) == {"kind", "value"}

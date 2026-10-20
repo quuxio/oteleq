@@ -130,11 +130,28 @@ type address struct {
 	data uintptr
 }
 type graph struct {
-	models map[string]model
-	seen   map[address]string
-	nodes  []node
-	fields int
-	bytes  int
+	models    map[string]model
+	seen      map[address]string
+	locations map[uintptr]string
+	nodes     []node
+	fields    int
+	bytes     int
+}
+
+// Typed pointer views can share one location, including named-type conversions
+// and a struct/array's first field. Keep that relation without exporting addresses.
+func (g *graph) location(data uintptr, depth int) value {
+	if g.locations == nil {
+		g.locations = map[uintptr]string{}
+	}
+	if prior, exists := g.locations[data]; exists {
+		return value{"kind": "reference", "node_id": prior}
+	}
+	require(depth <= 32 && len(g.nodes) < 512)
+	id := "n" + strconv.Itoa(len(g.nodes))
+	g.locations[data] = id
+	g.nodes = append(g.nodes, node{id, "go.location", map[string]value{}})
+	return value{"kind": "reference", "node_id": id}
 }
 
 func (g *graph) scalar(item reflect.Value, name string) value {
@@ -208,6 +225,7 @@ func (g *graph) encode(item reflect.Value, expected string, depth int) value {
 	g.nodes = append(g.nodes, node{id, "go.storage:" + expected, contents})
 	switch storage.Kind {
 	case "pointer":
+		contents["location"] = g.location(key.data, depth+1)
 		contents["value"] = g.encode(item.Elem(), storage.Element, depth+1)
 	case "struct":
 		for index, field := range storage.Fields {
@@ -383,7 +401,7 @@ func Run(encoded string, factory, target reflect.Value, globals ...Root) {
 	if failed {
 		kind = "error"
 	}
-	encodedCapture, err := json.Marshal(map[string]any{"go_receiver_schema_version": 1,
+	encodedCapture, err := json.Marshal(map[string]any{"go_receiver_schema_version": 2,
 		"before": before, "outcome": map[string]any{"kind": kind, "value": outcome}, "after": after})
 	require(err == nil && len(encodedCapture) <= 3*262144+1024)
 	require(os.WriteFile(os.Getenv("OTELEQ_OBSERVATION"), encodedCapture, 0600) == nil)

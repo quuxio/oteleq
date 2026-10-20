@@ -16,6 +16,7 @@ type Counter struct {
  value Number
  self *Counter
  pointer *Number
+ view *int16
  array [2]uint64
  label string
  active bool
@@ -28,16 +29,17 @@ func instrumented()bool{info,ok:=debug.ReadBuildInfo();if !ok{return false};for 
 func (value *Counter) Add(amount Number)*Counter{value.value+=amount;total+=amount;value.array[1]++;value.pointer=&total;return value}
 func (value *Counter) InstanceDifference(amount Number)int{value.value+=amount;if instrumented(){value.value++};return 7}
 func (value *Counter) GlobalDifference(amount Number)int{total+=amount;if instrumented(){total++};return 7}
+func (value *Counter) AliasDifference(amount Number)int{if instrumented(){other:=int16(value.value);value.view=&other};return 7}
 func (value *Counter) Fail(amount Number)int{value.value+=amount;panic("known")}
 func (value Counter) Copy(amount Number)Number{value.value+=amount;return value.value}
 func (value *Counter) Void(amount Number){value.value+=amount}
 func (value *Counter) Read(amount Number)Number{if value==nil{return amount};return value.value}
 func (value *Counter) String()string{panic("APPLICATION_FORMATTER")}
 func (value *Counter) MarshalJSON()([]byte,error){panic("APPLICATION_FORMATTER")}
-func New(seed Number)*Counter{value:=&Counter{value:seed,label:"\xff\x00é😀",active:true,ratio:math.Float32frombits(0x80000000),wide:math.Float64frombits(0x7ff0000000000001),array:[2]uint64{18446744073709551615,0}};value.self=value;value.pointer=&value.value;shared=value;return value}
+func New(seed Number)*Counter{value:=&Counter{value:seed,label:"\xff\x00é😀",active:true,ratio:math.Float32frombits(0x80000000),wide:math.Float64frombits(0x7ff0000000000001),array:[2]uint64{18446744073709551615,0}};value.self=value;value.pointer=&value.value;value.view=(*int16)(&value.value);shared=value;return value}
 func Nil(seed Number)*Counter{return nil}
 '''
-METHODS = ("Add", "InstanceDifference", "GlobalDifference", "Fail", "Copy", "Void", "Read", "Main")
+METHODS = ("Add", "InstanceDifference", "GlobalDifference", "AliasDifference", "Fail", "Copy", "Void", "Read", "Main")
 
 
 def selected(name: str) -> str:
@@ -99,10 +101,14 @@ def state(graph: dict, method: str, argument: int, lane: str, *, after: bool) ->
         return
     receiver = roots["receiver"]
     fields = node(graph, node(graph, receiver)["value"])
-    assert set(fields) == {"value", "self", "pointer", "array", "label", "active", "ratio", "wide"}
+    assert set(fields) == {"value", "self", "pointer", "view", "array", "label", "active", "ratio", "wide"}
     increment = argument if after and method in ("Add", "InstanceDifference", "Fail", "Void") else 0
     extra = int(after and method == "InstanceDifference" and lane == "instrumented_on")
     assert number(graph, fields["value"]) == 10 + increment + extra
+    view = node(graph, node(graph, fields["view"])["value"])
+    assert view["value"]["value"] == str(10 + increment + extra)
+    shared = not (after and method == "AliasDifference" and lane == "instrumented_on")
+    assert (view["location"] == node(graph, fields["value"])["location"]) == shared
     assert node(graph, fields["self"])["value"] == receiver
     assert node(graph, roots["global:shared"])["value"] == receiver
     total = argument if after and method in ("Add", "GlobalDifference") else 0
@@ -131,6 +137,9 @@ def copied_result(graph: dict, argument: int) -> None:
     assert number(graph, fields["value"]) == 10 + argument
     assert node(graph, fields["self"])["value"] == receiver
     assert node(graph, fields["pointer"])["value"] == original["value"]
+    view = node(graph, node(graph, fields["view"])["value"])
+    assert view["location"] == node(graph, original["value"])["location"]
+    assert view["value"]["value"] == "10"
     array = node(graph, node(graph, fields["array"])["value"])
     assert set(array) == {"item:0", "item:1"}
     assert number(graph, array["item:0"]) == 18446744073709551615
@@ -139,14 +148,14 @@ def copied_result(graph: dict, argument: int) -> None:
         assert node(graph, fields[name])["value"] == node(graph, original[name])["value"]
 
 
-def check_report(path: Path, expected_cases: int = 8) -> int:
+def check_report(path: Path, expected_cases: int = 9) -> int:
     """Each actual lane/repeat must satisfy an independent complete fixture oracle."""
     report = json.loads(path.read_text())
     assert report["source_preserved"] and not report["blocked"] and len(report["cases"]) == expected_cases
     launches = 0
     for case in report["cases"]:
         method = case["function"].rsplit(".", 1)[-1]
-        assert case["exit_code"] == int(method in ("InstanceDifference", "GlobalDifference")), case
+        assert case["exit_code"] == int(method in ("InstanceDifference", "GlobalDifference", "AliasDifference")), case
         bundle = json.loads((path.parent / case["case"] / "typed-bundle.json").read_text())["cases"][0]
         for lane in ("baseline", "instrumented_on"):
             assert len(bundle[lane]) == 2
@@ -189,7 +198,7 @@ def check_report(path: Path, expected_cases: int = 8) -> int:
 def framework(workspace: Path, folder: Path, label: str) -> int:
     outputs = command([sys.executable, workspace / "tests/test_equivalence.py"], folder, label, expected=1)
     reports = [json.loads(line) for line in outputs.splitlines()]
-    assert len(reports) == 8
+    assert len(reports) == 9
     return sum(check_report(Path(item["report"]), 1) for item in reports)
 
 
@@ -316,8 +325,8 @@ def main() -> None:
     unique = {hashlib.sha256(path.read_bytes()).hexdigest() for path in commands}
     assert len(unique) == launches
     result = {"claim": "equivalence over these tests and observations", "artefact_class": "diagnostic",
-              "cli_sha256": hashlib.sha256(cli.read_bytes()).hexdigest(), "cases": 8, "matching_cases": 6,
-              "difference_controls": 2, "actual_application_launches": launches, "source_preserved": True,
+              "cli_sha256": hashlib.sha256(cli.read_bytes()).hexdigest(), "cases": 9, "matching_cases": 6,
+              "difference_controls": 3, "actual_application_launches": launches, "source_preserved": True,
               "prelaunch_source_refusals": controls, "retained_attempt_folders": len(commands), "unique_command_identities": len(unique),
               "fixture_refusals": refused,
               "scope": "Declared same-package scalar factories, private struct/array slots, aliases/cycles, scalar panics and nil/value receivers. No maps/slices/interfaces, arbitrary arguments/actions, cross-boundary allocation identity or shipping qualification."}

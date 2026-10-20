@@ -57,7 +57,7 @@ func TestTypesAndStorage(t *testing.T) {
 	s := &sample{count: 7}
 	s.next = s
 	graph := capture(models, map[string]reflect.Value{"receiver": reflect.ValueOf(s)}, reflect.ValueOf(s), "*"+name, true, false)
-	if !reflect.DeepEqual(graph.Roots["receiver"], graph.Roots["result"]) || len(graph.Nodes) != 8 {
+	if !reflect.DeepEqual(graph.Roots["receiver"], graph.Roots["result"]) || len(graph.Nodes) != 12 {
 		t.Fatalf("lost alias or source slots: %+v", graph)
 	}
 	capture(models, map[string]reflect.Value{}, reflect.ValueOf(sample{}), name, true, false)

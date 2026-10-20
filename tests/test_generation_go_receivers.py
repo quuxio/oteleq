@@ -83,12 +83,12 @@ class GoReceiverTests(unittest.TestCase):
         self.assertEqual(entry["status"], "ready", entry["reason"])
         return entry
 
-    def worker(self, entry, arguments=None):
+    def worker(self, entry, arguments=None, extra_env=None):
         private = self.base / "private"
         shutil.copytree(self.snapshot, private)
         driver = harness.materialise(private, entry, [3] if arguments is None else arguments)
         observation = self.base / "observation.json"
-        env = {**self.environment, "OTELEQ_OBSERVATION": str(observation)}
+        env = {**self.environment, "OTELEQ_OBSERVATION": str(observation), **(extra_env or {})}
         process = subprocess.run([self.go, "run", driver], cwd=private, env=env,
                                  capture_output=True, check=False, timeout=90)
         return process, observation
@@ -172,6 +172,28 @@ func (value *Counter) Read(amount int64)int64{if value==nil{return amount};retur
         self.assertEqual(entry["go_context"]["import_path"], "example.test/receiver/counter")
         self.assertEqual(entry["go_receiver_type"], "*main.Counter")
 
+    def test_pointer_conversion_retains_aliases_across_nominal_types(self):
+        source = SOURCE.replace('import "math"', 'import "math"\nimport "os"')
+        source = source.replace("pointer *Number", "pointer *int16").replace("value.pointer=&value.value", "value.pointer=(*int16)(&value.value)")
+        source = source.replace("value.value+=amount;value.array[1]++;total+=amount;value.pointer=&total;return value",
+                                'if os.Getenv("CHANGE_ALIAS")=="yes"{other:=int16(value.value);value.pointer=&other};return value')
+        self.source.write_text(source)
+        entry = self.entry()
+        for flag in ("no", "yes"):
+            result, path = self.worker(entry, extra_env={"CHANGE_ALIAS": flag})
+            self.assertEqual(result.returncode, 0, result.stderr)
+            data = go_graph.boundaries(path.read_bytes(), entry)
+            for boundary in ("before", "after"):
+                graph = data[boundary]
+                fields = self.node(graph, self.node(graph, graph["roots"]["receiver"])["value"])
+                value = self.node(graph, fields["value"])
+                pointer = self.node(graph, self.node(graph, fields["pointer"])["value"])
+                self.assertEqual(value["value"]["value"], pointer["value"]["value"])
+                self.assertIn("location", value)
+                self.assertEqual(value["location"] == pointer["location"], boundary == "before" or flag == "no")
+            shutil.rmtree(self.base / "private")
+            path.unlink()
+
     def test_observer_failures_do_not_produce_complete_capture(self):
         changes = [SOURCE.replace('value:=&Counter{', 'panic("bad factory");value:=&Counter{'),
                    SOURCE.replace("math.Float32frombits(0x80000000)", "math.Float32frombits(0x7f800001)"),
@@ -191,7 +213,7 @@ func (value *Counter) Read(amount int64)int64{if value==nil{return amount};retur
         result, path = self.worker(entry)
         self.assertEqual(result.returncode, 0, result.stderr)
         original = json.loads(path.read_text())
-        for change in ("root", "field", "type", "unreachable", "version", "outcome"):
+        for change in ("root", "field", "type", "location", "location-fields", "unreachable", "version", "outcome"):
             data = copy.deepcopy(original)
             graph = data["before"]
             if change == "root":
@@ -200,6 +222,10 @@ func (value *Counter) Read(amount int64)int64{if value==nil{return amount};retur
                 next(node for node in graph["nodes"] if node["type"] == "go.storage:example.test/receiver/counter.Counter")["fields"].pop("value")
             elif change == "type":
                 graph["nodes"][0]["type"] = "go.storage:unbound"
+            elif change == "location":
+                next(node for node in graph["nodes"] if "location" in node["fields"])["fields"]["location"] = {"kind": "null"}
+            elif change == "location-fields":
+                next(node for node in graph["nodes"] if node["type"] == "go.location")["fields"]["unexpected"] = {"kind": "null"}
             elif change == "unreachable":
                 node = copy.deepcopy(graph["nodes"][0]);node["id"] = "n" + str(len(graph["nodes"]));graph["nodes"].append(node)
             elif change == "version":
