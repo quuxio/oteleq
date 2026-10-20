@@ -1,0 +1,113 @@
+{
+  "qualification_schema_version": 1,
+  "date": "2026-10-20",
+  "platform": {
+    "os": "macOS",
+    "architecture": "ARM64",
+    "python": "3.12.15",
+    "java": "openjdk version \"21.0.12.1\" 2026-08-18\nOpenJDK Runtime Environment Homebrew (build 21.0.12.1)\nOpenJDK 64-Bit Server VM Homebrew (build 21.0.12.1, mixed mode, sharing)\n"
+  },
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "runtime": {
+    "commit": "5ada5d5ad1612f2c4de60c851e72233863d20078",
+    "tree": "8c8bbd6807e5f42d2c065c02562fdadbf9789bbc",
+    "cli_sha256": "41fac6de6da14a438073193fa8873a9766e736ab723e2a5544558d3406498f7d",
+    "qualification_script_sha256": "c366724edbc6628d0bb6d5525c92f25f3c98a6292368fe8172e1ff69ee2ebc84",
+    "source_archive_sha256": "11cca07ccba9acf9d3b5a3c9c28740e87c5080b887a5bffe9349296282fc5a10",
+    "generator_sha256": "6c114a815d614b39952641ddb5a817be5dfff2b25fa0f146773ffd5ddf191dd2"
+  },
+  "provider": {
+    "source_commit": "0419a51af9aa5b86cabcc21690eda48b987b80d1",
+    "source_tree": "cf5e784bd34272089a387d773d72de4004110f86",
+    "status": "Immutable integrated provider snapshot; not latest producer-main qualification",
+    "manifest_sha256": "a02a87ab7c2a9b54326e5259b73186e84d333c2a5bc2ab37e4b3907c49d9be55",
+    "cli_sha256": "7965f812ff04b8a330d7e399b84dcebf268e14db141245ff21d8659a42adf460",
+    "java_agent_sha256": "1d0af25050d458f114cc1722ae2668eb952d5a9b593ad62af30e97e72ffffdcc",
+    "verified_source_files": 386,
+    "verified_product_files": 519,
+    "verified_dependency_records": 7478,
+    "selected_java_sha256": "d7ab2ea6a7e731a8a2cee7d722046c9f7d8c5f184cd769b9954a392592337770",
+    "selected_javac_sha256": "ab9b94d81dd22c843ef637be9aa2121253c6d4cfe2ba0a89a7bde5c0b9567945"
+  },
+  "inventory": {
+    "callables": 12,
+    "ready": 8,
+    "excluded": 4,
+    "blocked": 0
+  },
+  "results": {
+    "cases": 8,
+    "matching_cases": 6,
+    "same_return_state_differences": 2,
+    "actual_launches": 151,
+    "raw_attempt_folders": 155,
+    "unique_command_identities": 151,
+    "refusal_controls": 7,
+    "scalar_shrink": {
+      "original": [
+        7
+      ],
+      "reduced": [
+        0
+      ]
+    },
+    "routes": [
+      "run",
+      "replay",
+      "generated",
+      "exported"
+    ],
+    "source_preserved": true,
+    "qualified_application_launches": 148,
+    "refused_control_application_launches": 3,
+    "copied_original_shrink_attempts": 4,
+    "shrink_trials": 1,
+    "shrink_status": "candidate_rule_minimal",
+    "generated_suite_runs": 3,
+    "refused_controls": [
+      "missing factory",
+      "implemented interface storage",
+      "wrong factory class",
+      "custom exception codec",
+      "class initialisation failure without application formatting",
+      "changed application source before launch",
+      "changed frozen snapshot before launch"
+    ]
+  },
+  "independent_verification": {
+    "qualified_reports_verified": 31,
+    "refused_reports_verified": 3,
+    "blocked_reports_verified": 2,
+    "raw_files": 3279,
+    "raw_manifest_sha256": "dfc9e3e16bf7f5b25b610acd8beabf490f9510510679277911ac094ec7fb71d7",
+    "literal_source_preserved": true
+  },
+  "validation": {
+    "make_check": "passed",
+    "unique_regressions": 412,
+    "generation_regressions": 212,
+    "java_observer_line_coverage_percent": 96.69,
+    "java_graph_line_coverage_percent": 100,
+    "java_receiver_line_coverage_percent": 100,
+    "java_coverage_tool_line_coverage_percent": 99,
+    "rust_product_line_coverage_percent": 97.29,
+    "sonar_unresolved": 0
+  },
+  "scope": {
+    "observed": "Declared ordinary Java source receivers, supported private fields/methods, scalar arguments, own-static roots, bounded arrays, aliases/cycles and returned references; supported exceptions retain class/message only.",
+    "witness": "Existing name-bound function/span witness; invocation-scoped producer binding is unavailable.",
+    "not_qualified": [
+      "shipping artefacts",
+      "inherited/interface storage",
+      "external factories",
+      "arbitrary mutable arguments",
+      "general classpath/modules and dependency builds",
+      "cross-boundary allocation identity",
+      "arbitrary asynchronous/resource/action sequences",
+      "exception causes/suppressed exceptions/stack traces",
+      "other platforms or toolchains"
+    ],
+    "identity_limit": "Declared SDK/dependency files and selected executable identities; not a complete JDK/OS library closure."
+  }
+}
