@@ -21,12 +21,13 @@ oteleq-run-<id>/
     corpus.json
     harnesses/<case-id>/
   runs/replay-<id>/          # created by replay and the generated suite
-  go-cache/                 # created when needed by the Go adapter
+  go-cache/build/           # private compiler cache when Go is used
+  go-cache/modules/         # private module cache reused within this workspace
 ```
 
 `generate` creates `tests/` once. Each runnable case receives frozen arguments and a diagnostic caller preview; every selected blocker becomes a failing generated test. Zero selected cases cannot yield a passing empty suite. `run` writes attempts and `report.json` into the requested new external report directory. `replay` and the generated suite retain attempts inside `runs/`; a replay result applies only to that named case, while the complete suite includes all selected blockers.
 
-Builds use fresh per-attempt private project copies. Reports retain outputs, build logs, available native binary hashes, raw observations, runtime reports, OTLP captures and comparison bundles. The broader versioned graph protocol and per-language runner projects below are proposals; the current layout above is the implemented contract.
+Builds use fresh per-attempt private project copies. Go retains both executables and their build/recipe/module evidence under each report attempt, separately from its reused workspace caches. Reports retain outputs, build logs, available native binary hashes, raw observations, runtime reports, OTLP captures and comparison bundles. The broader versioned graph protocol and per-language runner projects below are proposals; the current layout above is the implemented contract.
 
 ## Retention and cleanup
 

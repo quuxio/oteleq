@@ -84,7 +84,7 @@ Rust requires the [standalone build/run provider API](docs/automatic-generation.
 
 The default generates up to three distinct scalar cases per function and compares two plain with two instrumented runs per case. Missing instrumentation, changed source, unstable observations, failed builds and selected blockers fail the gate. The report records tested inputs, state coverage, telemetry and gaps. Syntax discovery and scalar samples do not establish business preconditions.
 
-Go freezes its provider module manifest/checksums and the runtime/imported policy sources. Changing those inputs after planning invalidates execution; downloaded third-party module caches remain outside that identity scope.
+Go requires the [retained build/run provider API](docs/go-build-bundles.md). Each attempt retains its matched baseline/instrumented executables, compiler channels and loaded source/dependency identities; both launches replay without compilation. Provider module/checksum/runtime/policy changes invalidate the plan. Private per-workspace compiler/module caches are reused; arbitrary package/build integration and SDK dependency isolation remain open. The [Go build qualification](docs/qualification/go-builds-2026-10-20.json) records 78 actual launches, matched byte/status/signal controls and strict prelaunch refusals.
 
 Python can use explicit [source package import roots](docs/python-package-context.md), including regular packages and `src` layouts. Relative imports and package initialisers use their real module context; unsupported package contexts remain blockers.
 
