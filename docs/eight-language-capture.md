@@ -2,6 +2,8 @@
 
 The diagnostic capture integration runs C, C++, Rust, Python, Java, JavaScript, TypeScript and Go through the actual otelc launcher. Each language runs twice plain and twice instrumented in fresh processes and private source copies. The Rust comparator must return `equivalent_observed` for every requested language; missing instrumentation, incomplete export, unstable output or changed tools cannot pass.
 
+The [20 October integrated-provider record](qualification/integrated-provider-2026-10-20.json) includes all 32 standard fixed launches against frozen provider `d6d03b7`, alongside separate generated/configured and Rust semantic corpora. Optional worker, collection, resource and native-emitter profiles retain their earlier exact-revision records; the standard matrix does not qualify those profiles on another provider.
+
 ## Run
 
 Build otelc and its qualified toolchains/adapters first. Use its locked CPython 3.12 environment for the OTLP protobuf decoder. From the oteleq checkout:

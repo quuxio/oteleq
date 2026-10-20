@@ -98,7 +98,8 @@ def capture_attempt(root, lane, attempt_dir, originals, identities, temporary_di
         local_policy.write_bytes(originals[policy])
         env = {"PATH": os.environ.get("PATH", ""), "HOME": str(workspace),
                "TMPDIR": str(workspace), "LANG": "C.UTF-8",
-               "PYTHONDONTWRITEBYTECODE": "1", "OTELC_PYTHON": sys.executable}
+               "PYTHONDONTWRITEBYTECODE": "1", "OTELC_PYTHON": sys.executable,
+               "OTELC_ADAPTER_ROOT": str(root / "adapters")}
         server = CaptureServer(max_requests=16)
         worker = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True)
         worker.start()
@@ -115,6 +116,9 @@ def capture_attempt(root, lane, attempt_dir, originals, identities, temporary_di
             server.shutdown()
             server.server_close()
             worker.join(timeout=3)
+        (attempt_dir / "commands.json").write_text(json.dumps({
+            "executed": command, "working_directory": str(workspace),
+            "adapter_root": env["OTELC_ADAPTER_ROOT"], "python": env["OTELC_PYTHON"]}, indent=2) + "\n")
         retain_http(attempt_dir, server.bodies, server.errors, server.requests)
         for channel in ("stdout", "stderr"):
             (attempt_dir / channel).write_bytes(getattr(result, channel))

@@ -221,6 +221,37 @@ class ArtefactStabilityTests(unittest.TestCase):
         with self.assertRaises(FileNotFoundError):
             OBSERVER["require_same_artefacts"](self.root, self.interpreter, self.identities)
 
+    def test_task_launch_binds_the_requested_adapter_root_in_both_lanes(self):
+        app = self.root / "examples/apps/python_tasks_app.py"
+        app.parent.mkdir(parents=True)
+        app.write_text("print('same output')\n")
+        policy = self.root / "examples/python-task-context.toml"
+        policy.write_text("schema_version=2\n")
+        originals = {path: path.read_bytes() for path in (app, policy)}
+        identities = OBSERVER["artefact_identities"](self.root, Path(sys.executable))
+        capture_attempt = OBSERVER["capture_attempt"]
+        # Launch interception needs no actual receiver traffic or child process.
+        server = SimpleNamespace(server_port=12345, serve_forever=lambda **_: None,
+                                 shutdown=lambda: None, server_close=lambda: None)
+        class LaunchCaptured(Exception):
+            """Stop after retaining the exact environment passed to subprocess."""
+        with tempfile.TemporaryDirectory() as parent:
+            for lane in ("baseline", "instrumented_on"):
+                attempt = Path(parent) / lane
+                with self.subTest(lane=lane), \
+                     patch.dict(os.environ, {"OTELC_ADAPTER_ROOT": "/decoy/adapters", "OTELC_PYTHON": "/decoy/python"}), \
+                     patch.dict(capture_attempt.__globals__, {"CaptureServer": lambda **_: server}), \
+                     patch.object(subprocess, "run", side_effect=LaunchCaptured) as launch:
+                    with self.assertRaises(LaunchCaptured):
+                        capture_attempt(self.root, lane, attempt, originals, identities, Path(parent))
+                    command = launch.call_args.args[0]
+                    env = launch.call_args.kwargs["env"]
+                    self.assertEqual(env.get("OTELC_ADAPTER_ROOT"), str(self.root / "adapters"))
+                    self.assertEqual(env["OTELC_PYTHON"], sys.executable)
+                    self.assertEqual(command[0], str(self.root / "target/debug/quux-otelc")
+                                     if lane == "instrumented_on" else sys.executable)
+                    self.assertFalse((attempt / "attempt.json").exists())
+
     def test_source_contained_temporary_parent_is_rejected_before_creating_any_workspace(self):
         checker = Path(__file__).resolve().parents[1]
         with tempfile.TemporaryDirectory() as parent:
