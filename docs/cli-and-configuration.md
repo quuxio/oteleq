@@ -14,9 +14,10 @@ Updated 19 October 2026. `quux-oteleq` implements the commands below. The scalar
 | `replay` | `--workspace PATH --case ID` | None | One frozen case in a new `runs/replay-*` directory inside the workspace |
 | `export-tests` | `--workspace PATH --destination PATH` | `--apply` | Copy plan by default; with `--apply`, a new runnable frozen source/suite bundle |
 | `clean` | `--workspace PATH` | None | Removes an owned workspace after checking its snapshot/suite and top-level contents |
+| `render-report` | `REPORT.json --output-dir NEW_DIRECTORY` | None | Private standalone HTML and JUnit presentation of retained generated-run evidence |
 | `compare-workload` | `BUNDLE.json` positional path | None | Byte-channel comparison JSON on stdout |
 
-The generation commands accept `--help`. `quux-oteleq --help` lists both workflows and their exit contracts. Use full option names; abbreviations are rejected. Paths accept both `--source PATH` and `--source=PATH` forms. `--cases` accepts 1 through 1024 and defaults to the policy budget or 3 scalar cases per function. Larger budgets add seeded samples; finite domains can produce fewer distinct cases. Language IDs are `c`, `cpp`, `rust`, `python`, `java`, `javascript`, `typescript`, `go`; repeated language selectors form a subset, and exclusions match qualified function identities.
+The generation commands and `render-report` accept `--help`. `quux-oteleq --help` lists both workflows and their exit contracts. Use full option names; abbreviations are rejected. Paths accept both `--source PATH` and `--source=PATH` forms. `--cases` accepts 1 through 1024 and defaults to the policy budget or 3 scalar cases per function. Larger budgets add seeded samples; finite domains can produce fewer distinct cases. Language IDs are `c`, `cpp`, `rust`, `python`, `java`, `javascript`, `typescript`, `go`; repeated language selectors form a subset, and exclusions match qualified function identities.
 
 Set `OTELEQ_PYTHON` to otelc's qualified Python 3.12+ environment with the OTLP protobuf decoder. The selected language tools and built otelc adapters must already exist. `plan` performs syntax discovery using those tools, without executing target functions. It does not establish arbitrary build graphs or valid business preconditions. `generate` creates the suite once; a changed source, corpus, CLI or tool identity requires a new plan. Dependencies are not installed into the application.
 
@@ -24,9 +25,11 @@ Use the actual path printed by `plan` for subsequent commands. Workspace and tem
 
 Generation execution exits are `0` complete, `1` observed difference, `2` argument error, `3` incomplete/blocked and `4` tool/build/protocol/identity failure. A run with no completed cases or any selected blocker cannot return success. Mixed case results give precedence to `4`, `2`, `1`, then `3`; the report retains each result. `replay` qualifies only the named case. The generated `unittest` suite includes failing tests for all selected blockers. `compare-workload` has its own [exit-code contract](workload-comparison.md#build-and-compare).
 
+The Rust-only [report renderer](reporting.md) needs no Python, provider or original workspace. It exits `0` for complete matches, `1` for differences, `2` for arguments, `3` for gaps and `4` for invalid input/output. It retains whole-inventory gaps from partial replay and refuses existing output directories.
+
 ## Proposed extensions
 
-The broader design adds a `doctor` capability command, build recipes and object/receiver factories, richer promotion planning, stateful inputs, HTML/JUnit reports and a versioned graph/worker protocol. `doctor`, `promote`, `--keep-workspace`, `--dry-run` and replay `--bundle` are proposal names, not available CLI options. Current retention uses `export-tests` and explicit `clean`.
+The broader design adds a `doctor` capability command, build recipes and object/receiver factories, richer promotion planning, stateful inputs and a versioned graph/worker protocol. `doctor`, `promote`, `--keep-workspace`, `--dry-run` and replay `--bundle` are proposal names, not available CLI options. Current retention uses `export-tests` and explicit `clean`.
 
 ## Implemented configuration
 

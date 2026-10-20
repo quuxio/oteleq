@@ -57,7 +57,7 @@ pub struct Scope {
     pub channels: Vec<String>,
     pub gaps: Vec<String>,
 }
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum Language {
     C,

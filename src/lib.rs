@@ -4,3 +4,4 @@ pub mod protocol;
 pub use compare::{compare, Report, Verdict};
 pub use protocol::Bundle;
 pub mod generation;
+pub mod reporting;
