@@ -12,6 +12,15 @@ import qualify_go_receivers as qualifier
 
 
 class GoReceiverQualificationTests(unittest.TestCase):
+    def test_shrink_selection_ignores_excluded_same_named_methods(self):
+        plan = {"inventory": [{"id": "main", "name": "Counter.InstanceDifference", "status": "excluded"},
+                              {"id": "library", "name": "Counter.InstanceDifference", "status": "ready"}]}
+        case = {"id": "case", "function_id": "library"}
+        self.assertEqual(qualifier.selected_case(plan, [case], "Counter.InstanceDifference"), case)
+        plan["inventory"][0]["status"] = "ready"
+        with self.assertRaises(AssertionError):
+            qualifier.selected_case(plan, [case], "Counter.InstanceDifference")
+
     def test_exact_oracle_rejects_matching_wrong_results_arguments_and_state(self):
         graph = {"roots": {"receiver": {"kind": "null"}, "argument:0": {"kind": "integer", "value": "3"},
                            "global:shared": {"kind": "reference", "node_id": "n0"},

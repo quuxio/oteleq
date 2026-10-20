@@ -193,6 +193,15 @@ def framework(workspace: Path, folder: Path, label: str) -> int:
     return sum(check_report(Path(item["report"]), 1) for item in reports)
 
 
+def selected_case(plan: dict, corpus: list, name: str) -> dict:
+    """An excluded same-named method cannot supply the selected shrink case."""
+    entries = [item for item in plan["inventory"] if item["status"] == "ready" and item["name"] == name]
+    assert len(entries) == 1
+    cases = [item for item in corpus if item["function_id"] == entries[0]["id"]]
+    assert len(cases) == 1
+    return cases[0]
+
+
 def source_guards(cli: Path, workspace: Path, folder: Path, case: dict) -> int:
     """Changed source/module/snapshot inputs refuse before another launch."""
     plan = json.loads((workspace / "plan.json").read_text())
@@ -286,8 +295,7 @@ def main() -> None:
     launches += framework(exported, work, "export-framework")
     corpus = json.loads((workspace / "tests/corpus.json").read_text())
     plan = json.loads((workspace / "plan.json").read_text())
-    entry = next(item for item in plan["inventory"] if item["name"] == "Counter.InstanceDifference")
-    case = next(item for item in corpus if item["function_id"] == entry["id"])
+    case = selected_case(plan, corpus, "Counter.InstanceDifference")
     controls = source_guards(cli, workspace, work, case)
     command([cli, "shrink", "--workspace", workspace, "--case", case["id"], "--trials", "1",
              "--report-dir", work / "shrink"], work, "shrink", expected=1)
