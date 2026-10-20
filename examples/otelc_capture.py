@@ -884,11 +884,11 @@ def lifetime_diagnostics(bodies, report, spec, service, decoder, language):
     if not selected:
         return {}, 0
     kind = selected[0]
-    if len(selected) != 1 or language not in ("python", "javascript") or language == "javascript" and kind != "collection":
+    if len(selected) != 1 or language not in ("python", "javascript", "typescript") or language != "python" and kind != "collection":
         raise ValueError(f"{kind} qualification requires Python and a distinct workload")
     spans = [span for path, body in bodies if path == TRACE_PATH
              for span in service_spans(decoder.FromString(body), service)]
-    if language == "javascript":
+    if language in ("javascript", "typescript"):
         return otelc_collection.javascript(spans, report, spec[kind])
     verify = {"collection": otelc_collection.verify, "resource": otelc_resource.verify}[kind]
     if kind == "resource":

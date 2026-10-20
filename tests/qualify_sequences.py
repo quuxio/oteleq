@@ -32,19 +32,22 @@ function make(start){return new Counter(start);}
 '''
 
 
-def prepare(cli: Path, provider: Path, folder: Path) -> Path:
+def prepare(cli: Path, provider: Path, folder: Path, *, cases=CASES, typescript_backend=None,
+            collection_languages=("javascript",)) -> Path:
     folder.mkdir()
     source = folder / "application"
     source.mkdir()
+    if typescript_backend is not None:
+        (source / "package.json").write_text('{"private":true,"type":"module"}\n')
     include, fixtures = [], []
-    for filename, (method, factory, language, _) in CASES.items():
+    for filename, (method, factory, language, _) in cases.items():
         text = SOURCE
         if language == "typescript":
             text = text.replace("constructor(start)", "constructor(start:number)").replace("make(start)", "make(start:number)")
             text = text.replace("(value)", "(value:number)")
-        if filename == "retained.mjs":
+        if Path(filename).stem == "retained":
             text = text.replace(" constructor(start)", " static held=null;\n constructor(start)").replace("this.value=start;", "Counter.held=this;this.value=start;")
-        if filename == "finalized.mjs":
+        if Path(filename).stem == "finalized":
             text = 'import {register} from "./finalizers.mjs";\nlet completed=0;\nfunction mark(){completed++;}\n' + text.replace("this.value=start;", "register(this,mark);this.value=start;")
         (source / filename).write_text(text)
         identity = Path(filename).stem + ".Counter." + method
@@ -53,19 +56,20 @@ def prepare(cli: Path, provider: Path, folder: Path) -> Path:
         if method == "fail":
             first = '{action="call",arguments="case",expected_baseline={kind="error",category="exception",type="ecmascript.TypeError.prototype:TypeError"}}'
         steps = [first, '{action="call",arguments=[2]}', '{action="release"}']
-        if language == "javascript":
-            steps.append('{action="collect",gc_rounds=' + ("2" if filename == "retained.mjs" else "64") + ',settle_turns=4}')
+        if language in collection_languages:
+            steps.append('{action="collect",gc_rounds=' + ("2" if Path(filename).stem == "retained" else "64") + ',settle_turns=4}')
         text = '\n[[fixtures]]\nsource=' + json.dumps(filename) + '\nfunction=' + json.dumps(identity) + '\ncases=[[7]]\nreceiver={factory=' + json.dumps(factory) + ',arguments=[10]}\nsequence=[' + ','.join(steps) + ']\n'
         if method == "transient":
             text += 'domains=[{kind="integer",minimum=0,maximum=7}]\n'
         fixtures.append(text)
     (source / "finalizers.mjs").write_text('const registry=new FinalizationRegistry(notify=>notify());\nexport function register(value,notify){registry.register(value,notify);}\n')
     config = folder / "equivalence.toml"
-    config.write_text('schema_version=1\nlanguages=["javascript","typescript"]\n[functions]\ninclude=' + json.dumps(include) + '\n' + ''.join(fixtures))
+    backend = '[adapters.typescript]\nbackend=' + json.dumps(typescript_backend) + '\n' if typescript_backend is not None else ''
+    config.write_text('schema_version=1\nlanguages=' + json.dumps(sorted({case[2] for case in cases.values()})) + '\n[functions]\ninclude=' + json.dumps(include) + '\n' + backend + ''.join(fixtures))
     workspace = Path(command([cli, "plan", "--source", source, "--otelc-root", provider,
                               "--workspace-parent", folder, "--config", config], folder, "plan"))
     plan = json.loads((workspace / "plan.json").read_text())
-    assert len([entry for entry in plan["inventory"] if entry["status"] == "ready"]) == len(CASES), plan["inventory"]
+    assert len([entry for entry in plan["inventory"] if entry["status"] == "ready"]) == len(cases), plan["inventory"]
     assert not any(entry["status"] == "blocked" for entry in plan["inventory"]), plan["inventory"]
     command([cli, "generate", "--workspace", workspace], folder, "generate")
     return workspace
@@ -82,7 +86,7 @@ def receiver_value(snapshot: dict) -> float:
     return number(node["fields"]["property:value"])
 
 
-def check_report(path: Path, count: int = 8) -> int:
+def check_report(path: Path, count: int = 8, *, cases=CASES, collection_languages=("javascript",)) -> int:
     report = json.loads(path.read_text())
     assert report["source_preserved"] and not report["blocked"] and len(report["cases"]) == count
     entries = {entry["otelc_function"]: entry for entry in report["inventory"]}
@@ -90,7 +94,7 @@ def check_report(path: Path, count: int = 8) -> int:
     for case in report["cases"]:
         entry = entries[case["function"]]
         filename, method, argument = entry["path"], entry["name"].rsplit('.', 1)[-1], case["arguments"][0]
-        expected = CASES[filename][3]
+        expected = cases[filename][3]
         assert case["exit_code"] == expected, case
         typed = json.loads((path.parent / case["case"] / "typed-bundle.json").read_text())["cases"][0]
         for lane in ("baseline", "instrumented_on"):
@@ -99,7 +103,7 @@ def check_report(path: Path, count: int = 8) -> int:
                 launches += 1
                 observed, active = attempt["observation"], lane == "instrumented_on"
                 steps = observed["steps"]
-                assert len(steps) == (3 if entry["language"] == "typescript" else 4)
+                assert len(steps) == (4 if entry["language"] in collection_languages else 3)
                 assert receiver_value(observed["before"]) == 10
                 first = 10 + argument + int(method == "transient" and active)
                 assert receiver_value(steps[0]["after"]) == first
@@ -114,24 +118,24 @@ def check_report(path: Path, count: int = 8) -> int:
                         assert graph["roots"]["result"] == graph["roots"]["receiver"]
                 if method == "transient":
                     assert number(observed["outcome"]["graph"]["roots"]["result"]) == 7
-                if entry["language"] == "javascript":
-                    collected = filename != "retained.mjs"
+                if entry["language"] in collection_languages:
+                    collected = Path(filename).stem != "retained"
                     assert steps[3]["outcome"]["graph"]["roots"]["result"]["value"] is collected
                     assert bool(steps[3]["gaps"]) is (not collected)
-                if filename == "finalized.mjs":
+                if Path(filename).stem == "finalized":
                     assert number(observed["before"]["roots"]["global:completed"]) == 0
                     assert number(steps[3]["after"]["roots"]["global:completed"]) == 1
                 folder = path.parent / case["case"] / (lane + "-" + str(index))
                 assert (folder / "stdout").read_bytes() == b"" and (folder / "stderr").read_bytes() == b""
                 if active:
                     names = {case["function"]: 2}
-                    if filename == "async_factory.cjs":
+                    if Path(filename).stem == "async_factory":
                         names["async_factory.make"] = 1
-                    if entry["language"] == "javascript" and filename != "retained.mjs":
+                    if entry["language"] in collection_languages and Path(filename).stem != "retained":
                         names[entry["node_class_label"] + " lifetime"] = 1
                     witness = attempt["execution"]["witness"]
                     assert witness["functions"] == names
-                    assert bool(any(witness["losses"].values())) is (filename == "retained.mjs")
+                    assert bool(any(witness["losses"].values())) is (Path(filename).stem == "retained")
     return launches
 
 
@@ -172,10 +176,10 @@ def evidence_controls(cli: Path, report_path: Path, folder: Path) -> int:
     return len(controls)
 
 
-def source_control(cli: Path, workspace: Path, folder: Path, case: dict) -> None:
+def source_control(cli: Path, workspace: Path, folder: Path, case: dict, *, source_name="identity.mjs") -> None:
     """A changed application source refuses before creating any new attempt."""
     plan = json.loads((workspace / "plan.json").read_text())
-    path = Path(plan["source"]) / "identity.mjs"
+    path = Path(plan["source"]) / source_name
     original = path.read_bytes()
     (workspace / "runs").mkdir(exist_ok=True)
     runs = set((workspace / "runs").iterdir())
@@ -188,11 +192,12 @@ def source_control(cli: Path, workspace: Path, folder: Path, case: dict) -> None
         path.write_bytes(original)
 
 
-def framework(workspace: Path, folder: Path, name: str, count: int = 8) -> int:
+def framework(workspace: Path, folder: Path, name: str, count: int = 8, *, cases=CASES,
+              collection_languages=("javascript",)) -> int:
     summaries = command([sys.executable, workspace / "tests/test_equivalence.py"], folder, name, expected=1)
     reports = [json.loads(line) for line in summaries.splitlines()]
     assert len(reports) == count
-    return sum(check_report(Path(row["report"]), 1) for row in reports)
+    return sum(check_report(Path(row["report"]), 1, cases=cases, collection_languages=collection_languages) for row in reports)
 
 
 def main() -> None:

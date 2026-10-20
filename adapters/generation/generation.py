@@ -24,6 +24,7 @@ import python_project
 import shrinking
 import sequences
 import typed_capture
+import typescript_provider
 
 VERSION = 1
 MAX_FILE = 8 * 1024 * 1024
@@ -305,6 +306,8 @@ def inventory_entry(function, discovered, name, language, source_hash, snapshot,
     excluded = is_entrypoint(function, language) or bool(function.get("declaration_only"))
     excluded |= not project_policy.selected(entry["otelc_function"], args.configuration["functions"])
     entry["generation_seed"] = args.configuration["generation"]["seed"]
+    if language == "typescript":
+        entry["typescript_backend"] = args.configuration["adapters"]["typescript"]["backend"]
     if language == "rust":
         entry["rust_backend"] = args.configuration["adapters"]["rust"]["backend"]
     if language == "go":
@@ -355,8 +358,10 @@ def inventory_tree(contents, root, snapshot, workspace, args):
         discovered = discover_file(name, language, root, snapshot, workspace, tools, artefacts,
                                    adapter_state)
         discovered["entrypoints"] = [function for function in discovered["functions"] if is_entrypoint(function, language)]
-        inventory.extend(inventory_entry(function, discovered, name, language, sha, snapshot, args)
-                         for function in discovered["functions"])
+        for function in discovered["functions"]:
+            entry = inventory_entry(function, discovered, name, language, sha, snapshot, args)
+            typescript_provider.bind(entry, root, workspace, tools.get(language, {}), execute, policy)
+            inventory.append(entry)
     return tools, artefacts, inventory
 
 
@@ -438,7 +443,7 @@ def decoder_files():
 
 def generator_identity():
     here = Path(__file__).parent
-    names = ("generation.py", "policy.py", "domains.py", "shrinking.py", "sequences.py", "python_project.py", "go_project.py", "node_receivers.py", "discovery.py", "harness.py", "observe.py", "node_observe.mjs", "node_sequence.mjs", "typed_capture.py", "discover.mjs", "discover.go", "Discover.java")
+    names = ("generation.py", "policy.py", "domains.py", "shrinking.py", "sequences.py", "typescript_provider.py", "python_project.py", "go_project.py", "node_receivers.py", "discovery.py", "harness.py", "observe.py", "node_observe.mjs", "node_sequence.mjs", "typed_capture.py", "discover.mjs", "discover.go", "Discover.java")
     files = {name: capture.file_digest(here / name) for name in names}
     files["host-python"] = capture.file_digest(Path(sys.executable))
     files["host-version"] = sys.version
@@ -559,6 +564,8 @@ interval_ms = 50
         text += '[adapters.go]\nbackend = "compile"\n'
     if language == "rust":
         text += '[adapters.rust]\nbackend = ' + json.dumps(entry.get("rust_backend", "compiler")) + '\n'
+    if language == "typescript":
+        text += '[adapters.typescript]\nbackend = ' + json.dumps(entry["typescript_backend"]) + '\n'
     if sequences.collects(entry):
         text += '[lifetimes]\nenabled = true\nboundary = "collection"\ninclude = ' + json.dumps([entry["node_class_label"]]) + '\n'
     return text
@@ -716,6 +723,10 @@ def attempt(workspace, data, entry, case, lane, folder, decoder):
     with capture.receiver() as (endpoint, bodies, errors):
         config = folder / "policy.toml"
         config.write_text(policy(entry, endpoint))
+        if language == "typescript":
+            env["OTELC_TYPESCRIPT_BACKEND"] = capture.typescript_backend(root, language, entry, config.read_bytes())
+            write(folder / "typescript-controls.json", {"OTELC_TYPESCRIPT_BACKEND": env["OTELC_TYPESCRIPT_BACKEND"],
+                                                        "provider": entry.get("typescript_provider")})
         command = build_command(root, project, entry, driver, config, tools, env, folder, scratch, lane)
         write(folder / "command.json", [str(p) for p in command])
         working_directory = project / entry["go_context"]["module_root"] if "go_context" in entry else project
