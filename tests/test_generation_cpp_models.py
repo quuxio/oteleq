@@ -38,6 +38,13 @@ Counter make(Count seed) { return Counter(seed); }
 
 
 class CppModelTests(unittest.TestCase):
+    def test_array_dimensions_are_ascii_and_keep_the_outermost_extent(self):
+        match = cpp_models.ARRAY.fullmatch("sample::Value[2][3]")
+        self.assertIsNotNone(match)
+        self.assertEqual(match.groups(), ("sample::Value", "2", "[3]"))
+        for invalid in ("int[2]junk[3]", "int[2][", "int[\u0662]", "int[]", "int[2]" + "[3]"*4096 + "!"):
+            self.assertIsNone(cpp_models.ARRAY.fullmatch(invalid))
+
     def test_c_linkage_names_use_ir_identity_without_losing_application_underscores(self):
         data, path = self.model('extern "C" int plain(int value){return value;}\nextern "C" int _named(int value){return value;}\nextern "C" int _Zbad(int value){return value;}\n')
         compiler = Path(os.environ.get("OTELC_CLANGXX") or shutil.which("clang++"))
@@ -63,11 +70,14 @@ class CppModelTests(unittest.TestCase):
         self.assertEqual(read["compiler_identity"], "sample::Counter::read() const")
         self.assertEqual(add["compiler_identity"], "sample::Counter::add(short)")
         result = subprocess.CompletedProcess([], 1, b"", b"bad")
+        failed = Mock(return_value=result)
+        directory = path.parent
         with self.assertRaisesRegex(ValueError, "resolution"):
-            cpp_models.bind_symbols(data, demangler, path.parent, Mock(return_value=result))
+            cpp_models.bind_symbols(data, demangler, directory, failed)
         data["cpp_functions"][0]["symbol"] = "bad\nsymbol"
+        unused = Mock()
         with self.assertRaisesRegex(ValueError, "framing"):
-            cpp_models.bind_symbols(data, demangler, path.parent, Mock())
+            cpp_models.bind_symbols(data, demangler, directory, unused)
 
     def model(self, source=SOURCE):
         temporary = tempfile.TemporaryDirectory()

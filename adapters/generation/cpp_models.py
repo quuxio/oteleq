@@ -6,7 +6,7 @@ from pathlib import Path
 
 BUILTINS = {"bool", "char", "signed char", "unsigned char", "short", "unsigned short", "int", "unsigned int",
             "long", "unsigned long", "long long", "unsigned long long", "float", "double", "void"}
-ARRAY = re.compile(r"(.+?)\[([0-9]+)\]((?:\[[0-9]+\])*)$")
+ARRAY = re.compile(r"([^\[\]]+)\[(\d+)\]((?:\[\d+\])*)$", re.ASCII)
 FUNCTION_KINDS = {"FunctionDecl", "CXXMethodDecl", "CXXConstructorDecl", "CXXDestructorDecl"}
 
 
@@ -130,21 +130,27 @@ class Inventory:
             self.globals["::".join((*scope, name))] = {"scope": "::".join(scope),
                     "type": type_.get("desugaredQualType", type_.get("qualType", "unknown"))}
         if original and kind in FUNCTION_KINDS:
-            owner = qualified if kind != "FunctionDecl" else ""
-            self.functions[(node["loc"]["offset"], kind, node.get("mangledName", ""))] = {**signature(node), "owner": owner,
-                    "name": "::".join((*scope, name)), "kind": kind,
-                    "static": node.get("storageClass") == "static", "implicit": bool(node.get("isImplicit")),
-                    "nested": inside,
-                    "deleted": bool(node.get("explicitlyDeleted")), "symbol": node.get("mangledName", ""),
-                    "source_offset": node["loc"]["offset"], "has_body": any(item["kind"] in ("CompoundStmt", "CXXTryStmt") for item in node.get("inner", []))}
-            if kind == "CXXConstructorDecl":
-                self.functions[(node["loc"]["offset"], kind, node.get("mangledName", ""))]["construction"] = constructor(node)
+            self.collect_function(node, scope, inside)
         nested = inside or kind in FUNCTION_KINDS or kind in ("FunctionTemplateDecl", "ClassTemplateDecl")
         for child in node.get("inner", []):
             # Local classes need a separate lifetime and construction profile.
             if nested and child.get("kind") in ("CXXRecordDecl", "ClassTemplateDecl"):
                 continue
             self.collect(child, scope, nested)
+
+    def collect_function(self, node: dict, scope: tuple[str, ...], inside: bool) -> None:
+        """Retain one checked declaration, including distinct implicit overloads."""
+        kind = node["kind"]
+        key = (node["loc"]["offset"], kind, node.get("mangledName", ""))
+        self.functions[key] = {**signature(node), "owner": "::".join(scope) if kind != "FunctionDecl" else "",
+                "name": "::".join((*scope, node.get("name", ""))), "kind": kind,
+                "static": node.get("storageClass") == "static", "implicit": bool(node.get("isImplicit")),
+                "nested": inside,
+                "deleted": bool(node.get("explicitlyDeleted")), "symbol": node.get("mangledName", ""),
+                "source_offset": node["loc"]["offset"],
+                "has_body": any(item["kind"] in ("CompoundStmt", "CXXTryStmt") for item in node.get("inner", []))}
+        if kind == "CXXConstructorDecl":
+            self.functions[key]["construction"] = constructor(node)
 
     def resolve(self, text: str, scope: str, seen: frozenset[str] = frozenset()) -> str:
         """Resolve checked scalar aliases and named source records lexically."""

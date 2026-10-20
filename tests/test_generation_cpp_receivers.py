@@ -54,8 +54,9 @@ class CppReceiverBindingTests(unittest.TestCase):
     def test_missing_ambiguous_and_uninitialised_factories_do_not_bind(self):
         with self.assertRaisesRegex(ValueError, "unique"):
             self.contract("missing")
+        uninitialised = SOURCE.replace("value_(seed), ", "")
         with self.assertRaisesRegex(ValueError, "initialisation"):
-            self.contract(source=SOURCE.replace("value_(seed), ", ""))
+            self.contract(source=uninitialised)
         overload = SOURCE.replace("public:", "public:\nCounter():Counter(1){}")
         with self.assertRaisesRegex(ValueError, "unique"):
             self.contract(source=overload)
@@ -97,12 +98,14 @@ int main(){return __oteleq_cpp::access<sample::Counter>::run()==16?0:1;}
         source = self.path.read_text()
         with self.assertRaisesRegex(ValueError, "range"):
             cpp_receivers.private_source(source, changed)
+        collision = source + "// __oteleq_cpp"
         with self.assertRaisesRegex(ValueError, "collides"):
-            cpp_receivers.private_source(source + "// __oteleq_cpp", contract["records"])
+            cpp_receivers.private_source(collision, contract["records"])
         sanitised = cpp_receivers.sanitise_identifiers(contract)
         self.assertIn("#undef value_\n", sanitised)
         self.assertIn("#undef make\n", cpp_receivers.sanitise_identifiers(self.contract("sample::make")[0]))
 
     def test_local_static_storage_is_a_visible_gap(self):
+        source = SOURCE.replace("value_ += amount;", "static int hidden=0;hidden+=amount;value_+=amount;")
         with self.assertRaisesRegex(ValueError, "function-local static"):
-            self.contract(source=SOURCE.replace("value_ += amount;", "static int hidden=0;hidden+=amount;value_+=amount;"))
+            self.contract(source=source)

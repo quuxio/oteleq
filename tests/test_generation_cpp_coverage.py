@@ -21,8 +21,9 @@ class CppCoverageTests(unittest.TestCase):
         source = Path("observer.hpp").resolve()
         self.assertEqual(cpp_coverage.coverage(self.document(source), source), 80)
         for total, covered in ((0, 0), (10, 7), (10, 11), (10, -1), (True, 1)):
+            document = self.document(source, total, covered)
             with self.subTest(total=total, covered=covered), self.assertRaises(ValueError):
-                cpp_coverage.coverage(self.document(source, total, covered), source)
+                cpp_coverage.coverage(document, source)
         for files in ([], [self.document(source)["data"][0]["files"][0]]*2):
             with self.assertRaisesRegex(ValueError, "missing or ambiguous"):
                 cpp_coverage.coverage({"data": [{"files": files}]}, source)

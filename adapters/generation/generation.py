@@ -324,6 +324,19 @@ def receiver_factory(entry, discovered, name):
     raise ValueError("receiver factory requires an ordinary source constructor or function")
 
 
+def configure_go_context(entry: dict, discovered: dict, configuration: dict) -> None:
+    """Keep compiler package identity and recovery bindings in the frozen entry."""
+    entry["go_main_renames"] = discovered.get("main_renames", [])
+    entry["go_shadowed_recovery"] = any(function["name"] in ("recover", "panic")
+                                      for function in discovered["functions"])
+    if "go_context" in discovered:
+        entry["go_context"] = discovered["go_context"]
+        entry["go_options"] = configuration["adapters"]["go"]
+        entry["go_shadowed_recovery"] |= entry["go_context"]["shadowed_recovery"]
+        relative = Path(entry["path"]).relative_to(entry["go_context"]["module_root"])
+        entry["otelc_runtime_function"] = str(relative.with_suffix("")).replace("/", ".") + "." + entry["name"]
+
+
 def inventory_entry(function, discovered, name, language, source_hash, snapshot, args):
     entry = {**function, "path": name, "language": language, "globals": discovered["globals"],
              "parser": discovered.get("parser", "unavailable"), "package": discovered.get("package", ""),
@@ -346,15 +359,7 @@ def inventory_entry(function, discovered, name, language, source_hash, snapshot,
     if language == "rust":
         entry["rust_backend"] = args.configuration["adapters"]["rust"]["backend"]
     if language == "go":
-        entry["go_main_renames"] = discovered.get("main_renames", [])
-        entry["go_shadowed_recovery"] = any(function["name"] in ("recover", "panic")
-                                          for function in discovered["functions"])
-        if "go_context" in discovered:
-            entry["go_context"] = discovered["go_context"]
-            entry["go_options"] = args.configuration["adapters"]["go"]
-            entry["go_shadowed_recovery"] |= entry["go_context"]["shadowed_recovery"]
-            relative = Path(name).relative_to(entry["go_context"]["module_root"])
-            entry["otelc_runtime_function"] = str(relative.with_suffix("")).replace("/", ".") + "." + entry["name"]
+        configure_go_context(entry, discovered, args.configuration)
     if language == "python" and not excluded and args.configuration["adapters"]["python"]["import_roots"]:
         try:
             entry["python_import"] = python_project.context(snapshot, name, args.configuration["adapters"]["python"]["import_roots"])

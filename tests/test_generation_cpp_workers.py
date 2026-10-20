@@ -196,5 +196,6 @@ void operator delete(void* value) noexcept {std::free(value);}
                 scalar["fields"]["value"]["bytes"] = "FF"
             else:
                 graph["nodes"].append({"id": "n" + str(len(graph["nodes"])), "type": "cpp.location", "fields": {}})
+            altered = metadata + b"\n" + json.dumps(document).encode()
             with self.subTest(alteration=alteration), self.assertRaises(ValueError):
-                cpp_graph.boundaries(metadata + b"\n" + json.dumps(document).encode(), entry, typed_capture.native_scalar)
+                cpp_graph.boundaries(altered, entry, typed_capture.native_scalar)

@@ -21,6 +21,30 @@ def entry(language, parameters=None, output="int", globals_=None):
 
 
 class NativeScalarTests(unittest.TestCase):
+    def test_macro_callables_and_storage_are_visible_gaps_in_both_languages(self):
+        source = ("#define FUNCTION(name) int name(int value){return value;}\n"
+                  "#define STORAGE(name) int name=0;\n"
+                  "FUNCTION(generated)\nSTORAGE(hidden)\n"
+                  "int selected(int value){hidden+=value;return 7;}\n")
+        for language in ("c", "cpp"):
+            with self.subTest(language=language), tempfile.TemporaryDirectory() as temporary:
+                folder = Path(temporary)
+                path = folder / ("source.c" if language == "c" else "source.cpp")
+                path.write_text(source)
+                compiler = self.compiler(language)
+                def execute(command, cwd, **kwargs):
+                    return subprocess.run(command, cwd=cwd, capture_output=True, check=False, timeout=30)
+                data = discovery.discover(path, language, folder,
+                    {"clang++" if language == "cpp" else "clang": compiler}, execute)
+                functions = {item["name"]: item for item in data["functions"]}
+                self.assertEqual(set(functions), {"generated", "selected"})
+                self.assertIn("macro-expanded", functions["generated"]["reason"])
+                self.assertEqual(functions["generated"]["line"], 3)
+                self.assertEqual(len(data["globals"]), 1)
+                self.assertTrue(data["globals"][0]["inaccessible"])
+                candidate = {**functions["selected"], "path": path.name, "language": language, "globals": data["globals"]}
+                self.assertEqual(gen.qualify_entry(candidate, folder, 1), "blocked")
+
     def test_c_function_local_static_is_accounted_as_unobserved_storage(self):
         with tempfile.TemporaryDirectory() as temporary:
             folder = Path(temporary)

@@ -6,6 +6,9 @@ import cpp_receivers
 import cpp_models
 
 
+NEXT_DEPTH = "depth+1"
+
+
 def quoted(value: str) -> str:
     """A C++ string literal containing a complete quoted JSON string."""
     return json.dumps(json.dumps(value, ensure_ascii=True))
@@ -44,7 +47,7 @@ class Worker:
 
     def field(self, name: str, type_: str, address: str) -> str:
         """The declared field name and compiler-resolved type are separate bindings."""
-        return "g.field(" + quoted(name) + ");" + self.view(type_, address, "depth+1")
+        return "g.field(" + quoted(name) + ");" + self.view(type_, address, NEXT_DEPTH)
 
     def access(self, name: str, record: dict) -> str:
         """Friend access permits private data and exact method overload selection."""
@@ -78,13 +81,13 @@ class Worker:
             body += "access<type_" + str(index) + ">::fields(g,value,depth);"
         elif kind == "array":
             body += ("for(std::size_t i=0;i<" + str(model["length"]) + ";++i){g.item(i);"
-                     + self.view(model["element"], "__builtin_addressof((*value)[i])", "depth+1") + "}")
+                     + self.view(model["element"], "__builtin_addressof((*value)[i])", NEXT_DEPTH) + "}")
         else:
             body += 'g.field("\\\"value\\\"");'
             if kind == "pointer":
-                body += "if(*value==nullptr)g.absent();else{" + self.view(model["element"], "*value", "depth+1") + "}"
+                body += "if(*value==nullptr)g.absent();else{" + self.view(model["element"], "*value", NEXT_DEPTH) + "}"
             else:
-                body += self.view(model["element"], "address", "depth+1")
+                body += self.view(model["element"], "address", NEXT_DEPTH)
         return ("static void write_" + str(index) + "(Graph& g,const void* address,unsigned depth){\n"
                 + "auto value=static_cast<const std::remove_reference_t<type_" + str(index) + ">*>(address);\n"
                 + body + "\n}\n")
@@ -134,7 +137,7 @@ bool ok=std::fputs("{\"cpp_receiver_schema_version\":1,\"before\":",output)>=0 &
 return std::fclose(output)==0 && ok?0:92;}
 ''')
         generated = "namespace __oteleq_cpp {\n" + aliases + forwards + access + writers + main + "}\n"
-        macros = set(re.findall(r"[A-Za-z_][A-Za-z0-9_]*", generated))
+        macros = set(re.findall(r"[A-Za-z_]\w*", generated, re.ASCII))
         clean = cpp_receivers.sanitise_identifiers(self.contract) + "\n".join("#undef " + name for name in sorted(macros)) + "\n"
         return clean + generated + '\nint main(){try{return __oteleq_cpp::access<::' + owner + '>::run();}\n' + '''
 catch(const __oteleq_cpp::capture_failure& error){std::fprintf(stderr,"C++ observation incomplete: %s\\n",error.reason);return 91;}

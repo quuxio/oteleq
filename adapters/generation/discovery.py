@@ -101,6 +101,7 @@ def python_inventory(source):
 
 
 def native_origin(location, path):
+    location = location.get("expansionLoc", location)
     if location.get("includedFrom") or "offset" not in location:
         return False
     return not location.get("file") or Path(location["file"]).resolve() == path.resolve()
@@ -108,17 +109,48 @@ def native_origin(location, path):
 
 def native_function(node, scope, inside):
     kind, name = node["kind"], node.get("name", ANONYMOUS)
-    location = node.get("loc", {})
+    original_location = node.get("loc", {})
+    location = original_location.get("expansionLoc", original_location)
     params = [n["type"]["qualType"] for n in node.get("inner", []) if n["kind"] == "ParmVarDecl"]
     body = any(n["kind"] in ("CompoundStmt", "CXXTryStmt") for n in node.get("inner", []))
     reason = "" if kind == "FunctionDecl" and body and not inside else "method, lambda or external callable needs a fixture"
     if node.get("variadic"):
         reason = "variadic callable needs an argument fixture"
+    if "expansionLoc" in original_location:
+        reason = "macro-expanded callable needs a build-aware fixture"
     return {"name": "::".join((*scope, name)), "line": location.get("line", 1), "column": location.get("col", 1),
             "declaration_only": kind == "FunctionDecl" and not body, "parameters": params,
             "output": node.get("type", {}).get("qualType", "unknown").split(" (")[0],
             "reason": reason, "symbol": node.get("mangledName", name),
             "source_offset": location.get("offset", -1), "native_kind": kind}
+
+
+def native_storage(node: dict, scope: tuple[str, ...], inside: bool) -> dict | None:
+    """Unaddressable native state remains a required, explicit observation gap."""
+    original = node["loc"]
+    location = original.get("expansionLoc", original)
+    name = "::".join((*scope, node.get("name", ANONYMOUS)))
+    type_ = node.get("type", {}).get("qualType", "unknown")
+    if inside and not (node.get("storageClass") == "static" or node.get("tls")):
+        return None
+    if "expansionLoc" in original:
+        return {"name": "<macro-storage:" + name + "@" + str(location["offset"]) + ">", "type": type_,
+                "inaccessible": True, "reason": "macro-expanded global storage needs a fixture"}
+    if inside:
+        return {"name": "<static-local:" + name + "@" + str(location["offset"]) + ">", "type": type_,
+                "inaccessible": True, "reason": "function-local static storage needs a separate access fixture"}
+    return {"name": name, "type": type_}
+
+
+def native_positions(functions: list[dict], path: Path) -> None:
+    """Resolve omitted Clang line coordinates from original physical byte offsets."""
+    if not path.is_file():
+        return
+    source = path.read_bytes()
+    for function in functions:
+        offset = function["source_offset"]
+        function["line"] = source.count(b"\n", 0, offset) + 1
+        function["column"] = offset - source.rfind(b"\n", 0, offset)
 
 
 def native_inventory(document, path, *, cpp=False):
@@ -136,34 +168,35 @@ def native_inventory(document, path, *, cpp=False):
             if original:
                 functions.append(native_function(node, scope, inside))
             inside = True
-        if kind == "VarDecl" and original and not inside:
-            globals_.append({"name": "::".join((*scope, name)), "type": node.get("type", {}).get("qualType", "unknown")})
-        if kind == "VarDecl" and original and inside and (node.get("storageClass") == "static" or node.get("tls")):
-            globals_.append({"name": "<static-local:" + "::".join((*scope, name)) + "@" + str(node["loc"]["offset"]) + ">",
-                             "type": node.get("type", {}).get("qualType", "unknown"), "inaccessible": True})
+        if kind == "VarDecl" and original:
+            storage = native_storage(node, scope, inside)
+            if storage:
+                globals_.append(storage)
         for child in node.get("inner", []):
             visit(child, scope, inside)
     visit(document)
+    native_positions(functions, path)
     result = {"functions": functions, "globals": globals_, "parser": "Clang AST JSON"}
     if cpp:
-        models = cpp_models.Inventory(document, path).export()
-        source = path.read_bytes()
-        bindings = {(item["source_offset"], item["kind"], item["symbol"]): item for item in models["cpp_functions"]}
-        for function in functions:
-            key = (function["source_offset"], function["native_kind"], function["symbol"])
-            if key in bindings:
-                function["cpp_function"] = bindings[key]
-                function["name"] = bindings[key]["name"]
-                function["declaration_only"] = not bindings[key]["has_body"]
-                function["parameters"] = bindings[key]["parameters"]
-                function["output"] = bindings[key]["output"]
-                offset = function["source_offset"]
-                function["line"] = source.count(b"\n", 0, offset) + 1
-                function["column"] = offset - source.rfind(b"\n", 0, offset)
-        result.update(models)
-        result["globals"] = ([{"name": name, "type": type_} for name, type_ in models["cpp_globals"].items()]
-                             + [item for item in globals_ if item.get("inaccessible")])
+        attach_cpp_models(result, document, path)
     return result
+
+
+def attach_cpp_models(inventory: dict, document: dict, path: Path) -> None:
+    """Join checked C++ declarations to their physical callable and storage roots."""
+    models = cpp_models.Inventory(document, path).export()
+    bindings = {(item["source_offset"], item["kind"], item["symbol"]): item for item in models["cpp_functions"]}
+    for function in inventory["functions"]:
+        key = (function["source_offset"], function["native_kind"], function["symbol"])
+        if key in bindings:
+            function["cpp_function"] = bindings[key]
+            function["name"] = bindings[key]["name"]
+            function["declaration_only"] = not bindings[key]["has_body"]
+            function["parameters"] = bindings[key]["parameters"]
+            function["output"] = bindings[key]["output"]
+    inventory.update(models)
+    inventory["globals"] = ([{"name": name, "type": type_} for name, type_ in models["cpp_globals"].items()]
+                            + [item for item in inventory["globals"] if item.get("inaccessible")])
 
 
 def discover(path, language, root, tools, execute):

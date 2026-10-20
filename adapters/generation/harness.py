@@ -602,6 +602,24 @@ def go_materialise(project, entry, args, original):
     return driver
 
 
+def native_materialise(project: Path, entry: dict, args: list) -> Path:
+    """Create the private native caller, retaining exact Clang byte ranges."""
+    language = entry["language"]
+    driver = project / ("_oteleq_driver.c" if language == "c" else "_oteleq_driver.cpp")
+    if language == "cpp" and "cpp_receiver" in entry:
+        source = project / entry["path"]
+        # Universal newline decoding would move Clang's byte ranges in CRLF files.
+        original = source.read_bytes().decode("utf-8")
+        source.write_text(cpp_receivers.private_source(original, entry["cpp_receiver"]["records"]))
+        (project / "_oteleq_generated/cpp_observe.hpp").write_bytes(Path(__file__).with_name("cpp_observe.hpp").read_bytes())
+        driver.write_text('#include "_oteleq_generated/cpp_observe.hpp"\n#include <stdio.h>\n' + native_abi()
+                          + '#define main __oteleq_original_main\n#include ' + json.dumps(entry["path"])
+                          + '\n#undef main\n' + cpp_worker.Worker(entry, args, literal).source())
+    else:
+        driver.write_text(native_driver(entry, args))
+    return driver
+
+
 def materialise(project, entry, args):
     source = project / entry["path"]
     original = source.read_text()
@@ -613,18 +631,7 @@ def materialise(project, entry, args):
         driver.write_text(python_driver(entry, args))
         (generated / "_oteleq_observe.py").write_bytes(Path(__file__).with_name("observe.py").read_bytes())
     elif language in ("c", "cpp"):
-        driver = project / ("_oteleq_driver.c" if language == "c" else "_oteleq_driver.cpp")
-        if language == "cpp" and "cpp_receiver" in entry:
-            # Clang source ranges are byte offsets; universal newline decoding
-            # would move closing braces in an otherwise valid CRLF source file.
-            original = source.read_bytes().decode("utf-8")
-            source.write_text(cpp_receivers.private_source(original, entry["cpp_receiver"]["records"]))
-            (generated / "cpp_observe.hpp").write_bytes(Path(__file__).with_name("cpp_observe.hpp").read_bytes())
-            driver.write_text('#include "_oteleq_generated/cpp_observe.hpp"\n#include <stdio.h>\n' + native_abi()
-                              + '#define main __oteleq_original_main\n#include ' + json.dumps(entry["path"])
-                              + '\n#undef main\n' + cpp_worker.Worker(entry, args, literal).source())
-        else:
-            driver.write_text(native_driver(entry, args))
+        driver = native_materialise(project, entry, args)
     elif language == "java":
         driver = source.parent / "OteleqDriver.java"
         if driver.exists():

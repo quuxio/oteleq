@@ -203,6 +203,7 @@ def refusals(cli: Path, provider: Path, folder: Path) -> tuple[int, int]:
         ("uninitialised", SOURCE.replace("value_(seed),", ""), None, 3),
         ("opaque", SOURCE.replace("Count value_,other_;", "std::exception opaque_;Count value_,other_;").replace("value_(seed),", "opaque_{},value_(seed),"), None, 3),
         ("local-static", SOURCE.replace("int fail(Count amount){", "int fail(Count amount){static int hidden=0;++hidden;"), None, 3),
+        ("macro-storage", '#define STORAGE(name) int name=0;\nSTORAGE(hidden)\n' + SOURCE, None, 3),
         ("virtual", SOURCE.replace("public:", "public: virtual ~Counter(){}"), None, 3),
         ("collision", SOURCE + "\n// __oteleq_cpp\n", None, 3),
         ("budget", SOURCE.replace("int array_[2];", "int array_[4096];"), None, 4),
