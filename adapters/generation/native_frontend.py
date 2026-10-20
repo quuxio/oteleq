@@ -67,7 +67,7 @@ def build(compiler: Path, destination: Path, source_root: Path, execute) -> dict
     source.mkdir(mode=0o700)
     original = Path(__file__).with_name('native_discover.cpp')
     (source / original.name).write_bytes(original.read_bytes())
-    flags = ['-std=c++17', '-fno-exceptions', '-I', str(tools['include'])]
+    flags = ['-std=c++17', '-g', '-fno-exceptions', '-I', str(tools['include'])]
     if tools['no_rtti']:
         flags.append('-fno-rtti')
     unit = {'source': original.name, 'directory': '.', 'flags': flags}

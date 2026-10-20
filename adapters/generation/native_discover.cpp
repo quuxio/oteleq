@@ -16,6 +16,7 @@
 #include <llvm/Support/FileSystem.h>
 #include <llvm/Support/FormatVariadic.h>
 #include <llvm/Support/JSON.h>
+#include <llvm/Support/Signals.h>
 #include <llvm/Support/raw_ostream.h>
 #include <map>
 #include <memory>
@@ -309,6 +310,7 @@ public:
 } // namespace
 
 int main(int argc, char **argv) {
+  llvm::sys::PrintStackTraceOnErrorSignal(argv[0], true);
   if (argc < 5 ||
       (std::string(argv[2]) != "ast" && std::string(argv[2]) != "inputs")) {
     llvm::errs()
