@@ -100,7 +100,8 @@ class RustSemanticQualificationTests(unittest.TestCase):
             fixture.inventory = copy.deepcopy(original)
             fixture.inventory["functions"][0][field] = value
             fixture.seal()
-            with self.subTest(field=field), self.assertRaises(AssertionError):
+            expected_error = ValueError if field in ("name", "startup") else AssertionError
+            with self.subTest(field=field), self.assertRaises(expected_error):
                 self.verify()
 
 

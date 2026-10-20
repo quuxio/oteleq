@@ -16,9 +16,10 @@ import otelc_capture as capture
 import otelc_rust_build as compiler_build
 
 
+FUTURE_NAME = "semantics.selected_future"
+PANIC_NAME = "semantics.selected_panic"
 SEMANTIC_NAMES = {"semantics.selected_column": 1, "semantics.selected_caller": 1,
-                  "semantics.selected_closure": 1, "semantics.selected_future": 2,
-                  "semantics.selected_panic": 1}
+                  "semantics.selected_closure": 1, FUTURE_NAME: 2, PANIC_NAME: 1}
 ALIAS_NAMES = {"first.shared.selected": 1, "second.shared.selected": 1}
 ASYNC_UNSUPPORTED = "async compiler bodies require future-completion qualification"
 
@@ -29,15 +30,15 @@ def runtime_witness(bodies: list, runtime: dict, names: dict, service: str, deco
     witness = capture.witness(bodies, runtime, spec, service, decoder, "rust")
     if kind == "semantics":
         assert runtime["future_observers"] == {"admission_exhausted": False, "pending": 0}
-        assert runtime["functions"]["semantics.selected_future"] == {"count": 2, "cancellations": 1, "unwinds": 0}
-        assert runtime["functions"]["semantics.selected_panic"] == {"count": 1, "cancellations": 0, "unwinds": 1}
+        assert runtime["functions"][FUTURE_NAME] == {"count": 2, "cancellations": 1, "unwinds": 0}
+        assert runtime["functions"][PANIC_NAME] == {"count": 1, "cancellations": 0, "unwinds": 1}
         spans = [span for path, body in bodies if path == capture.TRACE_PATH
                  for span in capture.service_spans(decoder.FromString(body), service)]
         cancelled = [span for span in spans if any(attribute.key == "otelc.cancelled" and attribute.value.bool_value
                                                    for attribute in span.attributes)]
-        assert len(cancelled) == 1 and cancelled[0].name == "semantics.selected_future"
+        assert len(cancelled) == 1 and cancelled[0].name == FUTURE_NAME
         assert cancelled[0].status.code == 2 and cancelled[0].status.message == "cancelled"
-        panic = [span for span in spans if span.name == "semantics.selected_panic"]
+        panic = [span for span in spans if span.name == PANIC_NAME]
         assert len(panic) == 1 and panic[0].status.code == 2 and panic[0].status.message == "escaping unwind"
     return witness
 
@@ -80,12 +81,10 @@ def verify_bundle(root: Path, project: Path, source: Path, bundle: Path, tools: 
     assert type(inventory["schema_version"]) is int and inventory["schema_version"] == 3
     assert type(inventory["functions"]) is list and len(inventory["functions"]) <= 65536
     assert all(type(row["selected"]) is bool and type(row["startup"]) is bool for row in inventory["functions"])
-    capture.rust_frontend_rows(inventory)
-    selected = [row for row in inventory["functions"] if row["selected"]]
-    startup = [row for row in inventory["functions"] if row["startup"]]
-    assert len(selected) == len(names) and {row["name"] for row in selected} == set(names)
-    assert len(startup) == 1 and startup[0]["name"] == source.stem + ".main"
-    for row in (*selected, *startup):
+    futures = (FUTURE_NAME, PANIC_NAME) if source.stem == "semantics" else ()
+    selected, startup = compiler_build.emitted_roles(inventory, tuple(names), futures)
+    assert startup["name"] == source.stem + ".main"
+    for row in (*selected, startup):
         assert type(row["selected"]) is bool and type(row["startup"]) is bool
         assert not row["unsupported"] and row["emitted"] is True
         assert row["compiled_symbol"] and row["compiler_expansion"] is False
@@ -94,7 +93,7 @@ def verify_bundle(root: Path, project: Path, source: Path, bundle: Path, tools: 
         matches = [item for item in request["declarations"] if item["name"] == row["name"]]
         assert len(matches) == 1
         declared = dict(matches[0])
-        if row["name"] in ("semantics.selected_future", "semantics.selected_panic"):
+        if row["name"] in (FUTURE_NAME, PANIC_NAME):
             assert declared["unsupported"] == ASYNC_UNSUPPORTED
             declared["unsupported"] = ""
         assert original == declared

@@ -147,7 +147,7 @@ class RustCompilerBuildTests(unittest.TestCase):
         requested = self.multiple_targets()
         result = self.verify(function=("app.selected", "app.other"), requested=requested)
         self.assertEqual(result["selected_functions"], ["app.other", "app.selected"])
-        self.assertEqual(result["selected_symbols"], {"app.selected": "symbol-0", "app.other": "symbol-1"})
+        self.assertEqual(result["selected_symbols"], {"app.selected": ["symbol-0"], "app.other": ["symbol-1"]})
         for function in ((), ("app.selected",), ("app.other",), ("app.selected", "app.selected"),
                          ("app.selected", "app.unknown"), ("app.selected", 1)):
             with self.subTest(function=function), self.assertRaises(ValueError):
@@ -172,6 +172,21 @@ class RustCompilerBuildTests(unittest.TestCase):
         self.seal()
         with self.assertRaises(ValueError):
             self.verify(function=targets, requested=requested, futures=("app.other",))
+
+    def test_fixed_future_retains_constructor_and_poll_instances_without_extra_targets(self) -> None:
+        requested = self.multiple_targets()
+        self.request["declarations"][1]["unsupported"] = compiler_build.ASYNC_UNSUPPORTED
+        poll = {**self.inventory["functions"][1], "compiled_symbol": "symbol-other-poll"}
+        self.inventory["functions"].append(poll)
+        self.seal()
+        actual = self.verify(function=("app.selected", "app.other"), requested=requested, futures=("app.other",))
+        self.assertEqual(actual["selected_symbols"]["app.other"], ["symbol-1", "symbol-other-poll"])
+        with self.assertRaises(ValueError):
+            self.verify(function=("app.selected", "app.other"), requested=requested)
+        self.inventory["functions"].append({**self.inventory["functions"][0], "compiled_symbol": "extra-ordinary-instance"})
+        self.seal()
+        with self.assertRaises(ValueError):
+            self.verify(function=("app.selected", "app.other"), requested=requested, futures=("app.other",))
 
     def test_future_health_requires_empty_typed_registry_and_available_admission(self) -> None:
         capture.rust_future_health({"future_observers": {"pending": 0, "admission_exhausted": False}})

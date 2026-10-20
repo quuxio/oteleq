@@ -1,4 +1,5 @@
 """Bind original-source Rust compiler bundles to the caller's fixed recipe."""
+from collections import Counter
 from pathlib import Path
 
 from otelc_capture import (RUST_BASELINE_FLAGS, RUST_COMPILER_PROFILE_FILENAME,
@@ -126,11 +127,54 @@ def selection(plan: dict, source: Path, workspace: Path, functions: tuple[str, .
             "retained plan differs from the requested standalone selection")
 
 
+def emitted_roles(inventory: dict, functions: tuple[str, ...],
+                  futures: tuple[str, ...] = ()) -> tuple[list[dict], dict]:
+    """Bind ordinary instances and all constructor/poll symbols of fixed futures."""
+    rows = inventory.get("functions")
+    require(type(inventory.get("schema_version")) is int and inventory["schema_version"] == 3
+            and type(rows) is list and len(rows) <= 65536
+            and all(type(row) is dict and type(row.get("selected")) is bool
+                    and type(row.get("startup")) is bool for row in rows),
+            "compiler inventory roles are malformed")
+    selected = [row for row in rows if row["selected"]]
+    startup = [row for row in rows if row["startup"]]
+    require(all(type(row.get("name")) is str for row in selected), "selected owner names are malformed")
+    counts, future_names = Counter(row["name"] for row in selected), set(futures)
+    require(len(startup) == 1 and not startup[0]["selected"]
+            and not any(row["startup"] for row in selected) and set(counts) == set(functions)
+            and all(count == 1 for name, count in counts.items() if name not in future_names),
+            "expected target set or independent startup differs")
+    rust_frontend_rows(inventory)
+    return selected, startup[0]
+
+
+def bind_declarations(request: dict, selected: list[dict], startup: dict, source: Path,
+                      workspace: Path, source_sha256: str, futures: tuple[str, ...]) -> None:
+    """Bind original declaration records, including explicitly curated futures."""
+    declarations = request["declarations"]
+    require(type(declarations) is list and 0 < len(declarations) <= 65536
+            and all(type(row) is dict for row in declarations),
+            "request declarations are missing or exceed their bound")
+    identity = str(source.relative_to(workspace).with_suffix("")).replace("/", ".")
+    for row in [*selected, startup]:
+        name = identity + ".main" if row["startup"] else row["name"]
+        original = {key: value for key, value in row.items() if key not in INSTANCE_FIELDS}
+        candidates = declarations
+        if name in futures:
+            candidates = [{**item, "unsupported": ""} for item in declarations
+                          if item.get("name") == name and item.get("unsupported") == ASYNC_UNSUPPORTED]
+        require(sum(item == original for item in candidates) == 1,
+                "emitted callable lacks one exact original declaration")
+        rust_llvm_function(original, {**row, "kind": "function", "source_sha256": source_sha256}, source, name)
+        rust_frontend_function(row, row, name, identity)
+
+
 def records(request: dict, inventory: dict, plan: dict, descriptor: dict,
             workspace: Path, source: Path, functions: tuple[str, ...], discovery: list[str],
             futures: tuple[str, ...]) -> dict:
-    """Bind the compiler request and both emitted roles to original source."""
-    sources = {str(source.resolve()): regular_digest(source.resolve())}
+    """Bind the compiler request and emitted roles to the original source."""
+    source_sha256 = regular_digest(source.resolve())
+    sources = {str(source.resolve()): source_sha256}
     require(set(request) == REQUEST_FIELDS and type(request["schema_version"]) is int
             and request["schema_version"] == 1 and request["root"] == str(workspace.resolve())
             and request["entry"] == str(source.resolve()) and request["sources"] == sources
@@ -141,42 +185,16 @@ def records(request: dict, inventory: dict, plan: dict, descriptor: dict,
     require(set(inventory) == {"schema_version", "functions", "sources", "discovery_argv"}
             and inventory["sources"] == sources and inventory["discovery_argv"] == discovery,
             "compiler inventory source or discovery binding differs")
-    rows = inventory.get("functions")
-    require(type(inventory.get("schema_version")) is int and inventory["schema_version"] == 3
-            and type(rows) is list and len(rows) <= 65536
-            and all(type(row) is dict and type(row.get("selected")) is bool
-                    and type(row.get("startup")) is bool for row in rows),
-            "compiler inventory roles are malformed")
-    selected = [row for row in rows if row["selected"]]
-    startup = [row for row in rows if row["startup"]]
-    require(all(type(row.get("name")) is str for row in selected)
-            and len(startup) == 1 and not startup[0]["selected"]
-            and len(selected) == len(functions) and not any(row["startup"] for row in selected)
-            and {row.get("name") for row in selected} == set(functions),
-            "expected target set or independent startup differs")
-    rust_frontend_rows(inventory)
-    declarations = request["declarations"]
-    require(type(declarations) is list and 0 < len(declarations) <= 65536
-            and all(type(row) is dict for row in declarations),
-            "request declarations are missing or exceed their bound")
-    identity = str(source.relative_to(workspace).with_suffix("")).replace("/", ".")
-    for row in [*selected, startup[0]]:
-        name = identity + ".main" if row["startup"] else row["name"]
-        original = {key: value for key, value in row.items() if key not in INSTANCE_FIELDS}
-        candidates = declarations
-        if name in futures:
-            candidates = [{**item, "unsupported": ""} for item in declarations
-                          if item.get("name") == name and item.get("unsupported") == ASYNC_UNSUPPORTED]
-        require(sum(item == original for item in candidates) == 1,
-                "emitted callable lacks one exact original declaration")
-        rust_llvm_function(original, {**row, "kind": "function", "source_sha256": sources[str(source.resolve())]}, source, name)
-        rust_frontend_function(row, row, name, identity)
+    selected, startup = emitted_roles(inventory, functions, futures)
+    bind_declarations(request, selected, startup, source, workspace, source_sha256, futures)
     common = {"compiler_expansion": False, "resolution_phase": "mir", "loaded_sources": sources}
-    if len(selected) == 1:
+    if len(selected) == 1 and not futures:
         return {"selected_function": selected[0]["name"], "selected_symbol": selected[0]["compiled_symbol"],
                 "selected_compiler_name": selected[0]["compiler_name"], **common}
-    return {"selected_functions": sorted(functions),
-            "selected_symbols": {row["name"]: row["compiled_symbol"] for row in selected}, **common}
+    symbols = {name: [] for name in functions}
+    for row in selected:
+        symbols[row["name"]].append(row["compiled_symbol"])
+    return {"selected_functions": sorted(functions), "selected_symbols": symbols, **common}
 
 
 def validate(root: Path, workspace: Path, source: Path, bundle: Path, metadata: dict,
