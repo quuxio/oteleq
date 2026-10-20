@@ -1,0 +1,393 @@
+{
+  "qualification_schema_version": 1,
+  "date": "2026-10-20",
+  "platform": {
+    "os": "macOS",
+    "architecture": "ARM64",
+    "node": "24.21.0",
+    "python": "3.12.15",
+    "typescript": "6.0.3 classic/source emitter"
+  },
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "runtime": {
+    "commit": "6107761305db17e1f834a655b40f33c57951caa8",
+    "cli_sha256": "9e3074150440c484f9ce38f679c13a458a17154f17531412f2c380a3ce221908",
+    "qualification_script_sha256": "3f986eb08ff271bd52d3e91c27774f4fca7857447073aa87e5a81c793e89256e"
+  },
+  "provider": {
+    "source_commit": "8a7689a6d6779ed8621bbe852188eeb56e6fafad",
+    "status": "Private unmerged frozen provider candidate",
+    "cli_sha256": "4f11a98a7628411000c6a9992c907a8068d56156b29e51558b070ee57a972ecf",
+    "receipt_sha256": "b9cf8b8dfd8de69d17e6ec2db9ca11e6d0a03aa3564aac5569c18a02db34521c",
+    "frozen_node_input_files_verified": 2175
+  },
+  "source_sha256": {
+    "javascript": "f9c4687b362f8dd32ff5f9326f9b8d8810c568c99597d706e2eba614cfa1b7fc",
+    "typescript": "eee76b0cec4e1033abc9953d644b995c982cf2558b5dbcae951eaacbe963ffd7"
+  },
+  "results": {
+    "claim": "equivalence over these tests and observations",
+    "artefact_class": "diagnostic",
+    "cli_sha256": "9e3074150440c484f9ce38f679c13a458a17154f17531412f2c380a3ce221908",
+    "languages": [
+      {
+        "language": "javascript",
+        "cases": 6,
+        "matches": 4,
+        "difference_controls": 2,
+        "qualified_launches": 92,
+        "refused_control_launches": 1,
+        "shrink_trials": 1,
+        "source_preserved": true
+      },
+      {
+        "language": "typescript",
+        "cases": 6,
+        "matches": 4,
+        "difference_controls": 2,
+        "qualified_launches": 92,
+        "refused_control_launches": 1,
+        "shrink_trials": 1,
+        "source_preserved": true
+      }
+    ],
+    "actual_application_launches": 186,
+    "scope": "Declared plain source classes, own data/static descriptors and awaited method completion; no private slots, inherited/prototype mutation, arbitrary mutable inputs, scheduler sequences, other-language receivers or shipping qualification."
+  },
+  "callables": {
+    "javascript": [
+      {
+        "function": "sample.Counter.add",
+        "arguments": [
+          7.0
+        ],
+        "receiver_fixture": {
+          "argument_types": [
+            "unknown"
+          ],
+          "arguments": [
+            10.0
+          ],
+          "arguments_requested": [
+            10
+          ],
+          "factory": "Counter",
+          "kind": "constructor",
+          "line": 5,
+          "source_function": "Counter.constructor"
+        },
+        "exit_code": 0
+      },
+      {
+        "function": "sample.Counter.identity",
+        "arguments": [
+          7.0
+        ],
+        "receiver_fixture": {
+          "argument_types": [
+            "unknown"
+          ],
+          "arguments": [
+            10.0
+          ],
+          "arguments_requested": [
+            10
+          ],
+          "factory": "Counter",
+          "kind": "constructor",
+          "line": 5,
+          "source_function": "Counter.constructor"
+        },
+        "exit_code": 0
+      },
+      {
+        "function": "sample.Counter.later",
+        "arguments": [
+          7.0
+        ],
+        "receiver_fixture": {
+          "argument_types": [
+            "unknown"
+          ],
+          "arguments": [
+            10.0
+          ],
+          "arguments_requested": [
+            10
+          ],
+          "factory": "Counter",
+          "kind": "constructor",
+          "line": 5,
+          "source_function": "Counter.constructor"
+        },
+        "exit_code": 0
+      },
+      {
+        "function": "sample.Counter.silent",
+        "arguments": [
+          7.0
+        ],
+        "receiver_fixture": {
+          "argument_types": [
+            "unknown"
+          ],
+          "arguments": [
+            10.0
+          ],
+          "arguments_requested": [
+            10
+          ],
+          "factory": "make_counter",
+          "kind": "function",
+          "line": 14,
+          "source_function": "make_counter"
+        },
+        "exit_code": 1
+      },
+      {
+        "function": "sample.Counter.static_only",
+        "arguments": [
+          7.0
+        ],
+        "receiver_fixture": {
+          "argument_types": [
+            "unknown"
+          ],
+          "arguments": [
+            10.0
+          ],
+          "arguments_requested": [
+            10
+          ],
+          "factory": "Counter",
+          "kind": "constructor",
+          "line": 5,
+          "source_function": "Counter.constructor"
+        },
+        "exit_code": 1
+      },
+      {
+        "function": "sample.Counter.fail",
+        "arguments": [
+          7.0
+        ],
+        "receiver_fixture": {
+          "argument_types": [
+            "unknown"
+          ],
+          "arguments": [
+            10.0
+          ],
+          "arguments_requested": [
+            10
+          ],
+          "factory": "Counter",
+          "kind": "constructor",
+          "line": 5,
+          "source_function": "Counter.constructor"
+        },
+        "exit_code": 0
+      }
+    ],
+    "typescript": [
+      {
+        "function": "sample.Counter.add",
+        "arguments": [
+          7.0
+        ],
+        "receiver_fixture": {
+          "argument_types": [
+            "number"
+          ],
+          "arguments": [
+            10.0
+          ],
+          "arguments_requested": [
+            10
+          ],
+          "factory": "Counter",
+          "kind": "constructor",
+          "line": 5,
+          "source_function": "Counter.constructor"
+        },
+        "exit_code": 0
+      },
+      {
+        "function": "sample.Counter.identity",
+        "arguments": [
+          7.0
+        ],
+        "receiver_fixture": {
+          "argument_types": [
+            "number"
+          ],
+          "arguments": [
+            10.0
+          ],
+          "arguments_requested": [
+            10
+          ],
+          "factory": "Counter",
+          "kind": "constructor",
+          "line": 5,
+          "source_function": "Counter.constructor"
+        },
+        "exit_code": 0
+      },
+      {
+        "function": "sample.Counter.later",
+        "arguments": [
+          7.0
+        ],
+        "receiver_fixture": {
+          "argument_types": [
+            "number"
+          ],
+          "arguments": [
+            10.0
+          ],
+          "arguments_requested": [
+            10
+          ],
+          "factory": "Counter",
+          "kind": "constructor",
+          "line": 5,
+          "source_function": "Counter.constructor"
+        },
+        "exit_code": 0
+      },
+      {
+        "function": "sample.Counter.silent",
+        "arguments": [
+          7.0
+        ],
+        "receiver_fixture": {
+          "argument_types": [
+            "number"
+          ],
+          "arguments": [
+            10.0
+          ],
+          "arguments_requested": [
+            10
+          ],
+          "factory": "make_counter",
+          "kind": "function",
+          "line": 14,
+          "source_function": "make_counter"
+        },
+        "exit_code": 1
+      },
+      {
+        "function": "sample.Counter.static_only",
+        "arguments": [
+          7.0
+        ],
+        "receiver_fixture": {
+          "argument_types": [
+            "number"
+          ],
+          "arguments": [
+            10.0
+          ],
+          "arguments_requested": [
+            10
+          ],
+          "factory": "Counter",
+          "kind": "constructor",
+          "line": 5,
+          "source_function": "Counter.constructor"
+        },
+        "exit_code": 1
+      },
+      {
+        "function": "sample.Counter.fail",
+        "arguments": [
+          7.0
+        ],
+        "receiver_fixture": {
+          "argument_types": [
+            "number"
+          ],
+          "arguments": [
+            10.0
+          ],
+          "arguments_requested": [
+            10
+          ],
+          "factory": "Counter",
+          "kind": "constructor",
+          "line": 5,
+          "source_function": "Counter.constructor"
+        },
+        "exit_code": 0
+      }
+    ]
+  },
+  "controls": {
+    "missing_factory": "run 3, no application launch",
+    "wrong_receiver_class": "run 4, one refused baseline launch per language, no method/observation",
+    "valid_graph_missing_receiver_root": "compare-observations 3, inconclusive requested roots; result alias keeps graph reachable",
+    "scalar_shrinking": "7 to 0 in one trial per language, constructor argument stays 10; fresh confirmation/generated suite/replay complete"
+  },
+  "source_preserved": true,
+  "presentation": {
+    "javascript": {
+      "junit": {
+        "tests": "9",
+        "failures": "2",
+        "errors": "0",
+        "skipped": "3"
+      },
+      "html_xml_csp_static_checks": true,
+      "rendered_visual_inspection": false
+    },
+    "typescript": {
+      "junit": {
+        "tests": "9",
+        "failures": "2",
+        "errors": "0",
+        "skipped": "3"
+      },
+      "html_xml_csp_static_checks": true,
+      "rendered_visual_inspection": false
+    }
+  },
+  "local_gate": {
+    "regressions": 283,
+    "rust": 58,
+    "capture": 99,
+    "generation": 113,
+    "node": 13,
+    "rust_product_line_coverage_percent": 97.17,
+    "all_module_80_percent_floors_pass": true
+  },
+  "review": {
+    "method": "Direct source review and regression/qualification controls",
+    "sonar_unresolved_issues": 0,
+    "analysed_runtime": "6107761305db17e1f834a655b40f33c57951caa8"
+  },
+  "development_run": {
+    "commit": "ccf9c31525cec2d2fad97a5e33b0db00502a262d",
+    "actual_application_launches": 186,
+    "status": "Successful qualification before four Sonar maintainability findings were refactored; retained separately"
+  },
+  "retention": {
+    "archive": "/Users/sclarke/Documents/oteleq-qualification/2026-10-20/node-receivers-6107761",
+    "raw_files": {
+      "ccf9c31": 2845,
+      "6107761": 2845
+    },
+    "independently_verified_provider_inputs": 2175,
+    "durable_provider": "/Users/sclarke/Documents/oteleq-qualification/2026-10-19/scalar-3fa678f/oteleq-integrated-provider-8a7689a",
+    "runtime": "6107761305db17e1f834a655b40f33c57951caa8",
+    "scope": "Diagnostic Python-hosted Node receiver callers; the first successful run is separate from the final Sonar-reviewed revision. No shipping or rendered-HTML inspection claim."
+  },
+  "limitations": [
+    "Private class static-block/import access-helper changes reflective class source text.",
+    "No arbitrary native allocation/internal-slot proof, private/inherited storage, arbitrary mutable inputs or action sequences.",
+    "No other-language receiver, native TypeScript 7 emitter or shipping artefact qualification.",
+    "Rendered report visual check remains pending; static checks are separate."
+  ]
+}
