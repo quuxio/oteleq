@@ -88,7 +88,9 @@ Go requires the [retained build/run provider API](docs/go-build-bundles.md). Eac
 
 Python can use explicit [source package import roots](docs/python-package-context.md), including regular packages and `src` layouts. Relative imports and package initialisers use their real module context; unsupported package contexts remain blockers.
 
-[Declared receiver fixtures](docs/receiver-fixtures.md) test ordinary Python, JavaScript and TypeScript instance methods using existing constructors or same-module factories. They capture supported instance graphs and declared class statics, with independently reconstructed state for every attempt. Node methods can await declared async completion; inherited/private/native storage and action sequences remain unsupported. The [Node receiver qualification](docs/qualification/node-receivers-2026-10-20.json) records both language IDs, 186 actual launches and detected same-return instance/static mutation controls.
+[Declared receiver fixtures](docs/receiver-fixtures.md) test ordinary Python, JavaScript and TypeScript instance methods using existing constructors or same-module factories. They capture supported instance graphs and declared class statics, with independently reconstructed state for every attempt. Node methods can await declared async completion; inherited/private/native storage and arbitrary action targets remain unsupported. The [Node receiver qualification](docs/qualification/node-receivers-2026-10-20.json) records both language IDs, 186 actual launches and detected same-return instance/static mutation controls.
+
+Node receivers can opt into [ordered call/release sequences](docs/ordered-sequences.md), with intermediate typed observations and optional bounded JavaScript collection checks. Missing actions or unobserved collection remain incomplete; GC timing is excluded from equality. TypeScript collection still requires separate emitter qualification.
 
 Use repeated `--language ID`, `--exclude 'qualified.pattern'` and `--cases 1` through `--cases 1024` on `plan` to select a supported scope. [The CLI reference](docs/cli-and-configuration.md#implemented-commands) lists every public command and flag.
 

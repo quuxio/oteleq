@@ -113,3 +113,7 @@ Differences include typed values and graph paths. The comparator must handle ali
 | `130` | Interrupted run with best-effort retained evidence |
 
 Mixed-result precedence is tool error, invalid plan, difference, incompleteness, then success. Reports retain every outcome regardless of exit precedence. Inventory/plan success is separate from execution success, and zero executed cases cannot produce a successful comparison.
+
+### Ordered receiver sequences
+
+A receiver fixture can declare `sequence = [{ action = "call", arguments = "case" }, { action = "call", arguments = [2] }, { action = "release" }]`. [The sequence contract](ordered-sequences.md) records intermediate states, explicit errors and unavailable actions. JavaScript can append `{ action = "collect", gc_rounds = 64, settle_turns = 4 }` with a qualified provider. TypeScript collection and other runners remain blocked when requested.

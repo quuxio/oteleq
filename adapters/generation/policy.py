@@ -11,6 +11,7 @@ from typing import Any
 import domains
 import go_project
 import python_project
+import sequences
 
 
 LANGUAGES = ("c", "cpp", "rust", "python", "java", "javascript", "typescript", "go")
@@ -67,7 +68,7 @@ def expected_baseline(value: Any) -> dict[str, Any]:
 def fixture(value: Any, index: int) -> dict[str, Any]:
     """Validate source-scoped concrete argument lists without executing target code."""
     label = f"fixtures[{index}]"
-    keys(value, {"function", "source", "language", "cases", "expected_baseline", "domains", "receiver"}, label)
+    keys(value, {"function", "source", "language", "cases", "expected_baseline", "domains", "receiver", "sequence"}, label)
     function, source = value.get("function"), value.get("source", "**")
     if any(not isinstance(item, str) or not item.strip() for item in (function, source)):
         raise ValueError(f"{label} requires a function pattern and source pattern")
@@ -91,6 +92,10 @@ def fixture(value: Any, index: int) -> dict[str, Any]:
         result["domains"] = fixture_domains(value["domains"], cases, label)
     if "receiver" in value:
         result["receiver"] = receiver(value["receiver"])
+    if "sequence" in value:
+        if "receiver" not in result:
+            raise ValueError("fixture.sequence requires a declared receiver")
+        result["sequence"] = sequences.validate(value["sequence"], expected_baseline)
     return result
 
 

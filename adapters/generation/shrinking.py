@@ -126,6 +126,8 @@ def derived_data(workflow, original: dict, entry: dict, case: dict) -> dict:
                             "expected_baseline": entry["expected_baseline"]}]
     if "receiver_configuration" in entry:
         config["fixtures"][0]["receiver"] = copy.deepcopy(entry["receiver_configuration"])
+    if "sequence_configuration" in entry:
+        config["fixtures"][0]["sequence"] = copy.deepcopy(entry["sequence_configuration"])
     data["configuration_sha256"] = workflow.identity(config)
     data["derivation"] = {"kind": "scalar-shrink-v1", "parent_plan_sha256": workflow.identity(original),
                           "original_case": case, "original_configuration_sha256": original["configuration_sha256"]}

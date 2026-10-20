@@ -27,6 +27,30 @@ fn typed_fixture() -> Value {
     data
 }
 #[test]
+fn sequence_presentation_requires_matching_typed_actions_and_error_expectations() {
+    let mut data = typed_fixture();
+    let steps = json!([{"id":"first","action":"call","required_roots":[],"expected_baseline":{"kind":"return"}}]);
+    data["cases"][0]["sequence"] = json!([{"id":"first","action":"call","arguments":[7],"expected_baseline":{"kind":"return"}}]);
+    assert!(render(&serde_json::to_vec(&data).unwrap()).is_err());
+    data["cases"][0]["comparison"]["cases"][0]["contract"]["steps"] = steps;
+    assert!(rendered(&data).html.contains("Sequence:"));
+    let valid = data.clone();
+    for key in ["id", "action", "expected_baseline"] {
+        let mut altered = valid.clone();
+        altered["cases"][0]["sequence"][0][key] = match key {
+            "id" => json!("other"),
+            "action" => json!("release"),
+            _ => json!({"kind":"error","category":"exception","type":"RuntimeError"}),
+        };
+        assert!(render(&serde_json::to_vec(&altered).unwrap()).is_err());
+    }
+    data["cases"][0].as_object_mut().unwrap().remove("sequence");
+    assert!(render(&serde_json::to_vec(&data).unwrap()).is_err());
+    let mut bytes = fixture();
+    bytes["cases"][0]["sequence"] = valid["cases"][0]["sequence"].clone();
+    assert!(render(&serde_json::to_vec(&bytes).unwrap()).is_err());
+}
+#[test]
 fn go_module_runtime_binding_preserves_repo_labels_and_rejects_unbound_aliases() {
     let mut data = typed_fixture();
     data["inventory"][0]["language"] = json!("go");

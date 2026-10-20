@@ -1,0 +1,106 @@
+"""Freeze ordered receiver calls and explicit release/collection boundaries."""
+from collections.abc import Callable
+import copy
+import math
+from typing import Any
+
+MAX_STEPS = 32
+
+
+def validate(value: Any, expected_outcome: Callable) -> list[dict]:
+    """Require bounded calls followed by optional release and collection steps."""
+    if not isinstance(value, list) or not 1 <= len(value) <= MAX_STEPS:
+        raise ValueError("fixture.sequence requires 1 to 32 declared steps")
+    result, released, collected, uses_case = [], False, False, False
+    for step in value:
+        if not isinstance(step, dict):
+            raise ValueError("sequence steps require an action object")
+        action = step.get("action")
+        if action == "call" and not released:
+            item = call(step, expected_outcome)
+            uses_case |= item["arguments"] == "case"
+        elif action == "release" and result and not released and set(step) == {"action"}:
+            item, released = {"action": action}, True
+        elif action == "collect" and released and not collected and set(step) <= {"action", "gc_rounds", "settle_turns"}:
+            item = collection(step)
+            collected = True
+        else:
+            raise ValueError("sequence requires calls, at most one release, then at most one final collection")
+        result.append(item)
+    if not uses_case:
+        raise ValueError("sequence must call the selected method with the case arguments")
+    return result
+
+
+def call(step: dict, expected_outcome: Callable) -> dict:
+    """Retain either the generated case inputs or an explicit finite scalar list."""
+    if set(step) - {"action", "arguments", "expected_baseline"}:
+        raise ValueError("unsupported sequence call fields")
+    arguments = step.get("arguments", "case")
+    if arguments != "case" and (not isinstance(arguments, list) or any(type(value) not in (bool, int, float, str)
+                                    or type(value) is float and not math.isfinite(value) for value in arguments)):
+        raise ValueError("sequence call arguments require case or finite scalar inputs")
+    result = {"action": "call", "arguments": copy.deepcopy(arguments)}
+    if "expected_baseline" in step:
+        result["expected_baseline"] = expected_outcome(step["expected_baseline"])
+    return result
+
+
+def collection(step: dict) -> dict:
+    """The retry schedule is a requested capability, never an equality dimension."""
+    rounds, turns = step.get("gc_rounds", 64), step.get("settle_turns", 4)
+    if type(rounds) is not int or not 1 <= rounds <= 256 or type(turns) is not int or not 1 <= turns <= 16:
+        raise ValueError("collection requires gc_rounds 1..256 and settle_turns 1..16")
+    return {"action": "collect", "gc_rounds": rounds, "settle_turns": turns}
+
+
+def configure(entry: dict, value: list[dict], coerce: Callable) -> None:
+    """Requested unavailable adapters remain named inventory blockers."""
+    if entry["language"] not in ("javascript", "typescript") or "receiver_fixture" not in entry:
+        raise ValueError("sequences require a declared JavaScript/TypeScript receiver fixture")
+    if entry["language"] != "javascript" and any(step["action"] == "collect" for step in value):
+        raise ValueError("TypeScript collection lifetimes require separate emitter qualification")
+    for step in value:
+        if step["action"] == "call" and step["arguments"] != "case":
+            coerce(entry, step["arguments"])
+    entry["sequence_configuration"] = copy.deepcopy(value)
+
+
+def concrete(entry: dict, arguments: list, coerce: Callable) -> list[dict]:
+    """Freeze all call inputs and expectations into each retained corpus case."""
+    result = []
+    for index, step in enumerate(entry["sequence_configuration"]):
+        item = {**step, "id": "step-" + str(index)}
+        if step["action"] == "call":
+            generated = step["arguments"] == "case"
+            item["arguments"] = copy.deepcopy(arguments) if generated else coerce(entry, step["arguments"])
+            item["expected_baseline"] = copy.deepcopy(step.get("expected_baseline", entry["expected_baseline"] if generated else {"kind": "return"}))
+        result.append(item)
+    return result
+
+
+def contracts(entry: dict, case: dict, roots: list[str]) -> list[dict]:
+    """Step dimensions are independently requested before workers execute."""
+    return [{"id": step["id"], "action": step["action"], "required_roots": roots,
+             "expected_baseline": step.get("expected_baseline", {"kind": "return"})}
+            for step in case.get("sequence", [])]
+
+
+def collects(entry: dict) -> bool:
+    return any(step["action"] == "collect" for step in entry.get("sequence_configuration", []))
+
+
+def creator(entry: dict) -> str | None:
+    """Only a declared source factory is selected as a linked creation call."""
+    fixture = entry.get("receiver_fixture", {})
+    if not collects(entry) or fixture.get("kind") != "function":
+        return None
+    return entry["otelc_function"][:-len(entry["name"])] + fixture["source_function"]
+
+
+def expected_functions(entry: dict, observed: dict) -> dict:
+    """A missing collection event cannot redefine the requested witness denominator."""
+    result = dict(observed)
+    if collects(entry):
+        result[entry["node_class_label"] + " lifetime"] = 1
+    return result

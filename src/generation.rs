@@ -34,6 +34,10 @@ const RESOURCES: &[(&str, &str)] = &[
         include_str!("../adapters/generation/node_receivers.py"),
     ),
     (
+        "sequences.py",
+        include_str!("../adapters/generation/sequences.py"),
+    ),
+    (
         "policy.py",
         include_str!("../adapters/generation/policy.py"),
     ),
@@ -52,6 +56,10 @@ const RESOURCES: &[(&str, &str)] = &[
     (
         "node_observe.mjs",
         include_str!("../adapters/generation/node_observe.mjs"),
+    ),
+    (
+        "node_sequence.mjs",
+        include_str!("../adapters/generation/node_sequence.mjs"),
     ),
     (
         "typed_capture.py",

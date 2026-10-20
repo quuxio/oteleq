@@ -34,6 +34,7 @@ fn contract() -> Contract {
         fixture_sha256: "f".repeat(64),
         required_roots: vec!["receiver".into()],
         expected_baseline: ExpectedOutcome::Return,
+        steps: vec![],
     }
 }
 fn observation(id: &str) -> Observation {
@@ -49,6 +50,7 @@ fn observation(id: &str) -> Observation {
         before: snapshot(id, 3),
         outcome: Outcome::Return { graph: returned },
         after: snapshot(id, 4),
+        steps: vec![],
     }
 }
 fn thrown(observation: &mut Observation, category: ErrorCategory, type_name: &str) {

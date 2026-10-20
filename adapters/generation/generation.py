@@ -18,9 +18,11 @@ import go_project
 import harness
 import node_receivers
 import otelc_capture as capture
+import otelc_collection
 import policy as project_policy
 import python_project
 import shrinking
+import sequences
 import typed_capture
 
 VERSION = 1
@@ -261,6 +263,10 @@ def receiver_fixture(entry, discovered, declared):
                                      "arguments": arguments, "arguments_requested": declared["arguments"],
                                      "argument_types": factory["parameters"]}
         entry["receiver_configuration"] = declared
+        if (entry["language"] != "python" and Path(entry["path"]).suffix in (".cjs", ".cts")
+                and (any(item["name"] == "require" for item in discovered["functions"])
+                     or any(item["name"] == "require" for item in discovered["globals"]))):
+            raise ValueError("CommonJS bootstrap requires an unshadowed module require binding")
         if entry["reason"] == "instance method requires a receiver fixture":
             entry["reason"] = ""
     except ValueError as error:
@@ -331,6 +337,11 @@ def configure_fixture(entry, discovered, fixture):
             receiver_fixture(entry, discovered, fixture["receiver"])
         if "domains" in fixture:
             entry["input_domains"] = fixture["domains"]
+        if "sequence" in fixture:
+            try:
+                sequences.configure(entry, fixture["sequence"], harness.concrete_arguments)
+            except ValueError as error:
+                entry["reason"] = entry["reason"] or str(error)
 
 
 def inventory_tree(contents, root, snapshot, workspace, args):
@@ -427,7 +438,7 @@ def decoder_files():
 
 def generator_identity():
     here = Path(__file__).parent
-    names = ("generation.py", "policy.py", "domains.py", "shrinking.py", "python_project.py", "go_project.py", "node_receivers.py", "discovery.py", "harness.py", "observe.py", "node_observe.mjs", "typed_capture.py", "discover.mjs", "discover.go", "Discover.java")
+    names = ("generation.py", "policy.py", "domains.py", "shrinking.py", "sequences.py", "python_project.py", "go_project.py", "node_receivers.py", "discovery.py", "harness.py", "observe.py", "node_observe.mjs", "node_sequence.mjs", "typed_capture.py", "discover.mjs", "discover.go", "Discover.java")
     files = {name: capture.file_digest(here / name) for name in names}
     files["host-python"] = capture.file_digest(Path(sys.executable))
     files["host-version"] = sys.version
@@ -463,6 +474,9 @@ def generation_case(entry, index, values):
         case["arguments_requested"] = entry["input_cases"][index]
     if "receiver_fixture" in entry:
         case["receiver_fixture"] = entry["receiver_fixture"]
+    if "sequence_configuration" in entry:
+        case["sequence"] = sequences.concrete(entry, values, harness.concrete_arguments)
+        case["expected_baseline"] = next(step["expected_baseline"] for step in reversed(case["sequence"]) if step["action"] == "call")
     return case
 
 
@@ -523,12 +537,15 @@ if __name__=="__main__":unittest.main()
 def policy(entry, endpoint):
     language = entry["language"]
     sources = [entry["path"]] if language == "rust" and entry.get("rust_backend", "compiler") == "llvm" else ["**"]
+    functions = [entry.get("otelc_runtime_function", entry["otelc_function"])]
+    if sequences.creator(entry) is not None:
+        functions.append(sequences.creator(entry))
     text = f'''schema_version = 2
 languages = [{json.dumps(language)}]
 [sources]
 include = {json.dumps(sources)}
 [functions]
-include = [{json.dumps(entry.get('otelc_runtime_function', entry['otelc_function']))}]
+include = {json.dumps(functions)}
 [traces]
 enabled = true
 root_sample_ratio = 1.0
@@ -542,16 +559,38 @@ interval_ms = 50
         text += '[adapters.go]\nbackend = "compile"\n'
     if language == "rust":
         text += '[adapters.rust]\nbackend = ' + json.dumps(entry.get("rust_backend", "compiler")) + '\n'
+    if sequences.collects(entry):
+        text += '[lifetimes]\nenabled = true\nboundary = "collection"\ninclude = ' + json.dumps([entry["node_class_label"]]) + '\n'
     return text
 
 
 def telemetry(bodies, report, entry, service, decoder):
     # One generated invocation must start one selected trace. Recursive counts are runtime observations.
     names, _, roots, errors = capture.decode(bodies, service, decoder)
+    if "sequence_configuration" in entry:
+        return sequence_telemetry(bodies, report, entry, service, decoder, names, roots, errors)
     if set(names) != {entry.get("otelc_runtime_function", entry["otelc_function"])} or roots != 1 or not all(n > 0 for n in names.values()):
         raise ValueError("selected function was not witnessed as one complete invocation tree")
     spec = {"functions": names, "trees": 1, "errors": errors}
     return capture.witness(bodies, report, spec, service, decoder, entry["language"])
+
+
+def sequence_telemetry(bodies, report, entry, service, decoder, names, roots, errors):
+    """Validate independent call roots and collection metadata before comparison."""
+    target, creator = entry["otelc_function"], sequences.creator(entry)
+    calls = sum(step["action"] == "call" for step in entry["sequence_configuration"])
+    spans = [span for path, body in bodies if path == capture.TRACE_PATH
+             for span in capture.service_spans(decoder.FromString(body), service)]
+    otelc_collection.sequence_functions(spans, target, calls, creator)
+    allowed = {target} | ({creator} if creator is not None else set())
+    spec = {"functions": names, "trees": roots, "errors": errors}
+    if sequences.collects(entry):
+        lifetime = entry["node_class_label"] + " lifetime"
+        allowed.add(lifetime)
+        spec["collection"] = {"type": entry["node_class_label"], "span": lifetime, "creator": creator, "count": 1}
+    if set(names) - allowed:
+        raise ValueError("sequence emitted an unexpected function or lifetime identity")
+    return capture.witness(bodies, report, spec, service, decoder, entry["language"], allow_incomplete=sequences.collects(entry))
 
 
 def driver_path(project, entry):
@@ -670,6 +709,9 @@ def attempt(workspace, data, entry, case, lane, folder, decoder):
                 "OTELEQ_OBSERVATION": str(folder / "observation"), "OTELC_REPORT_PATH": str(folder / "runtime.json")})
     if "go_options" in entry:
         env.update(go_project.environment(entry["go_options"]))
+    if sequences.collects(entry):
+        env["NODE_OPTIONS"] = "--expose-gc"
+        write(folder / "collection-controls.json", {"NODE_OPTIONS": "--expose-gc", "sequence": case["sequence"]})
     immutable = manifest(project)
     with capture.receiver() as (endpoint, bodies, errors):
         config = folder / "policy.toml"
@@ -711,8 +753,10 @@ def compare_case(workspace, data, entry, case, destination, decoder):
     contract = {"observation_schema_version": 1, "case_id": case["id"], "function_id": entry.get("otelc_runtime_function", entry["otelc_function"]),
                 "fixture_sha256": identity({"case": case, "source": entry["source_sha256"], "roots": roots}),
                 "required_roots": roots, "expected_baseline": case["expected_baseline"]}
+    if "sequence" in case:
+        contract["steps"] = sequences.contracts(entry, case, roots)
     observed, typed_observed = capture_case(workspace, data, entry, case, destination, decoder, contract)
-    selected = observed["instrumented_on"][0]["witness"]["functions"]
+    selected = sequences.expected_functions(entry, observed["instrumented_on"][0]["witness"]["functions"])
     diagnostic = {"source": data["source_sha256"], "harness": manifest(workspace / "tests/harnesses" / case["id"]),
                   "tools": {name: sha for name, sha in data["artefacts"][entry["language"]].items() if name.startswith("tool:")}}
     scope = {"language": entry["language"], "artefact_class": "diagnostic", "source_sha256": data["source_sha256"],
@@ -776,6 +820,8 @@ def run(args):
             result["arguments_requested"] = case["arguments_requested"]
         if "receiver_fixture" in case:
             result["receiver_fixture"] = case["receiver_fixture"]
+        if "sequence" in case:
+            result["sequence"] = case["sequence"]
         results.append(result)
         write(destination / "partial-results.json", results)
     blocked = [e for e in data["inventory"] if e["status"] == "blocked"] if args.command == "run" else []

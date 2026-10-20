@@ -29,6 +29,171 @@ fn fixture() -> Value {
 fn evaluate(value: Value) -> typed::Report {
     typed::compare(serde_json::from_value(value).unwrap()).unwrap()
 }
+fn sequence_fixture() -> Value {
+    let mut data = fixture();
+    let steps = json!([
+        {"id":"first","action":"call","required_roots":["receiver"],"expected_baseline":{"kind":"return"}},
+        {"id":"second","action":"call","required_roots":["receiver"],"expected_baseline":{"kind":"return"}}
+    ]);
+    data["cases"][0]["contract"]["steps"] = steps;
+    for lane in ["baseline", "instrumented_on"] {
+        for attempt in data["cases"][0][lane].as_array_mut().unwrap() {
+            let observed = &mut attempt["observation"];
+            observed["steps"] = json!(["first", "second"].map(|id| json!({
+                "id":id,"action":"call","gaps":[],"before":observed["before"],
+                "outcome":observed["outcome"],"after":observed["after"]
+            })));
+        }
+    }
+    data
+}
+
+#[test]
+fn ordered_steps_detect_transient_state_changes_and_later_initial_differences() {
+    let data = sequence_fixture();
+    assert_eq!(evaluate(data.clone()).verdict, Verdict::EquivalentObserved);
+    let mut altered = data;
+    for attempt in altered["cases"][0]["instrumented_on"]
+        .as_array_mut()
+        .unwrap()
+    {
+        attempt["observation"]["steps"][0]["after"]["nodes"][0]["fields"]["calls"]["value"] =
+            json!("5");
+        attempt["observation"]["steps"][1]["before"]["nodes"][0]["fields"]["calls"]["value"] =
+            json!("5");
+    }
+    let compared = evaluate(altered);
+    assert_eq!(compared.verdict, Verdict::DifferentObserved);
+    let differences = &compared.cases[0].pairs[0].comparison.differences;
+    assert!(differences
+        .iter()
+        .any(|item| item.path == "/steps/first/after/receiver/calls"));
+    assert!(differences
+        .iter()
+        .any(|item| item.path == "/steps/second/before/receiver/calls"));
+    assert!(compared.cases[0].pairs[0]
+        .comparison
+        .initial_differences
+        .is_empty());
+}
+
+#[test]
+fn requested_steps_cannot_be_omitted_reordered_or_silently_added() {
+    for lane in ["baseline", "instrumented_on"] {
+        for mode in [
+            "missing",
+            "reordered",
+            "extra",
+            "kind",
+            "missing-root",
+            "collection-gap",
+        ] {
+            let mut data = sequence_fixture();
+            for attempt in data["cases"][0][lane].as_array_mut().unwrap() {
+                let steps = attempt["observation"]["steps"].as_array_mut().unwrap();
+                match mode {
+                    "missing" => steps.clear(),
+                    "reordered" => steps.swap(0, 1),
+                    "extra" => {
+                        let mut item = steps[0].clone();
+                        item["id"] = json!("extra");
+                        steps.push(item);
+                    }
+                    "kind" => steps[0]["action"] = json!("collect"),
+                    "missing-root" => steps[0]["before"] = json!({"roots":{},"nodes":[]}),
+                    "collection-gap" => {
+                        steps[0]["gaps"] = json!([{"phase":"after","path":"/collection","reason":"not observed within the declared bound"}])
+                    }
+                    _ => unreachable!(),
+                }
+            }
+            assert_eq!(
+                evaluate(data).verdict,
+                Verdict::Inconclusive,
+                "{lane} {mode}"
+            );
+        }
+    }
+}
+
+#[test]
+fn step_only_repeat_instability_is_inconclusive() {
+    let mut data = sequence_fixture();
+    data["cases"][0]["instrumented_on"][1]["observation"]["steps"][0]["after"]["nodes"][0]
+        ["fields"]["calls"]["value"] = json!("6");
+    assert_eq!(evaluate(data).verdict, Verdict::Inconclusive);
+}
+
+#[test]
+fn intermediate_unexpected_baseline_errors_block_even_when_the_final_call_returns() {
+    let mut data = sequence_fixture();
+    for lane in ["baseline", "instrumented_on"] {
+        for attempt in data["cases"][0][lane].as_array_mut().unwrap() {
+            let step = &mut attempt["observation"]["steps"][0];
+            let mut graph = step["after"].clone();
+            graph["roots"]["error"] = json!({"kind":"reference","node_id":"error"});
+            graph["nodes"]
+                .as_array_mut()
+                .unwrap()
+                .push(json!({"id":"error","type":"RuntimeError","fields":{}}));
+            step["outcome"] = json!({"kind":"error","category":"exception","graph":graph});
+        }
+    }
+    assert_eq!(evaluate(data.clone()).verdict, Verdict::Blocked);
+    data["cases"][0]["contract"]["steps"][0]["expected_baseline"] =
+        json!({"kind":"error","category":"exception","type":"RuntimeError"});
+    assert_eq!(evaluate(data).verdict, Verdict::EquivalentObserved);
+}
+
+#[test]
+fn sequence_metadata_and_extra_malformed_graphs_refuse_the_protocol() {
+    for mode in [
+        "duplicate-contract",
+        "duplicate-observation",
+        "too-many-contracts",
+        "too-many-observations",
+        "bad-extra-graph",
+        "release-error",
+    ] {
+        let mut data = sequence_fixture();
+        let case = &mut data["cases"][0];
+        match mode {
+            "duplicate-contract" => case["contract"]["steps"][1]["id"] = json!("first"),
+            "duplicate-observation" => {
+                case["baseline"][0]["observation"]["steps"][1]["id"] = json!("first")
+            }
+            "too-many-contracts" => {
+                case["contract"]["steps"] = json!(vec![case["contract"]["steps"][0].clone(); 33])
+            }
+            "too-many-observations" => {
+                case["baseline"][0]["observation"]["steps"] =
+                    json!(vec![
+                        case["baseline"][0]["observation"]["steps"][0].clone();
+                        33
+                    ])
+            }
+            "bad-extra-graph" => {
+                let mut step = case["baseline"][0]["observation"]["steps"][0].clone();
+                step["id"] = json!("extra");
+                step["before"]["roots"]["receiver"]["node_id"] = json!("orphan");
+                case["baseline"][0]["observation"]["steps"]
+                    .as_array_mut()
+                    .unwrap()
+                    .push(step);
+            }
+            "release-error" => {
+                case["contract"]["steps"][0]["action"] = json!("release");
+                case["contract"]["steps"][0]["expected_baseline"] =
+                    json!({"kind":"error","category":"exception","type":"RuntimeError"});
+            }
+            _ => unreachable!(),
+        }
+        assert!(
+            typed::compare(serde_json::from_value(data).unwrap()).is_err(),
+            "{mode}"
+        );
+    }
+}
 fn throw(attempt: &mut Value) {
     let mut graph = attempt["observation"]["after"].clone();
     graph["roots"]["error"] = json!({"kind":"reference","node_id":"error"});
