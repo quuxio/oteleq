@@ -92,6 +92,10 @@ The earlier control incorrectly returned equivalence for C and C++ structs named
 
 The integrated local gate passed 130 regressions (18 Rust, 71 capture, 41 generation), Rust line coverage 96.87% and all per-module Python gates. C11/C++17 compiler tests exercise real primitive/boolean calls, opaque results/globals/implicit arguments and exception-accessor refusal. Raw source preservation and exact tool/provider manifests are retained. Canonical project type resolution, object/buffer codecs and shipping artefact evidence remain open.
 
+## Typed diagnostic payload limits
+
+A deterministic graph regression reproduces long-path amplification: a 64,855-byte synthetic snapshot previously produced 1,024 opaque-gap records containing 32,584,996 bytes of diagnostic text. The same fixture now retains 18 records and 509,208 bytes across both lanes, including explicit limit markers. Gap traversal retains iterators and one path per active level rather than allocating a full path for every pending child. Separate record/payload limits also bound differences. Reaching any limit remains incomplete evidence; it cannot become observed equivalence. These are retained-text measurements from the maintained regression, not application performance or shipping-workload evidence.
+
 ## Passive static observer regressions
 
 Actual compiler controls reproduced application callbacks from the former Java exception message accessor, Go `GoString()` and Rust `Debug` paths. The maintained codecs now restrict observation to supported primitive/standard types; unsupported values fail outside application exception/panic handling. Regression workers cover exact primitive bits, Unicode code units, standard errors, shadowed helper/type names and refusal of custom callbacks. Rust, Go and Java development tools are required for these tests (`OTELC_RUSTC`, `OTELC_GO`, `OTELC_JAVA` and `OTELC_JAVAC` can select their executables). These plain-worker controls do not by themselves qualify paired instrumentation or a shipping artefact; exact paired qualification is recorded separately.

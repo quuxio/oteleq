@@ -1,0 +1,486 @@
+{
+  "typed_schema_version": 1,
+  "scope": {
+    "language": "python",
+    "artefact_class": "diagnostic",
+    "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "baseline_artefact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "instrumented_artefact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "policy_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "observer": "hand-authored acceptance example; no target execution",
+    "channels": [
+      "stdout",
+      "stderr"
+    ],
+    "gaps": [
+      "Only the illustrative receiver is declared; globals and external effects are not observed."
+    ]
+  },
+  "cases": [
+    {
+      "contract": {
+        "observation_schema_version": 1,
+        "case_id": "counter",
+        "function_id": "Counter.increment",
+        "fixture_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "required_roots": [
+          "receiver"
+        ],
+        "expected_baseline": {
+          "kind": "return"
+        }
+      },
+      "corpus_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected_functions": {
+        "Counter.increment": 1
+      },
+      "expected_spans": 1,
+      "baseline": [
+        {
+          "execution": {
+            "source_sha256_before": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "source_sha256_after": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "termination": {
+              "kind": "exit",
+              "code": 0
+            },
+            "channels": {
+              "stdout": [],
+              "stderr": []
+            },
+            "capture_complete": true,
+            "witness": null
+          },
+          "observation": {
+            "observation_schema_version": 1,
+            "case_id": "counter",
+            "function_id": "Counter.increment",
+            "fixture_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "fixture": {
+              "status": "ready"
+            },
+            "gaps": [],
+            "before": {
+              "roots": {
+                "receiver": {
+                  "kind": "reference",
+                  "node_id": "plain-object"
+                }
+              },
+              "nodes": [
+                {
+                  "id": "plain-object",
+                  "type": "Counter",
+                  "fields": {
+                    "calls": {
+                      "kind": "integer",
+                      "type": "i32",
+                      "value": "3",
+                      "bits": 32,
+                      "signed": true
+                    }
+                  }
+                }
+              ]
+            },
+            "outcome": {
+              "kind": "return",
+              "graph": {
+                "roots": {
+                  "receiver": {
+                    "kind": "reference",
+                    "node_id": "plain-object"
+                  },
+                  "result": {
+                    "kind": "integer",
+                    "type": "i32",
+                    "value": "4",
+                    "bits": 32,
+                    "signed": true
+                  }
+                },
+                "nodes": [
+                  {
+                    "id": "plain-object",
+                    "type": "Counter",
+                    "fields": {
+                      "calls": {
+                        "kind": "integer",
+                        "type": "i32",
+                        "value": "4",
+                        "bits": 32,
+                        "signed": true
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            "after": {
+              "roots": {
+                "receiver": {
+                  "kind": "reference",
+                  "node_id": "plain-object"
+                }
+              },
+              "nodes": [
+                {
+                  "id": "plain-object",
+                  "type": "Counter",
+                  "fields": {
+                    "calls": {
+                      "kind": "integer",
+                      "type": "i32",
+                      "value": "4",
+                      "bits": 32,
+                      "signed": true
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "execution": {
+            "source_sha256_before": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "source_sha256_after": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "termination": {
+              "kind": "exit",
+              "code": 0
+            },
+            "channels": {
+              "stdout": [],
+              "stderr": []
+            },
+            "capture_complete": true,
+            "witness": null
+          },
+          "observation": {
+            "observation_schema_version": 1,
+            "case_id": "counter",
+            "function_id": "Counter.increment",
+            "fixture_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "fixture": {
+              "status": "ready"
+            },
+            "gaps": [],
+            "before": {
+              "roots": {
+                "receiver": {
+                  "kind": "reference",
+                  "node_id": "plain-object"
+                }
+              },
+              "nodes": [
+                {
+                  "id": "plain-object",
+                  "type": "Counter",
+                  "fields": {
+                    "calls": {
+                      "kind": "integer",
+                      "type": "i32",
+                      "value": "3",
+                      "bits": 32,
+                      "signed": true
+                    }
+                  }
+                }
+              ]
+            },
+            "outcome": {
+              "kind": "return",
+              "graph": {
+                "roots": {
+                  "receiver": {
+                    "kind": "reference",
+                    "node_id": "plain-object"
+                  },
+                  "result": {
+                    "kind": "integer",
+                    "type": "i32",
+                    "value": "4",
+                    "bits": 32,
+                    "signed": true
+                  }
+                },
+                "nodes": [
+                  {
+                    "id": "plain-object",
+                    "type": "Counter",
+                    "fields": {
+                      "calls": {
+                        "kind": "integer",
+                        "type": "i32",
+                        "value": "4",
+                        "bits": 32,
+                        "signed": true
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            "after": {
+              "roots": {
+                "receiver": {
+                  "kind": "reference",
+                  "node_id": "plain-object"
+                }
+              },
+              "nodes": [
+                {
+                  "id": "plain-object",
+                  "type": "Counter",
+                  "fields": {
+                    "calls": {
+                      "kind": "integer",
+                      "type": "i32",
+                      "value": "4",
+                      "bits": 32,
+                      "signed": true
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "instrumented_on": [
+        {
+          "execution": {
+            "source_sha256_before": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "source_sha256_after": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "termination": {
+              "kind": "exit",
+              "code": 0
+            },
+            "channels": {
+              "stdout": [],
+              "stderr": []
+            },
+            "capture_complete": true,
+            "witness": {
+              "decoder": "illustrative hand-authored witness, not runtime evidence",
+              "raw_otlp_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "functions": {
+                "Counter.increment": 1
+              },
+              "spans": 1,
+              "losses": {
+                "export": 0
+              },
+              "pending": 0
+            }
+          },
+          "observation": {
+            "observation_schema_version": 1,
+            "case_id": "counter",
+            "function_id": "Counter.increment",
+            "fixture_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "fixture": {
+              "status": "ready"
+            },
+            "gaps": [],
+            "before": {
+              "roots": {
+                "receiver": {
+                  "kind": "reference",
+                  "node_id": "on-object"
+                }
+              },
+              "nodes": [
+                {
+                  "id": "on-object",
+                  "type": "Counter",
+                  "fields": {
+                    "calls": {
+                      "kind": "integer",
+                      "type": "i32",
+                      "value": "3",
+                      "bits": 32,
+                      "signed": true
+                    }
+                  }
+                }
+              ]
+            },
+            "outcome": {
+              "kind": "return",
+              "graph": {
+                "roots": {
+                  "receiver": {
+                    "kind": "reference",
+                    "node_id": "on-object"
+                  },
+                  "result": {
+                    "kind": "integer",
+                    "type": "i32",
+                    "value": "4",
+                    "bits": 32,
+                    "signed": true
+                  }
+                },
+                "nodes": [
+                  {
+                    "id": "on-object",
+                    "type": "Counter",
+                    "fields": {
+                      "calls": {
+                        "kind": "integer",
+                        "type": "i32",
+                        "value": "5",
+                        "bits": 32,
+                        "signed": true
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            "after": {
+              "roots": {
+                "receiver": {
+                  "kind": "reference",
+                  "node_id": "on-object"
+                }
+              },
+              "nodes": [
+                {
+                  "id": "on-object",
+                  "type": "Counter",
+                  "fields": {
+                    "calls": {
+                      "kind": "integer",
+                      "type": "i32",
+                      "value": "5",
+                      "bits": 32,
+                      "signed": true
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "execution": {
+            "source_sha256_before": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "source_sha256_after": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "termination": {
+              "kind": "exit",
+              "code": 0
+            },
+            "channels": {
+              "stdout": [],
+              "stderr": []
+            },
+            "capture_complete": true,
+            "witness": {
+              "decoder": "illustrative hand-authored witness, not runtime evidence",
+              "raw_otlp_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "functions": {
+                "Counter.increment": 1
+              },
+              "spans": 1,
+              "losses": {
+                "export": 0
+              },
+              "pending": 0
+            }
+          },
+          "observation": {
+            "observation_schema_version": 1,
+            "case_id": "counter",
+            "function_id": "Counter.increment",
+            "fixture_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "fixture": {
+              "status": "ready"
+            },
+            "gaps": [],
+            "before": {
+              "roots": {
+                "receiver": {
+                  "kind": "reference",
+                  "node_id": "on-object"
+                }
+              },
+              "nodes": [
+                {
+                  "id": "on-object",
+                  "type": "Counter",
+                  "fields": {
+                    "calls": {
+                      "kind": "integer",
+                      "type": "i32",
+                      "value": "3",
+                      "bits": 32,
+                      "signed": true
+                    }
+                  }
+                }
+              ]
+            },
+            "outcome": {
+              "kind": "return",
+              "graph": {
+                "roots": {
+                  "receiver": {
+                    "kind": "reference",
+                    "node_id": "on-object"
+                  },
+                  "result": {
+                    "kind": "integer",
+                    "type": "i32",
+                    "value": "4",
+                    "bits": 32,
+                    "signed": true
+                  }
+                },
+                "nodes": [
+                  {
+                    "id": "on-object",
+                    "type": "Counter",
+                    "fields": {
+                      "calls": {
+                        "kind": "integer",
+                        "type": "i32",
+                        "value": "5",
+                        "bits": 32,
+                        "signed": true
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            "after": {
+              "roots": {
+                "receiver": {
+                  "kind": "reference",
+                  "node_id": "on-object"
+                }
+              },
+              "nodes": [
+                {
+                  "id": "on-object",
+                  "type": "Counter",
+                  "fields": {
+                    "calls": {
+                      "kind": "integer",
+                      "type": "i32",
+                      "value": "5",
+                      "bits": 32,
+                      "signed": true
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -2,7 +2,7 @@
 
 ## Status
 
-Updated 19 October 2026. `quux-oteleq` implements the commands below. The scalar workflow uses embedded workers and a frozen JSON workspace contract. The generator consumes a validated TOML selection/input/budget policy through `plan --config`. The later build/observer configuration and adapter sections describe proposed interfaces; the illustrative graph protocol remains unimplemented.
+Updated 19 October 2026. `quux-oteleq` implements the commands below. The scalar workflow uses embedded workers and a frozen JSON workspace contract. The generator consumes a validated TOML selection/input/budget policy through `plan --config`. The later build/observer configuration and adapter sections describe proposed interfaces; the typed graph comparator has its own versioned bundle, while generated-worker integration remains incomplete.
 
 ## Implemented commands
 
@@ -16,6 +16,7 @@ Updated 19 October 2026. `quux-oteleq` implements the commands below. The scalar
 | `clean` | `--workspace PATH` | None | Removes an owned workspace after checking its snapshot/suite and top-level contents |
 | `render-report` | `REPORT.json --output-dir NEW_DIRECTORY` | None | Private standalone HTML and JUnit presentation of retained generated-run evidence |
 | `compare-workload` | `BUNDLE.json` positional path | None | Byte-channel comparison JSON on stdout |
+| `compare-observations` | `TYPED_BUNDLE.json` positional path | None | Typed graph and byte-channel comparison JSON on stdout |
 
 The generation commands and `render-report` accept `--help`. `quux-oteleq --help` lists both workflows and their exit contracts. Use full option names; abbreviations are rejected. Paths accept both `--source PATH` and `--source=PATH` forms. `--cases` accepts 1 through 1024 and defaults to the policy budget or 3 scalar cases per function. Larger budgets add seeded samples; finite domains can produce fewer distinct cases. Language IDs are `c`, `cpp`, `rust`, `python`, `java`, `javascript`, `typescript`, `go`; repeated language selectors form a subset, and exclusions match qualified function identities.
 

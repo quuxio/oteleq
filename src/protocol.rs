@@ -5,7 +5,7 @@ use serde::{
 use std::{collections::BTreeMap, fmt, marker::PhantomData};
 
 /// Duplicate keys must not overwrite observed bytes, counts or reported losses.
-fn unique_map<'de, D, V>(deserializer: D) -> Result<BTreeMap<String, V>, D::Error>
+pub(crate) fn unique_map<'de, D, V>(deserializer: D) -> Result<BTreeMap<String, V>, D::Error>
 where
     D: Deserializer<'de>,
     V: Deserialize<'de>,

@@ -99,7 +99,7 @@ Use repeated `--language ID`, `--exclude 'qualified.pattern'` and `--cases 1` th
 "$OTELEQ_CLI" clean --workspace "$OTELEQ_WORKSPACE"
 ```
 
-Export includes a frozen application snapshot and runnable suite. It refuses existing destinations and may be placed in the application only by that explicit choice. Generated boilerplate is MIT licensed; application code retains its licence. Retained suites test their frozen snapshot; create a new plan for changed application code. See [capabilities, limits and complete usage](docs/automatic-generation.md). Pass the executable [example policy](examples/equivalence.toml) with `plan --config PATH` for selection, scalar fixtures and budgets. Broader build/factory and graph/adapter contracts remain on the [completion checklist](docs/completion.md).
+Export includes a frozen application snapshot and runnable suite. It refuses existing destinations and may be placed in the application only by that explicit choice. Generated boilerplate is MIT licensed; application code retains its licence. Retained suites test their frozen snapshot; create a new plan for changed application code. See [capabilities, limits and complete usage](docs/automatic-generation.md). Pass the executable [example policy](examples/equivalence.toml) with `plan --config PATH` for selection, scalar fixtures and budgets. Broader build/factory and generated graph-adapter integration remain on the [completion checklist](docs/completion.md).
 
 ### Compare an existing workload bundle
 
@@ -108,3 +108,11 @@ Export includes a frozen application snapshot and runnable suite. It refuses exi
 ```
 
 This command consumes repeated captured observations from a qualified observer. The [fixed eight-language integration](docs/eight-language-capture.md) creates such bundles using actual otelc workloads. See [the evidence schema and exit codes](docs/workload-comparison.md).
+
+### Compare typed boundary graphs
+
+```sh
+./target/debug/quux-oteleq compare-observations /path/to/typed-bundle.json > /path/to/typed-comparison.json
+```
+
+The [typed comparator](docs/typed-comparison.md) reports field paths, alias/cycle changes, invalid initial fixtures and incomplete captures while retaining repeated execution and telemetry checks. Its shared format accepts all eight language IDs. The scalar generator does not yet emit that format; graph codec and generation integration remain incomplete.
