@@ -58,5 +58,5 @@ def bind(entry: dict, root: Path, workspace: Path, tools: dict, execute: Callabl
         resolved = capture.strict_json(result.stdout)
         validate(resolved, entry, result.returncode)
         entry["typescript_provider"]["resolved"] = resolved
-    except (ValueError, OSError, KeyError, UnicodeError) as error:
+    except (ValueError, OSError, KeyError) as error:
         entry["reason"], entry["status"] = str(error), "blocked"
