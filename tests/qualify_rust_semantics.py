@@ -26,10 +26,10 @@ ASYNC_UNSUPPORTED = "async compiler bodies require future-completion qualificati
 
 def runtime_witness(bodies: list, runtime: dict, names: dict, service: str, decoder, kind: str) -> dict:
     """Cancellation and panic have distinct, independently required evidence."""
+    capture.rust_future_health(runtime)
     spec = {"functions": names, "trees": sum(names.values()), "errors": 2 if kind == "semantics" else 0}
     witness = capture.witness(bodies, runtime, spec, service, decoder, "rust")
     if kind == "semantics":
-        assert runtime["future_observers"] == {"admission_exhausted": False, "pending": 0}
         assert runtime["functions"][FUTURE_NAME] == {"count": 2, "cancellations": 1, "unwinds": 0}
         assert runtime["functions"][PANIC_NAME] == {"count": 1, "cancellations": 0, "unwinds": 1}
         spans = [span for path, body in bodies if path == capture.TRACE_PATH

@@ -67,12 +67,13 @@ class RustSemanticQualificationTests(unittest.TestCase):
                     changed["functions"]["semantics.selected_future"][field] = 0
                 else:
                     changed["functions"]["semantics.selected_panic"][field] = 0
-                with self.subTest(field=field), self.assertRaises(AssertionError):
+                expected_error = ValueError if field == "pending" else AssertionError
+                with self.subTest(field=field), self.assertRaises(expected_error):
                     qualifier.runtime_witness(bodies, changed, qualifier.SEMANTIC_NAMES, "fixture", decoder, "semantics")
             spans[0].attributes = []
             with self.assertRaises(AssertionError):
                 qualifier.runtime_witness(bodies, runtime, qualifier.SEMANTIC_NAMES, "fixture", decoder, "semantics")
-            qualifier.runtime_witness([], {}, qualifier.ALIAS_NAMES, "fixture", decoder, "aliases")
+            qualifier.runtime_witness([], runtime, qualifier.ALIAS_NAMES, "fixture", decoder, "aliases")
             self.assertEqual(witness.call_args.args[2]["errors"], 0)
 
     def test_fixed_bundle_retains_application_channels_and_explicit_capability_gaps(self) -> None:
