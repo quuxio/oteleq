@@ -93,6 +93,17 @@ Use category `panic` for Rust/Go. The type is the captured error/payload type, s
 
 The resolved policy, exact typed cases and a policy digest are frozen into the owned plan and retained reports. An external policy edit does not change a frozen suite; export carries the resolved policy without requiring its original file. Editing a policy inside the application changes the source snapshot identity and requires a new plan.
 
+Rust provider selection is explicit and frozen in the same policy:
+
+```toml
+[adapters.rust]
+backend = "compiler"
+```
+
+`compiler` is the default standalone-source backend. `llvm` selects the separate compiler-hook profile and schema-2 build contract. The consumer verifies fixed profile/SDK/plugin paths and hashes, compiler-resolvable SDK dependencies, the selected compiler's actual verbose version, its complete argument recipe, original declaration coordinates, resolved symbol and exact target/startup selection before application launch. Missing, changed or unsupported evidence fails the run; there is no silent backend fallback. Other backend names and adapter settings are rejected. Earlier compiler captures retain their original identities and do not qualify LLVM.
+
+The LLVM profile is a bounded `target/debug/otelc-rust-llvm.json` beside the provider adapter, with its SDK under `target/rust-llvm-sdk/debug` and the compiler pass under `target/debug`. `OTELC_RUSTC` must select that profile's compiler; the stable compiler used to build oteleq can be different. Profile and manifest data cannot choose arbitrary executables or compiler flags. The current LLVM contract is standalone, synchronous source only: Cargo/features, multi-source compilation, generics, asynchronous execution and other contexts require separate adapter work and qualification.
+
 Repeats range from 2 to 32 per lane. `case_timeout_ms` bounds each application launch (1 to 900000 ms); build/tool deadlines remain separate. `max_capture_bytes` limits accepted combined application stdout/stderr and typed observation bytes (1 to 262144). The total corpus remains capped at 1024 cases. Limits never convert incomplete capture or a failed instrumentation witness into a pass.
 
 ## Discovery and build boundary
@@ -108,11 +119,11 @@ Repeats range from 2 to 32 per lane. `case_timeout_ms` bounds each application l
 
 C/C++ scalar spellings are scoped to those languages. Other languages' names such as `i32`, `float64` and `String` do not establish a native primitive: unresolved native aliases are visible fixture/type blockers. Generated native callers also use compiler type checks on parameters, returned values and observed globals before permitting raw scalar reads. Structured values and unsupported floating representations cannot be compared through object padding. Broader canonical alias resolution remains part of semantic/build-aware discovery.
 
-These are syntax inventories. Compilation and runtime witnesses qualify individual runnable cases; syntax alone does not establish semantic types, build visibility or safe domain inputs. Parse/tool errors produce inventory blockers. Rust requires otelc's separate standalone-source artefact API (`rust --build SOURCE.rs --output-dir BUNDLE`, then `rust --run BUNDLE`). The qualified candidate contract is [otelc PR65](https://github.com/quuxio/otelc/pull/65); providers which expose only combined compile-and-run are unsupported. Cargo build-only is not qualified.
+These are syntax inventories. Compilation and runtime witnesses qualify individual runnable cases; syntax alone does not establish semantic types, build visibility or safe domain inputs. Parse/tool errors produce inventory blockers. Rust requires otelc's separate standalone-source artefact API (`rust --build SOURCE.rs --output-dir BUNDLE`, then `rust --run BUNDLE`). The compiler candidate contract is [otelc PR65](https://github.com/quuxio/otelc/pull/65); the opt-in LLVM profile/resolution contract is [otelc PR68](https://github.com/quuxio/otelc/pull/68). Providers which expose only combined compile-and-run are unsupported. Cargo build-only is not qualified.
 
 Dependencies must already be available to the qualified local tools; generation does not install them into the application.
 
-Java uses `-Xshare:off` in both lanes. C/C++ select fixed LLVM 22 locations or explicit `OTELC_CLANG`/`OTELC_CLANGXX`; metadata verifies the canonical selected directory. Set qualified `OTELC_RUSTC`, `OTELC_NODE`, `OTELC_JAVA` and `OTELC_GO` where defaults are unsuitable. Rust SDK/compiler distributions and Node native observer ABI must match. Both Rust lanes use `--edition=2024 -O -g` and the same source-relative pathname. Build stdout/stderr stay in build evidence; application capture uses a no-build launch. The consumer rejects a changed baseline flag contract and verifies executable, retained plan, entry source, SDK and adapter hashes plus compiler provenance. Metadata never selects executable paths. See [tool qualification](eight-language-capture.md#run). The real eight-language integration is qualified on macOS ARM64; Linux/Windows are not qualified by that result.
+Java uses `-Xshare:off` in both lanes. C/C++ select fixed LLVM 22 locations or explicit `OTELC_CLANG`/`OTELC_CLANGXX`; metadata verifies the canonical selected directory. Set qualified `OTELC_RUSTC`, `OTELC_NODE`, `OTELC_JAVA` and `OTELC_GO` where defaults are unsuitable. Rust SDK/compiler distributions and Node native observer ABI must match. Both Rust lanes use the same source-relative pathname and caller-selected recipe: `--edition=2024 -O -g` for `compiler`, with `-Zmir-enable-passes=-Inline,-ForceInline -Ccodegen-units=1` added for `llvm`. Build stdout/stderr stay in build evidence; application capture uses a no-build launch. The consumer rejects a changed flag/manifest contract and verifies executable, retained plan, entry source, SDK and adapter hashes plus compiler provenance. LLVM additionally verifies the profile/plugin, inventory and resolution records. Metadata never selects executable paths. See [tool qualification](eight-language-capture.md#run). Each exact-revision record names its platform/provider; an earlier macOS ARM64 capture does not qualify another backend, Linux or Windows.
 
 ## What is compared
 
@@ -165,6 +176,19 @@ make generation-rust-otelc PYTHON=/absolute/path/to/otelc/.venv/bin/python \
 ```
 
 This is a Rust-only standalone-source check; it does not establish a common eight-language provider revision.
+
+To exercise the opt-in LLVM profile, select its exact compiler and pass the explicit backend to the same qualifier:
+
+```sh
+OTELC_RUSTC=/absolute/path/to/profile/rustc \
+make generation-rust-otelc PYTHON=/absolute/path/to/otelc/.venv/bin/python \
+  OTELC_ROOT=/absolute/path/to/otelc REPORT_DIR=/tmp/new-rust-llvm-qualification \
+  GENERATION_ARGS='--backend llvm'
+```
+
+This covers six matching cases/36 launches and a deliberately unstable panic case/six launches, with three repeats per lane. The stable panic fixture installs its own application hook with independently expected stderr. The unstable fixture retains changing process/native-thread output and must remain incomplete under exact byte comparison; the strict whole-application gate therefore exits `3`. Its hook closure remains an explicitly excluded helper requiring a separate capture fixture. This is not whole-inventory equivalence. Actual decoded instrumentation and both raw/typed altered-stderr rejection are required. The LLVM qualifier also rejects altered retained compiler/profile/plugin/inventory/resolution/selection records, including rehashed semantic edits. Those metadata controls do not execute the target again. Only a completed exact-revision qualification record establishes the tested compiler/profile combination.
+
+The [19 October Rust LLVM record](qualification/rust-llvm-2026-10-19.json) binds that result to consumer runtime `b824b0b` and private provider `6da80fbb`/CLI `ce8e1a0`. It also retains the separate default compiler, common 24-case/96-launch and configured 38-case/228-launch results. Exact source/binary/profile identities and the earlier incomplete corpora remain distinct; an experimental profile result does not qualify a shipping artefact.
 
 The configured-policy qualification adds concrete domain cases, three repeats per lane, integer extremes and lossless UTF-16 strings, plus an altered-observation rejection control:
 

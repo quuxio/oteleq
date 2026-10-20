@@ -183,13 +183,13 @@ def snapshot_source(source, workspace, contents):
     return snapshot
 
 
-def discover_file(name, language, root, snapshot, workspace, tools, artefacts):
+def discover_file(name, language, root, snapshot, workspace, tools, artefacts, rust_backend="compiler"):
     try:
         if language not in tools:
             selected = capture.selected_tools(root, language)
             if language == "java":
                 selected["javac"] = capture.tool_path(str(selected["java"].parent / "javac"))
-            qualified = capture.artefacts(root, language, selected)
+            qualified = capture.artefacts(root, language, selected, rust_backend=rust_backend)
             tools[language], artefacts[language] = selected, qualified
         def discover_execute(command, cwd, input_data=None):
             environment = capture.environment(snapshot, tools[language], "oteleq-discovery", root)
@@ -242,6 +242,8 @@ def inventory_entry(function, discovered, name, language, source_hash, snapshot,
     excluded = is_entrypoint(function, language) or bool(function.get("declaration_only"))
     excluded |= not project_policy.selected(entry["otelc_function"], args.configuration["functions"])
     entry["generation_seed"] = args.configuration["generation"]["seed"]
+    if language == "rust":
+        entry["rust_backend"] = args.configuration["adapters"]["rust"]["backend"]
     if language == "go":
         entry["go_shadowed_recovery"] = any(function["name"] in ("recover", "panic")
                                           for function in discovered["functions"])
@@ -260,7 +262,8 @@ def inventory_tree(contents, root, snapshot, workspace, args):
         if (not language or language not in args.language
                 or not project_policy.selected(name, args.configuration["sources"])):
             continue
-        discovered = discover_file(name, language, root, snapshot, workspace, tools, artefacts)
+        discovered = discover_file(name, language, root, snapshot, workspace, tools, artefacts,
+                                   args.configuration["adapters"]["rust"]["backend"])
         discovered["entrypoints"] = [function for function in discovered["functions"] if is_entrypoint(function, language)]
         inventory.extend(inventory_entry(function, discovered, name, language, sha, snapshot, args)
                          for function in discovered["functions"])
@@ -432,10 +435,11 @@ if __name__=="__main__":unittest.main()
 
 def policy(entry, endpoint):
     language = entry["language"]
+    sources = [entry["path"]] if language == "rust" and entry.get("rust_backend", "compiler") == "llvm" else ["**"]
     text = f'''schema_version = 2
 languages = [{json.dumps(language)}]
 [sources]
-include = ["**"]
+include = {json.dumps(sources)}
 [functions]
 include = [{json.dumps(entry['otelc_function'])}]
 [traces]
@@ -449,6 +453,8 @@ interval_ms = 50
 '''
     if language == "go":
         text += '[adapters.go]\nbackend = "compile"\n'
+    if language == "rust":
+        text += '[adapters.rust]\nbackend = ' + json.dumps(entry.get("rust_backend", "compiler")) + '\n'
     return text
 
 
@@ -488,7 +494,8 @@ def build_command(root, project, entry, driver, config, tools, env, folder, scra
         capture.execute = lambda command, cwd, environment, timeout=180: execute(command, cwd, environment, folder / ("build-" + uuid.uuid4().hex), timeout)
         try:
             if language == "rust":
-                command = capture.rust_command(root, project, driver, config, tools, env, folder, scratch, lane)
+                command = capture.rust_command(root, project, driver, config, tools, env, folder, scratch, lane,
+                                               backend=entry["rust_backend"], expected_function=entry["otelc_function"])
                 shutil.copyfile(folder / (lane + "-build-identities.json"), folder / BUILD_IDENTITIES)
                 return command
             plain, on = capture.commands(root, project, language, driver, config, tools, env, folder)
@@ -547,7 +554,7 @@ def qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, 
 def attempt(workspace, data, entry, case, lane, folder, decoder):
     root, language = Path(data["otelc_root"]), entry["language"]
     tools = {k: Path(v) for k, v in data["tools"][language].items()}
-    capture.stable(root, language, tools, data["artefacts"][language])
+    capture.stable(root, language, tools, data["artefacts"][language], rust_backend=entry.get("rust_backend", "compiler"))
     folder.mkdir(parents=True)
     project = folder / "project"
     shutil.copytree(workspace / "snapshot", project)
@@ -568,7 +575,7 @@ def attempt(workspace, data, entry, case, lane, folder, decoder):
         result = execute(command, project, env, folder, timeout=data["configuration"]["limits"]["case_timeout_ms"] / 1000)
     capture.retain_http(folder, bodies, errors)
     validate_private_sources(project, immutable, folder)
-    capture.stable(root, language, tools, data["artefacts"][language])
+    capture.stable(root, language, tools, data["artefacts"][language], rust_backend=entry.get("rust_backend", "compiler"))
     return qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, decoder)
 
 def capture_case(workspace, data, entry, case, destination, decoder, contract):

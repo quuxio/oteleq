@@ -28,6 +28,8 @@ Generation execution exits are `0` complete, `1` observed difference, `2` argume
 
 The Rust-only [report renderer](reporting.md) needs no Python, provider or original workspace. It exits `0` for complete matches, `1` for differences, `2` for arguments, `3` for gaps and `4` for invalid input/output. It retains whole-inventory gaps from partial replay and refuses existing output directories.
 
+The implemented generation policy accepts `[adapters.rust] backend = "compiler"` (default) or `"llvm"`. LLVM requires the separately matched compiler/profile/build evidence described in [automatic generation](automatic-generation.md#project-policy-and-concrete-fixtures). Unsupported adapter fields and backend values are rejected. This does not enable the proposed general build recipes below.
+
 ## Proposed extensions
 
 The broader design adds a `doctor` capability command, build recipes and object/receiver factories, richer promotion planning, stateful inputs and a versioned graph/worker protocol. `doctor`, `promote`, `--keep-workspace`, `--dry-run` and replay `--bundle` are proposal names, not available CLI options. Current retention uses `export-tests` and explicit `clean`.

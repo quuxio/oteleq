@@ -31,7 +31,9 @@ class PolicyTests(unittest.TestCase):
         first, second = policy.load(None), policy.load(None)
         self.assertEqual(first, policy.DEFAULTS)
         first["sources"]["include"].append("changed")
+        first["adapters"]["rust"]["backend"] = "llvm"
         self.assertNotEqual(first, second)
+        self.assertEqual(second["adapters"]["rust"]["backend"], "compiler")
         self.assertEqual(set(second["languages"]), set(policy.LANGUAGES))
         self.assertTrue(policy.selected("src/api.py", {"include": ["src/**"], "exclude": []}))
         self.assertFalse(policy.selected("src/test_api.py", {"include": ["src/**"], "exclude": ["**/test*"]}))
@@ -66,6 +68,9 @@ class PolicyTests(unittest.TestCase):
                    {"fixtures": [{"function": "f", "cases": [[float("nan")]]}]},
                    {"fixtures": [{"function": "f", "language": "unknown", "cases": [[1]]}]},
                    {"fixtures": [{"function": "f", "cases": [[1], [1]]}]}]
+        invalid.extend([{"adapters": []}, {"adapters": {"go": {"backend": "compile"}}},
+                        {"adapters": {"rust": []}}, {"adapters": {"rust": {"unknown": 1}}},
+                        *[{"adapters": {"rust": {"backend": value}}} for value in (True, None, [], "native", "LLVM")]])
         for document in invalid:
             with self.subTest(document=document), self.assertRaises(ValueError):
                 self.load(document)
@@ -79,6 +84,24 @@ class PolicyTests(unittest.TestCase):
             path.write_bytes(b" " * (1024 * 1024 + 1))
             with self.assertRaisesRegex(ValueError, "at most"):
                 policy.load(path)
+
+    def test_rust_selection_is_frozen_and_emitted_without_changing_default_backend(self):
+        function = {"name": "selected", "line": 1, "parameters": ["i32"], "output": "i32", "reason": ""}
+        discovered = {"globals": [], "entrypoints": []}
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            (folder / "app.rs").write_text("fn selected(value:i32)->i32{value+1}\n")
+            for backend in ("compiler", "llvm"):
+                config = self.load({"adapters": {"rust": {"backend": backend}}})
+                args = argparse.Namespace(configuration=config, cases=1)
+                entry = generation.inventory_entry(function, discovered, "app.rs", "rust", "a" * 64, folder, args)
+                self.assertEqual(entry["rust_backend"], backend)
+                self.assertEqual(entry["status"], "ready")
+                provider = policy.tomllib.loads(generation.policy(entry, "http://127.0.0.1:4318"))
+                self.assertEqual(provider["adapters"]["rust"]["backend"], backend)
+                self.assertEqual(provider["sources"]["include"], ["app.rs"] if backend == "llvm" else ["**"])
+        default = generation.policy({"language": "rust", "otelc_function": "app.selected"}, "receiver")
+        self.assertEqual(policy.tomllib.loads(default)["adapters"]["rust"]["backend"], "compiler")
 
     def test_fixture_scalars_are_checked_against_parameter_types_and_widths(self):
         def entry(language, name, values):
