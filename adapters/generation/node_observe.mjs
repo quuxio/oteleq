@@ -32,8 +32,10 @@ const intrinsicSlots=[
 ].map(([object,key])=>[object,key,ownDescriptor(object,key).value]);
 
 function stableIntrinsics() {
-  for(let index=0;index<intrinsicSlots.length;index++) {
-    const slot=intrinsicSlots[index];
+  // Do not use the application's Array iterator before validating that slot.
+  let index=0;
+  while(index<intrinsicSlots.length) {
+    const slot=intrinsicSlots[index++];
     const object=slot[0],key=slot[1],expected=slot[2];
     const actual=ownDescriptor(object,key);
     if(!actual||!hasOwn(actual,'value')||actual.value!==expected) throw new NativeError('changed observer intrinsic requires a fixture');
@@ -174,7 +176,8 @@ function staticRoots(record) {
 }
 
 /** Construct a fresh receiver and observe one source-bound instance method. */
-export async function runReceiver(record,factory,fixture,method,arguments_,roots,asynchronous,validBinding) {
+export async function runReceiver(record,call,roots,validBinding) {
+  const {factory,fixture,method,arguments:arguments_,asynchronous}=call;
   validateClass(record);
   if(!validBinding()) throw new NativeError('source class or factory binding changed');
   let receiver;

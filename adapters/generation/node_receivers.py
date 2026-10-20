@@ -50,7 +50,8 @@ def driver(entry: dict, arguments: list, source: str) -> str:
     return raw.decode() + f'''
 const __oteleqArguments={json.dumps(arguments)};
 const __oteleqRoots=()=>({{{globals_}arguments:__oteleqArguments}});
-await __oteleqObserver.runReceiver(__oteleqClass,__oteleqFactory,{json.dumps(fixture)},{json.dumps(method)},__oteleqArguments,__oteleqRoots,{str(bool(entry.get("async"))).lower()},()=>{valid_binding});
+const __oteleqCall={{factory:__oteleqFactory,fixture:{json.dumps(fixture)},method:{json.dumps(method)},arguments:__oteleqArguments,asynchronous:{str(bool(entry.get("async"))).lower()}}};
+await __oteleqObserver.runReceiver(__oteleqClass,__oteleqCall,__oteleqRoots,()=>{valid_binding});
 '''
 
 

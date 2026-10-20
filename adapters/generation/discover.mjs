@@ -74,12 +74,14 @@ function receiverMetadata(node,owner,reason) {
 }
 function functionInfo(node,depth,names,owner) {
   const local=nodeName(node);
-  const accessor=ts.isGetAccessorDeclaration(node)?'get ':ts.isSetAccessorDeclaration(node)?'set ':'';
+  let accessor='';
+  if(ts.isGetAccessorDeclaration(node)) accessor='get ';
+  else if(ts.isSetAccessorDeclaration(node)) accessor='set ';
   const location=source.getLineAndCharacterOfPosition(node.getStart(source));
   const unsupported=callableReason(node);
   const metadata=receiverMetadata(node,owner,unsupported);
-  const reason=metadata.node_receiver_eligible?'instance method requires a receiver fixture':
-    metadata.node_receiver_reason||unsupported||(depth||!ts.isFunctionDeclaration(node)?'nested function, method or closure needs an access fixture':'');
+  const accessReason=depth||!ts.isFunctionDeclaration(node)?'nested function, method or closure needs an access fixture':'';
+  const reason=metadata.node_receiver_eligible?'instance method requires a receiver fixture':metadata.node_receiver_reason||unsupported||accessReason;
   return {name:[...names,accessor+local].join('.'),line:location.line+1,column:location.character,
     parameters:node.parameters.map(p=>p.type?.getText(source)??'unknown'),output:node.type?.getText(source)??'unknown',
     reason,async:modifier(node,ts.SyntaxKind.AsyncKeyword),...metadata};
