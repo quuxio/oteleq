@@ -20,8 +20,9 @@ class GeneratedGoBuildTests(unittest.TestCase):
                     (folder/'go-build-identities.json').write_text(json.dumps(identity))
                     return ['plain'],['on']
                 execute=gen.capture.execute
-                with patch.object(gen.capture,'commands',side_effect=commands):
+                with patch.object(gen.capture,'go_commands',side_effect=commands) as build:
                     command=gen.build_command(folder,folder,{'language':'go'},folder/'app.go',folder/'policy',{}, {},folder,folder,lane)
+                self.assertEqual(build.call_args.args[1],{'workspace':folder,'target':folder/'app.go','sources':[folder/'app.go'],'project':folder})
                 self.assertEqual(command,[expected])
                 self.assertEqual(json.loads((folder/gen.BUILD_IDENTITIES).read_text()),identity)
                 self.assertIs(gen.capture.execute,execute)

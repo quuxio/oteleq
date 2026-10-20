@@ -8,6 +8,7 @@ import random
 import struct
 
 import domains
+import go_project
 import node_receivers
 import python_project
 
@@ -495,14 +496,19 @@ fn __oteleq_value<T:__oteleq_Value>(value:&T)->__oteleq_std::string::String {val
 
 
 def go_driver(entry, args, source):
-    source = rename_main(source, entry["file_functions"], "go")
+    source = (go_project.rename_entrypoint(source, entry["go_main_renames"]) if "go_main_renames" in entry
+              else rename_main(source, entry["file_functions"], "go"))
     position = entry["package_end"]
     imports = '\nimport (__oteleq_fmt "fmt"; __oteleq_os "os"; __oteleq_math "math"; __oteleq_reflect "reflect")\n'
     raw = source.encode()
     source = (raw[:position] + imports.encode() + raw[position:]).decode()
-    call = entry["name"] + "(" + ",".join(literal(v, t, "go") for v, t in zip(args, entry["parameters"])) + ")"
+    declared = entry.get("go_parameter_types", entry["parameters"])
+    arguments = [literal(value, kind, "go") if kind == original else original + "(" + literal(value, kind, "go") + ")"
+                 for value, kind, original in zip(args, entry["parameters"], declared)]
+    call = entry["name"] + "(" + ",".join(arguments) + ")"
     invoked = call + ';s+="return:void\\n"' if entry["output"] == "void" else 's+="return:"+__oteleqValue(' + call + ')+"\\n"'
     state = "\n".join('s+=' + json.dumps(g["name"] + ':') + '+__oteleqValue(' + g["name"] + ')+"\\n"' for g in entry["globals"])
+    worker = go_project.BRIDGE if entry.get("go_context", {}).get("package", "main") != "main" else "main"
     return source + f'''
 func __oteleqValue(v interface{{}}) string {{
  x:=__oteleq_reflect.ValueOf(v)
@@ -521,7 +527,7 @@ func __oteleqValue(v interface{{}}) string {{
  default:__oteleq_os.Exit(91);return ""
  }}
 }}
-func main(){{
+func {worker}(){{
  s:=__oteleq_fmt.Sprintf(`abi:{{"pointer_bits":%d}}`+"\\nbefore\\n",__oteleq_reflect.TypeOf(0).Bits()); {state}
  func(){{defer func(){{if p:=recover();__oteleq_reflect.ValueOf(p).IsValid(){{s+="error:"+__oteleqValue(p)+"\\n"}}}}();{invoked}}}()
  s+="after\\n"; {state}
@@ -581,6 +587,18 @@ def materialise(project, entry, args):
         if driver.exists():
             raise ValueError("generated Java driver would overwrite an application file")
         driver.write_text(java_driver(entry, args))
+    elif language == "go" and "go_context" in entry:
+        context = entry["go_context"]
+        source.write_text(go_driver(entry, args, original))
+        for name, positions in context["main_renames"].items():
+            if name != entry["path"] and positions:
+                sibling = project / name
+                sibling.write_text(go_project.rename_entrypoint(sibling.read_text(), positions))
+        driver = project / go_project.worker_path(context)
+        if context["package"] != "main":
+            driver.parent.mkdir(parents=True)
+            driver.write_text("package main\nimport __oteleq_target " + json.dumps(context["import_path"])
+                              + "\nfunc main(){__oteleq_target." + go_project.BRIDGE + "()}\n")
     else:
         driver = source
         emit = {"javascript": js_driver, "typescript": js_driver, "rust": rust_driver, "go": go_driver}[language]

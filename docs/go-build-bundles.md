@@ -1,6 +1,6 @@
 # Retained Go builds and replay
 
-Go capture and generated scalar tests require otelc's separate build-only/baseline/on replay API. The former combined `go SOURCE.go` compiler/launcher is not a qualified substitute. The API is developed in [otelc PR91](https://github.com/quuxio/otelc/pull/91); a frozen candidate is independent qualification evidence, not a claim that it has merged or shipped.
+Go capture and generated scalar tests require otelc's separate build-only/baseline/on replay API. The former combined `go SOURCE.go` compiler/launcher is not a qualified substitute. The API merged through [otelc PR91](https://github.com/quuxio/otelc/pull/91) at `0624ffdb2a02c80b0a7952f9dcd80f4b3fdd3c82`, with the same complete source tree as qualified candidate `5ea90fa`. Retained frozen products and qualification remain identified separately from canonical rebuilds and releases.
 
 ## What happens in an attempt
 
@@ -10,7 +10,7 @@ Go capture and generated scalar tests require otelc's separate build-only/baseli
 4. Launch the requested lane with `go --run-baseline BUNDLE` or `go --run BUNDLE`. The adapter validates the retained bundle and copies its selected executable privately; neither lane invokes the compiler.
 5. Capture exact application bytes, typed state/outcome and the selected on-lane instrumentation/transport witness. Compiler diagnostics stay in build evidence.
 
-The current generated caller is standalone and appends a diagnostic helper in a private source copy. It does not add arbitrary package/class access, build tags, cgo or workspace support. Original application/dependency files, manifests and locks remain unchanged. Tests and captures stay outside the target repository.
+The default generated caller is standalone and appends a diagnostic helper in a private source copy. Explicit [Go module roots](go-package-context.md) add ordinary library/`main` packages, active sibling files, semantic scalar types and frozen build tags. They do not add cgo or workspace support. Original application/dependency files, manifests and locks remain unchanged. Tests and captures stay outside the target repository.
 
 ## Retained evidence
 

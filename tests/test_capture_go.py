@@ -21,6 +21,8 @@ class GoBuildTests(unittest.TestCase):
         self.project=self.base/'project with spaces';self.project.mkdir()
         self.source=self.project/'app.go';self.source.write_text('package main\nfunc selected(v int)int{return v*3}\n')
         self.original=capture.file_digest(self.source)
+        self.request={'workspace':self.project,'target':self.source,'sources':[self.source],'project':self.project}
+        self.originals={str(self.source):self.original}
         self.evidence=self.base/'evidence';self.evidence.mkdir();self.bundle=self.evidence/'go-bundle'
         self.policy=self.base/'policy.toml';self.policy.write_text('schema_version=2\nlanguages=["go"]\n[functions]\ninclude=["app.selected"]\n[traces]\nenabled=true\n')
         tools=self.base/'tools';tools.mkdir()
@@ -63,7 +65,7 @@ class GoBuildTests(unittest.TestCase):
         (self.bundle/'build.json').write_text(json.dumps(self.metadata))
 
     def check_recipe(self):
-        return capture.go_recipe(self.root,self.project,self.source,self.bundle,self.compiler,self.original)
+        return capture.go_recipe(self.root,self.request,self.bundle,self.compiler,self.originals)
 
     def test_pair_retains_binary_and_compiler_bytes_without_launching_application(self):
         result=subprocess.CompletedProcess([],0,json.dumps(self.env).encode(),b'')
@@ -89,7 +91,7 @@ class GoBuildTests(unittest.TestCase):
         result=subprocess.CompletedProcess([],0,json.dumps(self.env).encode(),b'')
         with patch.object(capture,'execute',return_value=result),patch.object(capture,'build',side_effect=ValueError('unsupported --build')) as build:
             with self.assertRaisesRegex(ValueError,'unsupported --build'):
-                capture.go_commands(self.root,self.project,self.source,self.policy,self.tools,{},self.evidence)
+                capture.go_commands(self.root,self.request,self.policy,self.tools,{},self.evidence)
         self.assertEqual(build.call_count,1)
         self.assertFalse((self.evidence/'go-build-identities.json').exists())
 
@@ -139,15 +141,15 @@ class GoBuildTests(unittest.TestCase):
         self.create_bundle();dependency=self.base/'dependency.go';dependency.write_text('package dependency')
         self.recipe['inputs'][str(dependency)]={'sha256':capture.file_digest(dependency)}
         missing=self.base/'optional.sum';self.recipe['inputs'][str(missing)]={'absent':True}
-        capture.go_inputs(self.recipe,self.source,self.original,self.root)
+        capture.go_inputs(self.recipe,self.originals,self.root)
         missing.write_text('appeared')
-        with self.assertRaisesRegex(ValueError,'absent input'):capture.go_inputs(self.recipe,self.source,self.original,self.root)
+        with self.assertRaisesRegex(ValueError,'absent input'):capture.go_inputs(self.recipe,self.originals,self.root)
         missing.unlink();dependency.write_text('changed')
-        with self.assertRaisesRegex(ValueError,'loaded input changed'):capture.go_inputs(self.recipe,self.source,self.original,self.root)
+        with self.assertRaisesRegex(ValueError,'loaded input changed'):capture.go_inputs(self.recipe,self.originals,self.root)
         dependency.write_text('package dependency')
         for name,identity in [('relative',{'sha256':'0'*64}),(str(dependency),{'sha256':'bad'}),(str(dependency),{'absent':False})]:
             recipe=copy.deepcopy(self.recipe);recipe['inputs'][name]=identity
-            with self.subTest(identity=identity),self.assertRaises(ValueError):capture.go_inputs(recipe,self.source,self.original,self.root)
+            with self.subTest(identity=identity),self.assertRaises(ValueError):capture.go_inputs(recipe,self.originals,self.root)
 
     def test_resolved_build_policy_is_bound_to_selection_annotations_and_traces(self):
         self.create_bundle();requested={'functions':{'include':['app.selected']},'traces':{'enabled':True}}
@@ -187,7 +189,7 @@ class GoBuildTests(unittest.TestCase):
         (self.base/'go-cache').symlink_to(self.project,target_is_directory=True)
         with patch.object(capture,'execute') as execute,patch.object(capture,'build') as build:
             with self.assertRaisesRegex(ValueError,'cache location'):
-                capture.go_commands(self.root,self.project,self.source,self.policy,self.tools,{},self.evidence)
+                capture.go_commands(self.root,self.request,self.policy,self.tools,{},self.evidence)
         execute.assert_not_called();build.assert_not_called()
         (self.base/'go-cache').unlink()
         for location in (self.source,self.project/'cache',self.root/'cache'):
@@ -206,6 +208,26 @@ class GoBuildTests(unittest.TestCase):
             capture.go_dependency_identity(recipe,self.compiler,other,self.evidence)
         with self.assertRaisesRegex(ValueError,'changed between attempts'):
             capture.go_dependency_identity(self.recipe,{**self.compiler,'sha256':'0'*64},self.project,self.evidence)
+
+    def test_package_target_requires_all_requested_siblings_and_preserves_target_identity(self):
+        sibling=self.project/'state.go';sibling.write_text('package main\nvar state=7\n')
+        self.request['target']=self.project;self.request['sources'].append(sibling)
+        self.originals[str(sibling)]=capture.file_digest(sibling)
+        self.recipe['inputs'][str(sibling)]={'sha256':self.originals[str(sibling)]}
+        self.recipe['target']=str(self.project)
+        for name in ('baseline_argv','instrumented_argv'):self.recipe[name][-1]=str(self.project)
+        self.create_bundle()
+        self.assertEqual(self.check_recipe(),self.recipe)
+        del self.recipe['inputs'][str(sibling)]
+        (self.bundle/'recipe.json').write_text(json.dumps(self.recipe))
+        with self.assertRaisesRegex(ValueError,'source or SDK input'):self.check_recipe()
+
+    def test_request_roots_and_sources_cannot_escape_or_be_empty(self):
+        outside=self.base/'outside.go';outside.write_text('package main\n')
+        for changed in ({'target':outside},{'workspace':self.base},{'sources':[]},{'sources':[outside]}):
+            with self.subTest(changed=changed),patch.object(capture,'execute') as execute,self.assertRaises(ValueError):
+                capture.go_commands(self.root,{**self.request,**changed},self.policy,self.tools,{},self.evidence)
+            execute.assert_not_called()
 
 
 if __name__=='__main__':unittest.main()

@@ -27,6 +27,57 @@ fn typed_fixture() -> Value {
     data
 }
 #[test]
+fn go_module_runtime_binding_preserves_repo_labels_and_rejects_unbound_aliases() {
+    let mut data = typed_fixture();
+    data["inventory"][0]["language"] = json!("go");
+    data["inventory"][0]["path"] = json!("services/api/package/target.go");
+    data["inventory"][0]["otelc_function"] = json!("services.api.package.target.add");
+    data["inventory"][0]["otelc_runtime_function"] = json!("package.target.add");
+    data["inventory"][0]["go_context"] = json!({"module_root":"services/api"});
+    data["cases"][0]["function"] = json!("services.api.package.target.add");
+    data["cases"][0]["comparison"]["scope"]["language"] = json!("go");
+    assert!(rendered(&data)
+        .html
+        .contains("services.api.package.target.add"));
+    let valid = data.clone();
+    for root in [
+        "../services/api",
+        "/services/api",
+        "services//api",
+        "services/./api",
+        "services\\api",
+        "services:api",
+        "other",
+        "",
+    ] {
+        let mut altered = valid.clone();
+        altered["inventory"][0]["go_context"]["module_root"] = json!(root);
+        assert!(
+            render(&serde_json::to_vec(&altered).unwrap()).is_err(),
+            "{root}"
+        );
+    }
+    for (field, value) in [
+        ("otelc_runtime_function", json!("other.function")),
+        ("otelc_runtime_function", json!("")),
+        ("otelc_runtime_function", Value::Null),
+        ("go_context", Value::Null),
+        ("language", json!("python")),
+        ("path", json!("other/target.go")),
+    ] {
+        let mut altered = valid.clone();
+        altered["inventory"][0][field] = value;
+        assert!(
+            render(&serde_json::to_vec(&altered).unwrap()).is_err(),
+            "{field}"
+        );
+    }
+    data["inventory"][0]["go_context"]["module_root"] = json!(".");
+    data["inventory"][0]["otelc_function"] = json!("package.target.add");
+    data["cases"][0]["function"] = json!("package.target.add");
+    assert!(rendered(&data).junit.contains("package.target.add"));
+}
+#[test]
 fn receiver_fixtures_require_a_typed_root_and_keep_their_construction_inputs() {
     let mut data = typed_fixture();
     data["cases"][0]["receiver_fixture"] =

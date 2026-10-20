@@ -104,7 +104,7 @@ def direct(provider,folder):
     env=capture.environment(project,tools,service,provider);marker=folder/'init-marker';env['OTELEQ_INIT_MARKER']=str(marker)
     with capture.receiver() as (endpoint,bodies,errors):
         policy.write_bytes(capture.configure(policy.read_bytes(),endpoint))
-        commands=capture.go_commands(provider,project,source,policy,tools,env,folder)
+        commands=capture.go_commands(provider,{'workspace':project,'target':source,'sources':[source],'project':project},policy,tools,env,folder)
         assert not marker.exists() and not bodies and not errors
         install=folder/'runtime-only'
         for relative in ('target/debug/quux-otelc','adapters/go/build/otelc-go'):

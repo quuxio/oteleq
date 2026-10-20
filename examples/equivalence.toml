@@ -25,6 +25,12 @@ max_capture_bytes = 262144
 [adapters.rust]
 backend = "compiler"
 
+# Opt into ordinary Go package/type context with explicit source-relative module roots.
+# Empty roots retain standalone file mode. Tags require module roots.
+[adapters.go]
+module_roots = []
+build_tags = []
+
 # Optional explicit domain cases replace automatic samples for matching functions.
 # Use the exact function identity from plan.json or a deliberate glob.
 # [[fixtures]]
