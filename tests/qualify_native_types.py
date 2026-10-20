@@ -31,6 +31,9 @@ def main() -> None:
             "i32 selected_bad(void){i32 value={1,7};return value;}\n"
             "int selected_good(int value){return value+1;}\n"
             + f"int selected_bool({boolean} value){{return value?1:0;}}\n")
+    (source / 'thread-local.c').write_text('_Thread_local int hidden=0;\nint selected_tls(int value){return value;}\n')
+    (source / 'thread-local.cpp').write_text('int initialise(){__builtin_trap();return 1;}\n'
+        'thread_local int hidden=initialise();\nint selected_tls(int value){return value;}\n')
     policy = destination / "equivalence.toml"
     policy.write_text('''schema_version=1
 languages=["c","cpp"]
@@ -46,7 +49,9 @@ cases=[[true],[false]]
     plan = json.loads((workspace / "plan.json").read_text())
     blocked = [entry for entry in plan["inventory"] if entry["status"] == "blocked"]
     aliases = [entry for entry in blocked if entry["name"] == "selected_bad"]
+    thread_local = [entry for entry in blocked if entry['path'].startswith('thread-local.')]
     assert len(aliases) == 2
+    assert len(thread_local) == 3 and all('thread-local' in entry['reason'] for entry in thread_local)
     assert all("fixture" in entry["reason"] for entry in blocked)
     command([cli, "generate", "--workspace", workspace], destination, "generate")
     comparison = destination / "comparison"
@@ -54,6 +59,7 @@ cases=[[true],[false]]
     report = json.loads((comparison / "report.json").read_text())
     assert report["source_preserved"] and len(report["blocked"]) == len(blocked) and len(report["cases"]) == 6
     assert all(case["exit_code"] == 0 for case in report["cases"])
+    assert not any('thread-local.' in case['function'] for case in report['cases'])
     for case in report["cases"]:
         bundle = json.loads((comparison / case["case"] / "bundle.json").read_text())["cases"][0]
         expected = 8 if "selected_good" in case["function"] else int(case["arguments"][0])
@@ -62,11 +68,12 @@ cases=[[true],[false]]
             assert len(bundle[lane]) == 2
             assert all(token in bytes(attempt["channels"]["state-and-outcome"]) for attempt in bundle[lane])
     summary = {"claim": "equivalence over these tests and observations", "artefact_class": "diagnostic",
-               "scope": "six witnessed C/C++ primitive cases; object aliases and compiler-declared constructors remain blocked",
+               "scope": "six witnessed C/C++ primitive cases; object aliases and thread-local roots remain visible blockers",
                "oteleq_cli_sha256": hashlib.sha256(cli.read_bytes()).hexdigest(),
                "otelc_cli_sha256": hashlib.sha256((root / "target/debug/quux-otelc").read_bytes()).hexdigest(),
                "matching_cases": 6, "matching_attempts": 24, "blocked_callables": len(blocked),
-               "blocked_object_aliases": len(aliases), "blocked_other_declarations": len(blocked) - len(aliases),
+               "blocked_object_aliases": len(aliases), "blocked_thread_local_callables": len(thread_local),
+               "blocked_other_declarations": len(blocked) - len(aliases) - len(thread_local),
                "qualifier_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
                "strict_gate_exit": 3, "source_preserved": True, "native_scalar_value_oracles": True}
     (destination / "qualification.json").write_text(json.dumps(summary, indent=2) + "\n")
