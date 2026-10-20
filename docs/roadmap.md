@@ -50,7 +50,7 @@ Acceptance includes factories/interfaces, constructor/exception identity, module
 
 ## Stage 6: Go and Rust
 
-Explicit [Go module roots](go-package-context.md) now provide active package/type discovery, private library/main callers, sibling scalar state and fixed build tags. [Declared Go receiver fixtures](go-receivers.md) add source-bound private struct/array slots, pointer cycles/interior aliases and primitive panics; actual-provider qualification is pending. Broader Go fixtures, fuzz bridges and cgo/workspace recipes remain open.
+Explicit [Go module roots](go-package-context.md) now provide active package/type discovery, private library/main callers, sibling scalar state and fixed build tags. [Declared Go receiver fixtures](go-receivers.md) add source-bound private struct/array slots, pointer cycles/interior aliases and primitive panics; its [actual-provider corpus](qualification/go-receivers-2026-10-20.json) completes 168 launches. Broader Go fixtures, fuzz bridges and cgo/workspace recipes remain open.
 
 Deliver Go package/type discovery, private same-package tests and fuzz-to-typed-corpus bridges, plus Rust Cargo/type-aware discovery, external/private harnesses and proptest integration. Their ownership, panic, package/global state and build-variant contracts have independent qualifications.
 
