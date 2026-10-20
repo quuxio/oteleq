@@ -1,6 +1,12 @@
 """Bind declared Go factories to compiler-resolved source storage."""
 from collections.abc import Callable
-from pathlib import PurePosixPath
+import json
+from pathlib import Path, PurePosixPath
+import struct
+
+from go_project import OBSERVER_DIRECTORY
+
+OBSERVER = Path(__file__).with_name("go_observe.go").read_text()
 
 
 def require(condition: bool, reason: str) -> None:
@@ -50,9 +56,9 @@ def children(model: dict, package: str) -> list[str]:
         require(set(model) == {"kind", "element", "length"}
                 and type(model["length"]) is int and 0 <= model["length"] <= 4096,
                 "array declaration exceeds its bound")
-        return [model["element"]]
+        return ["*" + model["element"]]
     elif kind == "struct":
-        return fields(model, package)
+        return ["*" + name for name in fields(model, package)]
     else:
         raise ValueError("Go receiver fixture: " + str(model.get("reason", "unsupported storage")))
     return []
@@ -82,7 +88,7 @@ def bind(entry: dict, discovered: dict, declaration: dict, concrete: Callable) -
     require("go_context" in entry and entry.get("go_receiver")
             and entry["reason"] in ("", "instance method requires a receiver fixture")
             and not entry.get("go_variadic"), "requires an ordinary semantic source method")
-    models, context = discovered["go_types"], entry["go_context"]
+    models, context = dict(discovered["go_types"]), entry["go_context"]
     package, receiver = context["import_path"], entry["go_receiver"]
     require(receiver in models, "receiver storage is unavailable")
     owner = models[receiver].get("element") if models[receiver]["kind"] == "pointer" else receiver
@@ -102,8 +108,20 @@ def bind(entry: dict, discovered: dict, declaration: dict, concrete: Callable) -
     arguments = concrete({"language": "go", "parameters": factory["parameters"]}, declaration["arguments"])
     globals_ = discovered["go_global_types"]
     require(set(globals_) == {item["name"] for item in entry["globals"]}, "package global storage differs")
+    # Addressable slots preserve aliases to a field, array element or package
+    # variable as well as aliases between pointers to whole structs.
+    slots = list(globals_.values())
+    for model in list(models.values()):
+        if model["kind"] == "struct":
+            slots.extend(field["type"] for field in model["fields"])
+        elif model["kind"] == "array":
+            slots.append(model["element"])
+    for name in slots:
+        pointer = {"kind": "pointer", "element": name}
+        require(models.get("*" + name, pointer) == pointer, "slot pointer type differs")
+        models["*" + name] = pointer
     roots = {"receiver": root, **{"argument:" + str(i): name for i, name in enumerate(parameters)},
-             **{"global:" + name: type_ for name, type_ in globals_.items()}}
+             **{"global:" + name: "*" + type_ for name, type_ in globals_.items()}}
     selected = storage(models, [*roots.values(), result, *factory["go_parameters"]], package)
     source = str(PurePosixPath(context["directory"]) / filename)
     entry.update(receiver_class=models[owner]["name"], go_receiver_type=root, go_models=selected,
@@ -111,5 +129,51 @@ def bind(entry: dict, discovered: dict, declaration: dict, concrete: Callable) -
                  receiver_fixture={"factory": factory["name"], "kind": "function", "line": factory["line"],
                                    "source_function": source.removesuffix(".go").replace("/", ".") + "." + factory["name"],
                                    "source_path": source, "arguments": arguments,
-                                   "arguments_requested": declaration["arguments"], "argument_types": factory["parameters"]},
+                                   "arguments_requested": declaration["arguments"], "argument_types": factory["parameters"],
+                                   "parameter_storage": factory["go_parameters"]},
                  reason="")
+
+
+def scalar_input(value: object) -> dict:
+    """Encode constants without referring to application-shadowable Go builtins."""
+    if type(value) is bool:
+        return {"kind": "boolean", "value": str(value).lower()}
+    if type(value) is int:
+        return {"kind": "integer", "value": str(value)}
+    if type(value) is float:
+        return {"kind": "float", "value": struct.pack(">d", value).hex()}
+    require(type(value) is str, "unsupported scalar construction input")
+    return {"kind": "string", "value": value.encode("utf-8", errors="strict").hex()}
+
+
+def configuration(entry: dict, arguments: list) -> dict:
+    """Freeze independent construction and method inputs with their real types."""
+    return {"models": entry["go_models"], "roots": entry["go_root_types"],
+            "receiver": entry["go_receiver_type"], "method_receiver": entry["go_receiver"],
+            "parameters": entry["go_parameters"], "output": entry["go_result"],
+            "factory_parameters": entry["receiver_fixture"]["parameter_storage"],
+            "factory_arguments": [scalar_input(value) for value in entry["receiver_fixture"]["arguments"]],
+            "arguments": [scalar_input(value) for value in arguments]}
+
+
+def driver(entry: dict, arguments: list, source: str) -> str:
+    """Call statically bound private source functions through an external helper."""
+    context, fixture = entry["go_context"], entry["receiver_fixture"]
+    module_prefix = context["import_path"]
+    relative = PurePosixPath(context["directory"]).relative_to(context["module_root"])
+    if relative.as_posix() != ".":
+        module_prefix = module_prefix.removesuffix("/" + relative.as_posix())
+    helper = module_prefix + "/" + OBSERVER_DIRECTORY
+    imports = '\nimport (__oteleq_reflect "reflect"; __oteleq_observe ' + json.dumps(helper) + ')\n'
+    raw = source.encode()
+    source = (raw[:entry["package_end"]] + imports.encode() + raw[entry["package_end"]:]).decode()
+    owner = entry["receiver_class"]
+    method_owner = "(*" + owner + ")" if entry["go_receiver"].startswith("*") else owner
+    target = method_owner + "." + entry["name"].rsplit(".", 1)[-1]
+    worker = "OteleqGeneratedRun" if context["package"] != "main" else "main"
+    roots = ["__oteleq_observe.Bind(" + json.dumps("global:" + item["name"])
+             + ",__oteleq_reflect.ValueOf(&" + item["name"] + "))" for item in entry["globals"]]
+    encoded = json.dumps(json.dumps(configuration(entry, arguments), separators=(",", ":")))
+    return (source + '\nfunc ' + worker + '(){__oteleq_observe.Run(' + encoded + ',__oteleq_reflect.ValueOf('
+            + fixture["factory"] + '),__oteleq_reflect.ValueOf(' + target + ')'
+            + (',' + ','.join(roots) if roots else '') + ')}\n')

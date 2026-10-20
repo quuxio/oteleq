@@ -3,6 +3,7 @@ import base64
 from typing import Any
 import node_receivers
 import java_graph
+import go_graph
 
 from otelc_capture import strict_json
 
@@ -395,6 +396,8 @@ def scalar_capture(raw: bytes, entry: dict) -> tuple[dict, dict, dict]:
 
 
 def required_roots(entry: dict) -> list[str]:
+    if entry["language"] == "go" and "receiver_fixture" in entry:
+        return list(entry["go_root_types"])
     if entry["language"] == "java" and "receiver_fixture" in entry:
         return list(java_graph.root_types(entry))
     roots = ["global:" + item["name"] for item in entry["globals"]]
@@ -447,7 +450,9 @@ def dynamic_steps(capture: dict, entry: dict) -> list[dict]:
 
 def observation(raw: bytes, entry: dict, contract: dict) -> dict[str, Any]:
     language = entry["language"]
-    if language == "java" and "receiver_fixture" in entry:
+    if language == "go" and "receiver_fixture" in entry:
+        boundaries = go_graph.boundaries(raw, entry)
+    elif language == "java" and "receiver_fixture" in entry:
         boundaries = java_graph.boundaries(raw, entry)
     elif language in ("python", "javascript", "typescript"):
         capture = strict_json(raw)

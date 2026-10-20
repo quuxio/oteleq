@@ -5,6 +5,7 @@ import re
 
 
 COMMAND_DIRECTORY = "oteleq_generated_cmd"
+OBSERVER_DIRECTORY = "oteleq_generated_observer"
 BRIDGE = "OteleqGeneratedRun"
 
 
@@ -117,6 +118,8 @@ def load_package(source: Path, snapshot: Path, module: Path, go: Path, execute) 
         raise ValueError("generated Go observer name collides with package source")
     if (module / COMMAND_DIRECTORY).exists():
         raise ValueError("generated Go command directory collides with source")
+    if (module / OBSERVER_DIRECTORY).exists():
+        raise ValueError("generated Go observer directory collides with source")
     return {"inventories": inventories, "context": context}
 
 

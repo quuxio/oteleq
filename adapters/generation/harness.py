@@ -9,6 +9,7 @@ import struct
 
 import domains
 import go_project
+import go_receivers
 import node_receivers
 import java_receivers
 import python_project
@@ -254,6 +255,8 @@ def literal(value, type_, language):
 
 
 def global_gaps(entry):
+    if entry["language"] == "go" and "receiver_fixture" in entry:
+        return []  # The bound closed storage registry already covers every root.
     if entry["language"] in ("python", "javascript", "typescript"):
         gaps = [g["name"] for g in entry["globals"] if g["name"].startswith("<")]
         if "receiver_fixture" in entry and entry["language"] == "python":
@@ -500,6 +503,8 @@ fn __oteleq_value<T:__oteleq_Value>(value:&T)->__oteleq_std::string::String {val
 def go_driver(entry, args, source):
     source = (go_project.rename_entrypoint(source, entry["go_main_renames"]) if "go_main_renames" in entry
               else rename_main(source, entry["file_functions"], "go"))
+    if "receiver_fixture" in entry:
+        return go_receivers.driver(entry, args, source)
     position = entry["package_end"]
     imports = '\nimport (__oteleq_fmt "fmt"; __oteleq_os "os"; __oteleq_math "math"; __oteleq_reflect "reflect")\n'
     raw = source.encode()
@@ -576,6 +581,10 @@ java.lang.StringBuilder s=new java.lang.StringBuilder("before\\n");
 def go_materialise(project, entry, args, original):
     """Keep legal package access and original main bindings in private copies."""
     context = entry["go_context"]
+    if "receiver_fixture" in entry:
+        helper = project / context["module_root"] / go_receivers.OBSERVER_DIRECTORY
+        helper.mkdir()
+        (helper / "observer.go").write_text(go_receivers.OBSERVER)
     (project / entry["path"]).write_text(go_driver(entry, args, original))
     for name, positions in context["main_renames"].items():
         if name != entry["path"] and positions:

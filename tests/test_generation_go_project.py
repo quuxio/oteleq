@@ -199,7 +199,7 @@ func unused()*Unused{return nil}
         self.assertEqual(entry["receiver_class"], "Counter")
         self.assertEqual(entry["go_receiver_type"], "*" + prefix + "Counter")
         self.assertEqual(entry["go_root_types"], {"receiver": "*" + prefix + "Counter",
-                                                 "argument:0": prefix + "Count", "global:shared": "*" + prefix + "Counter"})
+                                                 "argument:0": prefix + "Count", "global:shared": "**" + prefix + "Counter"})
         self.assertEqual(entry["receiver_fixture"]["source_path"], "services/api/counter/factory.go")
         self.assertEqual(entry["receiver_fixture"]["source_function"], "services.api.counter.factory.New")
         self.assertEqual(entry["receiver_fixture"]["argument_types"], ["int16"])
@@ -242,6 +242,9 @@ func unused()*Unused{return nil}
         sibling.write_text("package counter\n")
         (self.module / go_project.COMMAND_DIRECTORY).mkdir()
         self.assertIn("command directory", self.discover(source)["functions"][0]["reason"])
+        (self.module / go_project.COMMAND_DIRECTORY).rmdir()
+        (self.module / go_project.OBSERVER_DIRECTORY).mkdir()
+        self.assertIn("observer directory", self.discover(source)["functions"][0]["reason"])
 
     def test_invalid_project_context_keeps_each_syntactic_callable_visible(self):
         source = self.source("counter/api.go", "package counter\nfunc one(){}\nfunc two(){}\n")

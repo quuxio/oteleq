@@ -169,3 +169,7 @@ The full local gate passed 339 regressions; Rust product line coverage was 97.29
 ## Shared effect qualification routes
 
 Filesystem and HTTP corpora retain independent protocol fixtures and literal oracles. A shared runner manages their generated/exported suites, missing/incomplete evidence controls, reduction/replay and source/launch accounting. `make effect-qualification-check` enforces an independent 80% coverage floor over that runner. Regression checks exercise fresh and resumed routes, copied evidence identity, malformed outcomes, source changes and forbidden output directories without claiming actual SDK qualification. Maintainer qualification refuses `-O` and `PYTHONOPTIMIZE` before its first command so independent assertion oracles cannot be disabled.
+
+## Go receiver observer validation
+
+[Go receiver fixtures](go-receivers.md) bind real compiler-resolved source storage and same-package factories. Plain workers exercise private fields, arrays, raw string bytes, float bits, aliases/cycles, nil/value receivers, primitive panics, callback avoidance and incomplete-capture controls. `make go-observer-check` compiles the maintained observer, runs probes and `go vet`, and enforces an independent 80% statement floor. The Python binding, graph validator and coverage runner each have an independent 80% floor. These checks do not establish actual otelc qualification, which is pending.
