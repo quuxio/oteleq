@@ -65,6 +65,12 @@ def expected_baseline(value: Any) -> dict[str, Any]:
     raise ValueError("expected_baseline requires return or an explicit error category/type")
 
 
+def scalar_arguments(value: Any) -> bool:
+    """Recognise the same finite scalar list for case and construction inputs."""
+    return isinstance(value, list) and all(type(item) in (str, int, float, bool)
+                                          and (type(item) is not float or math.isfinite(item)) for item in value)
+
+
 def fixture(value: Any, index: int) -> dict[str, Any]:
     """Validate source-scoped concrete argument lists without executing target code."""
     label = f"fixtures[{index}]"
@@ -79,9 +85,7 @@ def fixture(value: Any, index: int) -> dict[str, Any]:
     if not isinstance(cases, list) or not 1 <= len(cases) <= MAX_CASES:
         raise ValueError(f"{label}.cases must contain 1 to {MAX_CASES} argument lists")
     for arguments in cases:
-        if (not isinstance(arguments, list)
-                or any(type(arg) not in (str, int, float, bool) or type(arg) is float and not math.isfinite(arg)
-                       for arg in arguments)):
+        if not scalar_arguments(arguments):
             raise ValueError(f"{label} currently requires finite scalar arguments")
     identities = [json.dumps(arguments, ensure_ascii=True, allow_nan=False) for arguments in cases]
     if len(identities) != len(set(identities)):
@@ -103,9 +107,7 @@ def receiver(value: Any) -> dict[str, Any]:
     factory, arguments = value.get("factory"), value.get("arguments", [])
     if not isinstance(factory, str) or not factory.isidentifier() or keyword.iskeyword(factory):
         raise ValueError("receiver.factory requires one ordinary same-module class or function name")
-    if (not isinstance(arguments, list)
-            or any(type(arg) not in (str, int, float, bool) or type(arg) is float and not math.isfinite(arg)
-                   for arg in arguments)):
+    if not scalar_arguments(arguments):
         raise ValueError("receiver.arguments requires finite scalar constructor inputs")
     return {"factory": factory, "arguments": arguments.copy()}
 
