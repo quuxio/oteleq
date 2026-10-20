@@ -182,6 +182,11 @@ def artefacts(root, language, tools, *, rust_backend="compiler"):
         paths += [root / "target/debug/otelc-rust-adapter", root / "Cargo.lock"]
         if rust_backend == "llvm":
             paths += rust_llvm_inputs(root, tools)
+        elif ((root / RUST_COMPILER_PROFILE_FILENAME).exists()
+              or (root / RUST_COMPILER_PROFILE_FILENAME).is_symlink()):
+            from otelc_rust_build import inputs
+            rust_flags(rust_backend)
+            paths += inputs(root, tools)
         else:
             rust_flags(rust_backend)
             paths += [root / "target/debug/libquux_otelc_rust.rlib"]
@@ -210,7 +215,7 @@ def artefacts(root, language, tools, *, rust_backend="compiler"):
                   and "tests" not in p.relative_to(tree).parts]
     identities = {str(p.relative_to(root)): file_digest(p) for p in paths}
     identities.update({"tool:" + name: file_digest(path) for name, path in tools.items()})
-    for name in ("otelc_capture.py", "otelc_collection.py", "otelc_resource.py", "capture_otelc_languages.py", "otelc-workloads.json", "otelc-worker-workloads.json", "otelc-typescript-native-workloads.json", "otelc-collection-workloads.json", "otelc-resource-workloads.json"):
+    for name in ("otelc_capture.py", "otelc_rust_build.py", "otelc_collection.py", "otelc_resource.py", "capture_otelc_languages.py", "otelc-workloads.json", "otelc-worker-workloads.json", "otelc-typescript-native-workloads.json", "otelc-collection-workloads.json", "otelc-resource-workloads.json"):
         identities["observer:" + name] = file_digest(Path(__file__).with_name(name))
     return identities
 
@@ -236,6 +241,7 @@ def build(command, workspace, environment, output):
 RUST_BASELINE_FLAGS = ("--edition=2024", "-O", "-g")
 RUST_LLVM_BASELINE_FLAGS = (*RUST_BASELINE_FLAGS, "-Zmir-enable-passes=-Inline,-ForceInline", "-Ccodegen-units=1")
 RUST_PROFILE_FILENAME = "target/debug/otelc-rust-llvm.json"
+RUST_COMPILER_PROFILE_FILENAME = "target/debug/otelc-rust-compiler.json"
 PLAN_FILENAME = "plan.json"
 
 
@@ -248,11 +254,11 @@ def rust_flags(backend: str) -> tuple[str, ...]:
     raise ValueError("unsupported Rust backend")
 
 
-def build_document(path: Path) -> dict:
+def build_document(path: Path, *, limit: int = 4 * 1024 * 1024) -> dict:
     """Read fixed, bounded regular files with the shared strict JSON parser."""
     if path.is_symlink() or not path.is_file():
         raise ValueError("Build evidence requires regular files")
-    if path.stat().st_size > 4 * 1024 * 1024:
+    if path.stat().st_size > limit:
         raise ValueError("Build evidence exceeds its size limit")
     document = strict_json(path.read_bytes())
     if not isinstance(document, dict):
@@ -313,8 +319,8 @@ def rust_metadata(bundle: Path, backend: str = "compiler") -> dict:
     if metadata_path.stat().st_size > 4 * 1024 * 1024:
         raise ValueError("Rust build metadata exceeds its size limit")
     metadata = strict_json(metadata_path.read_text())
-    version = 2 if backend == "llvm" else 1
-    if (not isinstance(metadata, dict) or type(metadata.get("schema_version")) is not int or metadata["schema_version"] != version
+    versions = (2,) if backend == "llvm" else (1, 3)
+    if (not isinstance(metadata, dict) or type(metadata.get("schema_version")) is not int or metadata["schema_version"] not in versions
             or metadata.get("language") != "rust"
             or metadata.get("baseline_flags") != list(rust_flags(backend))):
         raise ValueError("Rust build flags or manifest schema require separate qualification")
@@ -322,6 +328,13 @@ def rust_metadata(bundle: Path, backend: str = "compiler") -> dict:
             "schema_version", "language", "backend", "executable_sha256", "plan_sha256", "adapter_sha256", "sdk_sha256",
             "source", "source_sha256", "source_root", "baseline_flags", "compiler", "compiler_hook"}):
         raise ValueError("Rust LLVM manifest fields or backend are unqualified")
+    if backend == "compiler":
+        fields = {"schema_version", "language", "executable_sha256", "plan_sha256", "adapter_sha256", "sdk_sha256",
+                  "source", "source_sha256", "source_root", "baseline_flags", "compiler"}
+        if metadata["schema_version"] == 3:
+            fields |= {"backend", "compiler_driver"}
+        if set(metadata) != fields or metadata["schema_version"] == 3 and metadata["backend"] != "compiler":
+            raise ValueError("Rust compiler manifest fields or backend are unqualified")
     return metadata
 
 
@@ -501,6 +514,10 @@ def rust_manifest(root: Path, workspace: Path, source: Path, bundle: Path, tools
                   backend: str = "compiler", expected_function: str | None = None, environment: dict | None = None) -> dict:
     """Verify all source/build/provider hashes using only caller-selected paths."""
     metadata = rust_metadata(bundle, backend)
+    if backend == "compiler":
+        profile_path = root / RUST_COMPILER_PROFILE_FILENAME
+        if (profile_path.exists() or profile_path.is_symlink()) != (metadata["schema_version"] == 3):
+            raise ValueError("Rust compiler profile and manifest versions require separate qualification")
     compiler = rust_compiler(metadata, tools, backend)
     assets = rust_profile(root, tools) if backend == "llvm" else None
     expected = {"executable_sha256": file_digest(bundle / "application"),
@@ -513,6 +530,9 @@ def rust_manifest(root: Path, workspace: Path, source: Path, bundle: Path, tools
             or metadata.get("source_root") != str(workspace.resolve())):
         raise ValueError("Rust build source, executable, policy or provider identity changed")
     hook = rust_llvm_manifest(root, workspace, source, bundle, metadata, tools, assets, expected_function, environment) if assets else {}
+    if backend == "compiler" and metadata["schema_version"] == 3:
+        from otelc_rust_build import validate
+        hook = validate(root, workspace, source, bundle, metadata, tools, expected_function, environment)
     return {**expected, "manifest_sha256": file_digest(bundle / BUILD_FILENAME),
             "baseline_flags": list(rust_flags(backend)), "compiler": compiler, **hook}
 

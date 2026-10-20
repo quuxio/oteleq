@@ -106,6 +106,10 @@ const RESOURCES: &[(&str, &str)] = &[
         include_str!("../examples/otelc_capture.py"),
     ),
     (
+        "otelc_rust_build.py",
+        include_str!("../examples/otelc_rust_build.py"),
+    ),
+    (
         "otelc_collection.py",
         include_str!("../examples/otelc_collection.py"),
     ),

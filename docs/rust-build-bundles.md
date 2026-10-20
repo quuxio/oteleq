@@ -1,0 +1,39 @@
+# Rust build records and replay
+
+Generated Rust callers build only the lane being tested. The plain lane uses the explicitly selected compiler; the instrumented lane uses otelc's build-only API and then replays the retained executable. Compiler output is retained separately from application stdout/stderr. A combined compile-and-launch provider is unsupported.
+
+The consumer implements three distinct contracts. Supporting a record format does not qualify an untested provider.
+
+| Backend | Build schema | Additional compiler evidence |
+| --- | --- | --- |
+| Legacy `compiler` | 1 | Fixed baseline flags, source/application/plan/adapter/SDK hashes and selected compiler provenance |
+| Original-source `compiler` | 3 | Fixed profile, MIR driver, original compiler request and emitted-instance inventory |
+| Explicit `llvm` | 2 | Profile1/inventory2 or profile2/inventory3, with actual LLVM resolution records |
+
+The original-source schema3 consumer is implemented and protocol-tested. Actual instrumented qualification against a content-verified replacement provider is pending. Existing frozen qualification records retain their original runtime/provider identities. The current scalar caller remains standalone and synchronous; format acceptance does not enable Cargo, general module graphs, generated async targets or receiver codecs.
+
+## Original-source compiler profile
+
+`target/debug/otelc-rust-compiler.json` has profile schema1 and `backend="compiler"`. The supported profile identifies Rust 1.98.1, commit `48a229ceaefd4985c50990b14116b6d856af0985`, macOS ARM64 and LLVM 22.1.8. `OTELC_RUSTC` must select that actual compiler. The consumer hashes its bytes and reads its verbose version; metadata cannot choose an executable.
+
+The SDK and MIR driver have fixed provider-relative paths: `target/debug/libquux_otelc_rust.rlib` and `target/debug/otelc-rust-mir`. The descriptor, driver, SDK and compiler-resolvable SDK products are frozen with the plan. Adding/removing/changing a dependency, redirecting a product through a symlink or altering the selected compiler invalidates that identity. Compiler sysroot libraries and OS libraries remain outside the content manifest.
+
+The profile and manifest must agree. A provider with the original-source profile cannot substitute a legacy schema1 build; schema3 requires the actual profile. The separate LLVM backend does not satisfy this contract.
+
+## Retained schema3 evidence
+
+Each instrumented attempt retains `application`, `build.json`, `plan.json`, `profile.json`, `compiler-request.json` and `inventory.json`.
+
+`build.compiler_driver` binds the profile, driver, request and inventory SHA-256 values. The retained profile must be byte-identical to the selected provider's descriptor. The complete compiler recipe must match the diagnostic caller: original relative entry path, `--edition=2024 -O -g`, private output, fixed SDK dependency lookup, selected sysroot and fixed probe crate. Unexpected flags, a substituted tool or an output outside the caller's scratch directory refuse the run.
+
+The request binds the original source/root, loaded-source hashes, resolved policy, protected provider source roots and dependency-discovery arguments. Its policy is the exact Rust `Plan` projection of the retained resolved plan. The inventory must agree with the source/discovery records. The requested ordinary target and independent startup each need one emitted compiler instance, an exact original declaration and distinct symbols. Expanded or uninstantiated targets cannot satisfy the supported scalar caller. Other loaded source graphs remain unavailable in this profile.
+
+Profiles are bounded to 64 KiB, requests to 8 MiB, inventory/build/plan records to 4 MiB and function inventories to 65,536 entries. Required records must be regular files. Missing or altered data cannot become an equivalence verdict.
+
+Build records establish compiler provenance within the trusted-provider boundary. They are not signed attestations against an actor replacing every artefact and recomputing all hashes. Emitted symbols and name-bound spans do not authenticate a particular invocation. The [invocation witness](action-witness.md) remains unavailable.
+
+## Independent semantic fixtures
+
+`tests/fixtures/rust_compiler_semantics.rs` has no SDK imports. Plain-compiler regression tests check source-derived column/tracked-caller observations, fixed closure/future layout, compile-time `Send`, unpolled drop, pending/completed/cancelled futures, a typed panic payload and exactly-once destruction. `rust_compiler_aliases.rs` and `rust_compiler_shared.rs` supply two logical module paths to one read-only physical source; the regression verifies both links, bytes and permissions after compilation.
+
+These plain fixtures prepare independent producer qualification. They do not establish instrumented future, aliased-module or general generated async support. Actual paired qualification must additionally check immutable provider identities, raw application observations, emitted instrumentation, health/loss status and source preservation. The [completion checklist](completion.md) retains those broader build and scheduling requirements.
