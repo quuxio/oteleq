@@ -189,8 +189,9 @@ class GoProjectTests(unittest.TestCase):
         self.assertEqual(go_project.documents(b' {"x":1}\n {"y":2} \n'), [{"x": 1}, {"y": 2}])
         with self.assertRaisesRegex(ValueError, "non-object"):
             go_project.documents(b'[]')
+        failed = subprocess.CompletedProcess([], 1, b"", b"diagnostic")
         with self.assertRaisesRegex(ValueError, "failed.*diagnostic"):
-            go_project.check_result(subprocess.CompletedProcess([], 1, b"", b"diagnostic"), "failed")
+            go_project.check_result(failed, "failed")
 
 
 if __name__ == "__main__":

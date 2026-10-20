@@ -577,31 +577,34 @@ def build_command(root, project, entry, driver, config, tools, env, folder, scra
             raise ValueError("generated Java build failed; inspect build/stderr")
         main = (entry["package"] + "." if entry["package"] else "") + "OteleqDriver"
         command = [tools["java"], "-Xshare:off", "-cp", classes, main] if lane == "baseline" else prefix + ["java", "-Xshare:off", "-cp", classes, main]
-    else:
-        # Use the proven build recipes, with bounded execution for every build and launch.
-        old_execute = capture.execute
-        capture.execute = lambda command, cwd, environment, timeout=180: execute(command, cwd, environment, folder / ("build-" + uuid.uuid4().hex), timeout)
-        try:
-            if language == "rust":
-                command = capture.rust_command(root, project, driver, config, tools, env, folder, scratch, lane,
-                                               backend=entry["rust_backend"], expected_function=entry["otelc_function"])
-                shutil.copyfile(folder / (lane + "-build-identities.json"), folder / BUILD_IDENTITIES)
-                return command
-            if language == "go":
-                context = entry.get("go_context")
-                module = project / context["module_root"] if context else project
-                sources = [project / name for name in context["files"]] if context else [driver]
-                if driver.is_file() and driver not in sources:
-                    sources.append(driver)
-                request = {"workspace": module, "target": driver, "sources": sources, "project": project}
-                plain, on = capture.go_commands(root, request, config, tools, env, folder)
-                shutil.copyfile(folder / "go-build-identities.json", folder / BUILD_IDENTITIES)
-            else:
-                plain, on = capture.commands(root, project, language, driver, config, tools, env, folder)
-        finally:
-            capture.execute = old_execute
-        command = plain if lane == "baseline" else on
-    return command
+        return command
+    # Use the proven build recipes, with bounded execution for every build and launch.
+    old_execute = capture.execute
+    capture.execute = lambda command, cwd, environment, timeout=180: execute(command, cwd, environment, folder / ("build-" + uuid.uuid4().hex), timeout)
+    try:
+        if language == "rust":
+            command = capture.rust_command(root, project, driver, config, tools, env, folder, scratch, lane,
+                                           backend=entry["rust_backend"], expected_function=entry["otelc_function"])
+            shutil.copyfile(folder / (lane + "-build-identities.json"), folder / BUILD_IDENTITIES)
+            return command
+        if language == "go":
+            plain, on = capture.go_commands(root, go_build_request(project, entry, driver), config, tools, env, folder)
+            shutil.copyfile(folder / "go-build-identities.json", folder / BUILD_IDENTITIES)
+        else:
+            plain, on = capture.commands(root, project, language, driver, config, tools, env, folder)
+    finally:
+        capture.execute = old_execute
+    return plain if lane == "baseline" else on
+
+
+def go_build_request(project, entry, driver):
+    """Bind a caller-selected module, target and required active package inputs."""
+    context = entry.get("go_context")
+    module = project / context["module_root"] if context else project
+    sources = [project / name for name in context["files"]] if context else [driver]
+    if driver.is_file() and driver not in sources:
+        sources.append(driver)
+    return {"workspace": module, "target": driver, "sources": sources, "project": project}
 
 
 def native_command(prefix, project, language, driver, tools, env, folder, scratch, lane):

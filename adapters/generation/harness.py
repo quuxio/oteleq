@@ -569,6 +569,22 @@ java.lang.StringBuilder s=new java.lang.StringBuilder("before\\n");
 ''' + state + '\ntry{' + invoked + '}catch(java.lang.Exception e){s.append("error:").append(e.getClass().getName()).append(":").append(value(message(e))).append("\\n");}\ns.append("after\\n");\n' + state + '\njava.nio.file.Files.writeString(java.nio.file.Path.of(java.lang.System.getenv("OTELEQ_OBSERVATION")),s.toString());\n}}\n'
 
 
+def go_materialise(project, entry, args, original):
+    """Keep legal package access and original main bindings in private copies."""
+    context = entry["go_context"]
+    (project / entry["path"]).write_text(go_driver(entry, args, original))
+    for name, positions in context["main_renames"].items():
+        if name != entry["path"] and positions:
+            sibling = project / name
+            sibling.write_text(go_project.rename_entrypoint(sibling.read_text(), positions))
+    driver = project / go_project.worker_path(context)
+    if context["package"] != "main":
+        driver.parent.mkdir(parents=True)
+        driver.write_text("package main\nimport __oteleq_target " + json.dumps(context["import_path"])
+                          + "\nfunc main(){__oteleq_target." + go_project.BRIDGE + "()}\n")
+    return driver
+
+
 def materialise(project, entry, args):
     source = project / entry["path"]
     original = source.read_text()
@@ -588,17 +604,7 @@ def materialise(project, entry, args):
             raise ValueError("generated Java driver would overwrite an application file")
         driver.write_text(java_driver(entry, args))
     elif language == "go" and "go_context" in entry:
-        context = entry["go_context"]
-        source.write_text(go_driver(entry, args, original))
-        for name, positions in context["main_renames"].items():
-            if name != entry["path"] and positions:
-                sibling = project / name
-                sibling.write_text(go_project.rename_entrypoint(sibling.read_text(), positions))
-        driver = project / go_project.worker_path(context)
-        if context["package"] != "main":
-            driver.parent.mkdir(parents=True)
-            driver.write_text("package main\nimport __oteleq_target " + json.dumps(context["import_path"])
-                              + "\nfunc main(){__oteleq_target." + go_project.BRIDGE + "()}\n")
+        driver = go_materialise(project, entry, args, original)
     else:
         driver = source
         emit = {"javascript": js_driver, "typescript": js_driver, "rust": rust_driver, "go": go_driver}[language]
