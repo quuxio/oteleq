@@ -1,0 +1,212 @@
+{
+  "qualification_schema_version": 1,
+  "date": "2026-10-20",
+  "platform": {
+    "os": "macOS",
+    "architecture": "ARM64",
+    "python": "3.12.15"
+  },
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "runtime": {
+    "commit": "b6cd1e1da5300f05bdb9e405902acfea58e57799",
+    "cli_sha256": "54a6e7d65b0d715ebd2105dd92574ce68c5964d3b5c33ec0dff0a6700c678e9a",
+    "qualification_script_sha256": "2f21799f989fb4eb716e261b77f08a63b0c6e73b1062a0ef8fcdda3a80ab000d"
+  },
+  "provider": {
+    "source_commit": "8a7689a6d6779ed8621bbe852188eeb56e6fafad",
+    "status": "Private unmerged frozen provider candidate",
+    "cli_sha256": "4f11a98a7628411000c6a9992c907a8068d56156b29e51558b070ee57a972ecf",
+    "receipt_sha256": "b9cf8b8dfd8de69d17e6ec2db9ca11e6d0a03aa3564aac5569c18a02db34521c",
+    "frozen_python_input_files_verified": 945
+  },
+  "source_sha256": "6357b529f90ddbdbc73f24e2cb86ced747bbd685deac51f008a3a94c7187a127",
+  "results": {
+    "cases": 5,
+    "matching_cases": 3,
+    "difference_controls": 2,
+    "qualified_application_launches": 80,
+    "refused_control_application_launches": 1,
+    "actual_application_launches": 81,
+    "generated_suite_runs": 3,
+    "counterexample_reduced_from": 7,
+    "counterexample_reduced_to": 0,
+    "shrink_trials": 1,
+    "refused_controls": [
+      "missing factory",
+      "wrong receiver class",
+      "edited retained receiver root"
+    ],
+    "source_preserved": true,
+    "scope": "Explicit plain Python receiver constructors/functions, declared own statics and dictionary graphs; no inherited/native slots, external factories, arbitrary mutable inputs, async sequences, other-language receivers or shipping qualification."
+  },
+  "callables": [
+    {
+      "function": "src.pkg.state.Counter.add",
+      "arguments": [
+        7
+      ],
+      "receiver_fixture": {
+        "argument_types": [
+          "int"
+        ],
+        "arguments": [
+          10
+        ],
+        "arguments_requested": [
+          10
+        ],
+        "factory": "Counter",
+        "kind": "constructor",
+        "line": 6,
+        "source_function": "Counter.__init__"
+      },
+      "exit_code": 0
+    },
+    {
+      "function": "src.pkg.state.Counter.identity",
+      "arguments": [
+        7
+      ],
+      "receiver_fixture": {
+        "argument_types": [
+          "int"
+        ],
+        "arguments": [
+          10
+        ],
+        "arguments_requested": [
+          10
+        ],
+        "factory": "Counter",
+        "kind": "constructor",
+        "line": 6,
+        "source_function": "Counter.__init__"
+      },
+      "exit_code": 0
+    },
+    {
+      "function": "src.pkg.state.Counter.silent",
+      "arguments": [
+        7
+      ],
+      "receiver_fixture": {
+        "argument_types": [
+          "int"
+        ],
+        "arguments": [
+          10
+        ],
+        "arguments_requested": [
+          10
+        ],
+        "factory": "make_counter",
+        "kind": "function",
+        "line": 31,
+        "source_function": "make_counter"
+      },
+      "exit_code": 1
+    },
+    {
+      "function": "src.pkg.state.Counter.static_only",
+      "arguments": [
+        7
+      ],
+      "receiver_fixture": {
+        "argument_types": [
+          "int"
+        ],
+        "arguments": [
+          10
+        ],
+        "arguments_requested": [
+          10
+        ],
+        "factory": "Counter",
+        "kind": "constructor",
+        "line": 6,
+        "source_function": "Counter.__init__"
+      },
+      "exit_code": 1
+    },
+    {
+      "function": "src.pkg.state.Counter.fail",
+      "arguments": [
+        7
+      ],
+      "receiver_fixture": {
+        "argument_types": [
+          "int"
+        ],
+        "arguments": [
+          10
+        ],
+        "arguments_requested": [
+          10
+        ],
+        "factory": "Counter",
+        "kind": "constructor",
+        "line": 6,
+        "source_function": "Counter.__init__"
+      },
+      "exit_code": 0
+    }
+  ],
+  "independent_oracles": {
+    "initial_instance_value": 10,
+    "initial_class_total": 0,
+    "initial_class_instances": 1,
+    "add_result_and_final_instance": 17,
+    "identity_result": "The same receiver node, with final value 17 and shared receiver/static aliases.",
+    "fail": "Expected builtin ValueError after the same instance/static mutation.",
+    "silent": "Return 7 in both lanes; final receiver value 17 versus 18.",
+    "static_only": "Return 7 with receiver value 10 in both lanes; own class total 7 versus 8.",
+    "difference_control_kind": "Deliberately telemetry-sensitive fixtures demonstrate detection; these are not discovered producer defects.",
+    "reduction": "silent method argument 7 to 0 in one trial; constructor input stays 10; fresh final confirmation, generated suite and replay retain the difference."
+  },
+  "negative_controls": {
+    "missing_factory": {
+      "application_launches": 0,
+      "generation_exit": 3
+    },
+    "wrong_receiver_class": {
+      "application_launches": 1,
+      "selected_method_invocations": 0,
+      "generation_exit": 4
+    },
+    "missing_required_receiver_root": {
+      "kind": "Edited retained graph, no new execution; returned alias keeps nodes reachable.",
+      "comparator_exit": 3,
+      "verdict": "inconclusive",
+      "required_reason": "Requested receiver root is absent from captured outcome roots."
+    }
+  },
+  "presentation": {
+    "junit_tests": 8,
+    "failures": 2,
+    "errors": 0,
+    "excluded": 3,
+    "xml_structure_and_script_free_csp_source_checks": true,
+    "visual_inspection": "Pending under the existing browser URL-policy limitation; not claimed complete."
+  },
+  "development_attempt": {
+    "runtime": "d388e158adeb13d753ebe067262be3a5c3bf7d7a",
+    "actual_application_launches": 81,
+    "status": "Retained separately, not part of the final 81-launch count.",
+    "notes": [
+      "The first edited-root control produced unreachable nodes and proved graph integrity refusal rather than the required-root contract.",
+      "The corrected returned-alias control preserves reachability and proves a missing requested root is inconclusive.",
+      "Two complexity findings were fixed before the full corpus was rerun on the final runtime."
+    ]
+  },
+  "retention": {
+    "final_raw_files": 1449,
+    "development_raw_files": 1454,
+    "method": "Complete raw observations, OTLP, plans, generated/exported/reduced suites, commands, source, executable, gate logs and provider identities are retained privately with byte verification."
+  },
+  "limits": [
+    "Plain Python receiver constructors/ordinary same-module functions and dictionary/declared own-static graphs only.",
+    "Private class data/methods, inheritance, slots/native storage, external factories, arbitrary mutable arguments and async/action sequences remain unsupported.",
+    "Other-language receivers, imported/undeclared class dimensions, invocation authentication, off/fault lanes and shipping artefacts remain unqualified."
+  ]
+}

@@ -124,6 +124,8 @@ def derived_data(workflow, original: dict, entry: dict, case: dict) -> dict:
     config["fixtures"] = [{"function": glob.escape(entry["otelc_function"]), "source": glob.escape(entry["path"]), "language": entry["language"],
                             "cases": [case["arguments"]], "domains": entry["input_domains"],
                             "expected_baseline": entry["expected_baseline"]}]
+    if "receiver_configuration" in entry:
+        config["fixtures"][0]["receiver"] = copy.deepcopy(entry["receiver_configuration"])
     data["configuration_sha256"] = workflow.identity(config)
     data["derivation"] = {"kind": "scalar-shrink-v1", "parent_plan_sha256": workflow.identity(original),
                           "original_case": case, "original_configuration_sha256": original["configuration_sha256"]}

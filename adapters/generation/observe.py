@@ -2,7 +2,7 @@
 import struct
 import sys
 from pathlib import Path
-from types import CodeType, FunctionType, GetSetDescriptorType, MemberDescriptorType, ModuleType
+from types import CodeType, FunctionType, GetSetDescriptorType, MemberDescriptorType, MethodType, ModuleType
 MISSING = object()
 
 
@@ -11,8 +11,12 @@ def function_code(source: Path, name: str, line: int) -> CodeType:
     source = source.resolve(strict=True)
     compiled = compile(source.read_bytes(), str(source), "exec", dont_inherit=True,
                        optimize=sys.flags.optimize)
-    matches = [item for item in compiled.co_consts if type(item) is CodeType
-               and item.co_name == name and item.co_firstlineno == line]
+    pending, matches = [compiled], []
+    while pending:
+        code = pending.pop()
+        if code.co_qualname == name and code.co_firstlineno == line:
+            matches.append(code)
+        pending.extend(item for item in code.co_consts if type(item) is CodeType)
     if len(matches) != 1:
         raise ValueError("selected function has no unique source code identity")
     return matches[0]
@@ -24,12 +28,54 @@ def bound_function(module: ModuleType, name: str, expected: CodeType) -> Functio
         raise ValueError("selected function module requires a binding fixture")
     namespace = vars(module)
     target = namespace.get(name)
+    return checked_function(target, namespace, expected)
+
+
+def checked_function(target: object, namespace: dict, expected: CodeType) -> FunctionType:
+    """The declared source body must still be the directly bound function."""
     if (type(target) is not FunctionType or target.__globals__ is not namespace
             or target.__code__ != expected
             or target.__code__.co_filename != expected.co_filename
             or target.__code__.co_firstlineno != expected.co_firstlineno):
         raise ValueError("selected function binding differs from its frozen source identity")
     return target
+
+
+def bound_receiver(module: ModuleType, owner: str, name: str, expected: CodeType,
+                   fixture: dict, factory_code: CodeType | None) -> tuple[object, MethodType]:
+    """Construct independently and bind through class storage without lookup hooks."""
+    if type(module) is not ModuleType:
+        raise ValueError("receiver requires an ordinary source module")
+    namespace = vars(module)
+    cls = namespace.get(owner)
+    if type(cls) is not type:
+        raise ValueError("receiver class requires its ordinary source type")
+    if type.__dict__["__mro__"].__get__(cls) != (cls, object):
+        raise ValueError("receiver inherited class state requires an observation fixture")
+    checked_function(class_members(cls).get(name), namespace, expected)
+    instance = construct_receiver(module, cls, fixture, factory_code)
+    if type(instance) is not cls or namespace.get(owner) is not cls:
+        raise ValueError("receiver factory returned a different source class")
+    _, origin, qualified = runtime_type(instance)
+    if type(namespace.get("__name__")) is not str or origin != namespace["__name__"] or qualified != owner:
+        raise ValueError("receiver class identity differs from its source declaration")
+    target = checked_function(class_members(cls).get(name), namespace, expected)
+    return instance, MethodType(target, instance)
+
+
+def construct_receiver(module: ModuleType, cls: type, fixture: dict, expected: CodeType | None) -> object:
+    """Only direct plain constructors or frozen ordinary factory functions are called."""
+    if fixture["kind"] == "function":
+        return bound_function(module, fixture["factory"], expected)(*fixture["arguments"])
+    members = class_members(cls)
+    if "__new__" in members:
+        raise ValueError("receiver constructor needs a plain class without custom allocation")
+    if expected is None:
+        if "__init__" in members:
+            raise ValueError("receiver constructor differs from its implicit source declaration")
+    else:
+        checked_function(members.get("__init__"), vars(module), expected)
+    return cls(*fixture["arguments"])
 
 
 def scalar(item):

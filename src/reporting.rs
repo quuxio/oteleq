@@ -51,6 +51,7 @@ struct Case {
     arguments: Box<RawValue>,
     argument_types: Vec<String>,
     arguments_requested: Option<Box<RawValue>>,
+    receiver_fixture: Option<Box<RawValue>>,
     comparison: Option<Comparison>,
     error: Option<String>,
 }
@@ -105,6 +106,22 @@ impl Comparison {
             Self::Typed(value) => serde_json::to_string_pretty(&value.cases[0]),
         }
     }
+    fn validate_receiver(&self, case: &Case) -> Result<(), String> {
+        if case.receiver_fixture.is_none() {
+            return Ok(());
+        }
+        if let Self::Typed(value) = self {
+            if value.cases[0]
+                .contract
+                .required_roots
+                .iter()
+                .any(|root| root == "receiver")
+            {
+                return Ok(());
+            }
+        }
+        Err("receiver fixture requires a typed receiver observation contract".into())
+    }
     fn validate(&self, case: &Case, entry: &Callable, report: &RunReport) -> Result<(), String> {
         let (version, claim, count, id, verdict) = match self {
             Self::Bytes(value) => (
@@ -134,6 +151,7 @@ impl Comparison {
         {
             return Err("case comparison identity or verdict is inconsistent".into());
         }
+        self.validate_receiver(case)?;
         match self {
             Self::Bytes(value) => validate_byte_case(&value.cases[0]),
             Self::Typed(value) => validate_typed_case(&value.cases[0], &case.function),
@@ -310,12 +328,15 @@ fn case_details(case: &Case, comparison: &Comparison) -> Result<String, String> 
     let scope = serde_json::to_string_pretty(comparison.scope())
         .map_err(|error| format!("render scope: {error}"))?;
     Ok(format!(
-        "Argument types: {:?}\nActual arguments: {}\nRequested arguments: {}\n{}\n{}\n{}",
+        "Argument types: {:?}\nActual arguments: {}\nRequested arguments: {}\nReceiver fixture: {}\n{}\n{}\n{}",
         case.argument_types,
         case.arguments.get(),
         case.arguments_requested
             .as_ref()
             .map_or("not separately configured", |value| value.get()),
+        case.receiver_fixture
+            .as_ref()
+            .map_or("none", |value| value.get()),
         comparison.description(),
         detail,
         scope

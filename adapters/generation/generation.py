@@ -233,6 +233,43 @@ def is_entrypoint(function, language):
     return function.get("entrypoint", function["name"] == "main" and not function["reason"])
 
 
+def receiver_fixture(entry, discovered, declared):
+    """Bind one reviewed factory to its source declaration and concrete arguments."""
+    try:
+        if entry["language"] != "python" or "python_receiver_class" not in entry:
+            raise ValueError("receiver fixtures currently require an ordinary Python instance method")
+        factory, kind = receiver_factory(entry, discovered, declared["factory"])
+        arguments = harness.concrete_arguments({"language": "python", "parameters": factory["parameters"]}, declared["arguments"])
+        entry["receiver_fixture"] = {"factory": factory["name"], "line": factory["line"],
+                                     "kind": kind, "source_function": factory["source_function"],
+                                     "arguments": arguments, "arguments_requested": declared["arguments"],
+                                     "argument_types": factory["parameters"]}
+        entry["receiver_configuration"] = declared
+        if entry["reason"] == "instance method requires a receiver fixture":
+            entry["reason"] = ""
+    except ValueError as error:
+        entry["reason"] = str(error)
+
+
+def receiver_factory(entry, discovered, name):
+    """Use a source constructor directly or one explicitly selected ordinary factory."""
+    constructor = name == entry["python_receiver_class"]
+    qualified = name + ".__init__" if constructor else name
+    matches = [item for item in discovered["functions"] if item["name"] == qualified]
+    if constructor and not matches:
+        return {"name": name, "line": 0, "source_function": None, "parameters": []}, "constructor"
+    if len(matches) != 1:
+        raise ValueError("receiver factory requires one unique same-module source declaration")
+    source = matches[0]
+    if constructor and "python_constructor_parameters" in source:
+        return {"name": name, "line": source["line"], "source_function": qualified,
+                "parameters": source["python_constructor_parameters"]}, "constructor"
+    if not constructor and not source["reason"]:
+        return {"name": name, "line": source["line"], "source_function": qualified,
+                "parameters": source["parameters"]}, "function"
+    raise ValueError("receiver factory requires an ordinary source constructor or function")
+
+
 def inventory_entry(function, discovered, name, language, source_hash, snapshot, args):
     entry = {**function, "path": name, "language": language, "globals": discovered["globals"],
              "parser": discovered.get("parser", "unavailable"), "package": discovered.get("package", ""),
@@ -255,13 +292,20 @@ def inventory_entry(function, discovered, name, language, source_hash, snapshot,
         except ValueError as error:
             entry["reason"] = entry["reason"] or str(error)
     fixture = project_policy.matching_fixture(entry, args.configuration) if not excluded else None
+    configure_fixture(entry, discovered, fixture)
+    entry["status"] = "excluded" if excluded else qualify_entry(entry, snapshot, args.cases)
+    return entry
+
+
+def configure_fixture(entry, discovered, fixture):
+    """Keep reviewed input, receiver and expected-outcome declarations together."""
     entry["expected_baseline"] = fixture["expected_baseline"] if fixture else {"kind": "return"}
     if fixture is not None:
         entry["input_cases"] = fixture["cases"]
+        if "receiver" in fixture:
+            receiver_fixture(entry, discovered, fixture["receiver"])
         if "domains" in fixture:
             entry["input_domains"] = fixture["domains"]
-    entry["status"] = "excluded" if excluded else qualify_entry(entry, snapshot, args.cases)
-    return entry
 
 
 def inventory_tree(contents, root, snapshot, workspace, args):
@@ -384,6 +428,18 @@ def load_workspace(path, generated=False):
     return workspace, data
 
 
+def generation_case(entry, index, values):
+    """Bind the concrete method and construction inputs into one corpus identity."""
+    case = {"id": entry["id"] + "-" + str(index), "function_id": entry["id"],
+            "arguments": values, "argument_types": entry["parameters"],
+            "expected_baseline": entry["expected_baseline"]}
+    if "input_cases" in entry:
+        case["arguments_requested"] = entry["input_cases"][index]
+    if "receiver_fixture" in entry:
+        case["receiver_fixture"] = entry["receiver_fixture"]
+    return case
+
+
 def generate(args):
     workspace, data = load_workspace(args.workspace)
     destination = workspace / "tests"
@@ -392,12 +448,7 @@ def generate(args):
     for entry in data["inventory"]:
         if entry["status"] == "ready":
             for index, values in enumerate(harness.corpus(entry, data["cases_per_function"])):
-                case = {"id": entry["id"] + "-" + str(index), "function_id": entry["id"],
-                        "arguments": values, "argument_types": entry["parameters"],
-                        "expected_baseline": entry["expected_baseline"]}
-                if "input_cases" in entry:
-                    case["arguments_requested"] = entry["input_cases"][index]
-                cases.append(case)
+                cases.append(generation_case(entry, index, values))
     write(destination / "corpus.json", cases)
     if len(cases) > 1024:
         raise ValueError("generation exceeds 1024 concrete cases; reduce --cases or use explicit exclusions")
@@ -675,6 +726,8 @@ def run(args):
         result["argument_types"] = case["argument_types"]
         if "arguments_requested" in case:
             result["arguments_requested"] = case["arguments_requested"]
+        if "receiver_fixture" in case:
+            result["receiver_fixture"] = case["receiver_fixture"]
         results.append(result)
         write(destination / "partial-results.json", results)
     blocked = [e for e in data["inventory"] if e["status"] == "blocked"] if args.command == "run" else []

@@ -1,0 +1,62 @@
+# Receiver fixtures
+
+The generator supports declared receivers for ordinary instance methods on plain Python classes. Each attempt constructs a fresh instance, binds the selected source method, then captures its declared instance dictionary, own class data roots and module globals before and after the call. The shared graph protocol preserves aliases and cycles, including a method returning its receiver.
+
+Other language receivers, inherited classes, private/dunder methods, private class data, slots/native storage, arbitrary mutable arguments, asynchronous calls and action sequences remain unsupported. They remain visible gaps rather than passing skipped tests.
+
+## Declare a constructor
+
+No change to the target source is required when its existing constructor accepts supported scalar arguments:
+
+```python
+class Counter:
+    total = 0
+
+    def __init__(self, start: int):
+        self.value = start
+
+    def add(self, amount: int) -> int:
+        self.value += amount
+        Counter.total += amount
+        return self.value
+```
+
+Select the method and declare its independent construction inputs:
+
+```toml
+schema_version = 1
+languages = ["python"]
+
+[functions]
+include = ["app.Counter.add"]
+
+[[fixtures]]
+function = "app.Counter.add"
+cases = [[7]]
+receiver = { factory = "Counter", arguments = [10] }
+domains = [{ kind = "integer", minimum = 0, maximum = 7 }]
+```
+
+Use the normal `plan --config`, `generate` and `run` commands. Tests and access helpers are generated in the private transient directory. The policy's `cases` are method arguments; its `receiver.arguments` are constructor arguments. Python's implicit receiver parameter is excluded from the generated argument list. Domain declarations are optional and apply to method arguments for scalar shrinking.
+
+The example observes `receiver.value`, the declared `static:Counter.total` root, module globals and argument/result graphs. Required receiver/static roots are retained in the typed contract. Source-wide inventory still includes the constructor and other callables: this policy explicitly selects only `Counter.add`, and excludes the others from its equivalence claim.
+
+Regular source packages use the same [explicit import-root policy](python-package-context.md). Function IDs continue to use their original source-relative class/method names. Constructor arguments must explicitly cover its supported positional parameters; implicit no-argument constructors are supported. Custom allocation, inherited state and changed constructor/method bindings refuse capture.
+
+## Existing application factory functions
+
+A policy can also name one existing ordinary synchronous function in the selected module, such as `receiver = { factory = "make_counter", arguments = [10] }`. Its declaration, concrete arguments and source body are frozen. It must return an instance of exactly the selected source class. Decorated, ambiguous, replaced or unsupported factories remain blockers. External fixture files and general factories for arbitrary argument types remain open.
+
+Construction executes inside each private application worker. It must complete successfully without invoking the selected method; missing construction, wrong classes and missing method witnesses cannot qualify. Construction failures are incomplete fixture evidence, not matching method outcomes. This mode does not yet compare constructor/action sequences as separate test targets.
+
+## Observation and replay
+
+The observer reads ordinary stored state through builtin metadata. It does not call application getters, `repr`, custom serialisers or dynamic method lookup. Unsupported descriptors/storage and incomplete requested roots prevent qualification. Mutations to declared class data and receiver state can produce differences even when the method returns the same value in both lanes.
+
+The corpus, reports, fixture identity and standalone HTML/JUnit details retain constructor/factory inputs. Generated suites, export and replay reconstruct the receiver independently. Scalar shrinking preserves the fixed construction fixture, its source bindings and required roots, while reducing method arguments; it does not shrink receiver construction inputs or object/action sequences.
+
+Only declared own class data roots and supported instance dictionaries are observed. Dynamic class attributes outside those declarations, inherited/imported state, descriptors, external effects and unrequested dimensions remain outside the scope. Source/plan/ownership guards continue to apply. The claim remains **equivalence over these tests and observations**, with diagnostic caller evidence kept separate from shipping artefacts.
+
+`make generation-receiver-otelc OTELC_ROOT=/absolute/path/to/otelc REPORT_DIR=/private/tmp/new-receiver-qualification` runs the maintained actual-provider corpus, including instance/static mutation controls, aliases, cycles, expected errors, generated/exported suites, scalar shrinking and refusal controls. Retain each provider/toolchain run before claiming it qualified.
+
+The [exact-revision macOS ARM64 corpus](qualification/receivers-2026-10-20.json) covers five cases, 80 qualified launches plus one refused wrong-class launch, generated/exported suites and shrinking/replay. Three cases match; both deliberate same-return instance/static mutation controls are detected. The initial development corpus remains separate.
