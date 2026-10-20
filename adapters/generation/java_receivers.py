@@ -6,6 +6,7 @@ from pathlib import Path
 
 PRIMITIVES = {"boolean", "byte", "short", "int", "long", "char", "float", "double"}
 BOXES = {"Boolean", "Byte", "Short", "Integer", "Long", "Character", "Float", "Double", "String", "Object"}
+CLASS_LITERAL = ".class"
 OBSERVER = Path(__file__).with_name("OteleqGraph.java").read_text()
 
 
@@ -75,8 +76,8 @@ def driver(entry: dict, arguments: list, literal: Callable) -> str:
     """Emit identical SDK-free reflection/access helpers for the two lanes."""
     models, fixture = entry["java_models"], entry["receiver_fixture"]
     owner = entry["receiver_class"]
-    params = ",".join(name + ".class" for name in entry["parameters"])
-    factory_params = ",".join(name + ".class" for name in fixture["argument_types"])
+    params = ",".join(name + CLASS_LITERAL for name in entry["parameters"])
+    factory_params = ",".join(name + CLASS_LITERAL for name in fixture["argument_types"])
     factory_args = ",".join(literal(value, type_) for value, type_ in zip(fixture["arguments"], fixture["argument_types"]))
     if fixture["kind"] == "constructor":
         construct = f'''java.lang.reflect.Constructor<?> factory={owner}.class.getDeclaredConstructor({factory_params});
@@ -92,7 +93,7 @@ constructed=factory.invoke(null,new java.lang.Object[]{{{factory_args}}});'''
               *["observer.staticValue(" + owner + ".class," + json.dumps(field["name"]) + ")" for field in entry["java_class_roots"]]]
     types = [owner, *entry["parameters"], *[field["type"] for field in entry["java_class_roots"]]]
     model_fields = ",".join("new java.lang.String[]{" + ",".join(json.dumps(field["name"]) for field in model["fields"]) + "}" for model in models)
-    model_types = ",".join("new java.lang.Class<?>[]{" + ",".join(field["type"] + ".class" for field in model["fields"]) + "}" for model in models)
+    model_types = ",".join("new java.lang.Class<?>[]{" + ",".join(field["type"] + CLASS_LITERAL for field in model["fields"]) + "}" for model in models)
     model_modifiers = ",".join("new int[]{" + ",".join(str(field["modifiers"]) for field in model["fields"]) + "}" for model in models)
     template = r'''class OteleqDriver {
 static OteleqGraph observer() throws java.lang.Exception {
@@ -127,10 +128,10 @@ java.nio.file.Files.writeString(java.nio.file.Path.of(java.lang.System.getenv("O
 }
 }
 '''
-    substitutions = {"MODELS": ",".join(model["name"] + ".class" for model in models),
+    substitutions = {"MODELS": ",".join(model["name"] + CLASS_LITERAL for model in models),
                      "FIELDS": model_fields, "TYPES": model_types, "MODIFIERS": model_modifiers,
                      "OWNER": owner, "NAMES": ",".join(json.dumps(name) for name in names),
-                     "VALUES": ",".join(values), "ROOT_TYPES": ",".join(type_ + ".class" for type_ in types),
+                     "VALUES": ",".join(values), "ROOT_TYPES": ",".join(type_ + CLASS_LITERAL for type_ in types),
                      "OUTPUT": entry["output"], "METHOD": json.dumps(entry["name"].rsplit(".", 1)[-1]),
                      "PARAMS": ("," + params) if params else "", "CONSTRUCT": construct,
                      "ARGUMENTS": ",".join(literal(value, type_) for value, type_ in zip(arguments, entry["parameters"]))}

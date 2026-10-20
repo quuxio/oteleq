@@ -24,8 +24,8 @@ class JavaCoverageTests(unittest.TestCase):
             self.assertEqual(java_coverage.coverage(path), 80)
             for text in (report(7, 3), report(0, 0), report(-1, 2), report(100, 0, "Unrelated"),
                          '<report/>', report(100, 0).replace('</package>', '<class name="OteleqGraph"><counter type="LINE" covered="1" missed="0"/></class></package>')):
+                path.write_text(text)
                 with self.subTest(text=text), self.assertRaises(ValueError):
-                    path.write_text(text)
                     java_coverage.coverage(path)
 
     def test_download_and_products_are_pinned_before_any_cache_write(self):

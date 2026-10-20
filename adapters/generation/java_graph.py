@@ -4,6 +4,9 @@ from collections import deque
 from otelc_capture import strict_json
 
 
+JAVA_PACKAGE = "java.lang."
+OBJECT_TYPE = JAVA_PACKAGE + "Object"
+OBJECT_PREFIX = "java.object:"
 INTEGERS = {"byte": (8, True), "short": (16, True), "int": (32, True),
             "long": (64, True), "char": (16, False)}
 BOXES = {"Boolean": "boolean", "Byte": "byte", "Short": "short", "Integer": "int",
@@ -12,7 +15,7 @@ ERRORS = {"Exception", "RuntimeException", "IllegalArgumentException", "IllegalS
           "NullPointerException", "ArithmeticException", "IndexOutOfBoundsException",
           "ArrayIndexOutOfBoundsException", "StringIndexOutOfBoundsException",
           "UnsupportedOperationException", "ClassCastException", "NumberFormatException"}
-ERROR_TYPES = {"java.lang." + name for name in ERRORS}
+ERROR_TYPES = {JAVA_PACKAGE + name for name in ERRORS}
 ARRAY_CODES = dict(zip("ZBSCIJFD", ("boolean", "byte", "short", "char", "int", "long", "float", "double")))
 
 
@@ -24,7 +27,9 @@ def require(condition: bool, reason: str) -> None:
 
 def hex_units(value: object, multiple: int, maximum: int) -> bool:
     """Only complete, canonical lowercase units are accepted."""
-    return (type(value) is str and len(value) <= maximum and len(value) % multiple == 0
+    if not isinstance(value, str) or type(value) is not str:
+        return False
+    return (len(value) <= maximum and len(value) % multiple == 0
             and all(char in "0123456789abcdef" for char in value))
 
 
@@ -65,18 +70,22 @@ class Schema:
         self.names = {item["name"]: (package + "." if package else "") + item["name"]
                       for item in entry["java_models"]}
         self.models = {self.names[item["name"]]: item for item in entry["java_models"]}
-        self.references = set(self.models) | {"java.lang." + name for name in BOXES} | {"java.lang.Object"} | ERROR_TYPES
+        self.references = set(self.models) | {JAVA_PACKAGE + name for name in BOXES} | {OBJECT_TYPE} | ERROR_TYPES
 
     def resolve(self, spelling: str) -> str:
         """Resolve the closed standalone source profile; javac checks binding too."""
         if spelling.endswith("[]"):
             component = self.resolve(spelling[:-2])
             code = next((code for code, name in ARRAY_CODES.items() if name == component), None)
-            return "[" + (code if code else component if component.startswith("[") else "L" + component + ";")
+            if code:
+                return "[" + code
+            if component.startswith("["):
+                return "[" + component
+            return "[L" + component + ";"
         if spelling in self.names:
             return self.names[spelling]
         if spelling in BOXES or spelling == "Object":
-            return "java.lang." + spelling
+            return JAVA_PACKAGE + spelling
         require(spelling in self.references | set(ARRAY_CODES.values()) | {"void"}, "unsupported declared type")
         return spelling
 
@@ -97,7 +106,7 @@ class Schema:
         """The supported source classes extend Object; arrays retain covariance."""
         if actual == expected:
             return True
-        if expected == "java.lang.Object":
+        if expected == OBJECT_TYPE:
             return actual in self.references or actual.startswith("[")
         if actual in ERROR_TYPES and expected == "java.lang.Exception":
             return True
@@ -119,7 +128,7 @@ class Schema:
             require(set(value) == {"kind", "node_id"} and value["kind"] == "reference"
                     and type(value["node_id"]) is str and value["node_id"] in nodes, "invalid reference")
             label = nodes[value["node_id"]]["type"]
-            actual = label.removeprefix("java.object:")
+            actual = label.removeprefix(OBJECT_PREFIX)
             require(self.assignable(actual, expected), "reference type differs from its storage")
 
     def fields(self, node: dict) -> dict[str, str] | None:
@@ -128,14 +137,14 @@ class Schema:
         require(type(label) is str and type(fields) is dict, "invalid node storage")
         if label in ERROR_TYPES:
             return {"message": "java.lang.String"}
-        require(label.startswith("java.object:"), "unknown node kind")
-        name = label.removeprefix("java.object:")
+        require(label.startswith(OBJECT_PREFIX), "unknown node kind")
+        name = label.removeprefix(OBJECT_PREFIX)
         if name in self.models:
             return {field["name"]: self.resolve(field["type"]) for field in self.models[name]["fields"] if not field["modifiers"] & 8}
-        if name == "java.lang.Object":
+        if name == OBJECT_TYPE:
             return {}
-        if name.startswith("java.lang.") and name[10:] in BOXES:
-            primitive(fields.get("value"), BOXES[name[10:]])
+        if name.startswith(JAVA_PACKAGE) and name.removeprefix(JAVA_PACKAGE) in BOXES:
+            primitive(fields.get("value"), BOXES[name.removeprefix(JAVA_PACKAGE)])
             require(set(fields) == {"value"}, "unexpected wrapper storage")
             return None
         require(name.startswith("["), "unbound node class")

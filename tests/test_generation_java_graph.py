@@ -60,6 +60,14 @@ class JavaGraphTests(unittest.TestCase):
         self.assertEqual(set(typed.required_roots(entry())), set(raw["before"]["roots"]))
 
     def test_exact_primitive_widths_signs_float_bits_and_string_units(self):
+        class CallbackString(str):
+            def __iter__(self):
+                raise AssertionError("application iterator must not run")
+
+            def __len__(self):
+                raise AssertionError("application length must not run")
+
+        self.assertFalse(java_graph.hex_units(CallbackString("0000"), 4, 16))
         for name, (bits, signed) in java_graph.INTEGERS.items():
             for number in ((-2**(bits-1), 2**(bits-1)-1) if signed else (0, 2**bits-1)):
                 with self.subTest(name=name, number=number):
@@ -114,8 +122,9 @@ class JavaGraphTests(unittest.TestCase):
                 schema.resolve(declared)
         with self.assertRaises(ValueError):
             schema.value({"kind": "null"}, "void", {})
+        root = reference(0)
         with self.assertRaisesRegex(ValueError, "reference type differs"):
-            schema.value(reference(0), "sample.Counter", {"n0": {"type": "java.object:java.lang.Object"}})
+            schema.value(root, "sample.Counter", {"n0": {"type": "java.object:java.lang.Object"}})
 
     def test_standard_exception_keeps_message_identity_without_formatting(self):
         raw = capture()
@@ -162,14 +171,16 @@ class JavaGraphTests(unittest.TestCase):
                     (('outcome', 'kind'), 'skipped'),
                     (('outcome', 'extra'), 1), (('extra',), 1)]
         for path, replacement in controls:
+            altered = mutate(path, replacement)
             with self.subTest(path=path, replacement=replacement), self.assertRaises(ValueError):
-                self.decode(mutate(path, replacement))
+                self.decode(altered)
         raw = capture()
         raw["before"]["nodes"].append({"id": "n1", "type": "java.object:java.lang.Object", "fields": {}})
         with self.assertRaisesRegex(ValueError, "unreachable"):
             self.decode(raw)
+        candidate = entry()
         with self.assertRaises(ValueError):
-            java_graph.boundaries(b'{"java_receiver_schema_version":1,"java_receiver_schema_version":1}', entry())
+            java_graph.boundaries(b'{"java_receiver_schema_version":1,"java_receiver_schema_version":1}', candidate)
 
     def test_graph_array_and_encoded_byte_budgets_refuse(self):
         raw = capture()
@@ -183,10 +194,12 @@ class JavaGraphTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "depth"):
             self.decode(raw)
         schema = java_graph.Schema(entry())
+        array = {"type": "java.object:[I", "fields": {"length": integer(4097)}}
         with self.assertRaisesRegex(ValueError, "array budget"):
-            schema.fields({"type": "java.object:[I", "fields": {"length": integer(4097)}})
+            schema.fields(array)
+        candidate = entry()
         with self.assertRaisesRegex(ValueError, "capture budget"):
-            java_graph.boundaries(b' ' * (3 * 262144 + 1025), entry())
+            java_graph.boundaries(b' ' * (3 * 262144 + 1025), candidate)
 
 
 if __name__ == "__main__":
