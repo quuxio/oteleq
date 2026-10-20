@@ -3,10 +3,10 @@ NODE ?= node
 COVERAGE_ENV ?=
 MARKDOWNLINT ?= ./ci/markdownlint/node_modules/.bin/markdownlint
 
-.PHONY: help setup lint examples docs-check observer-check generation-check node-observer-check generation-otelc generation-policy-otelc generation-rust-otelc generation-native-otelc generation-shrink-otelc resource-otelc capture-otelc report core-check coverage check
+.PHONY: help setup lint examples docs-check observer-check generation-check node-observer-check generation-otelc generation-policy-otelc generation-rust-otelc generation-native-otelc generation-shrink-otelc generation-python-project-otelc resource-otelc capture-otelc report core-check coverage check
 
 help:
-	@printf '%s\n' 'setup     Install locked documentation tools' 'lint      Validate repository Markdown' 'examples  Parse illustrative JSON and TOML' 'observer-check Test diagnostic capture and enforce 80% per observer module' 'generation-check Test inventory, generators, state and workspace contracts' 'node-observer-check Validate Node observer and enforce 80% V8 coverage' 'generation-otelc Qualify generated tests and mutation detection (OTELC_ROOT, REPORT_DIR)' 'generation-policy-otelc Qualify configured domains, repeats and scalar boundaries' 'generation-rust-otelc Qualify Rust build/application channel separation' 'generation-native-otelc Qualify native scalar type guards and visible aliases' 'generation-shrink-otelc Qualify declared-domain shrinking across all eight adapters' 'resource-otelc Qualify fixed Python resource-close observations' 'capture-otelc Compare all eight real otelc diagnostic workloads (OTELC_ROOT, REPORT_DIR)' 'report    Render retained JSON as HTML/JUnit (INPUT_REPORT, PRESENTATION_DIR)' 'core-check Rust formatting, Clippy and comparator tests' 'coverage  Enforce 80% Rust product line coverage' 'check     Run all documentation and product gates'
+	@printf '%s\n' 'setup     Install locked documentation tools' 'lint      Validate repository Markdown' 'examples  Parse illustrative JSON and TOML' 'observer-check Test diagnostic capture and enforce 80% per observer module' 'generation-check Test inventory, generators, state and workspace contracts' 'node-observer-check Validate Node observer and enforce 80% V8 coverage' 'generation-otelc Qualify generated tests and mutation detection (OTELC_ROOT, REPORT_DIR)' 'generation-policy-otelc Qualify configured domains, repeats and scalar boundaries' 'generation-rust-otelc Qualify Rust build/application channel separation' 'generation-native-otelc Qualify native scalar type guards and visible aliases' 'generation-shrink-otelc Qualify declared-domain shrinking across all eight adapters' 'generation-python-project-otelc Qualify regular Python package imports and source guards' 'resource-otelc Qualify fixed Python resource-close observations' 'capture-otelc Compare all eight real otelc diagnostic workloads (OTELC_ROOT, REPORT_DIR)' 'report    Render retained JSON as HTML/JUnit (INPUT_REPORT, PRESENTATION_DIR)' 'core-check Rust formatting, Clippy and comparator tests' 'coverage  Enforce 80% Rust product line coverage' 'check     Run all documentation and product gates'
 
 setup:
 	npm ci --ignore-scripts --prefix ci/markdownlint
@@ -30,6 +30,7 @@ generation-check: node-observer-check
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/generation.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/discovery.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/harness.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/python_project.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/policy.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/domains.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/shrinking.py' --fail-under=80
@@ -60,6 +61,11 @@ generation-shrink-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
 	$(PYTHON) tests/qualify_shrinking.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$(CURDIR)/target/debug/quux-oteleq"
+
+generation-python-project-otelc:
+	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
+	cargo build --locked
+	$(PYTHON) tests/qualify_python_project.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$(CURDIR)/target/debug/quux-oteleq"
 
 resource-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"

@@ -86,6 +86,8 @@ The default generates up to three distinct scalar cases per function and compare
 
 Go freezes its provider module manifest/checksums and the runtime/imported policy sources. Changing those inputs after planning invalidates execution; downloaded third-party module caches remain outside that identity scope.
 
+Python can use explicit [source package import roots](docs/python-package-context.md), including regular packages and `src` layouts. Relative imports and package initialisers use their real module context; unsupported package contexts remain blockers.
+
 Use repeated `--language ID`, `--exclude 'qualified.pattern'` and `--cases 1` through `--cases 1024` on `plan` to select a supported scope. [The CLI reference](docs/cli-and-configuration.md#implemented-commands) lists every public command and flag.
 
 ### Replay, retain or incorporate

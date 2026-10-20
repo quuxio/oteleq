@@ -31,6 +31,8 @@ The Rust-only [report renderer](reporting.md) needs no Python, provider or origi
 
 The implemented generation policy accepts `[adapters.rust] backend = "compiler"` (default) or `"llvm"`. LLVM requires the separately matched compiler/profile/build evidence described in [automatic generation](automatic-generation.md#project-policy-and-concrete-fixtures), including the fixed frontend and emitted-symbol checks for profile2/inventory3. Profile1/inventory2 remains supported. Unsupported adapter fields and backend values are rejected. This does not enable the proposed general build recipes below.
 
+`[adapters.python] import_roots = ["src"]` opts into [regular source-package imports](python-package-context.md), with `"."` for packages directly inside the source root. The default empty list keeps the standalone file loader. Roots are frozen, ordered source-relative paths; namespace packages, ambiguous roots and shadowed targets are blocked. General package-manager/build integration and imported-module observation remain open.
+
 ## Proposed extensions
 
 The broader design adds a `doctor` capability command, build recipes and object/receiver factories, richer promotion planning, stateful inputs and a versioned graph/worker protocol. `doctor`, `promote`, `--keep-workspace`, `--dry-run` and replay `--bundle` are proposal names, not available CLI options. Current retention uses `export-tests` and explicit `clean`.

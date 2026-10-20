@@ -8,6 +8,7 @@ import tomllib
 from typing import Any
 
 import domains
+import python_project
 
 
 LANGUAGES = ("c", "cpp", "rust", "python", "java", "javascript", "typescript", "go")
@@ -22,7 +23,7 @@ DEFAULTS = {
     "limits": {"case_timeout_ms": 60000, "baseline_repeats": 2,
                "instrumented_repeats": 2, "max_capture_bytes": MAX_CHANNEL_BYTES},
     "fixtures": [],
-    "adapters": {"rust": {"backend": "compiler"}},
+    "adapters": {"rust": {"backend": "compiler"}, "python": {"import_roots": []}},
 }
 
 
@@ -108,13 +109,16 @@ def load(path: Path | None) -> dict[str, Any]:
 
 def adapters(value: Any) -> dict[str, Any]:
     """Freeze explicit provider selection without guessing execution support."""
-    keys(value, {"rust"}, "adapters")
+    keys(value, {"rust", "python"}, "adapters")
     rust = value.get("rust", {})
     keys(rust, {"backend"}, "adapters.rust")
     backend = rust.get("backend", "compiler")
     if type(backend) is not str or backend not in ("compiler", "llvm"):
         raise ValueError("adapters.rust.backend must be compiler or llvm")
-    return {"rust": {"backend": backend}}
+    python = value.get("python", {})
+    keys(python, {"import_roots"}, "adapters.python")
+    return {"rust": {"backend": backend},
+            "python": {"import_roots": python_project.import_roots(python.get("import_roots", []))}}
 
 
 def validate(document: Mapping[str, Any]) -> dict[str, Any]:
