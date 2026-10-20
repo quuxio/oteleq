@@ -1,4 +1,5 @@
 ci/markdownlint/node_modules/
+ci/java-coverage/
 target/
 build/
 .venv/
