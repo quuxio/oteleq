@@ -8,6 +8,16 @@ import qualify_rust_build as qualifier
 
 
 class RustQualificationFixtureTests(unittest.TestCase):
+    def test_frontend_provenance_controls_are_scoped_to_schema3(self):
+        legacy = {"schema_version": 2, "functions": [{"selected": True}]}
+        self.assertEqual(qualifier.frontend_manifest_controls(legacy), [])
+        compiled = {"schema_version": 3, "functions": [{"selected": False}, {"selected": True}]}
+        controls = qualifier.frontend_manifest_controls(compiled)
+        self.assertEqual(len(controls), 4)
+        self.assertEqual({row[2] for row in controls},
+                         {("functions", 1, key) for key in ("compiler_name", "compiler_expansion", "emitted", "compiled_symbol")})
+        self.assertTrue(all(row[1] == "inventory.json" for row in controls))
+
     def test_llvm_fixture_keeps_the_unstable_case_and_declares_its_hook_scope(self):
         with tempfile.TemporaryDirectory() as temporary:
             source, policy, column = qualifier.fixture(Path(temporary), "llvm")

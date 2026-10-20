@@ -1,10 +1,16 @@
 # Repository quality and badges
 
+CI caches only the pinned `cargo-llvm-cov` executable using an OS, architecture, Rust-toolchain and tool-version key. A cache miss installs the locked version; every run verifies its exact version before running the same formatting, tests and coverage gates. Product sources, build outputs, credentials and telemetry data are not included in this cache. The official cache action is pinned to an immutable revision.
+
 ## Current scope
 
 CI validates Markdown, illustrative JSON/TOML syntax, diagnostic capture observers and the Rust comparator. The required Rust job runs formatting, Clippy, regression tests and a minimum 80% line-coverage gate over product `src/` files; integration-test code is excluded from that measurement. The documentation job tests the capture observers and enforces at least 80% line coverage separately for each eight-language capture module and the collection validator. CI uses fake witness fixtures and private subprocesses; actual otelc toolchain qualification uses the separate eight-language integration run. CI also checks the scalar generator, syntax discovery, harness materialisation, state observers, process limits and source preservation, with 80% coverage gates on each Python module. Real otelc execution is qualified separately; unobserved state and unsupported build contexts remain outside the claim.
 
 Rust build-contract regressions separately cover the default compiler manifest and opt-in LLVM profile. They reject changed assets/dependencies, compiler arguments/version, discovery/selection, source coordinates and resolved symbols. Actual LLVM qualification covers six matching standalone cases/36 launches plus an unstable panic case/six launches which must remain incomplete. Its application hook helper is explicitly excluded. Independent column/error oracles and strict stderr checks remain mandatory; unit fixtures and an earlier compiler qualification do not establish LLVM support.
+
+The profile2/inventory3 frontend regressions repeat the legacy refusal corpus and add fixed frontend path/hash/freeze checks, exact selected sysroot, strict compiler provenance, uninstantiated declaration handling and duplicate/rebound symbol rejection. Rehashed semantic changes are checked as data, never used to select executable paths. These tests preserve profile1/inventory2 support.
+
+The [20 October frontend record](qualification/rust-frontend-2026-10-20.json) binds runtime `4db9bb9` to the final `5657bfc` foundation/CLI `b2ff5369` and repaired `9e6eb9e` frontend/CLI `3ea71833`. Each actual corpus has six matches/36 launches plus the unstable panic/six launches correctly incomplete, with one hook helper excluded. The foundation rejects 11 altered metadata controls; frontend schema3 rejects 15. Raw/typed stderr controls, independent value/column/error oracles and source preservation pass. The failed `7001e81` precursor remains separate: 21 baseline launches, no instrumented launches, and no semantic controls. Its expression-macro closure mapping defect became a producer regression. Ordinary generated scalar callers are qualified; generated macro/generic/Cargo/async coverage and shipping evidence remain open.
 
 Install the locked documentation tools and run:
 

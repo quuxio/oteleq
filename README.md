@@ -80,7 +80,7 @@ Render a retained run as [standalone HTML and JUnit XML](docs/reporting.md):
   --output-dir /absolute/path/to/new-presentation
 ```
 
-Rust requires the [standalone build/run provider API](docs/automatic-generation.md#discovery-and-build-boundary); combined compile-and-launch providers are unsupported. The default `compiler` backend and opt-in `llvm` profile use separate matched flag and provenance contracts. Qualification is specific to the recorded provider/compiler/backend.
+Rust requires the [standalone build/run provider API](docs/automatic-generation.md#discovery-and-build-boundary); combined compile-and-launch providers are unsupported. The default `compiler` backend and opt-in `llvm` profile use separate matched flag and provenance contracts. LLVM accepts the original profile1/inventory2 pair or the compiler frontend profile2/inventory3 pair, with its fixed frontend asset and emitted-symbol checks. The [frontend record](docs/qualification/rust-frontend-2026-10-20.json) names exact qualified revisions and gaps; format support alone does not qualify a new provider.
 
 The default generates up to three distinct scalar cases per function and compares two plain with two instrumented runs per case. Missing instrumentation, changed source, unstable observations, failed builds and selected blockers fail the gate. The report records tested inputs, state coverage, telemetry and gaps. Syntax discovery and scalar samples do not establish business preconditions.
 

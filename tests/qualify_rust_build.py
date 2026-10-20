@@ -94,6 +94,10 @@ def check_build(evidence, backend, function, lane):
             assert identities["backend"] == "llvm" and identities["selected_symbol"]
             assert identities["selected_function"] == function
             assert identities["resolution_phase"] == "llvm-pipeline-start"
+            inventory = json.loads((evidence / "scratch/rust-bundle/inventory.json").read_text())
+            if inventory["schema_version"] == 3:
+                assert identities["selected_compiler_name"] == function.removeprefix("wide.")
+                assert identities["compiler_expansion"] is False and len(identities["frontend_sha256"]) == 64
 
 
 def check_attempt(case, folder, backend, column, lane, index, attempt):
@@ -170,6 +174,16 @@ def write_manifest_control(control, original_bytes, documents, filename, keys, v
     (control / "build.json").write_text(json.dumps(current["build.json"]))
 
 
+def frontend_manifest_controls(inventory):
+    """Keep schema2 controls unchanged and exercise real schema3 compiler provenance."""
+    if inventory["schema_version"] != 3:
+        return []
+    selected = next(index for index, row in enumerate(inventory["functions"]) if row["selected"])
+    changes = [("compiler-name", "compiler_name", "unrelated"), ("compiler-expansion", "compiler_expansion", True),
+               ("compiler-emitted", "emitted", False), ("compiler-symbol", "compiled_symbol", "unresolved-instance")]
+    return [(label, "inventory.json", ("functions", selected, key), value) for label, key, value in changes]
+
+
 def manifest_controls(destination, root, plan, case, folder):
     """Exercise real retained LLVM records with the exact embedded verifier bytes."""
     assert plan["artefacts"]["rust"]["observer:otelc_capture.py"] == capture.file_digest(Path(capture.__file__))
@@ -200,6 +214,7 @@ def manifest_controls(destination, root, plan, case, folder):
     selected_index = next(index for index, row in enumerate(documents["resolved.json"]["functions"]) if row["selected"])
     mutations += [("symbol", "resolved.json", ("functions", selected_index, "compiled_symbol"), ""),
                   ("function", "resolved.json", ("functions", selected_index, "name"), "wide.unrelated")]
+    mutations += frontend_manifest_controls(documents["inventory.json"])
     for label, filename, keys, value in mutations:
         write_manifest_control(control, original_bytes, documents, filename, keys, value)
         try:
