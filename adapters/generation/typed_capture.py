@@ -396,6 +396,10 @@ def required_roots(entry: dict) -> list[str]:
     roots = ["global:" + item["name"] for item in entry["globals"]]
     if entry["language"] in ("python", "javascript", "typescript"):
         roots.append("arguments")
+    if "receiver_fixture" in entry:
+        roots.append("receiver")
+        roots.extend("static:" + entry["python_receiver_class"] + "." + item["name"]
+                     for item in entry.get("python_class_roots", []))
     return roots
 
 

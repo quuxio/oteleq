@@ -27,6 +27,21 @@ fn typed_fixture() -> Value {
     data
 }
 #[test]
+fn receiver_fixtures_require_a_typed_root_and_keep_their_construction_inputs() {
+    let mut data = typed_fixture();
+    data["cases"][0]["receiver_fixture"] =
+        json!({"factory":"make_counter","arguments":[10],"line":7});
+    assert!(render(&serde_json::to_vec(&data).unwrap()).is_err());
+    data["cases"][0]["comparison"]["cases"][0]["contract"]["required_roots"] = json!(["receiver"]);
+    let output = rendered(&data);
+    assert!(output.html.contains("make_counter"));
+    assert!(output.junit.contains("Receiver fixture:"));
+    assert!(output.junit.contains("make_counter"));
+    let mut bytes = fixture();
+    bytes["cases"][0]["receiver_fixture"] = data["cases"][0]["receiver_fixture"].clone();
+    assert!(render(&serde_json::to_vec(&bytes).unwrap()).is_err());
+}
+#[test]
 fn typed_reports_retain_field_paths_and_do_not_require_equal_raw_graph_json() {
     let mut data = typed_fixture();
     assert_eq!(rendered(&data).exit_code, 0);

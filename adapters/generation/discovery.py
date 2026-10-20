@@ -22,7 +22,15 @@ def contains_yield(node):
     return False
 
 
-def python_function(node, scope):
+def ordinary_python_method(node, kinds, parameters):
+    """Receiver fixtures cover ordinary positional synchronous class functions."""
+    args = node.args
+    return (kinds == ("class",) and bool(parameters) and not node.decorator_list
+            and not args.vararg and not args.kwarg and not args.kwonlyargs
+            and not isinstance(node, ast.AsyncFunctionDef) and not contains_yield(node))
+
+
+def python_function(node, scope, kinds=(), class_roots=()):
     args = node.args
     annotations = [ast.unparse(p.annotation) if p.annotation else "dynamic"
                    for p in (*args.posonlyargs, *args.args)]
@@ -31,8 +39,16 @@ def python_function(node, scope):
         reason = "method, nested, decorated or variadic callable needs a fixture"
     if isinstance(node, ast.AsyncFunctionDef) or contains_yield(node):
         reason = "async or generator callable needs a scheduler fixture"
-    return {"name": ".".join((*scope, node.name)), "line": node.lineno, "column": node.col_offset,
+    result = {"name": ".".join((*scope, node.name)), "line": node.lineno, "column": node.col_offset,
             "parameters": annotations, "output": ast.unparse(node.returns) if node.returns else "dynamic", "reason": reason}
+    ordinary = ordinary_python_method(node, kinds, annotations)
+    if ordinary and node.name == "__init__":
+        result["python_constructor_parameters"] = annotations[1:]
+    elif ordinary and not node.name.startswith("__"):
+        result.update(parameters=annotations[1:], python_receiver_class=scope[0],
+                      python_class_roots=list(class_roots),
+                      reason="instance method requires a receiver fixture")
+    return result
 
 
 def assignment_targets(node):
@@ -61,17 +77,20 @@ def python_inventory(source):
     tree = ast.parse(source)
     functions = []
 
-    def visit(node, scope=()):
+    def visit(node, scope=(), kinds=(), class_roots=()):
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            functions.append(python_function(node, scope))
+            functions.append(python_function(node, scope, kinds, class_roots))
             scope = (*scope, node.name)
+            kinds = (*kinds, "function")
         elif isinstance(node, ast.ClassDef):
+            class_roots = python_globals(node)
             scope = (*scope, node.name)
+            kinds = (*kinds, "class")
         elif isinstance(node, ast.Lambda):
             functions.append({"name": ".".join((*scope, "<lambda>")), "line": node.lineno, "column": node.col_offset,
                               "parameters": [], "output": "unknown", "reason": "lambda needs a capture fixture"})
         for child in ast.iter_child_nodes(node):
-            visit(child, scope)
+            visit(child, scope, kinds, class_roots)
     visit(tree)
     return {"functions": functions, "globals": python_globals(tree), "parser": "Python ast " + sys.version.split()[0]}
 

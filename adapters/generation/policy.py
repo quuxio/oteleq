@@ -2,6 +2,7 @@
 from collections.abc import Mapping
 import fnmatch
 import json
+import keyword
 import math
 from pathlib import Path
 import tomllib
@@ -64,7 +65,7 @@ def expected_baseline(value: Any) -> dict[str, Any]:
 def fixture(value: Any, index: int) -> dict[str, Any]:
     """Validate source-scoped concrete argument lists without executing target code."""
     label = f"fixtures[{index}]"
-    keys(value, {"function", "source", "language", "cases", "expected_baseline", "domains"}, label)
+    keys(value, {"function", "source", "language", "cases", "expected_baseline", "domains", "receiver"}, label)
     function, source = value.get("function"), value.get("source", "**")
     if any(not isinstance(item, str) or not item.strip() for item in (function, source)):
         raise ValueError(f"{label} requires a function pattern and source pattern")
@@ -86,7 +87,22 @@ def fixture(value: Any, index: int) -> dict[str, Any]:
               "expected_baseline": expected_baseline(value.get("expected_baseline", {"kind": "return"}))}
     if "domains" in value:
         result["domains"] = fixture_domains(value["domains"], cases, label)
+    if "receiver" in value:
+        result["receiver"] = receiver(value["receiver"])
     return result
+
+
+def receiver(value: Any) -> dict[str, Any]:
+    """Declare a same-module constructor/factory; application code runs in workers."""
+    keys(value, {"factory", "arguments"}, "fixture.receiver")
+    factory, arguments = value.get("factory"), value.get("arguments", [])
+    if not isinstance(factory, str) or not factory.isidentifier() or keyword.iskeyword(factory):
+        raise ValueError("receiver.factory requires one ordinary same-module class or function name")
+    if (not isinstance(arguments, list)
+            or any(type(arg) not in (str, int, float, bool) or type(arg) is float and not math.isfinite(arg)
+                   for arg in arguments)):
+        raise ValueError("receiver.arguments requires finite scalar constructor inputs")
+    return {"factory": factory, "arguments": arguments.copy()}
 
 
 def fixture_domains(value: Any, cases: list[list[Any]], label: str) -> list[dict]:

@@ -33,6 +33,8 @@ The implemented generation policy accepts `[adapters.rust] backend = "compiler"`
 
 `[adapters.python] import_roots = ["src"]` opts into [regular source-package imports](python-package-context.md), with `"."` for packages directly inside the source root. The default empty list keeps the standalone file loader. Roots are frozen, ordered source-relative paths; namespace packages, ambiguous roots and shadowed targets are blocked. General package-manager/build integration and imported-module observation remain open.
 
+`[[fixtures]] receiver = { factory = "Counter", arguments = [10] }` declares an existing Python constructor or ordinary same-module factory for a selected instance method. Method `cases` exclude the implicit receiver. [Receiver fixtures](receiver-fixtures.md) retain construction inputs and source bindings, require typed receiver/class-data roots and reconstruct independently during generated tests, replay/export and scalar method-argument shrinking. Unsupported languages or callable/storage forms fail visibly.
+
 ## Proposed extensions
 
 The broader design adds a `doctor` capability command, build recipes and object/receiver factories, richer promotion planning, stateful inputs and a versioned graph/worker protocol. `doctor`, `promote`, `--keep-workspace`, `--dry-run` and replay `--bundle` are proposal names, not available CLI options. Current retention uses `export-tests` and explicit `clean`.
