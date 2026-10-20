@@ -10,6 +10,8 @@ import struct
 import domains
 import go_project
 import go_receivers
+import cpp_receivers
+import cpp_worker
 import node_receivers
 import java_receivers
 import python_project
@@ -255,6 +257,8 @@ def literal(value, type_, language):
 
 
 def global_gaps(entry):
+    if entry["language"] == "cpp" and "cpp_receiver" in entry:
+        return []  # The closed compiler registry includes every declared root.
     if entry["language"] == "go" and "receiver_fixture" in entry:
         return []  # The bound closed storage registry already covers every root.
     if entry["language"] in ("python", "javascript", "typescript"):
@@ -610,7 +614,14 @@ def materialise(project, entry, args):
         (generated / "_oteleq_observe.py").write_bytes(Path(__file__).with_name("observe.py").read_bytes())
     elif language in ("c", "cpp"):
         driver = project / ("_oteleq_driver.c" if language == "c" else "_oteleq_driver.cpp")
-        driver.write_text(native_driver(entry, args))
+        if language == "cpp" and "cpp_receiver" in entry:
+            source.write_text(cpp_receivers.private_source(original, entry["cpp_receiver"]["records"]))
+            (generated / "cpp_observe.hpp").write_bytes(Path(__file__).with_name("cpp_observe.hpp").read_bytes())
+            driver.write_text('#include "_oteleq_generated/cpp_observe.hpp"\n#include <stdio.h>\n' + native_abi()
+                              + '#define main __oteleq_original_main\n#include ' + json.dumps(entry["path"])
+                              + '\n#undef main\n' + cpp_worker.Worker(entry, args, literal).source())
+        else:
+            driver.write_text(native_driver(entry, args))
     elif language == "java":
         driver = source.parent / "OteleqDriver.java"
         if driver.exists():

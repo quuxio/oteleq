@@ -18,6 +18,26 @@ const RESOURCES: &[(&str, &str)] = &[
         include_str!("../adapters/generation/discovery.py"),
     ),
     (
+        "cpp_models.py",
+        include_str!("../adapters/generation/cpp_models.py"),
+    ),
+    (
+        "cpp_receivers.py",
+        include_str!("../adapters/generation/cpp_receivers.py"),
+    ),
+    (
+        "cpp_worker.py",
+        include_str!("../adapters/generation/cpp_worker.py"),
+    ),
+    (
+        "cpp_graph.py",
+        include_str!("../adapters/generation/cpp_graph.py"),
+    ),
+    (
+        "cpp_observe.hpp",
+        include_str!("../adapters/generation/cpp_observe.hpp"),
+    ),
+    (
         "harness.py",
         include_str!("../adapters/generation/harness.py"),
     ),

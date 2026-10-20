@@ -16,6 +16,7 @@ import uuid
 import discovery
 import go_project
 import go_receivers
+import cpp_receivers
 import filesystem_effects
 import http_effects
 import harness
@@ -176,7 +177,7 @@ def entry_identity(entry):
     if language == "c":
         return entry["name"]
     if language == "cpp":
-        return entry["name"] + "(" + ", ".join(entry["parameters"]) + ")"
+        return entry.get("cpp_function", {}).get("compiler_identity", entry["name"] + "(" + ", ".join(entry["parameters"]) + ")")
     if language == "java":
         package = entry.get("package", "")
         types = ["java.lang.String" if t == "String" else t for t in entry["parameters"]]
@@ -236,9 +237,10 @@ def qualify_entry(entry, snapshot, count):
             outputs = harness.native_scalar_types(entry["language"]) | {"void"}
         java_receiver = entry["language"] == "java" and "receiver_fixture" in entry
         go_receiver = entry["language"] == "go" and "receiver_fixture" in entry
+        cpp_receiver = entry["language"] == "cpp" and "receiver_fixture" in entry
         if java_receiver and not java_receivers.supported_type(entry["output"], entry["java_models"], entry["package"], void=True):
             raise ValueError("result type requires an observation fixture")
-        if not java_receiver and not go_receiver and entry["language"] not in ("python", "javascript", "typescript") and harness.scalar_type(entry["output"]) not in outputs:
+        if not java_receiver and not go_receiver and not cpp_receiver and entry["language"] not in ("python", "javascript", "typescript") and harness.scalar_type(entry["output"]) not in outputs:
             raise ValueError("result type requires an observation fixture")
         gaps = harness.global_gaps(entry)
         if gaps:
@@ -261,6 +263,15 @@ def is_entrypoint(function, language):
 def receiver_fixture(entry, discovered, declared):
     """Bind one reviewed factory to its source declaration and concrete arguments."""
     try:
+        if entry["language"] == "cpp":
+            bound = cpp_receivers.bind(entry, discovered, declared, harness.concrete_arguments)
+            fixture = bound["factory"]
+            entry.update(cpp_receiver=bound, receiver_class=bound["owner"], receiver_configuration=declared,
+                         parameters=bound["method"]["parameters"], output=bound["method"]["output"],
+                         receiver_fixture={"factory": fixture["name"], "kind": fixture["kind"], "line": 0,
+                                           "source_function": fixture["name"], "arguments": fixture["arguments"],
+                                           "arguments_requested": fixture["arguments_requested"], "argument_types": fixture["parameters"]}, reason="")
+            return
         if entry["language"] == "go":
             go_receivers.bind(entry, discovered, declared, harness.concrete_arguments)
             return
@@ -319,7 +330,10 @@ def inventory_entry(function, discovered, name, language, source_hash, snapshot,
              "package_end": discovered.get("package_end"), "file_functions": discovered["entrypoints"],
              "binding_capture_offset": discovered.get("binding_capture_offset", 0),
              "source_sha256": source_hash, "column": function.get("column", 0)}
-    entry["id"] = identity({k: entry[k] for k in ("language", "path", "name", "line", "column", "parameters", "source_sha256")})[:20]
+    binding = {k: entry[k] for k in ("language", "path", "name", "line", "column", "parameters", "source_sha256")}
+    if language == "cpp" and "cpp_function" in entry:
+        binding.update(source_offset=entry["source_offset"], symbol=entry["symbol"])
+    entry["id"] = identity(binding)[:20]
     entry["otelc_function"] = entry_identity(entry)
     excluded = is_entrypoint(function, language) or bool(function.get("declaration_only"))
     excluded |= not project_policy.selected(entry["otelc_function"], args.configuration["functions"])
@@ -467,7 +481,7 @@ def decoder_files():
 
 def generator_identity():
     here = Path(__file__).parent
-    names = ("generation.py", "policy.py", "filesystem_effects.py", "http_effects.py", "domains.py", "shrinking.py", "sequences.py", "typescript_provider.py", "python_project.py", "go_project.py", "go_receivers.py", "go_graph.py", "go_observe.go", "node_receivers.py", "java_receivers.py", "java_graph.py", "OteleqGraph.java", "discovery.py", "harness.py", "observe.py", "node_observe.mjs", "node_sequence.mjs", "typed_capture.py", "discover.mjs", "discover.go", "Discover.java")
+    names = ("generation.py", "policy.py", "filesystem_effects.py", "http_effects.py", "domains.py", "shrinking.py", "sequences.py", "typescript_provider.py", "python_project.py", "go_project.py", "go_receivers.py", "go_graph.py", "go_observe.go", "node_receivers.py", "java_receivers.py", "java_graph.py", "OteleqGraph.java", "cpp_models.py", "cpp_receivers.py", "cpp_worker.py", "cpp_graph.py", "cpp_observe.hpp", "discovery.py", "harness.py", "observe.py", "node_observe.mjs", "node_sequence.mjs", "typed_capture.py", "discover.mjs", "discover.go", "Discover.java")
     files = {name: capture.file_digest(here / name) for name in names}
     files["host-python"] = capture.file_digest(Path(sys.executable))
     files["host-version"] = sys.version
@@ -679,7 +693,7 @@ def go_build_request(project, entry, driver):
 
 def native_command(prefix, project, language, driver, tools, env, folder, scratch, lane):
     compiler = "clang++" if language == "cpp" else "clang"
-    flags = ["-O2", "-pthread", "-std=c++17"] if language == "cpp" else ["-O1", "-pthread"]
+    flags = capture.native_flags(language)
     output = scratch / "application"
     command = [tools[compiler], *flags, driver, "-o", output]
     if lane == "instrumented_on":

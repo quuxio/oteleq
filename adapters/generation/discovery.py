@@ -4,6 +4,9 @@ import json
 from pathlib import Path
 import sys
 
+import cpp_models
+from otelc_capture import native_flags
+
 NATIVE_METADATA_BYTES = 64 * 1024 * 1024
 
 LANGUAGES = {".c": "c", ".h": "c", ".cc": "cpp", ".cpp": "cpp", ".cxx": "cpp", ".hpp": "cpp", ".hh": "cpp", ".hxx": "cpp", ".rs": "rust",
@@ -114,10 +117,11 @@ def native_function(node, scope, inside):
     return {"name": "::".join((*scope, name)), "line": location.get("line", 1), "column": location.get("col", 1),
             "declaration_only": kind == "FunctionDecl" and not body, "parameters": params,
             "output": node.get("type", {}).get("qualType", "unknown").split(" (")[0],
-            "reason": reason, "symbol": node.get("mangledName", name)}
+            "reason": reason, "symbol": node.get("mangledName", name),
+            "source_offset": location.get("offset", -1), "native_kind": kind}
 
 
-def native_inventory(document, path):
+def native_inventory(document, path, *, cpp=False):
     functions, globals_ = [], []
     callable_kinds = {"FunctionDecl", "CXXMethodDecl", "CXXConstructorDecl", "CXXDestructorDecl", "LambdaExpr"}
 
@@ -134,10 +138,32 @@ def native_inventory(document, path):
             inside = True
         if kind == "VarDecl" and original and not inside:
             globals_.append({"name": "::".join((*scope, name)), "type": node.get("type", {}).get("qualType", "unknown")})
+        if kind == "VarDecl" and original and inside and (node.get("storageClass") == "static" or node.get("tls")):
+            globals_.append({"name": "<static-local:" + "::".join((*scope, name)) + "@" + str(node["loc"]["offset"]) + ">",
+                             "type": node.get("type", {}).get("qualType", "unknown"), "inaccessible": True})
         for child in node.get("inner", []):
             visit(child, scope, inside)
     visit(document)
-    return {"functions": functions, "globals": globals_, "parser": "Clang AST JSON"}
+    result = {"functions": functions, "globals": globals_, "parser": "Clang AST JSON"}
+    if cpp:
+        models = cpp_models.Inventory(document, path).export()
+        source = path.read_bytes()
+        bindings = {(item["source_offset"], item["kind"], item["symbol"]): item for item in models["cpp_functions"]}
+        for function in functions:
+            key = (function["source_offset"], function["native_kind"], function["symbol"])
+            if key in bindings:
+                function["cpp_function"] = bindings[key]
+                function["name"] = bindings[key]["name"]
+                function["declaration_only"] = not bindings[key]["has_body"]
+                function["parameters"] = bindings[key]["parameters"]
+                function["output"] = bindings[key]["output"]
+                offset = function["source_offset"]
+                function["line"] = source.count(b"\n", 0, offset) + 1
+                function["column"] = offset - source.rfind(b"\n", 0, offset)
+        result.update(models)
+        result["globals"] = ([{"name": name, "type": type_} for name, type_ in models["cpp_globals"].items()]
+                             + [item for item in globals_ if item.get("inaccessible")])
+    return result
 
 
 def discover(path, language, root, tools, execute):
@@ -149,7 +175,7 @@ def discover(path, language, root, tools, execute):
         command = [os.environ["OTELEQ_EXECUTABLE"], "inventory-rust", path]
     elif language in ("c", "cpp"):
         compiler = tools["clang++" if language == "cpp" else "clang"]
-        command = [compiler, "-Xclang", "-ast-dump=json", "-fsyntax-only", path]
+        command = [compiler, *native_flags(language), "-Xclang", "-ast-dump=json", "-fsyntax-only", path]
     elif language in ("javascript", "typescript"):
         command = [tools[language], here / "discover.mjs", root]
     elif language == "go":
@@ -166,4 +192,7 @@ def discover(path, language, root, tools, execute):
     if result.returncode:
         raise ValueError("inventory tool failed: " + result.stderr.decode(errors="replace")[-2000:])
     data = json.loads(result.stdout)
-    return native_inventory(data, path) if language in ("c", "cpp") else data
+    inventory = native_inventory(data, path, cpp=language == "cpp") if language in ("c", "cpp") else data
+    if language == "cpp" and "cpp-demangler" in tools:
+        cpp_models.bind_symbols(inventory, tools["cpp-demangler"], path.parent, execute)
+    return inventory

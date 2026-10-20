@@ -4,6 +4,7 @@ from typing import Any
 import node_receivers
 import java_graph
 import go_graph
+import cpp_graph
 
 from otelc_capture import strict_json
 
@@ -396,6 +397,8 @@ def scalar_capture(raw: bytes, entry: dict) -> tuple[dict, dict, dict]:
 
 
 def required_roots(entry: dict) -> list[str]:
+    if entry["language"] == "cpp" and "cpp_receiver" in entry:
+        return list(cpp_graph.root_types(entry))
     if entry["language"] == "go" and "receiver_fixture" in entry:
         return list(entry["go_root_types"])
     if entry["language"] == "java" and "receiver_fixture" in entry:
@@ -450,7 +453,9 @@ def dynamic_steps(capture: dict, entry: dict) -> list[dict]:
 
 def observation(raw: bytes, entry: dict, contract: dict) -> dict[str, Any]:
     language = entry["language"]
-    if language == "go" and "receiver_fixture" in entry:
+    if language == "cpp" and "cpp_receiver" in entry:
+        boundaries = cpp_graph.boundaries(raw, entry, native_scalar)
+    elif language == "go" and "receiver_fixture" in entry:
         boundaries = go_graph.boundaries(raw, entry)
     elif language == "java" and "receiver_fixture" in entry:
         boundaries = java_graph.boundaries(raw, entry)

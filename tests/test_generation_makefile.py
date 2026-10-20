@@ -20,7 +20,7 @@ class QualificationRecipeTests(unittest.TestCase):
             for flag in ("--cli", "--comparator"):
                 if line.startswith("\t") and flag + " " in line:
                     targets[target] = flag
-        self.assertEqual(len(targets), 19)
+        self.assertEqual(len(targets), 20)
         self.assertIn("generation-http-otelc", targets)
         self.assertIn("generation-java-receiver-otelc", targets)
         self.assertIn("generation-go-receiver-otelc", targets)
