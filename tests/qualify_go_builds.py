@@ -6,11 +6,13 @@ import os
 from pathlib import Path
 import shutil
 import signal
+import stat
 import struct
 import sys
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'examples'))
 import otelc_capture as capture
+from capture_otelc_languages import run as fixed_run
 from qualify_generation import command
 
 SOURCE='''package main
@@ -89,6 +91,7 @@ def execute_record(command_,cwd,env,folder,name,expected):
     result=capture.execute(command_,cwd,env)
     (folder/(name+'.stdout')).write_bytes(result.stdout);(folder/(name+'.stderr')).write_bytes(result.stderr)
     (folder/(name+'.command.json')).write_text(json.dumps([str(item) for item in command_])+'\n')
+    (folder/(name+'.status.json')).write_text(json.dumps({'returncode':result.returncode,'expected':expected})+'\n')
     assert result.returncode==expected,(name,result.returncode,result.stderr)
     return result
 
@@ -126,7 +129,7 @@ def direct(provider,folder):
             changed=folder/(name+'.toml');changed.write_text(policy.read_text().replace(*replacement))
             result=execute_record([install/'target/debug/quux-otelc','--config',changed,'go','--run',folder/'go-bundle'],cwd,offline,folder,name,1)
             assert result.stdout==b'';refused+=1
-        for name,change in [('binary',lambda bundle:(bundle/'application').write_bytes(b'changed')),
+        for name,change in [('binary',changed_binary),
                             ('empty-modules',lambda bundle:empty_graphs(bundle)),
                             ('missing-recipe',lambda bundle:(bundle/'recipe.json').unlink())]:
             bundle=folder/name;shutil.copytree(folder/'go-bundle',bundle);change(bundle)
@@ -148,6 +151,21 @@ def empty_graphs(bundle):
         (bundle/name).write_text(json.dumps({'Settings':original['Settings'],'Modules':{}}))
         manifest['files'][name]=hashlib.sha256((bundle/name).read_bytes()).hexdigest()
     (bundle/'build.json').write_text(json.dumps(manifest))
+
+
+def changed_binary(bundle):
+    """Alter only the owned control copy, whose executable retains mode 0500."""
+    path=bundle/'application';path.chmod(path.stat().st_mode|stat.S_IWUSR);path.write_bytes(b'changed')
+
+
+def fixed(provider,cli,folder):
+    from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceRequest
+    folder.mkdir()
+    manifest=json.loads((Path(__file__).resolve().parents[1]/'examples/otelc-workloads.json').read_text())
+    fixed_run(provider,folder/'go','go',manifest['go'],ExportTraceServiceRequest)
+    result=json.loads(command([cli,'compare-workload',folder/'go/bundle.json'],folder,'comparison'))
+    assert result['verdict']=='equivalent_observed'
+    return 4
 
 
 def main():
@@ -179,11 +197,13 @@ def main():
     assert not list((folder/'old-module/comparison').rglob('command.json'))
     assert any(b'instrumentation would change Go language version' in path.read_bytes() for path in (folder/'old-module/comparison').rglob('go-build.log'))
     control=direct(provider,folder/'direct')
+    fixed_launches=fixed(provider,cli,folder/'fixed')
     for path in [workspace,exported,Path(shrink['workspace'])]:
         plan=json.loads((path/'plan.json').read_text());assert all(hashlib.sha256((Path(plan['source'])/name).read_bytes()).hexdigest()==value for name,value in plan['source_manifest'].items())
     result={'claim':'equivalence over these tests and observations','artefact_class':'diagnostic','cli_sha256':hashlib.sha256(cli.read_bytes()).hexdigest(),
             'cases':4,'matching_cases':3,'difference_controls':1,'generated_qualified_launches':launches,'direct_controls':control,
-            'actual_application_launches':launches+control['qualified_launches']+control['termination_control_launches'],'source_preserved':True,
+            'fixed_workload_launches':fixed_launches,
+            'actual_application_launches':launches+control['qualified_launches']+control['termination_control_launches']+fixed_launches,'source_preserved':True,
             'scope':'Standalone generated scalar callers and fixed detached replay; no general Go package/build integration, cgo/workspaces, SDK dependency isolation, recording-off/fault lane or shipping qualification.'}
     (folder/'QUALIFICATION.json').write_text(json.dumps(result,indent=2)+'\n');print(json.dumps(result),flush=True)
 
