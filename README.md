@@ -37,6 +37,8 @@ Generated tests live in a new private directory outside the application reposito
 
 **Status: automatic scalar test generation, AST inventory and repeated actual otelc execution are implemented for all eight languages.** Supported functions receive frozen concrete inputs; unsupported callables and state remain visible blockers. Python and Node capture supported object graphs; other adapters capture scalar results and accessible scalar globals. Native scalar types are checked by the compiler; unresolved native aliases remain visible blockers. Generated access/entrypoint helpers produce diagnostic evidence. Shipping-artefact qualification and application-specific fixtures remain future work.
 
+Declared [ordered Node receiver calls/release](docs/ordered-sequences.md) retain intermediate state, with bounded JavaScript collection observations and [148-launch qualification](docs/qualification/ordered-sequences-2026-10-20.json). Missing collection stays inconclusive.
+
 Start with [automatic generation](docs/automatic-generation.md), [fixed eight-language workloads](docs/eight-language-capture.md) or [workload comparison](docs/workload-comparison.md). See [usefulness and limits](docs/adoption.md), the [design](docs/design.md) and [roadmap](docs/roadmap.md).
 
 Observers refuse unsupported application formatters and exception accessors. Such capture failures remain incomplete evidence; see the [qualified codec limits](docs/automatic-generation.md#selection-and-inputs).

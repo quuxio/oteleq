@@ -44,3 +44,9 @@ The bounded sequence has 1 through 32 steps: calls first, at most one release, t
 Generated and exported suites retain the concrete schedule and all intermediate observations. Raw collection telemetry is checked separately from application state and exact stdout/stderr. This remains **equivalence over these tests and observations**, with diagnostic callers rather than shipping artefact proof. Actual provider/toolchain qualification is separate from unit and plain-worker coverage.
 
 Run the maintained actual corpus with `make generation-sequence-otelc OTELC_ROOT=/absolute/path/to/qualified/otelc REPORT_DIR=/private/tmp/new-sequence-qualification`. It exercises both Node language IDs, JavaScript ESM/CommonJS collection and creation links, intermediate mutation restored before the final boundary, declared errors, user finalizers, retained-object incompleteness, generated/exported suites and scalar replay. Exact revisions and actual results must be recorded separately from the implementation checks.
+
+## Published qualification
+
+The [20 October record](qualification/ordered-sequences-2026-10-20.json) names runtime `2cf56e1` and the frozen `c65a35c` provider on macOS ARM64/Node24.21. The maintained eight-case corpus completed 148 actual launches: six cases matched, the transient-state control differed, and the application-retained receiver remained inconclusive. Generated/exported suites, scalar shrinking and replay retained those outcomes. Six altered-evidence controls and one changed-source refusal passed. Source inputs were preserved. All 332 local regressions and exact-runtime remote checks passed; Rust product line coverage was 97.29%.
+
+This qualification covers JavaScript ESM/CommonJS collection, source factories, ordinary async methods, encoded returned aliases and an application finalizer, plus TypeScript source-emitter calls/release. Broader TypeScript collection/emitter and other language sequence support need independent evidence.

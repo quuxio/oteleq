@@ -1,0 +1,191 @@
+{
+  "qualification_schema_version": 1,
+  "date": "2026-10-20",
+  "platform": {
+    "os": "macOS",
+    "architecture": "ARM64",
+    "node": "24.21.0",
+    "python": "3.12.15",
+    "typescript": "6.0.3 source emitter; calls/release only"
+  },
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "runtime": {
+    "commit": "2cf56e147bde11fbd5edbe59bd2b04413b793832",
+    "cli_sha256": "1fbae989cc154fe15bd701f7f8c443386bd2fc16faa8ceb603910186cbf83f4e",
+    "qualifier_sha256": "105f79ecdfaf01ae8d0a92d73d14087e34a156a32bce4d4dfdee969c54490e65"
+  },
+  "provider": {
+    "source": "c65a35c375ce0b3b82b79526ba86e4cfd454a15b",
+    "tree": "ef070493d416bb5a11cfd1d42e056206a9d07535",
+    "root": "/private/tmp/otelc-javascript-provider-c65a35c-frozen",
+    "manifest_sha256": "a22a813281aa87e4761413a09f7b92695fde28a58d3f0af1a3a4ad606fdee53f",
+    "source_and_products_verified": 382,
+    "dependency_records_verified": 5032,
+    "products": {
+      "cli": {
+        "path": "target/debug/quux-otelc",
+        "sha256": "5fee1048922a8d3de0b7bb046c44d5d3bf7bf761a9bb0caf121fb5e03728de77"
+      },
+      "observer": {
+        "path": "target/debug/otelc_node_observer.node",
+        "sha256": "e9300ba1ae5ff6fe62d36555c3e4e1efb61462c7d1aef154f3e8937006cd056a"
+      }
+    },
+    "status": "Independently reverified immutable provider; application qualification remains separate."
+  },
+  "results": {
+    "claim": "equivalence over these tests and observations",
+    "artefact_class": "diagnostic",
+    "cli_sha256": "1fbae989cc154fe15bd701f7f8c443386bd2fc16faa8ceb603910186cbf83f4e",
+    "cases": 8,
+    "matching_cases": 6,
+    "transient_difference_controls": 1,
+    "retained_collection_inconclusive_controls": 1,
+    "actual_application_launches": 148,
+    "source_preserved": true,
+    "evidence_refusal_controls": 6,
+    "prelaunch_source_refusals": 1,
+    "scope": "Ordered ordinary Node receiver calls/release, JavaScript ESM/CommonJS collection, source factories, async methods and application finalizers; TypeScript call/release only; no GC timing/leak/shipping claim."
+  },
+  "initial_strict_exit_code": 3,
+  "inventory": {
+    "excluded": 43,
+    "ready": 8
+  },
+  "callables": [
+    {
+      "function": "async_factory.Counter.later",
+      "arguments": [
+        7.0
+      ],
+      "exit_code": 0,
+      "actions": [
+        "call",
+        "call",
+        "release",
+        "collect"
+      ]
+    },
+    {
+      "function": "expected_error.Counter.fail",
+      "arguments": [
+        7.0
+      ],
+      "exit_code": 0,
+      "actions": [
+        "call",
+        "call",
+        "release",
+        "collect"
+      ]
+    },
+    {
+      "function": "finalized.Counter.identity",
+      "arguments": [
+        7.0
+      ],
+      "exit_code": 0,
+      "actions": [
+        "call",
+        "call",
+        "release",
+        "collect"
+      ]
+    },
+    {
+      "function": "identity.Counter.identity",
+      "arguments": [
+        7.0
+      ],
+      "exit_code": 0,
+      "actions": [
+        "call",
+        "call",
+        "release",
+        "collect"
+      ]
+    },
+    {
+      "function": "retained.Counter.identity",
+      "arguments": [
+        7.0
+      ],
+      "exit_code": 3,
+      "actions": [
+        "call",
+        "call",
+        "release",
+        "collect"
+      ]
+    },
+    {
+      "function": "transient.Counter.transient",
+      "arguments": [
+        7.0
+      ],
+      "exit_code": 1,
+      "actions": [
+        "call",
+        "call",
+        "release",
+        "collect"
+      ]
+    },
+    {
+      "function": "typed_cjs.Counter.identity",
+      "arguments": [
+        7.0
+      ],
+      "exit_code": 0,
+      "actions": [
+        "call",
+        "call",
+        "release"
+      ]
+    },
+    {
+      "function": "typed_esm.Counter.identity",
+      "arguments": [
+        7.0
+      ],
+      "exit_code": 0,
+      "actions": [
+        "call",
+        "call",
+        "release"
+      ]
+    }
+  ],
+  "validation": {
+    "regression_tests": 332,
+    "rust_tests": 65,
+    "capture_tests": 116,
+    "generation_tests": 134,
+    "node_tests": 17,
+    "rust_product_line_coverage_percent": 97.29,
+    "required_module_coverage_floor_percent": 80,
+    "runtime_ci": 39376788405,
+    "sonar_unresolved_issues": 0
+  },
+  "evidence_controls": [
+    "missing-action",
+    "reordered-action",
+    "action-gap",
+    "positive-witness-loss",
+    "missing-lifetime-witness",
+    "undeclared-intermediate-error"
+  ],
+  "retention": {
+    "archive": "/Users/sclarke/Documents/oteleq-qualification/2026-10-20/node-sequences-2cf56e1",
+    "development_application_launches": 28,
+    "copied_raw_observations_are_not_new_application_launches": true
+  },
+  "limits": [
+    "Ordinary source-bound receiver profile; TypeScript collection and native emitter remain separately qualified work.",
+    "Only selected-method calls followed by optional release and collection; no arbitrary scheduler, target, resource-close or object/action shrinking.",
+    "Named root counts and creation links are observed; invocation-scoped producer rendezvous remains unimplemented.",
+    "GC retry count is raw evidence outside typed equality; no duration, leak, destruction or shipping artefact claim.",
+    "The wider 21-row completion checklist remains open."
+  ]
+}
