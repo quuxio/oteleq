@@ -38,13 +38,13 @@ class CppQualificationTests(unittest.TestCase):
                               "exit_code": int(method in qualification.DIFFERENCES), "receiver_fixture": {"arguments": [10]}})
         cls.binding_bundles, cls.binding_cases = {}, []
         for index, name in enumerate(qualification.BINDING_FUNCTIONS):
-            receiver = index == 0
+            receiver = name in qualification.BINDING_FACTORIES
             entry, result, raw, _ = worker.worker(qualification.BINDING_SOURCE,
-                method="Graph::add" if receiver else name, factory="Graph" if receiver else None)
+                method=name.split('(')[0] if receiver else name, factory=qualification.BINDING_FACTORIES.get(name))
             worker.assertEqual(result.returncode, 0, result.stderr)
             capture = typed_capture.observation(raw, entry, {"case_id": str(index), "function_id": name, "fixture_sha256": "a"*64})
             attempt = {"observation": capture, "execution": {"witness": {"functions": {name: 1}}}}
-            cls.binding_bundles[str(index)] = {"cases": [{"contract": {"required_roots": ["receiver", "argument:0"] if receiver else []},
+            cls.binding_bundles[str(index)] = {"cases": [{"contract": {"required_roots": typed_capture.required_roots(entry)},
                 "baseline": [attempt, attempt], "instrumented_on": [attempt, attempt]}]}
             cls.binding_cases.append({"case": str(index), "function": name, "arguments": [3], "exit_code": 0,
                                       "receiver_fixture": {"arguments": [10]} if receiver else None})
@@ -69,7 +69,7 @@ class CppQualificationTests(unittest.TestCase):
             folder = self.folder / name
             folder.mkdir()
             (folder / "typed-bundle.json").write_text(json.dumps(bundle))
-        self.assertEqual(qualification.check_bindings(self.report, 4), 16)
+        self.assertEqual(qualification.check_bindings(self.report, len(qualification.BINDING_FUNCTIONS)), 20)
         for name in ("1", "2", "3"):
             bundle = copy.deepcopy(self.binding_bundles[name])
             for lane in ("baseline", "instrumented_on"):
@@ -78,7 +78,7 @@ class CppQualificationTests(unittest.TestCase):
             target = self.folder / name / "typed-bundle.json"
             target.write_text(json.dumps(bundle))
             with self.subTest(case=name), self.assertRaises(AssertionError):
-                qualification.check_bindings(self.report, 4)
+                qualification.check_bindings(self.report, len(qualification.BINDING_FUNCTIONS))
             target.write_text(json.dumps(self.binding_bundles[name]))
 
     def test_original_shrink_copies_do_not_inflate_unique_launch_count(self):
@@ -90,6 +90,25 @@ class CppQualificationTests(unittest.TestCase):
         self.assertEqual(qualification.verify_launches(self.folder, 4), {"unique_application_launches": 4, "raw_attempt_folders": 8})
         with self.assertRaises(AssertionError):
             qualification.verify_launches(self.folder, 8)
+
+    def test_unicode_getter_count_reference_and_return_copy_have_independent_oracles(self):
+        name = str(qualification.BINDING_FUNCTIONS.index('UnicodeCounter::add(int)'))
+        case = self.binding_cases[int(name)]
+        original = self.binding_bundles[name]['cases'][0]['baseline'][0]['observation']
+        qualification.check_binding_receiver(original, case)
+        for change in ('getter', 'reference', 'return-copy'):
+            observed = copy.deepcopy(original)
+            graph = observed['outcome']['graph']
+            fields = qualification.node(graph, graph['roots']['receiver'])['fields']
+            if change == 'getter':
+                qualification.node(graph, graph['roots'][qualification.BINDING_STATIC])['fields']['value']['value'] = '1'
+            elif change == 'reference':
+                qualification.node(graph, fields['field:\u6570\u636e'])['fields']['value'] = graph['roots']['result']
+            else:
+                location = qualification.node(graph, fields['field:value_'])['fields']['location']
+                qualification.node(graph, graph['roots']['result'])['fields']['location'] = location
+            with self.subTest(change=change), self.assertRaises(AssertionError):
+                qualification.check_binding_receiver(observed, case)
 
     def test_equal_wrong_fields_widths_arguments_float_bits_and_aliases_are_rejected(self):
         original = self.bundles["identity"]

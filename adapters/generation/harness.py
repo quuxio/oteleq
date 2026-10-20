@@ -12,6 +12,7 @@ import go_project
 import go_receivers
 import cpp_receivers
 import cpp_worker
+import native_names
 import node_receivers
 import java_receivers
 import python_project
@@ -415,7 +416,7 @@ def native_driver(entry, args):
         invocation = 'try {' + returned + '} catch(const std::exception& e){if(!__oteleq_error(out,e)){fclose(out);return 91;}} catch(...){fclose(out);return 91;}'
     headers = '#include <exception>\n#include <typeinfo>\n' if entry["language"] == "cpp" else ''
     arguments_checked = "\n".join("__oteleq_assert_scalar(" + type_ + ");" for type_ in entry["parameters"])
-    return headers + '''#include <stdio.h>
+    support = headers + '''#include <stdio.h>
 #include <stdlib.h>
 ''' + native_guards(entry["language"]) + native_abi() + '''
 static void __oteleq_raw_bytes(FILE* out,const char* label,const void* v,size_t n){
@@ -426,13 +427,16 @@ static void __oteleq_raw_bytes(FILE* out,const char* label,const void* v,size_t 
   __oteleq_assert_value(*(value)); \\
   __oteleq_raw_bytes((out),(label),(value),(size)); \\
 } while(0)
-#define main __oteleq_original_main
-#include ''' + json.dumps(entry["path"]) + '''
-#undef main
-int main(void){ FILE* out=fopen(getenv("OTELEQ_OBSERVATION"),"wb"); if(!out)return 90;
+'''
+    worker = '''int main(void){ FILE* out=fopen(getenv("OTELEQ_OBSERVATION"),"wb"); if(!out)return 90;
 __oteleq_abi(out);
 fputs("before\\n",out);
 ''' + arguments_checked + '\n' + state + '\n' + invocation + '\nfputs("after\\n",out);\n' + state + '\nreturn fclose(out)!=0;}\n'
+    names = [entry['name'], *entry['parameters'], entry['output'], *(item['name'] for item in entry['globals'])]
+    preserve = {'__oteleq_bytes', '__oteleq_assert_scalar', '__oteleq_assert_value', '__oteleq_scalar_value'}
+    clean = native_names.undefinitions(support + worker, names, preserve=preserve)
+    return (support + '#define main __oteleq_original_main\n#include ' + json.dumps(entry['path'])
+            + '\n#undef main\n' + clean + worker)
 
 
 def rename_main(source, entries, language):

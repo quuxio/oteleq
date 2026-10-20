@@ -52,6 +52,7 @@ generation-check: node-observer-check node-sequence-check java-observer-check go
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/go_receivers.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/go_graph.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/cpp_models.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/native_names.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/cpp_receivers.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/cpp_worker.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/cpp_graph.py' --fail-under=80

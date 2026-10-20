@@ -48,6 +48,8 @@ The closed registry supports native booleans and integers up to 64 bits, IEEE fl
 
 The observer uses a fixed arena without C++ dynamic allocation. It does not call overloaded address operators, getters, stream formatters or object serialisers. Exception capture is limited to exact supported standard exception classes and their standard `what()` payload; derived/custom exception accessors and other thrown values refuse capture. A thrown exception can still expose the method's preceding state mutation.
 
+After including the private application copy, the observer undefines macros for its generated code and exact compiler-bound field/type names, including Unicode identifiers. An application macro cannot replace an observation read with a getter call. Storage declarations which the compiler-backed observer cannot bind remain explicit observation gaps, including template statics; ordinary out-of-line static definitions retain their compiler-declared owner.
+
 The registry is bounded to 512 types, 256 fields per source record and 4,096 elements per array dimension. Each boundary permits 512 nodes, depth 32, 8,192 fields and 256 KiB of encoded graph data. Exception messages are bounded to 64 KiB. Exceeding a bound is incomplete evidence.
 
 Clang's complete AST JSON currently has a 64 MiB discovery budget. Large standard-library instantiations can exceed it and produce an inventory gap before fixtures are bound. A build-aware source inventory which avoids dumping all included declarations remains required for broader repository adoption.

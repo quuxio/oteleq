@@ -21,6 +21,50 @@ def entry(language, parameters=None, output="int", globals_=None):
 
 
 class NativeScalarTests(unittest.TestCase):
+    def test_out_of_line_static_keeps_its_compiler_owner_without_an_extra_gap(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            path = folder / 'source.cpp'
+            path.write_text('namespace sample {struct Counter {static int total;};\n'
+                            'int Counter::total=4;\n'
+                            'int selected(int amount){Counter::total+=amount;return Counter::total;}}\n')
+            def execute(command, cwd, **kwargs):
+                return subprocess.run(command, cwd=cwd, capture_output=True, check=False, timeout=30)
+            data = discovery.discover(path, 'cpp', folder, {'clang++': self.compiler('cpp')}, execute)
+            self.assertEqual(data['globals'], [{'name': 'sample::Counter::total', 'type': 'int'}])
+            selected = next(item for item in data['functions'] if item['name'] == 'sample::selected')
+            candidate = {**selected, 'path': path.name, 'language': 'cpp', 'globals': data['globals']}
+            self.assertEqual(gen.qualify_entry(candidate, folder, 1), 'ready')
+
+    def test_template_static_storage_cannot_disappear_from_cpp_observation_coverage(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            path = folder / 'source.cpp'
+            path.write_text('template<class T>struct Holder{inline static int state=0;};\n'
+                            'int selected(int amount){Holder<int>::state+=amount;return 7;}\n')
+            def execute(command, cwd, **kwargs):
+                return subprocess.run(command, cwd=cwd, capture_output=True, check=False, timeout=30)
+            data = discovery.discover(path, 'cpp', folder, {'clang++': self.compiler('cpp')}, execute)
+            selected = next(item for item in data['functions'] if item['name'] == 'selected')
+            candidate = {**selected, 'path': path.name, 'language': 'cpp', 'globals': data['globals']}
+            self.assertEqual(gen.qualify_entry(candidate, folder, 1), 'blocked')
+            self.assertTrue(candidate['globals'])
+            self.assertTrue(any(item.get('inaccessible') for item in candidate['globals']))
+
+    def test_source_macro_cannot_replace_a_global_read_with_an_application_callback(self):
+        source = ('#include <stdio.h>\nint state=4;int* address(){puts("OBSERVER_CALLBACK");return &state;}\n'
+                  'int selected(int amount){state+=amount;return state;}\n#define state (*address())\n')
+        for language in ('c', 'cpp'):
+            with self.subTest(language=language), tempfile.TemporaryDirectory() as temporary:
+                folder = Path(temporary)
+                candidate = entry(language, ['int'], globals_=[{'name': 'state', 'type': 'int'}])
+                compiled, binary = self.compile(folder, candidate, source, [3])
+                self.assertEqual(compiled.returncode, 0, compiled.stderr)
+                result = subprocess.run([binary], env={**os.environ, 'OTELEQ_OBSERVATION': str(folder / 'observation')},
+                                        capture_output=True, check=False, timeout=10)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout, b'')
+
     def test_thread_local_roots_cannot_trigger_application_initialisation_from_the_observer(self):
         for language in ("c", "cpp"):
             with self.subTest(language=language), tempfile.TemporaryDirectory() as temporary:

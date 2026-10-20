@@ -108,6 +108,7 @@ class Inventory:
         self.contexts: dict[str, tuple[str, ...]] = {}
         self.functions: dict[tuple[int, str, str], dict] = {}
         self.globals: dict[str, dict] = {}
+        self.global_offsets: set[int] = set()
         self.collect(document)
 
     def collect(self, node: dict, scope: tuple[str, ...] = (), inside: bool = False) -> None:
@@ -125,6 +126,7 @@ class Inventory:
             type_ = node.get("type", {})
             self.aliases["::".join((*scope, name))] = type_.get("desugaredQualType", type_.get("qualType", "unknown"))
         if original and kind == "VarDecl" and not inside and not node.get("tls"):
+            self.global_offsets.add(node['loc']['offset'])
             type_ = node.get("type", {})
             self.globals["::".join((*scope, name))] = {"scope": "::".join(scope),
                     "type": type_.get("desugaredQualType", type_.get("qualType", "unknown"))}
@@ -190,4 +192,5 @@ class Inventory:
             item["parameters"] = [self.resolve(value, scope) for value in item["parameters"]]
             item["output"] = self.resolve(item["output"], scope)
         globals_ = {name: self.resolve(item["type"], item["scope"]) for name, item in self.globals.items()}
-        return {"cpp_records": self.records, "cpp_functions": list(self.functions.values()), "cpp_globals": globals_}
+        return {"cpp_records": self.records, "cpp_functions": list(self.functions.values()), "cpp_globals": globals_,
+                "cpp_global_offsets": sorted(self.global_offsets)}
