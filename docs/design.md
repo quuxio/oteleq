@@ -6,7 +6,7 @@ oteleq generates repeatable tests and compares an application's behaviour with a
 
 Updated 19 October 2026. The [Rust workload comparator](workload-comparison.md) and [scalar generator](automatic-generation.md) are implemented. Rust owns the CLI, Rust syntax inventory, byte-channel and typed graph comparators, and standalone HTML/JUnit presentation; an embedded Python adapter host coordinates language-specific syntax discovery, harness materialisation, state capture and execution. Generated tests use standard `unittest` for all eight languages. A validated project policy freezes selection, scalar fixtures, seeded samples and execution budgets. The implementation retains workspaces until explicit cleanup and exports frozen snapshots through `export-tests`.
 
-The remaining sections describe the broader design. Full semantic/build-aware adapters, arbitrary receiver factories, stateful sequences, richer generated object/factory codecs, off/fault lanes, shrinking and production qualification remain proposed. Use the [implemented CLI reference](cli-and-configuration.md#implemented-commands) for runnable commands.
+The remaining sections describe the broader design. Full semantic/build-aware adapters, arbitrary receiver factories, stateful sequences, richer generated object/factory codecs, off/fault lanes, object/sequence shrinking and production qualification remain proposed. [Scalar shrinking](counterexample-shrinking.md) is implemented within explicit independent domains. Use the [implemented CLI reference](cli-and-configuration.md#implemented-commands) for runnable commands.
 
 ## Requirements
 

@@ -12,6 +12,7 @@ Updated 19 October 2026. `quux-oteleq` implements the commands below. The scalar
 | `generate` | `--workspace PATH` | None | Frozen concrete corpus, diagnostic harness previews and `tests/test_equivalence.py` |
 | `run` | `--workspace PATH --report-dir PATH` | None | All generated cases, complete inventory and JSON report in a new external directory |
 | `replay` | `--workspace PATH --case ID` | None | One frozen case in a new `runs/replay-*` directory inside the workspace |
+| `shrink` | `--workspace PATH --case ID --report-dir PATH` | `--trials N` | Declared-domain scalar reduction, retained trial evidence and a sealed one-case replay workspace; see [shrinking](counterexample-shrinking.md) |
 | `export-tests` | `--workspace PATH --destination PATH` | `--apply` | Copy plan by default; with `--apply`, a new runnable frozen source/suite bundle |
 | `clean` | `--workspace PATH` | None | Removes an owned workspace after checking its snapshot/suite and top-level contents |
 | `render-report` | `REPORT.json --output-dir NEW_DIRECTORY` | None | Private standalone HTML and JUnit presentation of retained generated-run evidence |

@@ -7,6 +7,8 @@ from pathlib import Path
 import random
 import struct
 
+import domains
+
 NATIVE_INTEGERS = {
     "int", "long", "short", "signed", "signed int", "long long", "unsigned", "unsigned int",
     "unsigned long", "unsigned short", "unsigned long long", "char", "signed char", "unsigned char",
@@ -159,6 +161,9 @@ def scalar_sample(name: str, language: str, rng: random.Random):
 def corpus(entry, count, seed=20261008):
     if "input_cases" in entry:
         concrete = [concrete_arguments(entry, arguments) for arguments in entry["input_cases"]]
+        if "input_domains" in entry:
+            for arguments in concrete:
+                domains.arguments(arguments, entry["input_domains"])
         if len({json.dumps(arguments) for arguments in concrete}) != len(concrete):
             raise ValueError("configured cases collapse to duplicate target representations")
         return concrete

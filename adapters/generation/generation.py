@@ -17,6 +17,7 @@ import discovery
 import harness
 import otelc_capture as capture
 import policy as project_policy
+import shrinking
 import typed_capture
 
 VERSION = 1
@@ -29,7 +30,7 @@ GENERATED_MANIFEST = 'generated-manifest.json'
 TYPED_BUNDLE = 'typed-bundle.json'
 BUILD_IDENTITIES = 'build-identities.json'
 README_FILE = 'README.txt'
-COMMANDS = ("plan", "generate", "run", "replay", "clean", "export-tests")
+COMMANDS = ("plan", "generate", "run", "replay", "clean", "export-tests", "shrink")
 
 
 def write(path, data):
@@ -251,6 +252,8 @@ def inventory_entry(function, discovered, name, language, source_hash, snapshot,
     entry["expected_baseline"] = fixture["expected_baseline"] if fixture else {"kind": "return"}
     if fixture is not None:
         entry["input_cases"] = fixture["cases"]
+        if "domains" in fixture:
+            entry["input_domains"] = fixture["domains"]
     entry["status"] = "excluded" if excluded else qualify_entry(entry, snapshot, args.cases)
     return entry
 
@@ -348,7 +351,7 @@ def decoder_files():
 
 def generator_identity():
     here = Path(__file__).parent
-    names = ("generation.py", "policy.py", "discovery.py", "harness.py", "observe.py", "node_observe.mjs", "typed_capture.py", "discover.mjs", "discover.go", "Discover.java")
+    names = ("generation.py", "policy.py", "domains.py", "shrinking.py", "discovery.py", "harness.py", "observe.py", "node_observe.mjs", "typed_capture.py", "discover.mjs", "discover.go", "Discover.java")
     files = {name: capture.file_digest(here / name) for name in names}
     files["host-python"] = capture.file_digest(Path(sys.executable))
     files["host-version"] = sys.version
@@ -739,6 +742,19 @@ def case_budget(value):
         raise argparse.ArgumentTypeError("--cases must be an integer from 1 to 1024") from error
 
 
+def trial_budget(value):
+    """Keep shrink budget errors specific to the public flag."""
+    try:
+        return project_policy.integer(int(value), 1, project_policy.MAX_CASES, "--trials")
+    except ValueError as error:
+        raise argparse.ArgumentTypeError("--trials must be an integer from 1 to 1024") from error
+
+
+def shrink(args):
+    """Use the same sealed worker and comparator for every reduction trial."""
+    return shrinking.run(args, sys.modules[__name__])
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, allow_abbrev=False)
     commands = parser.add_subparsers(dest="command", required=True)
@@ -760,9 +776,15 @@ def main(argv=None):
         elif command == "export-tests":
             sub.add_argument("--destination", type=Path, required=True)
             sub.add_argument("--apply", action="store_true")
+        elif command == "shrink":
+            sub.add_argument("--case", required=True)
+            sub.add_argument("--report-dir", type=Path, required=True)
+            sub.add_argument("--trials", type=trial_budget, default=64, metavar="N",
+                             help="candidate budget 1..1024; original and final confirmations are additional")
     args = parser.parse_args(argv)
     try:
-        return {"plan": plan, "generate": generate, "run": run, "replay": run, "clean": clean, "export-tests": export_tests}[args.command](args)
+        return {"plan": plan, "generate": generate, "run": run, "replay": run, "clean": clean,
+                "export-tests": export_tests, "shrink": shrink}[args.command](args)
     except (ValueError, OSError, KeyError, ImportError) as error:
         print("oteleq: " + str(error), file=sys.stderr)
         return 4

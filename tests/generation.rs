@@ -60,6 +60,15 @@ fn cli_embeds_generation_workers_and_exposes_subcommand_help() {
         String::from_utf8_lossy(&help.stderr)
     );
     assert!(String::from_utf8_lossy(&help.stdout).contains("--otelc-root"));
+    let shrinking = Command::new(exe)
+        .args(["shrink", "--help"])
+        .output()
+        .unwrap();
+    assert!(shrinking.status.success());
+    let shrinking = String::from_utf8_lossy(&shrinking.stdout);
+    for flag in ["--case", "--report-dir", "--trials"] {
+        assert!(shrinking.contains(flag));
+    }
     let missing_value = Command::new(exe)
         .args(["plan", "--source"])
         .output()

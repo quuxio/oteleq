@@ -7,6 +7,8 @@ from pathlib import Path
 import tomllib
 from typing import Any
 
+import domains
+
 
 LANGUAGES = ("c", "cpp", "rust", "python", "java", "javascript", "typescript", "go")
 MAX_CASES = 1024
@@ -61,7 +63,7 @@ def expected_baseline(value: Any) -> dict[str, Any]:
 def fixture(value: Any, index: int) -> dict[str, Any]:
     """Validate source-scoped concrete argument lists without executing target code."""
     label = f"fixtures[{index}]"
-    keys(value, {"function", "source", "language", "cases", "expected_baseline"}, label)
+    keys(value, {"function", "source", "language", "cases", "expected_baseline", "domains"}, label)
     function, source = value.get("function"), value.get("source", "**")
     if any(not isinstance(item, str) or not item.strip() for item in (function, source)):
         raise ValueError(f"{label} requires a function pattern and source pattern")
@@ -79,8 +81,15 @@ def fixture(value: Any, index: int) -> dict[str, Any]:
     identities = [json.dumps(arguments, ensure_ascii=True, allow_nan=False) for arguments in cases]
     if len(identities) != len(set(identities)):
         raise ValueError(f"{label} contains duplicate concrete cases")
-    return {"function": function, "source": source, "language": language, "cases": cases,
-            "expected_baseline": expected_baseline(value.get("expected_baseline", {"kind": "return"}))}
+    result = {"function": function, "source": source, "language": language, "cases": cases,
+              "expected_baseline": expected_baseline(value.get("expected_baseline", {"kind": "return"}))}
+    if "domains" in value:
+        if not isinstance(value["domains"], list):
+            raise ValueError(label + ".domains must be an array")
+        result["domains"] = [domains.validate(item) for item in value["domains"]]
+        for arguments in cases:
+            domains.arguments(arguments, result["domains"])
+    return result
 
 
 def load(path: Path | None) -> dict[str, Any]:

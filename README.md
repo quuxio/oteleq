@@ -88,6 +88,8 @@ Use repeated `--language ID`, `--exclude 'qualified.pattern'` and `--cases 1` th
 
 ### Replay, retain or incorporate
 
+For a reproducible difference, [counterexample shrinking](docs/counterexample-shrinking.md) reduces scalar inputs within explicit fixture domains and retains a sealed replay suite plus all trial evidence. It preserves the qualified failure and reports budget/incomplete-search limits.
+
 ```sh
 "$OTELEQ_CLI" replay --workspace "$OTELEQ_WORKSPACE" --case case-id-from-corpus
 
