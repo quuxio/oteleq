@@ -8,6 +8,7 @@ import random
 import struct
 
 import domains
+import node_receivers
 import python_project
 
 NATIVE_INTEGERS = {
@@ -252,7 +253,7 @@ def literal(value, type_, language):
 def global_gaps(entry):
     if entry["language"] in ("python", "javascript", "typescript"):
         gaps = [g["name"] for g in entry["globals"] if g["name"].startswith("<")]
-        if "receiver_fixture" in entry:
+        if "receiver_fixture" in entry and entry["language"] == "python":
             gaps.extend("static:" + entry["python_receiver_class"] + "." + item["name"]
                         for item in entry.get("python_class_roots", [])
                         if item["name"].startswith("<") or item["name"].startswith("__") and not item["name"].endswith("__"))
@@ -312,6 +313,8 @@ JS_OBSERVER = Path(__file__).with_name("node_observe.mjs").read_text()
 
 
 def js_driver(entry, args, source):
+    if "receiver_fixture" in entry:
+        return node_receivers.driver(entry, args, source)
     roots = "".join(json.dumps("global:" + g["name"]) + ":" + g["name"] + "," for g in entry["globals"])
     # Capture the hoisted declaration before application statements can rebind
     # it, retaining hashbang/directive syntax at the parser-selected position.

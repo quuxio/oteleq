@@ -15,6 +15,7 @@ import uuid
 
 import discovery
 import harness
+import node_receivers
 import otelc_capture as capture
 import policy as project_policy
 import python_project
@@ -236,10 +237,16 @@ def is_entrypoint(function, language):
 def receiver_fixture(entry, discovered, declared):
     """Bind one reviewed factory to its source declaration and concrete arguments."""
     try:
-        if entry["language"] != "python" or "python_receiver_class" not in entry:
-            raise ValueError("receiver fixtures currently require an ordinary Python instance method")
+        owner = entry.get("python_receiver_class") if entry["language"] == "python" else entry.get("node_receiver_class")
+        if not owner or entry["language"] not in ("python", "javascript", "typescript"):
+            raise ValueError("receiver fixtures currently require an ordinary Python or JavaScript/TypeScript instance method")
+        if entry["language"] != "python" and not entry["node_receiver_eligible"]:
+            raise ValueError(entry["node_receiver_reason"])
+        entry["receiver_class"] = owner
+        if entry["language"] != "python":
+            entry["node_class_label"] = entry["otelc_function"].rsplit(".", 1)[0]
         factory, kind = receiver_factory(entry, discovered, declared["factory"])
-        arguments = harness.concrete_arguments({"language": "python", "parameters": factory["parameters"]}, declared["arguments"])
+        arguments = harness.concrete_arguments({"language": entry["language"], "parameters": factory["parameters"]}, declared["arguments"])
         entry["receiver_fixture"] = {"factory": factory["name"], "line": factory["line"],
                                      "kind": kind, "source_function": factory["source_function"],
                                      "arguments": arguments, "arguments_requested": declared["arguments"],
@@ -253,6 +260,8 @@ def receiver_fixture(entry, discovered, declared):
 
 def receiver_factory(entry, discovered, name):
     """Use a source constructor directly or one explicitly selected ordinary factory."""
+    if entry["language"] != "python":
+        return node_receivers.factory(entry, discovered, name)
     constructor = name == entry["python_receiver_class"]
     qualified = name + ".__init__" if constructor else name
     matches = [item for item in discovered["functions"] if item["name"] == qualified]
@@ -401,7 +410,7 @@ def decoder_files():
 
 def generator_identity():
     here = Path(__file__).parent
-    names = ("generation.py", "policy.py", "domains.py", "shrinking.py", "python_project.py", "discovery.py", "harness.py", "observe.py", "node_observe.mjs", "typed_capture.py", "discover.mjs", "discover.go", "Discover.java")
+    names = ("generation.py", "policy.py", "domains.py", "shrinking.py", "python_project.py", "node_receivers.py", "discovery.py", "harness.py", "observe.py", "node_observe.mjs", "typed_capture.py", "discover.mjs", "discover.go", "Discover.java")
     files = {name: capture.file_digest(here / name) for name in names}
     files["host-python"] = capture.file_digest(Path(sys.executable))
     files["host-version"] = sys.version
