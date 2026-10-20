@@ -102,7 +102,10 @@ def strict_json(data):
 
 
 OTELC_CLI_PATH = "target/debug/quux-otelc"
-RUST_BUILD_FILENAME = "build.json"
+BUILD_FILENAME = "build.json"
+RECIPE_FILENAME = "recipe.json"
+GO_MODULE_FILENAME = "go.mod"
+GO_ADAPTER_DIRECTORY = "adapters/go"
 
 
 def digest(data):
@@ -233,7 +236,7 @@ def build(command, workspace, environment, output):
 RUST_BASELINE_FLAGS = ("--edition=2024", "-O", "-g")
 RUST_LLVM_BASELINE_FLAGS = (*RUST_BASELINE_FLAGS, "-Zmir-enable-passes=-Inline,-ForceInline", "-Ccodegen-units=1")
 RUST_PROFILE_FILENAME = "target/debug/otelc-rust-llvm.json"
-RUST_PLAN_FILENAME = "plan.json"
+PLAN_FILENAME = "plan.json"
 
 
 def rust_flags(backend: str) -> tuple[str, ...]:
@@ -302,11 +305,11 @@ def rust_llvm_inputs(root: Path, tools: dict[str, Path]) -> list[Path]:
 
 def rust_metadata(bundle: Path, backend: str = "compiler") -> dict:
     """Read only fixed bundle files and reject an unqualified schema/flag contract."""
-    for name in ("application", RUST_PLAN_FILENAME, RUST_BUILD_FILENAME):
+    for name in ("application", PLAN_FILENAME, BUILD_FILENAME):
         path = bundle / name
         if path.is_symlink() or not path.is_file():
             raise ValueError("Rust build bundle needs regular application/plan/build files")
-    metadata_path = bundle / RUST_BUILD_FILENAME
+    metadata_path = bundle / BUILD_FILENAME
     if metadata_path.stat().st_size > 4 * 1024 * 1024:
         raise ValueError("Rust build metadata exceeds its size limit")
     metadata = strict_json(metadata_path.read_text())
@@ -480,7 +483,7 @@ def rust_llvm_manifest(root: Path, workspace: Path, source: Path, bundle: Path, 
               "resolved_sha256": file_digest(bundle / "resolved.json")}
     if not isinstance(hook, dict) or hook != hashes:
         raise ValueError("Rust LLVM profile, plugin or compiler evidence identity differs")
-    plan = build_document(bundle / RUST_PLAN_FILENAME)
+    plan = build_document(bundle / PLAN_FILENAME)
     if (type(plan.get("schema_version")) is not int or plan["schema_version"] != 2
             or plan.get("backend") != "llvm" or plan.get("language") != "rust"
             or plan.get("functions") != {"include": [expected_function], "exclude": []}
@@ -501,7 +504,7 @@ def rust_manifest(root: Path, workspace: Path, source: Path, bundle: Path, tools
     compiler = rust_compiler(metadata, tools, backend)
     assets = rust_profile(root, tools) if backend == "llvm" else None
     expected = {"executable_sha256": file_digest(bundle / "application"),
-                "plan_sha256": file_digest(bundle / RUST_PLAN_FILENAME),
+                "plan_sha256": file_digest(bundle / PLAN_FILENAME),
                 "source_sha256": file_digest(source),
                 "sdk_sha256": file_digest(assets["sdk"] if assets else root / "target/debug/libquux_otelc_rust.rlib"),
                 "adapter_sha256": file_digest(root / "target/debug/otelc-rust-adapter")}
@@ -510,7 +513,7 @@ def rust_manifest(root: Path, workspace: Path, source: Path, bundle: Path, tools
             or metadata.get("source_root") != str(workspace.resolve())):
         raise ValueError("Rust build source, executable, policy or provider identity changed")
     hook = rust_llvm_manifest(root, workspace, source, bundle, metadata, tools, assets, expected_function, environment) if assets else {}
-    return {**expected, "manifest_sha256": file_digest(bundle / RUST_BUILD_FILENAME),
+    return {**expected, "manifest_sha256": file_digest(bundle / BUILD_FILENAME),
             "baseline_flags": list(rust_flags(backend)), "compiler": compiler, **hook}
 
 
@@ -538,7 +541,7 @@ def rust_command(root, workspace, source, policy, tools, environment, evidence, 
 
 GO_COMPILER_ENV = ("GOVERSION", "GOROOT", "GOTOOLDIR", "GOOS", "GOARCH", "GOAMD64", "GOARM64",
                    "GOEXPERIMENT", "GOFLAGS", "CGO_ENABLED", "GOWORK")
-GO_REQUIRED_FILES = {"baseline", "application", "plan.json", "recipe.json", "baseline.mod", "go.mod",
+GO_REQUIRED_FILES = {"baseline", "application", PLAN_FILENAME, RECIPE_FILENAME, "baseline.mod", GO_MODULE_FILENAME,
                      "overlay.json", "modules-original.json", "modules-instrumented.json",
                      "baseline-build.stdout", "baseline-build.stderr", "baseline-build.status",
                      "instrumented-build.stdout", "instrumented-build.stderr", "instrumented-build.status"}
@@ -568,7 +571,7 @@ def go_compiler(workspace: Path, tools: dict, environment: dict, evidence: Path)
 
 def go_bundle_file(bundle: Path, name: str, expected: str) -> None:
     """Read bounded regular bundle files; names never become launch arguments."""
-    go_require(type(name) is str and 0 < len(name) <= 200 and name not in (".", "..", "build.json")
+    go_require(type(name) is str and 0 < len(name) <= 200 and name not in (".", "..", BUILD_FILENAME)
                and not any(char in name for char in ("/", "\\", "\x00")), "unsafe bundle file name")
     go_require(type(expected) is str and re.fullmatch("[0-9a-f]{64}", expected), "invalid bundle file digest")
     path = bundle / name
@@ -580,14 +583,14 @@ def go_bundle_file(bundle: Path, name: str, expected: str) -> None:
 
 def go_files(root: Path, bundle: Path) -> dict:
     """Check the fixed versioned manifest and retain both executable identities."""
-    metadata = build_document(bundle / "build.json")
+    metadata = build_document(bundle / BUILD_FILENAME)
     go_require(set(metadata) == {"schema_version", "language", "backend", "adapter_sha256", "files"}, "manifest fields differ")
     go_require(type(metadata["schema_version"]) is int and metadata["schema_version"] == 1
                and metadata["language"] == "go" and metadata["backend"] == "compile", "unsupported manifest schema/backend")
     go_require(metadata["adapter_sha256"] == file_digest(root / "adapters/go/build/otelc-go"), "adapter identity differs")
     files = metadata["files"]
     go_require(type(files) is dict and GO_REQUIRED_FILES <= set(files) and len(files) <= 65536, "incomplete bundle inventory")
-    go_require({path.name for path in bundle.iterdir()} == set(files) | {"build.json"}, "unlisted bundle contents")
+    go_require({path.name for path in bundle.iterdir()} == set(files) | {BUILD_FILENAME}, "unlisted bundle contents")
     for name, expected in files.items():
         go_bundle_file(bundle, name, expected)
     for lane in ("baseline", "instrumented"):
@@ -600,8 +603,8 @@ def go_inputs(recipe: dict, source: Path, original: str, root: Path) -> None:
     inputs = recipe.get("inputs")
     go_require(type(inputs) is dict and 0 < len(inputs) <= 65536, "missing source/dependency inputs")
     required = {str(source.resolve()): original}
-    for name in ("go.mod", "go.sum", "policy/policy.go"):
-        path = root / "adapters/go" / name
+    for name in (GO_MODULE_FILENAME, "go.sum", "policy/policy.go"):
+        path = root / GO_ADAPTER_DIRECTORY / name
         required[str(path.resolve())] = file_digest(path)
     go_require(all(inputs.get(name) == {"sha256": expected} for name, expected in required.items()), "source or SDK input binding differs")
     for name, identity in inputs.items():
@@ -619,18 +622,18 @@ def go_inputs(recipe: dict, source: Path, original: str, root: Path) -> None:
 
 def go_recipe(root: Path, workspace: Path, source: Path, bundle: Path, compiler: dict, original: str) -> dict:
     """Cross-check recipe identity; paths/flags in evidence never select execution."""
-    recipe = build_document(bundle / "recipe.json")
+    recipe = build_document(bundle / RECIPE_FILENAME)
     go_require(type(recipe.get("schema_version")) is int and recipe["schema_version"] == 1, "unsupported recipe schema")
     go_require(recipe.get("source_root") == str(workspace.resolve())
                and recipe.get("target") == str(source.resolve())
-               and recipe.get("sdk_root") == str((root / "adapters/go").resolve()), "source/root/SDK binding differs")
+               and recipe.get("sdk_root") == str((root / GO_ADAPTER_DIRECTORY).resolve()), "source/root/SDK binding differs")
     go_require(recipe.get("compiler") == compiler, "selected compiler provenance differs")
     baseline = recipe.get("baseline_argv")
     go_require(type(baseline) is list and len(baseline) == 6 and all(type(arg) is str for arg in baseline), "missing compiler recipe")
     private = Path(baseline[4]).parent
     go_require(private.is_absolute(), "compiler output provenance must be absolute")
     go_require(baseline == ["build", "-mod=readonly", "-modfile=" + str(private / "baseline.mod"), "-o", str(private / "baseline"), str(source.resolve())], "baseline compiler flags differ")
-    go_require(recipe.get("instrumented_argv") == ["build", "-mod=mod", "-modfile=" + str(private / "go.mod"), "-overlay=" + str(private / "overlay.json"), "-o", str(private / "application"), str(source.resolve())], "instrumented compiler flags differ")
+    go_require(recipe.get("instrumented_argv") == ["build", "-mod=mod", "-modfile=" + str(private / GO_MODULE_FILENAME), "-overlay=" + str(private / "overlay.json"), "-o", str(private / "application"), str(source.resolve())], "instrumented compiler flags differ")
     go_inputs(recipe, source, original, root)
     for name in ("baseline_build_info", "instrumented_build_info"):
         info = recipe.get(name)
@@ -640,7 +643,7 @@ def go_recipe(root: Path, workspace: Path, source: Path, bundle: Path, compiler:
 
 def go_plan(bundle: Path, requested: dict) -> None:
     """Bind the resolved selection and build-time tracing to the caller's policy."""
-    resolved = build_document(bundle / "plan.json")
+    resolved = build_document(bundle / PLAN_FILENAME)
     go_require(type(resolved.get("schema_version")) is int and resolved["schema_version"] == 2
                and resolved.get("language") == "go" and resolved.get("backend") == "compile", "resolved policy is unsupported")
     for section in ("sources", "functions"):
@@ -667,7 +670,7 @@ def go_graphs(root: Path, bundle: Path) -> None:
     go_require(mains[0] == mains[1] and graphs[0]["Settings"] == graphs[1]["Settings"], "module or language defaults changed")
     sdk = graphs[1]["Modules"].get("io.quux.otelc/go", {})
     replacement = sdk.get("Replace") if type(sdk) is dict else None
-    go_require(type(replacement) is dict and replacement.get("Path") == str((root / "adapters/go").resolve())
+    go_require(type(replacement) is dict and replacement.get("Path") == str((root / GO_ADAPTER_DIRECTORY).resolve())
                and replacement.get("ModHash") == file_digest(root / "adapters/go/go.mod"), "SDK module replacement differs")
 
 
@@ -711,8 +714,8 @@ def go_commands(root, workspace, source, policy, tools, environment, evidence):
     go_graphs(root, bundle)
     dependencies = go_dependency_identity(recipe, compiler, workspace, evidence)
     identities = {"baseline": metadata["files"]["baseline"], "application": metadata["files"]["application"],
-                  "manifest_sha256": file_digest(bundle / "build.json"), "recipe_sha256": file_digest(bundle / "recipe.json"),
-                  "plan_sha256": metadata["files"]["plan.json"], "compiler": compiler, "source_sha256": original,
+                  "manifest_sha256": file_digest(bundle / BUILD_FILENAME), "recipe_sha256": file_digest(bundle / RECIPE_FILENAME),
+                  "plan_sha256": metadata["files"][PLAN_FILENAME], "compiler": compiler, "source_sha256": original,
                   "policy_sha256": digest(policy_bytes), "loaded_input_count": len(recipe["inputs"]),
                   "dependency_sha256": dependencies}
     (evidence / "go-build-identities.json").write_text(json.dumps(identities, indent=2) + "\n")
