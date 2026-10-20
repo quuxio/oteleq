@@ -144,6 +144,22 @@ def refusal_controls(cli, provider, folder):
     return 1
 
 
+def required_receiver_control(cli, destination, report):
+    """Keep nodes reachable through a returned alias, isolating the missing root."""
+    identity=next(case for case in report['cases'] if case['function'].endswith('.identity'))
+    bundle=json.loads((destination/'comparison'/identity['case']/'typed-bundle.json').read_text())
+    for lane in ('baseline','instrumented_on'):
+        for attempt in bundle['cases'][0][lane]:
+            roots=attempt['observation']['outcome']['graph']['roots']
+            assert roots['result']==roots['receiver']
+            roots.pop('receiver')
+    altered=destination/'altered-required-receiver-root.json'
+    altered.write_text(json.dumps(bundle))
+    observed=json.loads(command([cli,'compare-observations',altered],destination,'altered-required-receiver-root',expected=3))
+    assert observed['verdict']=='inconclusive'
+    assert 'requested roots' in json.dumps(observed) and 'receiver' in json.dumps(observed)
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--otelc-root',type=Path,required=True)
@@ -177,13 +193,7 @@ def main():
     replay=json.loads(command([cli,'replay','--workspace',Path(shrink['workspace']),'--case',target['case']],destination,'shrunk-replay',expected=1))
     launches+=check_report(Path(replay['report']),1)
     refused_launches=refusal_controls(cli,provider,destination)
-    bundle=json.loads((destination/'comparison'/target['case']/'typed-bundle.json').read_text())
-    for lane in ('baseline','instrumented_on'):
-        for attempt in bundle['cases'][0][lane]:
-            attempt['observation']['after']['roots'].pop('receiver')
-    altered=destination/'altered-receiver-root.json'
-    altered.write_text(json.dumps(bundle))
-    command([cli,'compare-observations',altered],destination,'altered-receiver-root',expected=2)
+    required_receiver_control(cli,destination,report)
     command([cli,'render-report',destination/'comparison/report.json','--output-dir',destination/'presentation'],destination,'presentation',expected=1)
     for path in [workspace,exported,Path(shrink['workspace'])]:
         plan=json.loads((path/'plan.json').read_text())

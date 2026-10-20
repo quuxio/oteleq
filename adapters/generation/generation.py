@@ -292,6 +292,13 @@ def inventory_entry(function, discovered, name, language, source_hash, snapshot,
         except ValueError as error:
             entry["reason"] = entry["reason"] or str(error)
     fixture = project_policy.matching_fixture(entry, args.configuration) if not excluded else None
+    configure_fixture(entry, discovered, fixture)
+    entry["status"] = "excluded" if excluded else qualify_entry(entry, snapshot, args.cases)
+    return entry
+
+
+def configure_fixture(entry, discovered, fixture):
+    """Keep reviewed input, receiver and expected-outcome declarations together."""
     entry["expected_baseline"] = fixture["expected_baseline"] if fixture else {"kind": "return"}
     if fixture is not None:
         entry["input_cases"] = fixture["cases"]
@@ -299,8 +306,6 @@ def inventory_entry(function, discovered, name, language, source_hash, snapshot,
             receiver_fixture(entry, discovered, fixture["receiver"])
         if "domains" in fixture:
             entry["input_domains"] = fixture["domains"]
-    entry["status"] = "excluded" if excluded else qualify_entry(entry, snapshot, args.cases)
-    return entry
 
 
 def inventory_tree(contents, root, snapshot, workspace, args):
@@ -423,6 +428,18 @@ def load_workspace(path, generated=False):
     return workspace, data
 
 
+def generation_case(entry, index, values):
+    """Bind the concrete method and construction inputs into one corpus identity."""
+    case = {"id": entry["id"] + "-" + str(index), "function_id": entry["id"],
+            "arguments": values, "argument_types": entry["parameters"],
+            "expected_baseline": entry["expected_baseline"]}
+    if "input_cases" in entry:
+        case["arguments_requested"] = entry["input_cases"][index]
+    if "receiver_fixture" in entry:
+        case["receiver_fixture"] = entry["receiver_fixture"]
+    return case
+
+
 def generate(args):
     workspace, data = load_workspace(args.workspace)
     destination = workspace / "tests"
@@ -431,14 +448,7 @@ def generate(args):
     for entry in data["inventory"]:
         if entry["status"] == "ready":
             for index, values in enumerate(harness.corpus(entry, data["cases_per_function"])):
-                case = {"id": entry["id"] + "-" + str(index), "function_id": entry["id"],
-                        "arguments": values, "argument_types": entry["parameters"],
-                        "expected_baseline": entry["expected_baseline"]}
-                if "input_cases" in entry:
-                    case["arguments_requested"] = entry["input_cases"][index]
-                if "receiver_fixture" in entry:
-                    case["receiver_fixture"] = entry["receiver_fixture"]
-                cases.append(case)
+                cases.append(generation_case(entry, index, values))
     write(destination / "corpus.json", cases)
     if len(cases) > 1024:
         raise ValueError("generation exceeds 1024 concrete cases; reduce --cases or use explicit exclusions")

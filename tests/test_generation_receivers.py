@@ -21,6 +21,7 @@ import observe
 import policy
 import shrinking
 import typed_capture
+import qualify_receivers
 
 SOURCE = '''class Counter:
  def __init__(self,start:int):
@@ -275,6 +276,29 @@ def outer():
                 altered = copy.deepcopy(corpus[0])
                 altered['receiver_fixture']['arguments'] = [11]
                 self.assertNotEqual(gen.identity(altered), gen.identity(corpus[0]))
+
+    def test_missing_receiver_control_preserves_node_reachability_and_checks_the_reason(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            case = folder/'comparison/case'
+            case.mkdir(parents=True)
+            roots = {'receiver': {'kind': 'reference', 'node_id': 'n0'},
+                     'result': {'kind': 'reference', 'node_id': 'n0'}}
+            attempt = {'observation': {'outcome': {'graph': {'roots': roots}}}}
+            bundle = {'cases': [{'baseline': [copy.deepcopy(attempt)], 'instrumented_on': [copy.deepcopy(attempt)]}]}
+            (case/'typed-bundle.json').write_text(json.dumps(bundle))
+            report = {'cases': [{'function': 'Counter.identity', 'case': 'case'}]}
+            result = json.dumps({'verdict': 'inconclusive', 'reasons': ['requested roots receiver; captured result']})
+            with patch.object(qualify_receivers, 'command', return_value=result):
+                qualify_receivers.required_receiver_control(Path('cli'), folder, report)
+            altered = json.loads((folder/'altered-required-receiver-root.json').read_text())
+            for lane in ('baseline', 'instrumented_on'):
+                observed = altered['cases'][0][lane][0]['observation']['outcome']['graph']['roots']
+                self.assertNotIn('receiver', observed)
+                self.assertEqual(observed['result']['node_id'], 'n0')
+            with patch.object(qualify_receivers, 'command', return_value=json.dumps({'verdict':'inconclusive','reasons':['another cause']})):
+                with self.assertRaises(AssertionError):
+                    qualify_receivers.required_receiver_control(Path('cli'), folder, report)
 
 
 if __name__ == '__main__':
