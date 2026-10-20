@@ -10,7 +10,7 @@ def identifiers(code: str, names: Iterable[str] = ()) -> set[str]:
         for part in name.split('::'):
             # Clang already validated source names. Avoid Python's different
             # Unicode tables and retain Clang's supported dollar identifiers.
-            if part and re.fullmatch(r'(?:[A-Za-z_$]|[^\x00-\x7f])(?:[\w$]|[^\x00-\x7f])*', part, re.ASCII):
+            if part and re.fullmatch(r'[A-Za-z_$\u0080-\U0010ffff][\w$\u0080-\U0010ffff]*', part, re.ASCII):
                 result.add(part)
     return result
 

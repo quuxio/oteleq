@@ -10,9 +10,9 @@ import native_names
 class NativeNameTests(unittest.TestCase):
     def test_exact_compiler_names_keep_unicode_and_dollar_spellings(self):
         actual = native_names.identifiers('int main(){return selected(value);}',
-            ['scope::\u6570\u636e', 'dollar$slot', '$root', 'operator()', 'bad-name', 'Thing<int>', ''])
+            ['scope::\u6570\u636e', '\U00020000', 'dollar$slot', '$root', 'operator()', 'bad-name', 'Thing<int>', ''])
         self.assertEqual(actual, {'int', 'main', 'return', 'selected', 'value',
-                                  'scope', '\u6570\u636e', 'dollar$slot', '$root'})
+                                  'scope', '\u6570\u636e', '\U00020000', 'dollar$slot', '$root'})
 
     def test_cleanup_is_sorted_unique_and_preserves_only_owned_macros(self):
         self.assertEqual(native_names.undefinitions('owned(z); z(); a();',
