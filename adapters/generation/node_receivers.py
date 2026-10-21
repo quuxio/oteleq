@@ -55,7 +55,7 @@ def driver(entry: dict, arguments: list, source: str, sequence: list | None = No
     if fixture["kind"] == "function":
         valid_binding += "&&" + factory_name + "===__oteleqFactory"
     invoke = ("__oteleqSequence.runSequence" if sequence is not None else "__oteleqObserver.runReceiver") + "(__oteleqClass,__oteleqCall,__oteleqRoots,()=>" + valid_binding + ")"
-    start = "void(async()=>{\n" if commonjs else ""
+    start = "\n;void(async()=>{\n" if commonjs else ""
     finish = "})();\n" if commonjs else ""
     return raw.decode() + start + f'''
 const __oteleqArguments={json.dumps(arguments)};

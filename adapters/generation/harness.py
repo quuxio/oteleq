@@ -340,7 +340,7 @@ def js_driver(entry, args, source):
                 else "await import(" + json.dumps(helper) + ")")
     capture = (";const __oteleqSelected=" + entry["name"] + ";\nconst __oteleqObserver=" + observer + ";\n").encode()
     source = (raw[:position] + capture + raw[position:]).decode()
-    start, finish = ("void(async()=>{\n", "})();\n") if commonjs else ("", "")
+    start, finish = ("\n;void(async()=>{\n", "})();\n") if commonjs else ("", "")
     return source + start + f'''
 const __oteleqArguments={json.dumps(args)};
 const __oteleqRoots=()=>({{{roots}arguments:__oteleqArguments}});

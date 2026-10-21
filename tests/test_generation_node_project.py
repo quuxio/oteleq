@@ -164,7 +164,8 @@ class NodeProjectTests(unittest.TestCase):
                     (folder / "package.json").write_text(json.dumps({"type": kind}))
                 source = folder / ("sample" + suffix)
                 source.write_text('"use strict";\nlet state=2;\nfunction sample(value){state+=value;return state+value;}\n'
-                                  'console.log(typeof require=== "function"?"commonjs":"module");\n')
+                                  'console.log(typeof require=== "function"?"commonjs":"module");\n'
+                                  '// trailing source comment without a final newline')
                 language = "typescript" if suffix in (".cts", ".mts") else "javascript"
                 baseline = execute([NODE, source], folder)
                 self.assertEqual(baseline.returncode, 0, baseline.stderr)
@@ -224,7 +225,8 @@ class NodeProjectTests(unittest.TestCase):
     def test_actual_parser_and_loader_bind_commonjs_receiver_class_callers(self):
         source = self.project / "sample.js"
         source.write_text('class Counter {static total=2;constructor(start){this.value=start;}'
-                          'add(amount){this.value+=amount;Counter.total+=amount;return this.value;}}\n')
+                          'add(amount){this.value+=amount;Counter.total+=amount;return this.value;}}\n'
+                          '// trailing source comment without a final newline')
         parsed = generation.discovery.discover(source, "javascript", self.provider, {"javascript": NODE}, execute)
         parsed["entrypoints"] = []
         parsed["node_context"] = self.inspect(source)

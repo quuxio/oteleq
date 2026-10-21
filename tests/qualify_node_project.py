@@ -41,6 +41,7 @@ def fixture(context: tuple, *, receiver: bool = False, different: bool = False) 
         result = "7" if different else "state+n"
         source = "let state=2;\n" + prefix + "function selected(n" + annotation + "){state+=n" + extra + ";return " + result + ";}\n"
     source += 'console.log(typeof require==="function"?"commonjs":"module");\n'
+    source += '// trailing source comment without a final newline'
     package_text = json.dumps({"type": package_type}) + "\n" if package_type else None
     spec = {"context": name, "filename": "sample" + suffix, "language": language,
             "format": module_format, "receiver": receiver, "different": different,
@@ -235,7 +236,7 @@ def rebound_refusal(cli: Path, provider: Path, destination: Path) -> dict:
     """Startup rebinding cannot substitute a different callable for the source body."""
     spec, source, package = fixture(CONTEXTS[4])
     folder = destination / "rebound-callable"
-    source += "selected=()=>99;\n"
+    source += "\nselected=()=>99;\n"
     workspace = prepare(cli, provider, folder, spec, source, package)
     comparison = folder / "comparison"
     command([cli, "run", "--workspace", workspace, "--report-dir", comparison], folder, "run", expected=4)
