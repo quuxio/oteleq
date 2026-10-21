@@ -19,7 +19,7 @@ def require(condition: bool, reason: str) -> None:
 
 def path_list(value: object, label: str, *, relative: bool) -> list[str]:
     """Configuration paths are literal inputs, never JVM options or globs."""
-    if type(value) is not list:
+    if not isinstance(value, list):
         raise ValueError("Java project: invalid " + label)
     require(len(value) <= MAX_ENTRIES, "invalid " + label)
     result = []

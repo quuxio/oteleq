@@ -43,6 +43,26 @@ Runtime classpaths contain the compiled application first, followed by the decla
 
 The claim remains **equivalence over these tests and observations**. Compiling a sibling source or loading a dependency does not add its globals to the selected method's observation scope. Existing scalar and declared receiver codecs retain their own limits. Private diagnostic callers do not qualify a different shipping artefact.
 
+Private file paths and resource URL strings are compared literally. They can vary across independent attempts and make the result inconclusive; the runner does not normalise them.
+
 Named Java modules, module-path builds, multi-release JARs, arbitrary compiler/JVM flags, annotation processing, Maven/Gradle build execution and custom classloader qualification remain open. SDK/runtime compatibility requires actual-provider qualification; passing compiler regressions alone is insufficient.
 
 `make check` covers real JDK compilation, actual JAR/directory class reads, generated source roots, resource loading, loaded origins, large internal JARs, detached context, source/dependency mutation controls and guarded cleanup. `java_project.py` and `java_classpath.py` each have an 80% line-coverage floor. Prepared-provider capability probes are sealed, exported and checked before cleanup, including when the original application is unavailable.
+
+## Reproduce actual-provider qualification
+
+With matching prebuilt SDK products and a complete JDK 21, run:
+
+```sh
+make generation-java-project-otelc \
+  JAVA_BACKEND=prepared JAVA_PROFILE=safe-methods-v1 \
+  PYTHON=/absolute/path/to/qualified/python \
+  OTELC_ROOT=/absolute/path/to/prepared-sdk \
+  REPORT_DIR=/absolute/path/to/new-qualification
+```
+
+Use `JAVA_BACKEND=legacy` with the separately qualified pre-rebuild provider. The qualifier does not select a provider or profile from filenames.
+
+The four-case corpus covers ordinary static calls, private receiver construction, JAR and directory resource reads, and a deliberate same-return global-state difference. It checks complete independent values in every repeat, direct execution, per-case replay, generated and detached exported suites, and scalar reduction from seven to zero. Separate controls reject changed source/dependencies/probes, rehashed compiler reads/options, changed resource bytes and altered loaded origins. Retained evidence checks distinguish original application JVMs from copied reduction records. Prepared runs also verify actual PID, policy/service/function identities, cumulative function metrics and direct final health/export accounting against decoded OTLP.
+
+The result applies to the recorded CLI, provider, platform, inputs and observations. Passing a maintained recipe on another provider requires a new qualification record.
