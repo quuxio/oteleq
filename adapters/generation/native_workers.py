@@ -59,6 +59,27 @@ def copied_value(expression: str, type_: str, language: str) -> str:
             'return sizeof(__oteleq_value);\n')
 
 
+def invocation(entry: dict, args: list) -> str:
+    """Freeze one exact scalar signature and its concrete invocation inputs."""
+    language = entry['language']
+    linkage = 'extern "C" ' if language == 'cpp' else ''
+    parameters = ','.join(harness.native_literal(value, harness.scalar_type(type_), language)
+                          for value, type_ in zip(args, entry['parameters']))
+    name = ('::' if language == 'cpp' else '') + entry['name']
+    signature = entry['output'] + '(*)(' + (','.join(entry['parameters']) or 'void') + ')'
+    if language == 'cpp':
+        binding = 'auto __oteleq_selected=static_cast<' + signature + '>(&' + name + ');\n'
+    else:
+        binding = ('_Static_assert(__builtin_types_compatible_p(__typeof__(&' + name + '),' +
+                   signature + '),"call type changed");\n' + entry['output'] +
+                   ' (*__oteleq_selected)(' + (','.join(entry['parameters']) or 'void') + ')=&' + name + ';\n')
+    call = '__oteleq_selected(' + parameters + ')'
+    returned = call + ';return 0;\n' if entry['output'] == 'void' else copied_value(
+        call, harness.scalar_type(entry['output']), language)
+    return (linkage + 'unsigned long long __oteleq_invoke(unsigned char* __oteleq_out){\n' +
+            binding + returned + '}\n')
+
+
 def application_helpers(entry: dict, args: list, key: str) -> str:
     """Append header-free accessors after the original application bytes."""
     language = entry['language']
@@ -73,21 +94,7 @@ def application_helpers(entry: dict, args: list, key: str) -> str:
                          type_check(expression, item['type'], language) + '\n' +
                          copied_value(expression, item['type'], language) + '}\n')
     if key == entry['unit']:
-        parameters = ','.join(harness.native_literal(value, harness.scalar_type(type_), language)
-                              for value, type_ in zip(args, entry['parameters']))
-        name = ('::' if language == 'cpp' else '') + entry['name']
-        signature = entry['output'] + '(*)(' + (','.join(entry['parameters']) or 'void') + ')'
-        if language == 'cpp':
-            binding = 'auto __oteleq_selected=static_cast<' + signature + '>(&' + name + ');\n'
-        else:
-            binding = ('_Static_assert(__builtin_types_compatible_p(__typeof__(&' + name + '),' +
-                       signature + '),"call type changed");\n' + entry['output'] +
-                       ' (*__oteleq_selected)(' + (','.join(entry['parameters']) or 'void') + ')=&' + name + ';\n')
-        call = '__oteleq_selected(' + parameters + ')'
-        returned = call + ';return 0;\n' if entry['output'] == 'void' else copied_value(
-            call, harness.scalar_type(entry['output']), language)
-        functions.append(linkage + 'unsigned long long __oteleq_invoke(unsigned char* __oteleq_out){\n' +
-                         binding + returned + '}\n')
+        functions.append(invocation(entry, args))
     code = ''.join(functions)
     names = [entry['name'], *(item['expression'] for item in entry['globals']),
              *entry['parameters'], entry['output'], *(item['type'] for item in entry['globals'])]
