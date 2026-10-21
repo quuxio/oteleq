@@ -35,7 +35,7 @@ Each successful compilation retains the following outside the private applicatio
 | `prepared-application.json` | Schema-1 main class, classpath and source/class bindings |
 | `build-identities.json` | Complete private source/product inventories and retained metadata hashes |
 
-The prepared manifest follows the replacement otelc SDK's published Java input format. The public loader is checked separately against an immutable SDK source revision; that read-only check starts no application JVM. Producing it does not make the generic generator compatible with that SDK's runtime, health or live controls. Generated paired execution continues to require the [qualified pre-rebuild provider](automatic-generation.md#build-and-run). Replacement-SDK runtime integration and invocation attribution remain open.
+The prepared manifest follows the replacement otelc SDK's published Java input format. Its public loader was first checked separately against an immutable SDK source revision without starting an application JVM. The optional [prepared provider](java-prepared-provider.md) now uses that manifest through ordinary generated paired execution, with independent argv, loaded-origin, PID and direct health/OTLP checks. The default Java backend retains the pre-rebuild provider contract. Live-control sequences and invocation-scoped attribution remain open.
 
 ## Validation
 

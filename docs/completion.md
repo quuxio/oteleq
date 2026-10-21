@@ -4,6 +4,8 @@ The goal is to finish the application described in the [design](design.md) and [
 
 This checklist records the acceptance boundary. A row becomes complete only after implementation, negative controls, source preservation, current documentation and published exact-revision evidence cover the whole requirement. Optional features remain explicitly optional; unavailable requested capabilities remain visible.
 
+Java now has an explicit [prepared SDK provider](java-prepared-provider.md) for the existing generated diagnostic workers, with compiler/launch/origin checks, actual PID and direct final health/decoded OTLP receipt. This advances runtime integration; live metric-control sequences, invocation attribution, broader Java builds and the replacement SDK's other language implementations remain open. It does not complete any broader row by itself.
+
 Instrumentation and its generated bootstraps/extensions/probes must require no application or dependency coding changes. Users supply common configuration and build/launch setup. Live metric controls require one unchanged application process and build: collection and emission change independently and together, with actual collection suppression distinguished from exporter/network suppression and tracing verified unaffected.
 
 | Requirement | Current evidence and remaining work |

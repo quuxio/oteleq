@@ -1,0 +1,176 @@
+{
+  "qualification_schema_version": 1,
+  "date": "2026-10-21",
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "platform": {
+    "os": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+    "architecture": "arm64",
+    "jdk": "21.0.12.1"
+  },
+  "runtime": {
+    "runtime_commit": "fae38740673de0405186662e7b861ca4f75c8c96",
+    "cli_sha256": "7672545c743269cef94d0983ee3df9bad5ddb5013ea1b00a68cccabcd4da810e",
+    "provider_commit": "f3279fdff099e9f2406c122fc5c3b6ae4ba4f84f",
+    "provider_archive_sha256": "5347cf89b04adb0bd72b3aa7a31e249abafbfb967423fe38a3cda95dd2c63d70"
+  },
+  "provider": {
+    "sdk_commit": "f3279fdff099e9f2406c122fc5c3b6ae4ba4f84f",
+    "archive_sha256": "5347cf89b04adb0bd72b3aa7a31e249abafbfb967423fe38a3cda95dd2c63d70",
+    "source_files_preserved": {
+      "provider": 62,
+      "prepared-provider": 62
+    },
+    "source_identity_sha256": "7992b7bb5780fa09a19ef305a554f2a10efce43cc25b448c20fdae1931c674c3",
+    "products_preserved": {
+      "build/tools/opentelemetry-javaagent-2.32.0.jar": "f787eb6c7f3d18e69a431e108a15278d25ee37f83d68b678f621e063f3988f82",
+      "adapters/java/target/java-extension-0.2.0-SNAPSHOT.jar": "8b681aace5988474466a40fa02056b314ef5c1079adbc0945f0206c28f1b4405"
+    },
+    "build_provenance": {
+      "sdk_main": "f3279fdff099e9f2406c122fc5c3b6ae4ba4f84f",
+      "java_sources_and_pom_equal": true,
+      "built_from": "f9f73eac9eaca6148ea7c3db74373ca1012db16f",
+      "products": {
+        "build/tools/opentelemetry-javaagent-2.32.0.jar": "f787eb6c7f3d18e69a431e108a15278d25ee37f83d68b678f621e063f3988f82",
+        "adapters/java/target/java-extension-0.2.0-SNAPSHOT.jar": "8b681aace5988474466a40fa02056b314ef5c1079adbc0945f0206c28f1b4405"
+      }
+    }
+  },
+  "results": {
+    "claim": "equivalence over these tests and observations",
+    "artefact_class": "diagnostic",
+    "java_backend": "prepared",
+    "cases": 8,
+    "matching_cases": 6,
+    "same_return_state_differences": 2,
+    "actual_launches": 151,
+    "raw_attempt_folders": 155,
+    "unique_command_identities": 151,
+    "compiler_builds": {
+      "retained_manifests": 155,
+      "unique_manifest_identities": 151,
+      "retained_class_bindings": 467
+    },
+    "prepared_provider": {
+      "retained_attempts": 155,
+      "unique_processes": 151,
+      "retained_instrumented_receipts": 76,
+      "short_runtimes_removed": true
+    },
+    "exported_without_original_source": true,
+    "refusal_controls": 7,
+    "scalar_shrink": {
+      "original": [
+        7
+      ],
+      "reduced": [
+        0
+      ]
+    },
+    "routes": [
+      "run",
+      "replay",
+      "generated",
+      "exported"
+    ],
+    "cli_sha256": "7672545c743269cef94d0983ee3df9bad5ddb5013ea1b00a68cccabcd4da810e",
+    "source_preserved": true
+  },
+  "supplementary": {
+    "packaged_recursive": {
+      "actual_launches": 4,
+      "case": "packaged recursive method",
+      "full_literal_observations_checked": true,
+      "exact_stdout_stderr_checked": true,
+      "spans_per_instrumented_repeat": 2,
+      "source_preserved": true,
+      "cli_sha256": "7672545c743269cef94d0983ee3df9bad5ddb5013ea1b00a68cccabcd4da810e"
+    },
+    "legacy_compatibility": {
+      "actual_launches": 8,
+      "cases": 2,
+      "matching_cases": 1,
+      "same_return_state_differences": 1,
+      "source_preserved": true,
+      "provider_commit": "d6d03b72026cde8962b11ce3cc184ff3ebcb60d4"
+    }
+  },
+  "validation": {
+    "runtime_commit": "fae38740673de0405186662e7b861ca4f75c8c96",
+    "regression_inventory": {
+      "total": 625,
+      "python": 534,
+      "rust": 70,
+      "node": 17,
+      "go": 4
+    },
+    "focused_java_tests": {
+      "tests": 71,
+      "result": "passed",
+      "log_sha256": "b0ae5cdacaec68543af981d1b5ee7d0305ccabd25369bc3f5731f32d1683bbe4"
+    },
+    "runtime_base_required_checks": "passed on fae3874",
+    "rust_product_line_coverage": 97.32,
+    "java_observer_line_coverage": 96.69,
+    "java_compiler_frontend_line_coverage": 95.38,
+    "new_java_python_module_line_coverage": {
+      "java_health.py": 100,
+      "java_launch.py": 99,
+      "java_provider.py": 100,
+      "java_telemetry.py": 100
+    },
+    "delivery_checks": "https://github.com/quuxio/oteleq/pull/49/checks",
+    "scope": "Runtime qualification and focused verifier regressions are retained here; final-head delivery gates have separate retained receipts.",
+    "files_sha256": {
+      "quux-oteleq": "7672545c743269cef94d0983ee3df9bad5ddb5013ea1b00a68cccabcd4da810e",
+      "oteleq-source.tar": "b68ad49e1bf182e255639505adef5c18c6642f4e139cbc55ec115e6d55343721",
+      "provider-source.tar.gz": "5347cf89b04adb0bd72b3aa7a31e249abafbfb967423fe38a3cda95dd2c63d70",
+      "verifier-source.tar": "d59cf3fc4efb82e014e6cef315322ffff43bd5539f050008b230201ab7f9d49d",
+      "check-fae3874.log": "60f52abea0cc1c32c81ddb4025898efa74d2eab9760ade74ec2f7b54a81bafbe"
+    }
+  },
+  "evidence": {
+    "retained_files": 5947,
+    "manifest_sha256": "4f550d9fcac24e20e94b04edce085c5e1fb8bf60a00666b3c69d8cdfe69df360"
+  },
+  "checks": [
+    "Complete independent receiver/static/outcome and alias/cycle oracles pass for every repeat, including the two deliberately different state cases.",
+    "Generated suites, per-case replay, detached export after original source removal, scalar shrinking from seven to zero and seven refusal controls pass.",
+    "Actual JVM PID/argv, 155 retained compiler manifests, 467 class bindings, all runtime archives and decoded protobuf batch/unit accounting are independently rechecked; copied original shrink evidence is not a new launch.",
+    "A separately packaged recursive method delivers two spans per instrumented repeat, exact nonempty stdout/stderr and independently expected complete typed state over four actual JVMs.",
+    "The frozen CLI retains legacy Java matching/mutation behaviour over eight additional JVMs.",
+    "Both 62-file SDK source copies and both pinned/prebuilt Java products remain unchanged; original short runtime directories are removed.",
+    "System-temporary-root path length and source-root refusal controls pass before application launch; original private runtimes are archived and removed.",
+    "The host-lane regression fails against the broken helper and passes after the fix; conflicting producer metadata cannot select the expected lane.",
+    "The separately archived verifier at 8f8e86b rechecks all 160 retained successful observations, including four copied original shrink attempts, with exact scalar types/widths, UTF-16 payloads, root/field/node sets and aliases. Eight type/shape alterations and two fixture-identity substitutions cannot pass."
+  ],
+  "limits": [
+    "Fixed JDK21 source-classpath diagnostic builds on macOS ARM64; external classpaths, modules, annotation processing, custom loaders and arbitrary flags remain unsupported.",
+    "Witnessing binds selected names, loaded classes, actual PID, policy and selection; invocation-scoped attribution and arbitrary concurrent activity remain open.",
+    "Direct health covers the supported SDK pipeline and independent local receipt; downstream collector processing, partial rejection and lifetime completeness are not inferred.",
+    "Live metric controls, broader object/sequence factories, shipping artefacts, other replacement-SDK language adapters and other platforms remain open."
+  ],
+  "review": {
+    "initial_sonar_findings": 17,
+    "corrections": [
+      "simpler per-scope metric and post-execution validators",
+      "shared runtime filenames",
+      "ASCII-only decimal shorthand",
+      "redundant exception catch removed",
+      "system temporary parent with source/length guards",
+      "one throwing call per exception regression",
+      "full literal graph and exact fixture owner/signature qualification checks"
+    ],
+    "requalification_regression": "An omitted host execution lane was found by actual qualification, corrected and covered by a failing-before/passing-after regression. The failed candidate has no compatibility claim.",
+    "followup_sonar_findings": 1
+  },
+  "literal_graph_verifier": {
+    "reports": 32,
+    "retained_successful_observations": 160,
+    "complete_typed_graph_oracles": "passed",
+    "new_application_launches": 0,
+    "verifier_commit": "8f8e86b6abd8cf1c4d279d92ab95c0eb4049d7b5",
+    "verifier_source_sha256": "d59cf3fc4efb82e014e6cef315322ffff43bd5539f050008b230201ab7f9d49d",
+    "note": "Four copied original shrink observations are rechecked without counting them as new JVM launches."
+  }
+}

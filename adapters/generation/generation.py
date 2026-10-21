@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import tomllib
 import uuid
 
 import discovery
@@ -22,6 +23,9 @@ import http_effects
 import harness
 import java_receivers
 import java_build
+import java_launch
+import java_provider
+import java_telemetry
 import node_receivers
 import native_profile
 import otelc_capture as capture
@@ -140,12 +144,12 @@ def finish_process(process: subprocess.Popen) -> None:
         process.wait()
 
 
-def execute(command, cwd, env=None, folder=None, timeout=60, input_data=None, *, max_output_bytes=None):
+def execute(command, cwd, env=None, folder=None, timeout=60, input_data=None, *, max_output_bytes=None, record_process=False):
     """Trusted local execution with wall time/output limits and process-group cleanup."""
     if folder is None:
         with tempfile.TemporaryDirectory(prefix="oteleq-discover-") as directory:
             return execute(command, cwd, env, Path(directory), timeout, input_data,
-                           max_output_bytes=max_output_bytes)
+                           max_output_bytes=max_output_bytes, record_process=record_process)
     maximum = MAX_OUTPUT if max_output_bytes is None else max_output_bytes
     folder.mkdir(parents=True, exist_ok=True)
     out, err = folder / "stdout", folder / "stderr"
@@ -156,6 +160,8 @@ def execute(command, cwd, env=None, folder=None, timeout=60, input_data=None, *,
         deadline = time.monotonic() + timeout
         failure = None
         try:
+            if record_process:
+                write(folder / "process.json", {"pid": process.pid, "argv": list(map(str, command))})
             while process.poll() is None:
                 if time.monotonic() > deadline:
                     failure = "process timeout"
@@ -215,7 +221,9 @@ def discover_file(name, language, root, snapshot, workspace, tools, artefacts, a
             if language == "java":
                 selected["javac"] = capture.tool_path(str(selected["java"].parent / "javac"))
                 selected["java-modules"] = java_build.module_image(selected["java"])
-            qualified = capture.artefacts(root, language, selected, rust_backend=rust_backend)
+            qualified = (java_provider.artefacts(root, selected)
+                         if language == "java" and adapters.get("java", {}).get("backend") == "prepared"
+                         else capture.artefacts(root, language, selected, rust_backend=rust_backend))
             tools[language], artefacts[language] = selected, qualified
         def discover_execute(command, cwd, input_data=None, *, max_output_bytes=None):
             environment = capture.environment(snapshot, tools[language], "oteleq-discovery", root)
@@ -367,6 +375,8 @@ def inventory_entry(function, discovered, name, language, source_hash, snapshot,
         entry["typescript_backend"] = args.configuration["adapters"]["typescript"]["backend"]
     if language == "rust":
         entry["rust_backend"] = args.configuration["adapters"]["rust"]["backend"]
+    if language == "java":
+        entry["java_backend"] = args.configuration["adapters"].get("java", {}).get("backend", "legacy")
     if language == "go":
         configure_go_context(entry, discovered, args.configuration)
     if language == "python" and not excluded and args.configuration["adapters"]["python"]["import_roots"]:
@@ -421,6 +431,7 @@ def inventory_tree(contents, root, snapshot, workspace, args, native_projects=No
             entry = inventory_entry(function, discovered, name, language, sha, snapshot, args)
             filesystem_effects.bind(entry, args.configuration)
             typescript_provider.bind(entry, root, workspace, tools.get(language, {}), execute, policy)
+            java_provider.bind(entry, root, workspace, tools.get(language, {}), execute)
             inventory.append(entry)
     return tools, artefacts, inventory
 
@@ -515,12 +526,13 @@ def decoder_files():
 
 def generator_identity():
     here = Path(__file__).parent
-    names = ("generation.py", "policy.py", "return_expectations.py", "filesystem_effects.py", "http_effects.py", "domains.py", "shrinking.py", "sequences.py", "typescript_provider.py", "python_project.py", "go_project.py", "go_receivers.py", "go_graph.py", "go_observe.go", "node_receivers.py", "java_receivers.py", "java_build.py", "OteleqCompile.java", "java_graph.py", "OteleqGraph.java", "cpp_models.py", "cpp_receivers.py", "cpp_worker.py", "cpp_graph.py", "cpp_observe.hpp", "native_names.py", "discovery.py", "harness.py", "observe.py", "node_observe.mjs", "node_sequence.mjs", "typed_capture.py", "discover.mjs", "discover.go", "Discover.java")
+    names = ("generation.py", "policy.py", "return_expectations.py", "filesystem_effects.py", "http_effects.py", "domains.py", "shrinking.py", "sequences.py", "typescript_provider.py", "python_project.py", "go_project.py", "go_receivers.py", "go_graph.py", "go_observe.go", "node_receivers.py", "java_receivers.py", "java_build.py", "java_health.py", "java_launch.py", "java_provider.py", "java_telemetry.py", "OteleqCompile.java", "java_graph.py", "OteleqGraph.java", "cpp_models.py", "cpp_receivers.py", "cpp_worker.py", "cpp_graph.py", "cpp_observe.hpp", "native_names.py", "discovery.py", "harness.py", "observe.py", "node_observe.mjs", "node_sequence.mjs", "typed_capture.py", "discover.mjs", "discover.go", "Discover.java")
     files = {name: capture.file_digest(here / name) for name in names}
     files.update({name: capture.file_digest(here / name) for name in (
         'native_profile.py', 'native_project.py', 'native_dependencies.py', 'native_frontend.py',
         'native_discover.cpp', 'native_context.py', 'native_workers.py', 'native_workspace.py')})
     files["host-python"] = capture.file_digest(Path(sys.executable))
+    files["observer:otelc_capture.py"] = capture.file_digest(Path(capture.__file__))
     files["host-version"] = sys.version
     files.update(decoder_files())
     return identity(files)
@@ -618,7 +630,9 @@ if __name__=="__main__":unittest.main()
     return 0
 
 
-def policy(entry, endpoint):
+def policy(entry, endpoint, *, service="oteleq-generation"):
+    if java_provider.prepared(entry):
+        return java_provider.policy(entry, endpoint, service)
     language = entry["language"]
     sources = [entry["path"]] if language == "rust" and entry.get("rust_backend", "compiler") == "llvm" else ["**"]
     functions = [entry.get("otelc_runtime_function", entry["otelc_function"])]
@@ -689,7 +703,7 @@ def driver_path(project, entry):
     return project / (relative or entry["path"])
 
 
-def build_command(root, project, entry, driver, config, tools, env, folder, scratch, lane):
+def build_command(root, project, entry, driver, config, tools, env, folder, scratch, lane, *, prepared_runtime=None):
     language = entry["language"]
     prefix = [root / "target/debug/quux-otelc", "--config", config, "--language", language]
     if language in ("c", "cpp"):
@@ -699,6 +713,10 @@ def build_command(root, project, entry, driver, config, tools, env, folder, scra
         main = (entry["package"] + "." if entry["package"] else "") + "OteleqDriver"
         java_build.build(project, [project / entry["path"], driver], main, tools["java"],
                          classes, folder, env, execute)
+        if java_provider.prepared(entry):
+            java_provider.require(prepared_runtime is not None, "missing owned runtime context")
+            return java_launch.prepare(root, project, folder, tools, prepared_runtime, entry,
+                                       tomllib.loads(config.read_text()), lane == "baseline", env, execute)
         command = [tools["java"], "-Xshare:off", "-cp", classes, main] if lane == "baseline" else prefix + ["java", "-Xshare:off", "-cp", classes, main]
         return command
     # Use the proven build recipes, with bounded execution for every build and launch.
@@ -756,7 +774,8 @@ def validate_private_sources(project, immutable, folder):
               for name in ("plain", "instrumented") if (project / name).is_file()})
 
 
-def qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, decoder, *, extra_channels=None, capture_complete=True):
+def qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, decoder, *, extra_channels=None,
+                    capture_complete=True, prepared_runtime=None):
     if errors or result.returncode:
         raise ValueError("application exit or OTLP capture failed; inspect retained stdout/stderr")
     observation = folder / "observation"
@@ -769,6 +788,8 @@ def qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, 
     if lane == "baseline":
         if bodies:
             raise ValueError("baseline unexpectedly exported telemetry")
+    elif prepared_runtime is not None:
+        witness = java_telemetry.witness(prepared_runtime, folder, entry, bodies, service, decoder)
     else:
         runtime = read(folder / "runtime.json")
         if entry["language"] == "rust" and capture.RUST_COMPILER_PROFILE_FILENAME in data.get("artefacts", {}).get("rust", {}):
@@ -780,14 +801,29 @@ def qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, 
 
 
 
+def provider_stable(root, language, tools, expected, entry):
+    """Re-enumerate the selected provider without changing its frozen API."""
+    if java_provider.prepared(entry):
+        java_provider.require(java_provider.artefacts(root, tools) == expected, "SDK or selected tools changed")
+    else:
+        capture.stable(root, language, tools, expected, rust_backend=entry.get("rust_backend", "compiler"))
+
+
 def attempt(workspace, data, entry, case, lane, folder, decoder, *, http_fixtures=None):
     http_fixtures = http_fixtures or []
     if [item.settings for item in http_fixtures] != http_effects.selected(data["configuration"]):
         raise ValueError("HTTP effects require the frozen case fixture context before application execution")
+    folder.mkdir(parents=True)
+    roots = (Path(data["source"]), Path(data["otelc_root"]), workspace)
+    with java_launch.runtime(entry, folder, source_roots=roots) as runtime:
+        return attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, http_fixtures, runtime)
+
+
+def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, http_fixtures, runtime):
+    """Capture each lane with the same private source, effects and process budgets."""
     root, language = Path(data["otelc_root"]), entry["language"]
     tools = {k: Path(v) for k, v in data["tools"][language].items()}
-    capture.stable(root, language, tools, data["artefacts"][language], rust_backend=entry.get("rust_backend", "compiler"))
-    folder.mkdir(parents=True)
+    provider_stable(root, language, tools, data["artefacts"][language], entry)
     project = folder / "project"
     shutil.copytree(workspace / "snapshot", project)
     if 'native_context' not in entry:
@@ -805,9 +841,10 @@ def attempt(workspace, data, entry, case, lane, folder, decoder, *, http_fixture
         env["NODE_OPTIONS"] = "--expose-gc"
         write(folder / "collection-controls.json", {"NODE_OPTIONS": "--expose-gc", "sequence": case["sequence"]})
     immutable = manifest(project)
-    with capture.receiver() as (endpoint, bodies, errors):
+    receiver_options = {"max_requests": java_provider.MAX_TELEMETRY_REQUESTS} if runtime is not None else {}
+    with capture.receiver(**receiver_options) as (endpoint, bodies, errors):
         config = folder / "policy.toml"
-        config.write_text(policy(entry, endpoint))
+        config.write_text(policy(entry, endpoint, service=service) if runtime is not None else policy(entry, endpoint))
         if language == "typescript":
             env["OTELC_TYPESCRIPT_BACKEND"] = capture.typescript_backend(root, language, entry, config.read_bytes())
             write(folder / "typescript-controls.json", {"OTELC_TYPESCRIPT_BACKEND": env["OTELC_TYPESCRIPT_BACKEND"],
@@ -817,7 +854,9 @@ def attempt(workspace, data, entry, case, lane, folder, decoder, *, http_fixture
             command = native_profile.build(sys.modules[__name__], workspace, data, entry, case,
                                            project, prefix, env, folder, lane)
         else:
-            command = build_command(root, project, entry, driver, config, tools, env, folder, scratch, lane)
+            options = {"prepared_runtime": runtime} if runtime is not None else {}
+            command = build_command(root, project, entry, driver, config, tools, env, folder, scratch, lane, **options)
+        launch = read(folder / java_launch.LAUNCH_FILE) if runtime is not None else None
         write(folder / "command.json", [str(p) for p in command])
         working_directory = project / entry["go_context"]["module_root"] if "go_context" in entry else project
         write(folder / "working-directory.json", str(working_directory))
@@ -830,20 +869,33 @@ def attempt(workspace, data, entry, case, lane, folder, decoder, *, http_fixture
             env.update(bindings)
             write(folder / "http-controls.json", {"declarations": http_effects.selected(data["configuration"]), "environment": bindings})
         with http_effects.observe(http_fixtures, folder, data["configuration"]["limits"]["max_capture_bytes"]) as requests:
-            result = execute(command, working_directory, env, folder, timeout=data["configuration"]["limits"]["case_timeout_ms"] / 1000)
+            options = {"record_process": True} if runtime is not None else {}
+            result = execute(command, working_directory, env, folder, timeout=data["configuration"]["limits"]["case_timeout_ms"] / 1000,
+                             **options)
     capture.retain_http(folder, bodies, errors)
     effect_channels, complete = filesystem_effects.finish(effects, folder)
     request_channels, request_complete = http_effects.finish(requests)
     effect_channels.update(request_channels)
     complete &= request_complete
+    verify_attempt_inputs(data, entry, project, folder, scratch, tools, immutable, runtime, launch, config, lane=lane)
+    return qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, decoder,
+                           extra_channels=effect_channels, capture_complete=complete, prepared_runtime=runtime)
+
+
+def verify_attempt_inputs(data, entry, project, folder, scratch, tools, immutable, runtime, launch, config, *, lane):
+    """Recheck private sources, compiler products and the selected launch/provider."""
+    root, language = Path(data["otelc_root"]), entry["language"]
     validate_private_sources(project, immutable, folder)
     if language == "java":
         java_build.verify(project, scratch / "classes", folder)
+    if runtime is not None:
+        java_provider.require(read(folder / java_launch.LAUNCH_FILE) == launch, "retained launch changed during execution")
+        java_launch.verify(launch, root=root, project=project, folder=folder, tools=tools, runtime=runtime,
+                           entry=entry, data=tomllib.loads(config.read_text()), plain=lane == "baseline")
+        java_launch.origins(runtime, folder, entry)
     if 'native_context' in entry:
         native_profile.verify_build(sys.modules[__name__], folder)
-    capture.stable(root, language, tools, data["artefacts"][language], rust_backend=entry.get("rust_backend", "compiler"))
-    return qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, decoder,
-                           extra_channels=effect_channels, capture_complete=complete)
+    provider_stable(root, language, tools, data["artefacts"][language], entry)
 
 def capture_case(workspace, data, entry, case, destination, decoder, contract, *, http_fixtures=None):
     """Keep raw evidence and bounded typed observations for every actual launch."""

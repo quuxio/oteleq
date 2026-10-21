@@ -23,6 +23,7 @@ import otelc_resource
 MAX_REQUEST_BYTES = 1024 * 1024
 TRACE_PATH = "/v1/traces"
 MAX_REQUESTS = 32
+MAX_CAPTURE_BYTES = MAX_REQUESTS * MAX_REQUEST_BYTES
 REQUEST_TIMEOUT = 2
 
 
@@ -37,7 +38,8 @@ class Receiver(BaseHTTPRequestHandler):
             self.send_error(400)
             return
         size = int(lengths[0])
-        if size > MAX_REQUEST_BYTES or self.server.requests > self.server.max_requests:
+        if (size > MAX_REQUEST_BYTES or self.server.requests > self.server.max_requests
+                or size > self.server.max_bytes - self.server.received_bytes):
             self.send_error(413)
             return
         deadline = time.monotonic() + REQUEST_TIMEOUT
@@ -57,6 +59,7 @@ class Receiver(BaseHTTPRequestHandler):
             self.send_error(408)
             return
         self.server.bodies.append((self.path, bytes(body)))
+        self.server.received_bytes += size
         self.send_response(200)
         self.send_header("Content-Length", "0")
         self.end_headers()
@@ -70,8 +73,10 @@ class Receiver(BaseHTTPRequestHandler):
 
 
 class CaptureServer(HTTPServer):
-    def __init__(self, max_requests=MAX_REQUESTS):
+    def __init__(self, max_requests=MAX_REQUESTS, *, max_bytes=MAX_CAPTURE_BYTES):
         self.max_requests = max_requests
+        self.max_bytes = max_bytes
+        self.received_bytes = 0
         self.bodies = []
         self.errors = []
         self.requests = 0
@@ -801,9 +806,9 @@ def commands(root, workspace, language, source, policy, tools, environment, evid
 
 
 @contextmanager
-def receiver():
+def receiver(*, max_requests=MAX_REQUESTS, max_bytes=MAX_CAPTURE_BYTES):
     """Expose exact received bytes and every transport failure to the observer."""
-    server = CaptureServer()
+    server = CaptureServer(max_requests, max_bytes=max_bytes)
     worker = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True)
     worker.start()
     try:
