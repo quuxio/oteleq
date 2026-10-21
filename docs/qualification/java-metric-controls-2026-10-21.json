@@ -1,0 +1,150 @@
+{
+  "qualification_schema_version": 1,
+  "date": "2026-10-21",
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "platform": {
+    "os": "macOS-27.0.1-arm64-arm-64bit",
+    "architecture": "arm64",
+    "jdk": "21.0.12.1"
+  },
+  "runtime": {
+    "commit": "0288559f7226ab8186c41cd23e8a64edc4a5d618",
+    "cli_sha256": "692a7589a361918e284e79ca1b0bd235e01f277d026ca5979ca80fb28d75290e",
+    "source_archive_sha256": "fef3a763000d441e6588dc99b2814a90c9632f45a0b8b9b07e1aac6af3bc58de"
+  },
+  "providers": {
+    "prepared": "f3279fdff099e9f2406c122fc5c3b6ae4ba4f84f",
+    "legacy": "d6d03b72026cde8962b11ce3cc184ff3ebcb60d4"
+  },
+  "results": {
+    "claim": "equivalence over these tests and observations",
+    "artefact_class": "diagnostic",
+    "cli_sha256": "692a7589a361918e284e79ca1b0bd235e01f277d026ca5979ca80fb28d75290e",
+    "cases": 6,
+    "matching_cases": 4,
+    "state_difference_controls": 2,
+    "actual_jvm_launches": 140,
+    "retained_observations": 144,
+    "qualified_reports": 26,
+    "launches": {
+      "raw_attempt_folders": 144,
+      "unique_command_identities": 140
+    },
+    "builds": {
+      "retained_manifests": 144,
+      "unique_manifest_identities": 140,
+      "retained_class_bindings": 432
+    },
+    "prepared": {
+      "retained_attempts": 144,
+      "unique_processes": 140,
+      "retained_instrumented_receipts": 72,
+      "short_runtimes_removed": true
+    },
+    "source_preserved": true,
+    "detached_export": true,
+    "original_short_runtimes_removed": true,
+    "scope": "Selected synchronous Java receiver call trees; four live metric states in one unchanged JVM/build, independent tracing, private checkpoints and bounded export windows. No general SDK-instrument or invocation-cookie/shipping claim.",
+    "supplementary": {
+      "getter_cause": {
+        "actual_jvm_launches": 8,
+        "expected_getter_delta_per_call": 1,
+        "equivalent": false,
+        "comparison_exit": 1,
+        "source_sha256": "00064fae91c7a6022368bb0febe0594b15582ab75e14546a9e4c9ab49ddb7b10",
+        "builds": {
+          "retained_manifests": 8,
+          "unique_manifest_identities": 8,
+          "retained_class_bindings": 32
+        },
+        "prepared": {
+          "retained_attempts": 8,
+          "unique_processes": 8,
+          "retained_instrumented_receipts": 4,
+          "short_runtimes_removed": true
+        },
+        "scope": "Exact outer RuntimeException class/message; custom cause remains unobserved, while application getter side effects mutate a fully observed private receiver field."
+      },
+      "ordinary_prepared": {
+        "backend": "prepared",
+        "actual_jvm_launches": 8,
+        "opt_in_preserved": true,
+        "builds": {
+          "retained_manifests": 8,
+          "unique_manifest_identities": 8,
+          "retained_class_bindings": 24
+        }
+      },
+      "ordinary_legacy": {
+        "backend": "legacy",
+        "actual_jvm_launches": 8,
+        "opt_in_preserved": true,
+        "builds": {
+          "retained_manifests": 8,
+          "unique_manifest_identities": 8,
+          "retained_class_bindings": 24
+        }
+      }
+    }
+  },
+  "totals": {
+    "actual_jvm_launches": 164,
+    "retained_observations": 168,
+    "retained_class_bindings": 512
+  },
+  "negative_controls": {
+    "altered_actual_receipts_refused": 7,
+    "incompatible_schedules_refused_before_application_launch": 3,
+    "changed_source_refused_before_application_launch": 1
+  },
+  "provider_preservation": {
+    "source_files_preserved": {
+      "provider": 62,
+      "prepared-provider": 62
+    },
+    "source_identity_sha256": "7992b7bb5780fa09a19ef305a554f2a10efce43cc25b448c20fdae1931c674c3",
+    "products_preserved": {
+      "build/tools/opentelemetry-javaagent-2.32.0.jar": "f787eb6c7f3d18e69a431e108a15278d25ee37f83d68b678f621e063f3988f82",
+      "adapters/java/target/java-extension-0.2.0-SNAPSHOT.jar": "8b681aace5988474466a40fa02056b314ef5c1079adbc0945f0206c28f1b4405"
+    },
+    "build_provenance": {
+      "sdk_main": "f3279fdff099e9f2406c122fc5c3b6ae4ba4f84f",
+      "java_sources_and_pom_equal": true,
+      "built_from": "f9f73eac9eaca6148ea7c3db74373ca1012db16f",
+      "products": {
+        "build/tools/opentelemetry-javaagent-2.32.0.jar": "f787eb6c7f3d18e69a431e108a15278d25ee37f83d68b678f621e063f3988f82",
+        "adapters/java/target/java-extension-0.2.0-SNAPSHOT.jar": "8b681aace5988474466a40fa02056b314ef5c1079adbc0945f0206c28f1b4405"
+      }
+    },
+    "product_copy": "prepared-provider"
+  },
+  "evidence": {
+    "retained_files": 9902,
+    "manifest_sha256": "501314a9e7e8ec56102735cb6c2fe4e5a389476ed6d1ae5865b549fd375af2a1"
+  },
+  "validation": {
+    "result": "passed",
+    "distinct_regressions": 661,
+    "python_capture": 140,
+    "python_generation": 430,
+    "rust": 70,
+    "node": 17,
+    "go": 4,
+    "rust_product_line_coverage": 97.32,
+    "log_sha256": "66228256e84ea52a97c4102eab74b0aa85bca45e584c4c10c99c977bf881ba2a",
+    "new_control_line_coverage": {
+      "java_control": 100,
+      "java_control_receipt": 100,
+      "java_live": 97
+    }
+  },
+  "delivery_checks": "https://github.com/quuxio/oteleq/pull/51/checks",
+  "limits": [
+    "Declared synchronous source-classpath Java receiver calls on the recorded provider/JDK/platform only.",
+    "Named serial trees and PID/source identity do not provide invocation cookies or general asynchronous attribution.",
+    "Metric collection suppression and bounded emission windows qualify selected function measurements; general SDK instruments, exporter faults and other language controls remain open.",
+    "The frozen provider has a genuine exception-cause getter mutation defect. Its failing comparison is retained as a difference; it is never reclassified as equivalent.",
+    "General project/dependency builds, shipping artefacts, performance budgets and other platforms remain open."
+  ]
+}
