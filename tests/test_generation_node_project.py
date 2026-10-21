@@ -1,6 +1,7 @@
 """Actual Node loader formats and callers preserve the frozen package context."""
 import argparse
-from contextlib import redirect_stdout
+from collections.abc import Iterator
+from contextlib import contextmanager, redirect_stdout
 import hashlib
 import io
 import json
@@ -51,6 +52,21 @@ class NodeProjectTests(unittest.TestCase):
 
     def inspect(self, path, language="javascript"):
         return node_project.context(path, self.project, language, self.provider, NODE, execute)
+
+    @contextmanager
+    def planned_workspace(self, parent: Path | None = None) -> Iterator[Path]:
+        """Keep the fixed tool identities active through planning and retained operations."""
+        parent = self.base if parent is None else parent
+        cli = parent / "cli"
+        cli.write_text("fixed unit CLI")
+        request = argparse.Namespace(source=self.project, otelc_root=self.provider, workspace_parent=parent,
+                                     config=None, language=["javascript"], exclude=[], cases=1)
+        with patch.dict(os.environ, {"OTELEQ_EXECUTABLE": str(cli)}), \
+             patch.object(generation.capture, "selected_tools", return_value={"javascript": NODE}), \
+             patch.object(generation.capture, "artefacts", return_value={"fixture": "fixed"}):
+            with redirect_stdout(io.StringIO()) as output:
+                generation.plan(request)
+            yield Path(output.getvalue().strip())
 
     def test_loader_reads_formats_and_packages_without_evaluating_the_application(self):
         cases = [(".cjs", None, "commonjs"), (".mjs", None, "module"),
@@ -256,16 +272,7 @@ class NodeProjectTests(unittest.TestCase):
     def test_public_plan_generation_and_detached_export_keep_the_loader_context(self):
         source = self.project / "sample.js"
         source.write_text('function sample(value){return value+1;}\nthrow Error("application must not execute during planning");\n')
-        cli = self.base / "cli"
-        cli.write_text("fixed unit CLI")
-        request = argparse.Namespace(source=self.project, otelc_root=self.provider, workspace_parent=self.base,
-                                     config=None, language=["javascript"], exclude=[], cases=1)
-        with patch.dict(os.environ, {"OTELEQ_EXECUTABLE": str(cli)}), \
-             patch.object(generation.capture, "selected_tools", return_value={"javascript": NODE}), \
-             patch.object(generation.capture, "artefacts", return_value={"fixture": "fixed"}):
-            with redirect_stdout(io.StringIO()) as output:
-                generation.plan(request)
-            workspace = Path(output.getvalue().strip())
+        with self.planned_workspace() as workspace:
             plan = generation.read(workspace / "plan.json")
             self.assertEqual(len(plan["inventory"]), 1)
             entry = plan["inventory"][0]
@@ -290,16 +297,7 @@ class NodeProjectTests(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory(prefix="node independent workspace ")
         self.addCleanup(temporary.cleanup)
         parent = Path(temporary.name).resolve()
-        cli = parent / "cli"
-        cli.write_text("fixed unit CLI")
-        request = argparse.Namespace(source=self.project, otelc_root=self.provider, workspace_parent=parent,
-                                     config=None, language=["javascript"], exclude=[], cases=1)
-        with patch.dict(os.environ, {"OTELEQ_EXECUTABLE": str(cli)}), \
-             patch.object(generation.capture, "selected_tools", return_value={"javascript": NODE}), \
-             patch.object(generation.capture, "artefacts", return_value={"fixture": "fixed"}):
-            with redirect_stdout(io.StringIO()) as output:
-                generation.plan(request)
-            workspace = Path(output.getvalue().strip())
+        with self.planned_workspace(parent) as workspace:
             plan = generation.read(workspace / "plan.json")
             self.assertEqual(len(plan["inventory"]), 1)
             entry = plan["inventory"][0]
