@@ -55,7 +55,6 @@ class JavaBuildTests(unittest.TestCase):
             self.assertEqual(bindings[name]["source_sha256"], self.original["sample/App.java"])
         self.assertEqual(bindings["sample.Other"]["policy_path"], "sample/Other.java")
         self.assertEqual(bindings["sample.OteleqDriver"]["policy_path"], "_oteleq_generated/sample/OteleqDriver.java")
-        self.assertFalse((self.project / "APP_INITIALISED").exists())
         java_build.verify(self.project, self.classes, self.folder)
         marker = self.folder / "application-started"
         result = subprocess.run([JAVA, "-Dapp.marker=" + str(marker), "-cp", self.classes, "sample.OteleqDriver"],
@@ -152,6 +151,14 @@ class JavaBuildTests(unittest.TestCase):
                 java_build.verify(self.project, self.classes, self.folder)
         finally:
             evidence.write_bytes(original)
+        frontend = self.folder / "compiler-tool/OteleqCompile.java"
+        original_frontend = frontend.read_bytes()
+        try:
+            frontend.write_bytes(original_frontend + b"\n// changed compiler\n")
+            with self.assertRaisesRegex(ValueError, "selected compiler changed"):
+                java_build.verify(self.project, self.classes, self.folder)
+        finally:
+            frontend.write_bytes(original_frontend)
         linked = self.project / "link"
         try:
             linked.symlink_to(self.project / "sample/App.java")

@@ -9,6 +9,9 @@ from otelc_capture import strict_json
 
 FRONTEND = Path(__file__).with_name("OteleqCompile.java")
 MAX_METADATA = 16 * 1024 * 1024
+COMPILER_METADATA_FILENAME = "java-compiler.json"
+COMPILER_IDENTITY_FILENAME = "java-compiler-identity.json"
+PREPARED_APPLICATION_FILENAME = "prepared-application.json"
 
 
 def require(condition: bool, reason: str) -> None:
@@ -139,19 +142,19 @@ def build(project: Path, sources: list[Path], main: str, java: Path,
     metadata = strict_json(result.stdout)
     require(files(project) == original and compiler_inputs(java, frontend) == tool_inputs,
             "private source or compiler changed during compilation")
-    (folder / "java-compiler.json").write_text(json.dumps(metadata, indent=2) + "\n")
+    (folder / COMPILER_METADATA_FILENAME).write_text(json.dumps(metadata, indent=2) + "\n")
     compiler = {"driver": "JDK JavaCompiler file manager", "inputs_sha256": tool_inputs,
-                "argv": list(map(str, command)), "compiler_metadata_sha256": digest(folder / "java-compiler.json")}
-    (folder / "java-compiler-identity.json").write_text(json.dumps(compiler, indent=2) + "\n")
-    provenance = "oteleq.jdk-file-manager-v1:" + digest(folder / "java-compiler-identity.json")
+                "argv": list(map(str, command)), "compiler_metadata_sha256": digest(folder / COMPILER_METADATA_FILENAME)}
+    (folder / COMPILER_IDENTITY_FILENAME).write_text(json.dumps(compiler, indent=2) + "\n")
+    provenance = "oteleq.jdk-file-manager-v1:" + digest(folder / COMPILER_IDENTITY_FILENAME)
     bound = bindings(metadata, project, classes, original, set(sources[1:]), provenance)
     require(main in bound, "generated main has no compiler binding")
     application = {"schema_version": 1, "main_class": main, "classpath": [str(classes)], "bindings": bound}
-    (folder / "prepared-application.json").write_text(json.dumps(application, indent=2) + "\n")
+    (folder / PREPARED_APPLICATION_FILENAME).write_text(json.dumps(application, indent=2) + "\n")
     record = {"schema_version": 1, "source_sha256": original, "classes_sha256": files(classes),
-              "main_class": main, "compiler_metadata_sha256": digest(folder / "java-compiler.json"),
-              "compiler_identity_sha256": digest(folder / "java-compiler-identity.json"),
-              "prepared_application_sha256": digest(folder / "prepared-application.json")}
+              "main_class": main, "compiler_metadata_sha256": digest(folder / COMPILER_METADATA_FILENAME),
+              "compiler_identity_sha256": digest(folder / COMPILER_IDENTITY_FILENAME),
+              "prepared_application_sha256": digest(folder / PREPARED_APPLICATION_FILENAME)}
     (folder / "build-identities.json").write_text(json.dumps(record, indent=2) + "\n")
     return application
 
@@ -163,10 +166,10 @@ def verify(project: Path, classes: Path, folder: Path) -> None:
             "unsupported build identity")
     require(files(project) == record["source_sha256"] and files(classes) == record["classes_sha256"],
             "application source or class products changed")
-    for name, key in (("java-compiler.json", "compiler_metadata_sha256"),
-                      ("java-compiler-identity.json", "compiler_identity_sha256"),
-                      ("prepared-application.json", "prepared_application_sha256")):
+    for name, key in ((COMPILER_METADATA_FILENAME, "compiler_metadata_sha256"),
+                      (COMPILER_IDENTITY_FILENAME, "compiler_identity_sha256"),
+                      (PREPARED_APPLICATION_FILENAME, "prepared_application_sha256")):
         require(digest(folder / name) == record[key], "retained compiler evidence changed: " + name)
-    compiler = strict_json((folder / "java-compiler-identity.json").read_bytes())
+    compiler = strict_json((folder / COMPILER_IDENTITY_FILENAME).read_bytes())
     require(all(Path(name).is_file() and digest(Path(name)) == sha
                 for name, sha in compiler["inputs_sha256"].items()), "selected compiler changed")
