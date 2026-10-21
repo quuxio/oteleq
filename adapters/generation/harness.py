@@ -553,7 +553,8 @@ func {worker}(){{
 
 def java_driver(entry, args):
     if "receiver_fixture" in entry:
-        return java_receivers.driver(entry, args, java_literal)
+        sequence = sequences.concrete(entry, args, concrete_arguments) if "sequence_configuration" in entry else None
+        return java_receivers.driver(entry, args, java_literal, sequence)
     package = "package " + entry["package"] + ";\n" if entry["package"] else ""
     call = entry["name"] + "(" + ",".join(literal(v, t, "java") for v, t in zip(args, entry["parameters"])) + ")"
     invoked = call + ';s.append("return:void\\n");' if entry["output"] == "void" else 'java.lang.Object result=' + call + ';s.append("return:").append(value(result)).append("\\n");'

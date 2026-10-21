@@ -72,6 +72,19 @@ class JavaTelemetryTests(unittest.TestCase):
         self.assertEqual(self.receipt(), {"trace_batches": 1, "spans": 2, "metric_batches": 1,
                                           "metric_points": 3, "errors": 1})
 
+    def test_ordered_calls_require_distinct_roots_and_all_recursive_metric_counts(self):
+        self.entry["sequence_configuration"] = [{"action": "call"}, {"action": "call"}]
+        second, third = span(b"c" * 8), span(b"d" * 8)
+        second.trace_id, third.trace_id = b"u" * 16, b"v" * 16
+        self.trace = traces([span(), span(b"b" * 8, b"a" * 8), second])
+        self.metric = metrics(3)
+        self.assertEqual(self.receipt()["spans"], 3)
+        for nodes in ([span(), span(b"b" * 8, b"a" * 8)],
+                      [span(), second, third]):
+            self.trace = traces(nodes);self.metric = metrics(len(nodes))
+            with self.subTest(nodes=len(nodes)), self.assertRaisesRegex(ValueError, "declared calls"):
+                self.receipt()
+
     def test_incomplete_unknown_duplicate_or_wrongly_typed_attributes_refuse(self):
         for rows in ([attribute("name", "x"), attribute("name", "y")],
                      [NS(key="name", value=NS(WhichOneof=lambda _: None))]):

@@ -240,7 +240,7 @@ def verify_launches(folder: Path, expected: int) -> dict:
     return {"raw_attempt_folders": len(raw), "unique_command_identities": len(unique)}
 
 
-def verify_prepared(folder: Path) -> dict:
+def verify_prepared(folder: Path, receipt_verifier=None) -> dict:
     """Independently inspect retained PID, archive and actual protobuf accounting."""
     from opentelemetry.proto.collector.metrics.v1.metrics_service_pb2 import ExportMetricsServiceRequest
     from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceRequest
@@ -263,7 +263,7 @@ def verify_prepared(folder: Path) -> dict:
             assert identity["path"] == str(original / name)
         records.append(launch)
         if not launch["plain"]:
-            verify_receipt(attempt, launch, process["pid"], ExportTraceServiceRequest, ExportMetricsServiceRequest)
+            (receipt_verifier or verify_receipt)(attempt, launch, process["pid"], ExportTraceServiceRequest, ExportMetricsServiceRequest)
             instrumented += 1
     assert records and instrumented
     return {"retained_attempts": len(records), "unique_processes": len(identities),

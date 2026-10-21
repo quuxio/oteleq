@@ -1,6 +1,6 @@
 # Ordered receiver and collection observations
 
-Declared receiver fixtures can execute an ordered sequence of calls to the selected method, followed by release and optional collection. Each case reconstructs its receiver independently in each process. The typed contract records every requested action and its required roots; missing, reordered or unobserved actions cannot become passing skips.
+Declared Java, JavaScript and TypeScript receiver fixtures can execute an ordered sequence of calls to the selected method. Node receivers additionally support release and optional collection. Each case reconstructs its receiver independently in each process. The typed contract records every requested action and its required roots; missing, reordered or unobserved actions cannot become passing skips.
 
 ```toml
 schema_version = 1
@@ -25,6 +25,25 @@ At least one call uses the concrete case arguments. Other calls can have indepen
 
 Call steps can declare `expected_baseline` using the existing return/error contract. Otherwise a case-argument call inherits the fixture expectation and a fixed-argument call expects a return. Unexpected intermediate baseline errors block the case even if a later call succeeds. The case's outer outcome is its last call outcome. Scalar shrinking preserves the declared construction and action schedule while reducing every use of the case arguments; it does not shrink action order or fixed inputs.
 
+## Java call sequences
+
+Use the existing [Java receiver profile](java-receivers.md), including permitted private constructor/factory/method access. Add a call-only schedule to its fixture:
+
+```toml
+sequence = [
+  { action = "call", arguments = "case" },
+  { action = "call", arguments = [2] },
+]
+```
+
+One JVM and one constructed receiver execute the complete schedule per repeat. Each call retains every declared receiver, scalar argument and own-static root before and after execution, plus its result/error graph. Returned aliases, source arrays and cycles use the same closed Java codecs. The outer `before` is the first call's starting graph; its `outcome` and `after` come from the last call. The version-two receiver envelope must contain every declared step in order and agree with those outer boundaries. Missing state, reordered actions and unsupported codecs cannot qualify.
+
+Both `legacy` and explicit `prepared` providers require one independent selected root tree per declared call. Recursion may add spans within each tree. Prepared mode additionally requires cumulative call/duration metrics to finish at the total decoded selected-span count, and final health to match actual PID and exports. This is still a named-tree witness; it does not attribute an individual span to a particular action using the [proposed invocation API](action-witness.md). Construction/startup calls and other side effects need their own qualified witness scope.
+
+Java release, collection, asynchronous schedules, other method targets and resource actions remain named blockers. Identity is local to each graph; the profile does not establish allocation identity across calls. Filesystem/HTTP observations cover the whole worker rather than each intermediate call. All steps share the existing case time/output budgets.
+
+Run `make generation-java-sequence-otelc JAVA_BACKEND=prepared OTELC_ROOT=/absolute/frozen/sdk REPORT_DIR=/new/external/evidence` for the maintained actual-provider corpus. Select `JAVA_BACKEND=legacy` with the matching earlier provider for compatibility qualification. The corpus checks complete independently expected intermediate graphs, private factories, expected intermediate errors, recursive trees and a state difference restored before the final boundary. It exercises generated/detached-exported suites, per-case replay, scalar shrinking and altered-evidence refusals. Implementation tests alone do not qualify another provider or platform.
+
 ## Release and collection
 
 `release` clears the harness's strong receiver reference. Returned-receiver graphs contain encoded values, so a captured alias does not intentionally keep that receiver alive. Application globals, class data, caches or closures can still retain the object; the harness does not change them.
@@ -37,9 +56,9 @@ For JavaScript/TypeScript, the provider selects the exact declared class for col
 
 ## Current boundaries
 
-The generator supports the existing ordinary JavaScript/TypeScript receiver profile. Call/release sequences use those supported source bindings and codecs. Collection additionally requires a separately qualified lifetime-capable provider. [TypeScript collection](typescript-collection.md) freezes the source/native emitter and requires the provider's explicit public capability response before application execution. Explicit CommonJS `.cjs`/`.cts` receiver callers use the real module wrapper and require an unshadowed `require` binding. General Node package/build contexts remain open.
+Java supports the call-only profile above. Node call/release sequences use the existing ordinary JavaScript/TypeScript receiver bindings and codecs. Collection additionally requires a separately qualified lifetime-capable provider. [TypeScript collection](typescript-collection.md) freezes the source/native emitter and requires the provider's explicit public capability response before application execution. Explicit CommonJS `.cjs`/`.cts` receiver callers use the real module wrapper and require an unshadowed `require` binding. General Node package/build contexts remain open.
 
-The bounded sequence has 1 through 32 steps: calls first, at most one release, then at most one final collection. Other method targets, scheduler/yield/iteration actions, resource-close actions, arbitrary object arguments, inherited/private/native receiver state and the other language runners require further adapter work. The common ordered typed protocol is shared across all language IDs; unavailable requested generators remain named blockers.
+The bounded sequence has 1 through 32 steps: calls first, then Node-only release and optional final collection. Other method targets, scheduler/yield/iteration actions, resource-close actions, arbitrary object arguments, unsupported inherited/private/native receiver state and the remaining language runners require further adapter work. The common ordered typed protocol is shared across all language IDs; unavailable requested generators remain named blockers.
 
 Generated and exported suites retain the concrete schedule and all intermediate observations. Raw collection telemetry is checked separately from application state and exact stdout/stderr. This remains **equivalence over these tests and observations**, with diagnostic callers rather than shipping artefact proof. Actual provider/toolchain qualification is separate from unit and plain-worker coverage.
 

@@ -63,8 +63,10 @@ def collection(step: dict) -> dict:
 
 def configure(entry: dict, value: list[dict], coerce: Callable) -> None:
     """Requested unavailable adapters remain named inventory blockers."""
-    if entry["language"] not in ("javascript", "typescript") or "receiver_fixture" not in entry:
-        raise ValueError("sequences require a declared JavaScript/TypeScript receiver fixture")
+    if entry["language"] not in ("javascript", "typescript", "java") or "receiver_fixture" not in entry:
+        raise ValueError("sequences require a declared Java/JavaScript/TypeScript receiver fixture")
+    if entry["language"] == "java" and any(step["action"] != "call" for step in value):
+        raise ValueError("Java receiver sequences currently support call actions only")
     if (entry["language"] == "typescript" and any(step["action"] == "collect" for step in value)
             and entry.get("typescript_backend") not in ("source", "native")):
         raise ValueError("TypeScript collection requires an explicitly selected emitter")
@@ -96,6 +98,11 @@ def contracts(case: dict, roots: list[str]) -> list[dict]:
 
 def collects(entry: dict) -> bool:
     return any(step["action"] == "collect" for step in entry.get("sequence_configuration", []))
+
+
+def call_count(entry: dict) -> int:
+    """The requested call denominator is fixed before any telemetry is received."""
+    return sum(step["action"] == "call" for step in entry["sequence_configuration"]) if "sequence_configuration" in entry else 1
 
 
 def creator(entry: dict) -> str | None:

@@ -470,6 +470,6 @@ def observation(raw: bytes, entry: dict, contract: dict) -> dict[str, Any]:
     result = {"observation_schema_version": 1, "case_id": contract["case_id"], "function_id": contract["function_id"],
             "fixture_sha256": contract["fixture_sha256"], "fixture": {"status": "ready"}, "gaps": [],
             **boundaries}
-    if "sequence_configuration" in entry:
+    if "sequence_configuration" in entry and language in ("javascript", "typescript"):
         result["steps"] = dynamic_steps(capture, entry) if "steps" in capture else []
     return result

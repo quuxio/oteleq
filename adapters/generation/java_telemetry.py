@@ -9,6 +9,7 @@ import java_health
 import java_launch
 import java_provider as provider
 import otelc_capture as capture
+import sequences
 
 CALLS = "otelc.function.calls"
 DURATION = "otelc.function.duration"
@@ -119,7 +120,7 @@ def scope_metrics(scope, method: str, recorded: dict) -> int:
 
 
 def receipt(bodies: list, service: str, entry: dict, trace_decoder, metric_decoder) -> dict:
-    """Require the complete one-root invocation tree and matching direct metrics."""
+    """Require the declared call roots and complete matching cumulative metrics."""
     owner, method = entry["otelc_function"].split("(", 1)[0].rsplit(".", 1)
     nodes, batches = {}, Counter()
     recorded = {CALLS: [], DURATION: []}
@@ -132,7 +133,8 @@ def receipt(bodies: list, service: str, entry: dict, trace_decoder, metric_decod
             spans += calls;errors += failed
         else:
             points += metrics(decode(metric_decoder, body), service, method, recorded)
-    provider.require(spans > 0 and capture.trace_roots(nodes) == 1, "missing complete selected invocation tree")
+    provider.require(spans > 0 and capture.trace_roots(nodes) == sequences.call_count(entry),
+                     "missing complete selected invocation tree(s) for declared calls")
     for name, values in recorded.items():
         ordered = [value for _, value in sorted(values)]
         provider.require(ordered and all(0 <= value <= spans for value in ordered)
