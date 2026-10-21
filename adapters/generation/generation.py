@@ -147,6 +147,24 @@ def finish_process(process: subprocess.Popen) -> None:
         process.wait()
 
 
+def monitor_process(process, out, err, maximum, deadline, interaction):
+    """Keep process budgets active while advancing optional private checkpoints."""
+    failure = None
+    while process.poll() is None:
+        if time.monotonic() > deadline:
+            failure = "process timeout"
+        if out.stat().st_size + err.stat().st_size > maximum:
+            failure = "process output limit exceeded"
+        if failure:
+            break
+        if interaction is not None:
+            interaction.poll(process, deadline)
+        time.sleep(0.01)
+    if interaction is not None and failure is None:
+        interaction.finish(process)
+    return failure
+
+
 def execute(command, cwd, env=None, folder=None, timeout=60, input_data=None, *, max_output_bytes=None, record_process=False, interaction=None):
     """Trusted local execution with wall time/output limits and process-group cleanup."""
     if folder is None:
@@ -165,18 +183,7 @@ def execute(command, cwd, env=None, folder=None, timeout=60, input_data=None, *,
         try:
             if record_process:
                 write(folder / "process.json", {"pid": process.pid, "argv": list(map(str, command))})
-            while process.poll() is None:
-                if time.monotonic() > deadline:
-                    failure = "process timeout"
-                if out.stat().st_size + err.stat().st_size > maximum:
-                    failure = "process output limit exceeded"
-                if failure:
-                    break
-                if interaction is not None:
-                    interaction.poll(process, deadline)
-                time.sleep(0.01)
-            if interaction is not None and failure is None:
-                interaction.finish(process)
+            failure = monitor_process(process, out, err, maximum, deadline, interaction)
         finally:
             # Descendants cannot keep running after the leader exits or interrupts the host.
             finish_process(process)
@@ -782,6 +789,14 @@ def validate_private_sources(project, immutable, folder):
               for name in ("plain", "instrumented") if (project / name).is_file()})
 
 
+def baseline_receipt(entry, folder, bodies):
+    """Plain execution must neither emit telemetry nor invent SDK replies."""
+    if bodies:
+        raise ValueError("baseline unexpectedly exported telemetry")
+    if sequences.controls(entry):
+        java_control_receipt.read(folder, entry, read(folder / "process.json")["pid"], bodies, plain=True)
+
+
 def qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, decoder, *, extra_channels=None,
                     capture_complete=True, prepared_runtime=None):
     if errors or result.returncode:
@@ -794,10 +809,7 @@ def qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, 
         raise ValueError("case observation exceeds comparator channel budget")
     witness = None
     if lane == "baseline":
-        if bodies:
-            raise ValueError("baseline unexpectedly exported telemetry")
-        if sequences.controls(entry):
-            java_control_receipt.read(folder, entry, read(folder / "process.json")["pid"], bodies, plain=True)
+        baseline_receipt(entry, folder, bodies)
     elif prepared_runtime is not None:
         witness = java_telemetry.witness(prepared_runtime, folder, entry, bodies, service, decoder)
     else:
@@ -879,11 +891,7 @@ def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, ht
             env.update(bindings)
             write(folder / "http-controls.json", {"declarations": http_effects.selected(data["configuration"]), "environment": bindings})
         with http_effects.observe(http_fixtures, folder, data["configuration"]["limits"]["max_capture_bytes"]) as requests:
-            options = {"record_process": True} if runtime is not None else {}
-            if sequences.controls(entry):
-                interaction = java_live.Session(folder, runtime, case["sequence"], bodies, plain=lane == "baseline")
-                env.update(interaction.environment())
-                options["interaction"] = interaction
+            options = execution_options(entry, case, lane, folder, runtime, bodies, env)
             result = execute(command, working_directory, env, folder, timeout=data["configuration"]["limits"]["case_timeout_ms"] / 1000,
                              **options)
     capture.retain_http(folder, bodies, errors)
@@ -894,6 +902,16 @@ def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, ht
     verify_attempt_inputs(data, entry, project, folder, scratch, tools, immutable, runtime, launch, config, lane=lane)
     return qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, decoder,
                            extra_channels=effect_channels, capture_complete=complete, prepared_runtime=runtime)
+
+
+def execution_options(entry, case, lane, folder, runtime, bodies, env):
+    """Add only explicitly requested process recording and live Java checkpoints."""
+    options = {"record_process": True} if runtime is not None else {}
+    if sequences.controls(entry):
+        interaction = java_live.Session(folder, runtime, case["sequence"], bodies, plain=lane == "baseline")
+        env.update(interaction.environment())
+        options["interaction"] = interaction
+    return options
 
 
 def verify_attempt_inputs(data, entry, project, folder, scratch, tools, immutable, runtime, launch, config, *, lane):

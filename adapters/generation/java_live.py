@@ -11,6 +11,7 @@ import java_control as control
 ROOT_ENV = "OTELEQ_JAVA_CONTROL_ROOT"
 TOKEN_ENV = "OTELEQ_JAVA_CONTROL_TOKEN"
 RECORD = "java-controls.json"
+CONTROL_SOCKET = "control.sock"
 INTERVAL_MS = 1000
 MAX_STATUSES = 512
 MAX_RECORD_BYTES = 262144
@@ -90,14 +91,14 @@ class Session:
     def query(self, command: str, deadline: float) -> dict | None:
         if self.plain:
             return None
-        value = control.request(self.runtime / "control.sock", command, self.pid, deadline)
+        value = control.request(self.runtime / CONTROL_SOCKET, command, self.pid, deadline)
         self.retain([{"command": command, "status": value}])
         return value
 
     def transition(self, requested: dict, deadline: float) -> list[dict]:
         if self.plain:
             return []
-        result = control.switch(self.runtime / "control.sock", self.pid, **requested, deadline=deadline)
+        result = control.switch(self.runtime / CONTROL_SOCKET, self.pid, **requested, deadline=deadline)
         return self.retain(result)
 
     def acknowledge(self) -> None:
@@ -180,7 +181,7 @@ class Session:
             return
         marker(path, (self.token + " " + phase + "\n").encode())
         if self.position == 0 and not self.plain:
-            socket = self.runtime / "control.sock"
+            socket = self.runtime / CONTROL_SOCKET
             if not socket.exists() and not socket.is_symlink():
                 return  # The SDK's control thread may finish binding after main starts.
         if phase == "finish":

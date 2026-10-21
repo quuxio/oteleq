@@ -71,13 +71,18 @@ def history(rows: list, pid: int, requested: dict, completed: int) -> int:
         current = control.status(row["status"], pid)
         control.require(current["completed"] == completed, "selected measurements changed during a control transition")
         if index > 0:
-            key = "collection" if index == 1 else "emission"
-            other = "emission" if index == 1 else "collection"
-            control.require(current[key] == requested[key] and current[other] == previous[other], "control transition altered an independent state")
+            independent_transition(index, current, previous, requested)
         previous = current
     control.require(all(previous[key] == value for key, value in requested.items())
                     and (requested["emission"] or previous["effective_emission_off"]), "requested export barrier was not reached")
     return len(rows)
+
+
+def independent_transition(index: int, current: dict, previous: dict, requested: dict) -> None:
+    """A setter acknowledges only its own flag; polls preserve both flags."""
+    key, other = ("collection", "emission") if index == 1 else ("emission", "collection")
+    control.require(current[key] == requested[key] and current[other] == previous[other],
+                    "control transition altered an independent state")
 
 
 def trees(nodes: dict, intervals: dict) -> list[int]:
@@ -130,4 +135,4 @@ def phase_series(indices: list[int], series: dict, expected: int, *, required: b
         values = [point for index in indices for point in series[index][name]]
         control.require(all(value <= expected for _, value in values), "phase metric includes uncollected calls")
         if required:
-            control.require(values and sorted(values)[-1][1] == expected, "missing positive or retained emission-off measurements")
+            control.require(values and max(values)[1] == expected, "missing positive or retained emission-off measurements")
