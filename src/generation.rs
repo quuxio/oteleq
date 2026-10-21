@@ -134,6 +134,10 @@ const RESOURCES: &[(&str, &str)] = &[
         include_str!("../adapters/generation/policy.py"),
     ),
     (
+        "return_expectations.py",
+        include_str!("../adapters/generation/return_expectations.py"),
+    ),
+    (
         "domains.py",
         include_str!("../adapters/generation/domains.py"),
     ),

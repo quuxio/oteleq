@@ -42,3 +42,5 @@ build_tags = []
 # domains = [{ kind = "integer", minimum = 0, maximum = 100 }]
 # Intentional errors require an explicit contract; otherwise a return is required.
 # expected_baseline = { kind = "error", category = "exception", type = "python.builtins.ValueError" }
+# Or independently declare one scalar result for every case in this fixture:
+# expected_baseline = { kind = "return_value", value = { kind = "integer", type = "python.int", value = "8", signed = true } }

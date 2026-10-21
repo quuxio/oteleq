@@ -81,7 +81,11 @@ Source and function selectors are case-sensitive globs over complete POSIX relat
 
 Each fixture replaces automatic inputs for its matched callable(s). `source` defaults to `**`; optional `language` scopes a fixture when a shared policy is narrowed with CLI language selectors. Multiple matching fixtures are an error. A fixture matching no inventoried callable is an error, including its partial workspace path for inspection. Arguments must have the correct arity and supported scalar types; integer range checks reject narrowing. Cases retain both requested values and the concrete target representation (including binary32/binary64 rounding); duplicate cases after conversion are rejected. Go floating inputs are constructed from their exact IEEE bits; an untyped Go `-0.0` constant would otherwise lose its sign. No application observations are normalised. Plain native `char` currently uses the portable 0..127 range; explicitly signed/unsigned byte types have their declared ranges. Current native ranges describe host builds, not cross-compilation. Complex objects/buffers still require the unfinished factory contract.
 
-A successful baseline return is the default fixture expectation. Matching unexpected exceptions/panics are blocked rather than accepted as equivalent. Declare an intentional error explicitly in its concrete fixture:
+A successful baseline return is the default fixture expectation. Matching unexpected exceptions/panics are blocked rather than accepted as equivalent.
+
+An optional [declared scalar return value](expected-returns.md) also blocks equal results that violate an independently known expectation. Use `expected_baseline = { kind = "return_value", value = { kind = "integer", type = "python.int", value = "8", signed = true } }` for a Python integer result of eight. The same expectation applies to all cases in that fixture and remains frozen through replay, export and scalar shrinking.
+
+Declare an intentional error explicitly in its concrete fixture:
 
 ```toml
 [[fixtures]]

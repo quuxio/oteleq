@@ -203,6 +203,7 @@ case_timeout_ms=250
 [[fixtures]]
 function="api.sample"
 cases=[[7],[41]]
+expected_baseline={kind="return_value",value={kind="integer",type="python.int",value="8",signed=true}}
 ''')
             original = generation.manifest(source)
             options = argparse.Namespace(source=source, otelc_root=root, workspace_parent=base,
@@ -228,6 +229,9 @@ cases=[[7],[41]]
                 self.assertEqual(generation.load_workspace(exported, generated=True)[1]["configuration"], data["configuration"])
                 entry = data["inventory"][0]
                 case = generation.read(workspace / "tests/corpus.json")[0]
+                self.assertEqual(case["expected_baseline"], {
+                    "kind": "return_value", "value": {"kind": "integer", "type": "python.int", "value": "8", "bits": None, "signed": True}})
+                self.assertEqual(generation.read(exported / "tests/corpus.json")[0]["expected_baseline"], case["expected_baseline"])
                 folder = base / "comparison";folder.mkdir()
                 captured_graph = {"roots": {"arguments": {"type":"null"}}, "nodes": []}
                 raw = json.dumps({"before":captured_graph,"after":captured_graph,
