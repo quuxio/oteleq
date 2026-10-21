@@ -17,6 +17,10 @@ import otelc_capture as capture
 MAX_RUNTIME_BYTES = 32 * 1024 * 1024
 MAX_RUNTIME_FILES = 64
 LAUNCH_FILE = "prepared-launch.json"
+CLASS_LOG = "class-load.log"
+AGENT_CONFIG = "agent.properties"
+PLAN_CONFIG = "plan.properties"
+APPLICATION_FILE = "prepared-application.json"
 IDENTITY_FIELDS = {"path", "sha256", "size", "inode", "device", "mtime_ns"}
 LAUNCH_FIELDS = {"schema_version", "language", "plain", "jvm_profile", "agent_diagnostics", "health_report",
                  "selection_sha256", "argv", "main_class", "ordered_classpath", "application", "tooling",
@@ -91,13 +95,13 @@ def target(entry: dict, application: dict, project: Path) -> tuple[str, str]:
 def expected_argv(root: Path, java: Path, classes: Path, main: str, runtime: Path,
                   data: dict, owner: str, method: str, plain: bool) -> list[str]:
     """SDK metadata may verify this recipe; it cannot choose executables or flags."""
-    args = [str(java), "-Xshare:off", "-Xlog:class+load=info:file=" + str(runtime / "class-load.log")]
+    args = [str(java), "-Xshare:off", "-Xlog:class+load=info:file=" + str(runtime / CLASS_LOG)]
     if not plain:
         args[1:1] = ["-Dotel.javaagent.logging=simple",
                      "-Dio.opentelemetry.javaagent.slf4j.simpleLogger.logFile=" + str(runtime / "agent.log")]
         args += ["-javaagent:" + str(root / provider.AGENT), "-Dotel.javaagent.extensions=" + str(root / provider.EXTENSION),
-                 "-Dotel.javaagent.configuration-file=" + str(runtime / "agent.properties"),
-                 "-Dotelc.plan=" + str(runtime / "plan.properties"), "-Dotelc.traces.enabled=true",
+                 "-Dotel.javaagent.configuration-file=" + str(runtime / AGENT_CONFIG),
+                 "-Dotelc.plan=" + str(runtime / PLAN_CONFIG), "-Dotelc.traces.enabled=true",
                  "-Dotelc.lifetime.types=", "-Dotelc.lifetime.resources=", "-Dotelc.lifetime.max-live=4096",
                  "-Dotelc.lifetime.release=close"]
         args += ["-D" + key + "=" + value for key, value in sorted(agent_values(data, owner, method).items())]
@@ -116,7 +120,7 @@ def plan_values(runtime: Path, data: dict, selection: dict) -> dict:
 def verify(launch: dict, *, root: Path, project: Path, folder: Path, tools: dict,
            runtime: Path, entry: dict, data: dict, plain: bool) -> None:
     """Bind the full public response, argv and loaded inputs before and after Java."""
-    application_path = folder / "prepared-application.json"
+    application_path = folder / APPLICATION_FILE
     application = capture.strict_json(application_path.read_bytes())
     classes = folder / "scratch/classes"
     java = tools["java"].resolve(strict=True)
@@ -130,7 +134,7 @@ def verify(launch: dict, *, root: Path, project: Path, folder: Path, tools: dict
     provider.require(launch["main_class"] == application["main_class"] and launch["ordered_classpath"] == [str(classes)]
                      and type(launch["java_version"]) is str and launch["java_version"], "prepared main/classpath/version differs")
     provider.require(launch["policy_sha256"] == provider.digest(data)
-                     and launch["loaded_origins"] == str(runtime / "class-load.log"), "prepared policy/origin identity differs")
+                     and launch["loaded_origins"] == str(runtime / CLASS_LOG), "prepared policy/origin identity differs")
     for key, filename in (("agent_diagnostics", "agent.log"), ("health_report", "health.json"), ("control_socket", "control.sock")):
         provider.require(launch[key] == (None if plain else str(runtime / filename)), "prepared runtime path differs: " + key)
     verify_application(launch["application"], application, application_path, classes)
@@ -142,11 +146,11 @@ def verify(launch: dict, *, root: Path, project: Path, folder: Path, tools: dict
         provider.require(launch["selection_sha256"] == provider.digest(selection)
                          and capture.strict_json((runtime / "selection.json").read_bytes()) == selection,
                          "SDK changed resolved method selection")
-        provider.require((runtime / "agent.properties").read_text() == properties(agent_values(data, owner, method))
-                         and (runtime / "plan.properties").read_text() == properties(plan_values(runtime, data, selection)),
+        provider.require((runtime / AGENT_CONFIG).read_text() == properties(agent_values(data, owner, method))
+                         and (runtime / PLAN_CONFIG).read_text() == properties(plan_values(runtime, data, selection)),
                          "SDK changed agent configuration or live controls")
         tooling |= {root / provider.AGENT, root / provider.EXTENSION,
-                    runtime / "agent.properties", runtime / "plan.properties", runtime / "selection.json"}
+                    runtime / AGENT_CONFIG, runtime / PLAN_CONFIG, runtime / "selection.json"}
     files(launch["tooling"], tooling)
 
 
@@ -165,7 +169,7 @@ def prepare(root: Path, project: Path, folder: Path, tools: dict, runtime: Path,
     """Use the public prepare-only API, then accept only the independently fixed argv."""
     config = folder / "policy.toml"
     command = [sys.executable, "-m", "otelc", "--config", config, "java", "--manifest",
-               folder / "prepared-application.json", "--runtime", runtime, "--prepare-only", "--diagnostic-profile"]
+               folder / APPLICATION_FILE, "--runtime", runtime, "--prepare-only", "--diagnostic-profile"]
     if plain:
         command.append("--plain")
     result = execute(command, root, provider.environment(root, tools, folder, env), folder / "sdk-prepare",
@@ -199,14 +203,16 @@ def archive(runtime: Path, folder: Path) -> None:
 
 
 @contextmanager
-def runtime(entry: dict, folder: Path) -> Iterator[Path | None]:
+def runtime(entry: dict, folder: Path, *, source_roots: tuple[Path, ...] = ()) -> Iterator[Path | None]:
     """The SDK socket needs a short path; all runtime files remain caller-owned."""
     if not provider.prepared(entry):
         yield None
         return
     provider.require(os.name == "posix", "prepared runtime requires qualified POSIX control sockets")
-    with tempfile.TemporaryDirectory(prefix="oej-", dir="/tmp") as temporary:
+    with tempfile.TemporaryDirectory(prefix="oej-", dir=capture.temporary_parent(*source_roots)) as temporary:
         path = Path(temporary).resolve() / "r"
+        provider.require(len(os.fsencode(path / "control.sock")) <= 100,
+                         "runtime socket path exceeds 100 bytes; select a shorter TMPDIR before planning")
         try:
             yield path
         finally:
@@ -216,9 +222,9 @@ def runtime(entry: dict, folder: Path) -> Iterator[Path | None]:
 
 def origins(runtime: Path, folder: Path, entry: dict) -> None:
     """Required application/driver classes must load from the retained class output."""
-    path = runtime / "class-load.log"
+    path = runtime / CLASS_LOG
     provider.require(path.is_file() and path.stat().st_size <= MAX_RUNTIME_BYTES, "missing or oversized JVM origin log")
-    application = capture.strict_json((folder / "prepared-application.json").read_bytes())
+    application = capture.strict_json((folder / APPLICATION_FILE).read_bytes())
     loaded = {}
     for line in path.read_text().splitlines():
         match = re.search(r"\] ([^ ]+) source: (.+)$", line)

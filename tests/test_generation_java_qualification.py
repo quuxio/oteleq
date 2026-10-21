@@ -72,6 +72,8 @@ class JavaQualificationTests(unittest.TestCase):
                        "sha256": hashlib.sha256((runtime / "health.json").read_bytes()).hexdigest()}}}
             (folder / "runtime-archive.json").write_text(json.dumps(archive))
             with patch.dict(sys.modules, modules):
+                trace_decoder = modules["opentelemetry.proto.collector.trace.v1.trace_service_pb2"].ExportTraceServiceRequest
+                metric_decoder = modules["opentelemetry.proto.collector.metrics.v1.metrics_service_pb2"].ExportMetricsServiceRequest
                 self.assertEqual(qualifier.verify_prepared(root), {"retained_attempts": 1, "unique_processes": 1,
                                   "retained_instrumented_receipts": 1, "short_runtimes_removed": True})
                 for group, key in (("trace_exports", "units_succeeded"), ("metric_exports", "batches_succeeded"),
@@ -79,8 +81,7 @@ class JavaQualificationTests(unittest.TestCase):
                     changed = copy.deepcopy(health);changed[group][key] = "2"
                     (runtime / "health.json").write_text(json.dumps(changed))
                     with self.subTest(group=group), self.assertRaises(AssertionError):
-                        qualifier.verify_receipt(folder, launch, 123, modules[next(iter(modules))].ExportTraceServiceRequest,
-                                                 modules[list(modules)[1]].ExportMetricsServiceRequest)
+                        qualifier.verify_receipt(folder, launch, 123, trace_decoder, metric_decoder)
                 (runtime / "health.json").write_text(json.dumps(health))
                 (folder / "process.json").write_text(json.dumps({"argv": ["other"], "pid": 123}))
                 with self.assertRaises(AssertionError):qualifier.verify_prepared(root)

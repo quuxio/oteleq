@@ -149,7 +149,8 @@ class JavaTelemetryTests(unittest.TestCase):
                                                                          selection_sha256="b" * 64)))
             (folder / "process.json").write_text(json.dumps(dict(pid=123, argv=argv)))
             with patch.dict(sys.modules, {"opentelemetry.proto.collector.metrics.v1.metrics_service_pb2": module}):
-                result = telemetry.witness(runtime, folder, self.entry, self.bodies, "case", NS(FromString=lambda _: self.trace))
+                trace_decoder = NS(FromString=lambda _: self.trace)
+                result = telemetry.witness(runtime, folder, self.entry, self.bodies, "case", trace_decoder)
                 self.assertEqual(result["raw_otlp_sha256"], hashlib.sha256(b"tracemetric").hexdigest())
                 self.assertEqual(result["functions"], {self.entry["otelc_function"]: 1})
                 self.assertEqual(result["pending"], 0)
@@ -158,7 +159,7 @@ class JavaTelemetryTests(unittest.TestCase):
                 for process in ({"pid": 123, "argv": ["/other/java"]}, {"pid": 124, "argv": argv}, {}):
                     (folder / "process.json").write_text(json.dumps(process))
                     with self.subTest(process=process), self.assertRaises(ValueError):
-                        telemetry.witness(runtime, folder, self.entry, self.bodies, "case", NS(FromString=lambda _: self.trace))
+                        telemetry.witness(runtime, folder, self.entry, self.bodies, "case", trace_decoder)
 
 
 if __name__ == "__main__":

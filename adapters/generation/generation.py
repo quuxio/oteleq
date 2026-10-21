@@ -814,7 +814,8 @@ def attempt(workspace, data, entry, case, lane, folder, decoder, *, http_fixture
     if [item.settings for item in http_fixtures] != http_effects.selected(data["configuration"]):
         raise ValueError("HTTP effects require the frozen case fixture context before application execution")
     folder.mkdir(parents=True)
-    with java_launch.runtime(entry, folder) as runtime:
+    roots = (Path(data["source"]), Path(data["otelc_root"]), workspace)
+    with java_launch.runtime(entry, folder, source_roots=roots) as runtime:
         return attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, http_fixtures, runtime)
 
 
@@ -876,6 +877,14 @@ def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, ht
     request_channels, request_complete = http_effects.finish(requests)
     effect_channels.update(request_channels)
     complete &= request_complete
+    verify_attempt_inputs(data, entry, project, folder, scratch, tools, immutable, runtime, launch, config)
+    return qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, decoder,
+                           extra_channels=effect_channels, capture_complete=complete, prepared_runtime=runtime)
+
+
+def verify_attempt_inputs(data, entry, project, folder, scratch, tools, immutable, runtime, launch, config):
+    """Recheck private sources, compiler products and the selected launch/provider."""
+    root, language = Path(data["otelc_root"]), entry["language"]
     validate_private_sources(project, immutable, folder)
     if language == "java":
         java_build.verify(project, scratch / "classes", folder)
@@ -887,8 +896,6 @@ def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, ht
     if 'native_context' in entry:
         native_profile.verify_build(sys.modules[__name__], folder)
     provider_stable(root, language, tools, data["artefacts"][language], entry)
-    return qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, decoder,
-                           extra_channels=effect_channels, capture_complete=complete, prepared_runtime=runtime)
 
 def capture_case(workspace, data, entry, case, destination, decoder, contract, *, http_fixtures=None):
     """Keep raw evidence and bounded typed observations for every actual launch."""

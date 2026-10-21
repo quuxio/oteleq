@@ -122,5 +122,5 @@ def bind(entry: dict, root: Path, workspace: Path, tools: dict, execute: Callabl
                 and set(implemented + remaining) == SDK_LANGUAGES
                 and "java" in implemented, "public provider has no supported Java capability")
         entry["java_provider"]["resolved"] = value
-    except (ValueError, OSError, KeyError, UnicodeError) as error:
+    except (ValueError, OSError, KeyError) as error:
         entry["status"], entry["reason"] = "blocked", "Java prepared provider unavailable: " + str(error)

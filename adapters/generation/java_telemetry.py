@@ -92,22 +92,29 @@ def metrics(message, service: str, method: str, recorded: dict) -> int:
     for group in message.resource_metrics:
         resource(group.resource, service)
         for scope in group.scope_metrics:
-            for metric in scope.metrics:
-                kind = metric.WhichOneof("data")
-                provider.require(kind is not None, "missing metric data")
-                data = getattr(metric, kind)
-                count += len(data.data_points)
-                if metric.name not in (CALLS, DURATION):
-                    continue
-                provider.require((scope.scope.name, scope.scope.version) == METHOD_SCOPE
-                                 and metric.unit == ("{call}" if metric.name == CALLS else "s"),
-                                 "unbound function metric scope or unit")
-                expected = "sum" if metric.name == CALLS else "histogram"
-                provider.require(kind == expected and data.aggregation_temporality == 2,
-                                 "function metric is not a cumulative counter/histogram")
-                for point in data.data_points:
-                    metric_point(point, method)
-                    recorded[metric.name].append((point.time_unix_nano, metric_value(metric, data, point)))
+            count += scope_metrics(scope, method, recorded)
+    return count
+
+
+def scope_metrics(scope, method: str, recorded: dict) -> int:
+    """Validate each scope's required series and count all its exported points."""
+    count = 0
+    for metric in scope.metrics:
+        kind = metric.WhichOneof("data")
+        provider.require(kind is not None, "missing metric data")
+        data = getattr(metric, kind)
+        count += len(data.data_points)
+        if metric.name not in (CALLS, DURATION):
+            continue
+        provider.require((scope.scope.name, scope.scope.version) == METHOD_SCOPE
+                         and metric.unit == ("{call}" if metric.name == CALLS else "s"),
+                         "unbound function metric scope or unit")
+        expected = "sum" if metric.name == CALLS else "histogram"
+        provider.require(kind == expected and data.aggregation_temporality == 2,
+                         "function metric is not a cumulative counter/histogram")
+        for point in data.data_points:
+            metric_point(point, method)
+            recorded[metric.name].append((point.time_unix_nano, metric_value(metric, data, point)))
     return count
 
 

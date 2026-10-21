@@ -48,7 +48,7 @@ def read(runtime: Path) -> dict:
 
 def counter(value: object, label: str) -> int:
     """Null is unavailable, and decimal counters use ASCII without lost precision."""
-    require(type(value) is str and re.fullmatch(r"0|[1-9][0-9]*", value) is not None,
+    require(type(value) is str and re.fullmatch(r"0|[1-9]\d*", value, flags=re.ASCII) is not None,
             "missing, unavailable or invalid counter: " + label)
     return int(value)
 

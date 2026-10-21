@@ -43,7 +43,7 @@ class JavaHealthTests(unittest.TestCase):
         self.assertEqual(java_health.counter("9007199254740993", "large"), 9007199254740993)
 
     def test_counter_unknown_boolean_non_ascii_and_noncanonical_values_refuse(self):
-        for value in (None, True, 0, -1, "-1", "01", "1.0", "1e2", " 1", "1\n", "\u0661"):
+        for value in (None, True, 0, -1, "-1", "01", "1.0", "1e2", " 1", "1\n", "\u0661", "1\u0661"):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 java_health.counter(value, "counter")
 
@@ -60,7 +60,8 @@ class JavaHealthTests(unittest.TestCase):
         for value in ({}, {**report(), "unknown": 0}):
             with self.assertRaises(ValueError): qualify(value)
         for key, value in (("pid", True), ("policy_sha256", "bad"), ("metric_points", 0), ("spans", True)):
-            with self.subTest(key=key), self.assertRaises(ValueError): qualify(report(), **{key: value})
+            unchanged = report()
+            with self.subTest(key=key), self.assertRaises(ValueError): qualify(unchanged, **{key: value})
 
     def test_unknown_loss_pending_or_export_count_mismatch_refuses(self):
         for group in ("span_accounting", "trace_exports", "metric_exports"):

@@ -105,13 +105,16 @@ class JavaLaunchTests(unittest.TestCase):
     def test_rehashed_controls_selection_and_foreign_source_still_refuse(self):
         path = self.runtime / "plan.properties"
         path.write_text(path.read_text().replace("metrics.collection=true", "metrics.collection=false"))
-        with self.assertRaisesRegex(ValueError, "configuration or live controls"):self.verify(self.value())
+        changed = self.value()
+        with self.assertRaisesRegex(ValueError, "configuration or live controls"):self.verify(changed)
         path.write_text(launch.properties(launch.plan_values(self.runtime, self.data, self.selection)))
         (self.runtime / "selection.json").write_text('{"methods":{},"types":[],"resources":[]}')
-        with self.assertRaisesRegex(ValueError, "resolved method"):self.verify(self.value())
+        changed = self.value()
+        with self.assertRaisesRegex(ValueError, "resolved method"):self.verify(changed)
         self.application["bindings"]["App"]["source"] = str(self.project / "Foreign.java")
         self.manifest.write_text(json.dumps(self.application))
-        with self.assertRaisesRegex(ValueError, "compiler-owned source"):self.verify(self.value())
+        changed = self.value()
+        with self.assertRaisesRegex(ValueError, "compiler-owned source"):self.verify(changed)
 
     def test_metadata_cannot_initiate_a_query_for_an_unapproved_path(self):
         row = launch.identity(self.java);row["path"] = "/unapproved/path"
@@ -150,8 +153,23 @@ class JavaLaunchTests(unittest.TestCase):
             self.assertEqual((destination / "sdk-runtime/health.json").read_text(), "observed")
             self.assertEqual(json.loads((destination / "runtime-archive.json").read_text())["original"], str(runtime))
         with launch.runtime({"language": "python"}, self.folder) as runtime:self.assertIsNone(runtime)
+        context = launch.runtime(self.entry, self.folder)
         with patch.object(launch.os, "name", "nt"), self.assertRaisesRegex(ValueError, "POSIX"):
-            with launch.runtime(self.entry, self.folder):self.fail("unsupported platform entered")
+            context.__enter__()
+
+    def test_long_system_temporary_parent_refuses_and_cleans_the_private_directory(self):
+        parent = self.base / ("x" * 120);parent.mkdir()
+        context = launch.runtime(self.entry, self.folder)
+        with patch.object(launch.capture, "temporary_parent", return_value=parent), self.assertRaisesRegex(ValueError, "shorter TMPDIR"):
+            context.__enter__()
+        self.assertFalse(list(parent.iterdir()))
+
+    def test_configured_temporary_parent_cannot_write_into_a_source_root(self):
+        source = self.base / "application";source.mkdir()
+        context = launch.runtime(self.entry, self.folder, source_roots=(source,))
+        with patch.dict(os.environ, {"TMPDIR": str(source)}), self.assertRaisesRegex(ValueError, "outside both repositories"):
+            context.__enter__()
+        self.assertFalse(list(source.iterdir()))
 
     def test_runtime_links_special_files_and_budgets_refuse(self):
         foreign = self.base / "foreign";foreign.write_text("preserve")
@@ -159,13 +177,13 @@ class JavaLaunchTests(unittest.TestCase):
             destination = self.base / ("budget-" + fault);destination.mkdir()
             limit = (patch.object(launch, "MAX_RUNTIME_BYTES" if fault == "bytes" else "MAX_RUNTIME_FILES",
                                   1 if fault == "bytes" else 0) if fault in ("bytes", "count") else nullcontext())
-            with self.subTest(fault=fault), limit, self.assertRaises(ValueError):
-                with launch.runtime(self.entry, destination) as runtime:
-                    runtime.mkdir(mode=0o700)
-                    if fault == "link":(runtime / "link").symlink_to(foreign)
-                    elif fault == "fifo":os.mkfifo(runtime / "fifo")
-                    else:
-                        (runtime / "file").write_bytes(b"xx")
+            with self.subTest(fault=fault), limit:
+                context = launch.runtime(self.entry, destination)
+                runtime = context.__enter__();runtime.mkdir(mode=0o700)
+                if fault == "link":(runtime / "link").symlink_to(foreign)
+                elif fault == "fifo":os.mkfifo(runtime / "fifo")
+                else:(runtime / "file").write_bytes(b"xx")
+                with self.assertRaises(ValueError):context.__exit__(None, None, None)
             self.assertFalse(runtime.exists())
         self.assertEqual(foreign.read_text(), "preserve")
 
