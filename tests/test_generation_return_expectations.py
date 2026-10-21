@@ -39,6 +39,7 @@ class ReturnExpectationTests(unittest.TestCase):
         bad = [None, 7, {}, {"kind": []}, {"kind": "unbound"}, {"kind": "reference", "node_id": "n0"},
                {"kind": "opaque", "type": "x", "reason": "unknown"}, {"kind": "null", "value": 0},
                {"kind": "unit"}, {"kind": "unit", "type": ""}, {"kind": "unit", "type": "x" * 1025},
+               {"kind": "unit", "type": "\u00e9" * 513}, {"kind": "unit", "type": "\ud800"},
                {"kind": "boolean", "value": 1}, {"kind": "boolean", "value": True, "type": None}]
         for value in bad:
             with self.subTest(value=value), self.assertRaises(ValueError):

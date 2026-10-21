@@ -48,9 +48,7 @@ fn validate_return_value(value: &Value) -> Result<(), String> {
         roots: [("result".into(), value.clone())].into(),
         nodes: Vec::new(),
     };
-    if !graph::inspect(&expected, "expected")?.is_empty() {
-        return Err("expected return requires a complete scalar value".into());
-    }
+    graph::inspect(&expected, "expected")?;
     Ok(())
 }
 #[derive(Clone, Debug, Deserialize, Serialize)]

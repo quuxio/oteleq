@@ -61,7 +61,7 @@ def prepare(cli: Path, provider: Path, folder: Path) -> tuple[Path, Path]:
         target.parent.mkdir()
         target.write_text(text)
         for suffix, value in (("match", 7), ("wrong_fixture", 8)):
-            policy += (f'\n[[fixtures]]\nlanguage="{language}"\nfunction="*selected_{suffix}"\ncases=[[3]]\n'
+            policy += (f'\n[[fixtures]]\nlanguage="{language}"\nfunction="*selected_{suffix}*"\ncases=[[3]]\n'
                        + 'expected_baseline={kind="return_value",value=' + toml_value(scalar(language, value)) + '}\n')
     config = folder / "policy.toml"
     config.write_text(policy)

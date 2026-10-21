@@ -4,7 +4,7 @@ oteleq now inventories source files and generates an external `unittest` suite f
 
 ## Build and run
 
-Build otelc and its qualified compiler/runtime adapters first. Use its locked CPython 3.12 environment so the OTLP protobuf decoder and Python adapter agree. Build oteleq with Rust 1.98.1 or newer:
+Prepare a qualified pre-rebuild otelc provider and its matching compiler/runtime adapters first; the [integrated-provider record](qualification/integrated-provider-2026-10-20.json) names the frozen `d6d03b7` revision. The replacement SDK on otelc `main` uses different APIs and is not yet a compatible generator provider. Use the selected provider's locked CPython 3.12 environment so the OTLP protobuf decoder and Python adapter agree. Build oteleq with Rust 1.98.1 or newer:
 
 ```sh
 cargo build --locked

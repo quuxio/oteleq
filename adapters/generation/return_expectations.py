@@ -44,6 +44,16 @@ def string_payload(encoding: Any, value: Any) -> None:
                                          for i in range(0, len(data), 4)), "invalid code point")
 
 
+def type_label(value: Any) -> None:
+    """Use the Rust protocol's byte bound and valid UTF-8 strings."""
+    require(type(value) is str, "requires a type label")
+    try:
+        encoded = value.encode("utf8")
+    except UnicodeError as error:
+        raise ValueError("expected return: invalid type label") from error
+    require(0 < len(encoded) <= 1024, "requires a bounded type label")
+
+
 def validate(value: Any) -> dict:
     """Return a closed typed scalar; graph references and opaque state need fixtures."""
     require(type(value) is dict, "requires a typed scalar record")
@@ -60,9 +70,8 @@ def validate(value: Any) -> dict:
                    "bytes": {"kind", "type", "hex"}}
         require(type(kind) is str and kind in layouts, "unsupported or incomplete scalar kind")
         fields(value, layouts[kind], {"bits"} if kind == "integer" else set())
-    label = value.get("type")
-    require(kind == "boolean" and "type" not in value or type(label) is str and 0 < len(label) <= 1024,
-            "requires a bounded type label")
+    if "type" in value:
+        type_label(value["type"])
     return payload(value)
 
 

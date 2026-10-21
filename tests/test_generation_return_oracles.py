@@ -1,9 +1,12 @@
 """The declared-return qualification checks complete independently known results."""
 import copy
+import fnmatch
 import json
 from pathlib import Path
 import tempfile
+import tomllib
 import unittest
+from unittest.mock import patch
 
 import qualify_returns as qualify
 
@@ -18,6 +21,24 @@ def attempt(language: str, lane: str) -> dict:
 
 
 class ReturnQualificationTests(unittest.TestCase):
+    def test_fixture_patterns_match_source_and_signature_qualified_identities(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            workspace = folder / "workspace"
+            workspace.mkdir()
+            with patch.object(qualify, "command", return_value=str(workspace)):
+                qualify.prepare(Path("cli"), Path("provider"), folder)
+            policy = tomllib.loads((folder / "policy.toml").read_text())
+            self.assertEqual(len(policy["fixtures"]), 16)
+            for fixture in policy["fixtures"]:
+                suffix = "wrong_fixture" if "wrong_fixture" in fixture["function"] else "match"
+                identity = "Owner.selected_" + suffix
+                if fixture["language"] in ("cpp", "java"):
+                    identity += "(int)"
+                with self.subTest(language=fixture["language"], suffix=suffix):
+                    self.assertTrue(fnmatch.fnmatchcase(identity, fixture["function"]))
+                    self.assertEqual(fixture["cases"], [[3]])
+
     def test_all_language_sources_and_toml_expectations_are_concrete(self):
         for language in qualify.LANGUAGES:
             name, text = qualify.source(language)
