@@ -109,7 +109,7 @@ class JavaProfileTests(unittest.TestCase):
             patch_jar(root)
             frozen = provider.artefacts(root, {"java": java}, profiles.SAFE)
             self.assertIn(profiles.PATCH, frozen)
-            self.assertTrue(set(profiles.LICENCES.values()) <= set(frozen))
+            self.assertLessEqual(set(profiles.LICENCES.values()), set(frozen))
             entry = {"language": "java", "java_backend": "prepared", "java_profile": profiles.SAFE}
             generation.provider_stable(root, "java", {"java": java}, frozen, entry)
             patch_path = root / profiles.PATCH
