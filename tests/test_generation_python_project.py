@@ -102,6 +102,43 @@ class PythonProjectTests(unittest.TestCase):
                                 capture_output=True, timeout=30, check=False)
         return result, observation
 
+    def test_receiver_fixtures_cannot_clear_invalid_import_context(self):
+        source = ('class Counter:\n def __init__(self,start:int):self.value=start\n'
+                  ' def add(self,n:int)->int:\n  self.value+=n\n  return self.value\n'
+                  'def make_counter(start:int):return Counter(start)\n')
+        contexts = [('namespace', ['src'], 'namespace'),
+                    ('ambiguous', ['.', 'src'], 'exactly one'),
+                    ('shadowed', ['first', 'src'], 'shadowed'),
+                    ('regular', ['src'], None)]
+        for kind, roots, error in contexts:
+            for factory in ('Counter', 'make_counter'):
+                with self.subTest(context=kind, factory=factory), tempfile.TemporaryDirectory() as temporary:
+                    root = Path(temporary)
+                    path = self.write(root, 'src/pkg/api.py', source)
+                    if kind != 'namespace':
+                        self.write(root, 'src/pkg/__init__.py')
+                    if kind == 'shadowed':
+                        self.write(root, 'first/pkg/__init__.py')
+                    config = policy.validate({'languages': ['python'],
+                        'adapters': {'python': {'import_roots': roots}},
+                        'functions': {'include': ['*.Counter.add']},
+                        'fixtures': [{'function': '*.Counter.add', 'cases': [[7]],
+                                      'receiver': {'factory': factory, 'arguments': [10]}}]})
+                    parsed = discovery.python_inventory(source)
+                    parsed['entrypoints'] = []
+                    function = next(row for row in parsed['functions'] if row['name'] == 'Counter.add')
+                    entry = generation.inventory_entry(function, parsed, 'src/pkg/api.py', 'python',
+                        'a' * 64, root, argparse.Namespace(configuration=config, cases=1))
+                    self.assertEqual(path.read_text(), source)
+                    self.assertEqual(entry['receiver_fixture']['arguments'], [10])
+                    if error:
+                        self.assertEqual(entry['status'], 'blocked')
+                        self.assertIn(error, entry['reason'])
+                        self.assertNotIn('python_import', entry)
+                    else:
+                        self.assertEqual(entry['status'], 'ready', entry['reason'])
+                        self.assertEqual(entry['python_import'], {'module': 'pkg.api', 'roots': ['src']})
+
     def test_worker_uses_real_relative_and_absolute_package_imports_and_retains_mutation(self):
         for prefix, roots in [('', ['.']), ('src/', ['src'])]:
             with self.subTest(prefix=prefix), tempfile.TemporaryDirectory() as temporary:

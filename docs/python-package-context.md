@@ -19,6 +19,8 @@ cases = [[7]]
 
 Use `import_roots = ["."]` when the package directory is directly inside the selected source root. Paths must be distinct, canonical and relative to that source root. The configured order controls import resolution. Each selected file must match exactly one import root. Parent directories must be regular packages with `__init__.py`; ambiguous roots, shadowed modules, invalid module names and namespace packages remain visible blockers.
 
+Declared receiver constructors and factories retain these same import checks. A construction fixture cannot clear an invalid package context or select the standalone loader as a fallback.
+
 ```sh
 quux-oteleq plan --source /absolute/path/to/project \
   --otelc-root /absolute/path/to/otelc \

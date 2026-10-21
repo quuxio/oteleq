@@ -404,7 +404,7 @@ def configure_entry_context(entry, discovered, configuration, snapshot, excluded
         try:
             entry["python_import"] = python_project.context(snapshot, entry["path"], adapters["python"]["import_roots"])
         except ValueError as error:
-            entry["reason"] = entry["reason"] or str(error)
+            entry["reason"] = str(error)
 
 
 def inventory_entry(function, discovered, name, language, source_hash, snapshot, args):
