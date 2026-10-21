@@ -163,6 +163,17 @@ def preview(workflow, workspace: Path, entry: dict, case: dict, destination: Pat
     workflow.write(destination / 'recipe.json', recipe)
 
 
+def driver_inputs(profile: dict, retained: Path, step: dict, folder: Path, execute) -> dict:
+    """Bind headers read by the neutral driver as well as application unit inputs."""
+    arguments = step['command']
+    position = arguments.index('-c')
+    source = Path(arguments[position + 1])
+    unit = {'source': source.name, 'directory': '.', 'compiler': arguments[0], 'flags': arguments[1:position]}
+    document = native_frontend.inspect(unit, source.parent, profile['frontend'], retained / 'frontend',
+                                       folder / 'driver-inputs', execute, mode='inputs')
+    return native_frontend.input_state(document, unit, source.parent)
+
+
 def build(workflow, workspace: Path, data: dict, entry: dict, case: dict, project: Path,
           prefix: list, environment: dict, folder: Path, lane: str) -> list:
     """Compile actual unit recipes and retain every command, object and final binary."""
@@ -177,6 +188,10 @@ def build(workflow, workspace: Path, data: dict, entry: dict, case: dict, projec
     workflow.write(folder / 'native-build.json', recipe)
     identities = {'helpers': recipe['assets'], 'outputs': {}}
     for index, step in enumerate(recipe['steps']):
+        if step['kind'] == 'driver':
+            identities['driver_inputs'] = driver_inputs(profile, retained, step, folder,
+                executor(workflow, folder / 'discovery', Path(data['otelc_root']),
+                         {name: Path(path) for name, path in profile['tools'].items()}))
         command = (native_workers.instrumented_command(step, list(map(str, prefix)), entry['language'])
                    if lane == 'instrumented_on' else step['command'])
         evidence = folder / ('build-' + str(index) + '-' + step['kind'])
@@ -195,6 +210,11 @@ def build(workflow, workspace: Path, data: dict, entry: dict, case: dict, projec
 
 def verify_build(workflow, folder: Path) -> None:
     """Application execution cannot alter retained objects, SDK markers or helpers."""
-    expected = workflow.read(folder / workflow.BUILD_IDENTITIES)['build_assets']
-    native_project.require(workflow.manifest(folder / 'helpers', max_file_bytes=workflow.MAX_TREE) == expected,
+    identities = workflow.read(folder / workflow.BUILD_IDENTITIES)
+    native_project.require(workflow.manifest(folder / 'helpers', max_file_bytes=workflow.MAX_TREE) == identities['build_assets'],
                            'native build assets changed during application execution')
+    for name, record in identities['driver_inputs']['dependencies'].items():
+        path = Path(name)
+        native_project.require(path.is_file() and str(path.resolve()) == record['resolved'] and
+                               workflow.capture.file_digest(path) == record['sha256'],
+                               'neutral native driver input changed: ' + name)

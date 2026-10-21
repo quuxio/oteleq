@@ -446,7 +446,12 @@ def plan(args):
         raise ValueError("empty source tree")
     workspace = Path(tempfile.mkdtemp(prefix="oteleq-run-", dir=parent))
     write(workspace / OWNED_MARKER, {"schema_version": VERSION, "id": uuid.uuid4().hex})
-    native_projects = native_profile.prepare(sys.modules[__name__], source, root, workspace, configuration)
+    try:
+        native_projects = native_profile.prepare(sys.modules[__name__], source, root, workspace, configuration)
+    except (ValueError, OSError) as error:
+        write(workspace / 'discovery-failure.json', {'schema_version': VERSION, 'error': str(error),
+                                                   'phase': 'native build context'})
+        raise ValueError(str(error) + '; partial workspace: ' + str(workspace)) from error
     if native_projects:
         required = native_profile.source_manifest(sys.modules[__name__], source, native_projects)
         if any(required.get(name) != digest for name, digest in contents.items()):
