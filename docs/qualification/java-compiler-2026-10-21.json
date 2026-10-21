@@ -1,0 +1,94 @@
+{
+  "qualification_schema_version": 1,
+  "date": "2026-10-21",
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "platform": {
+    "os": "macOS-27.0.1-arm64-arm-64bit",
+    "architecture": "arm64"
+  },
+  "runtime": {
+    "runtime_commit": "884381693b8b1237c57283f42b5489a83d452f4a",
+    "files_sha256": {
+      "quux-oteleq": "828fc91fa1da9957b32e5374ebeacb4a8b2d7331fa1d32ce523a971419131a2c",
+      "oteleq-source.tar": "a223d50e5131f1f7bf263114004b3878a82016599f68f8fce55511f8aab0a6f1",
+      "source/tests/qualify_java_receivers.py": "d92e7fe8f419ada0d726bb1e9149d18a922d5ae40fbcb152dc0accb43bf48018",
+      "source/tests/qualify_generation.py": "db6e53931e17d6122e504a89e2a931a2d3df5224f6f37deff1fe135a47781652",
+      "load_prepared.py": "a20f2ca6d71f987bd7570d0395ba143f25f3d0e4201ef9b1f226e3275d83e273"
+    }
+  },
+  "provider": {
+    "provider_commit": "d6d03b72026cde8962b11ce3cc184ff3ebcb60d4",
+    "manifest_sha256": "2a8dbf239c6444c0fb536dff049993beade7eaed6578c9654c1e2d7233e9431f",
+    "verified_records": 7360,
+    "counts": {
+      "source_sha256": 413,
+      "products_sha256": 586,
+      "dependencies": 6361
+    },
+    "tools": 8
+  },
+  "results": {
+    "claim": "equivalence over these tests and observations",
+    "artefact_class": "diagnostic",
+    "cases": 8,
+    "matching_cases": 6,
+    "same_return_state_differences": 2,
+    "actual_launches": 151,
+    "raw_attempt_folders": 155,
+    "unique_command_identities": 151,
+    "compiler_builds": {
+      "retained_manifests": 155,
+      "unique_manifest_identities": 151,
+      "retained_class_bindings": 467
+    },
+    "refusal_controls": 7,
+    "scalar_shrink": {
+      "original": [
+        7
+      ],
+      "reduced": [
+        0
+      ]
+    },
+    "routes": [
+      "run",
+      "replay",
+      "generated",
+      "exported"
+    ],
+    "cli_sha256": "828fc91fa1da9957b32e5374ebeacb4a8b2d7331fa1d32ce523a971419131a2c",
+    "source_preserved": true
+  },
+  "prepared_loader": {
+    "sdk_commit": "760a5264bd4c64ecc4a56bf747fb819f085226fa",
+    "scope": "public prepared manifest loader only; no application JVM or SDK runtime qualification",
+    "retained_manifests": 155,
+    "unique_manifests_loaded": 151,
+    "class_bindings_loaded": 455,
+    "negative_controls": [
+      "source_sha256",
+      "class_sha256",
+      "provenance",
+      "main"
+    ],
+    "sdk_files_preserved": 55
+  },
+  "evidence": {
+    "retained_files": 4159,
+    "manifest_sha256": "0d1788bdaaa4e7dc95ee77ac6176212e320d3a2330fe21d5a7d8e366af477658"
+  },
+  "checks": [
+    "Every repeat checks complete independent receiver, static, result/error and alias/cycle values plus actual decoded selected-function telemetry.",
+    "All 155 retained compiler manifests and 467 retained class bindings are independently checked; four copied original shrink attempts do not inflate the 151 actual launches.",
+    "Generated, exported and replay suites retain source/class bindings; scalar reduction preserves construction inputs and reduces the intentional static-state difference from seven to zero.",
+    "The public replacement-SDK loader accepts all 151 unique manifests and 455 unique class bindings; no application JVM is started by that separate loader check.",
+    "All 7360 declared legacy-provider source/product/dependency records and all 55 frozen replacement-SDK source files remain unchanged."
+  ],
+  "limits": [
+    "Fixed UTF-8 private source-classpath profile with annotation processing disabled; arbitrary classpath/module/project builds remain open.",
+    "Source/class hashes and compiler callbacks are trusted local evidence, not a proof against malicious change-and-revert activity.",
+    "The JDK module image is hashed; native JDK/OS library identities are not comprehensively covered.",
+    "Public prepared-manifest loading does not establish replacement-SDK runtime health, live controls, invocation attribution, shipping artefact equivalence or another platform."
+  ]
+}

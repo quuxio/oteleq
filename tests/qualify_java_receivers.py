@@ -134,6 +134,58 @@ def commands(folder: Path) -> list[Path]:
     return [path for path in folder.rglob("command.json") if path.parent.name.startswith(("baseline-", "instrumented_on-"))]
 
 
+def check_build(folder: Path) -> int:
+    """Independently recheck compiler reads, class origins and retained products."""
+    def sha(path: Path) -> str:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    def inventory(root: Path) -> dict:
+        paths = list(root.rglob("*"))
+        assert all(not path.is_symlink() for path in paths)
+        return {path.relative_to(root).as_posix(): sha(path) for path in paths if path.is_file()}
+    record = json.loads((folder / "build-identities.json").read_text())
+    project, classes = folder / "project", folder / "scratch/classes"
+    assert inventory(project) == record["source_sha256"]
+    assert inventory(classes) == record["classes_sha256"]
+    for name, key in (("java-compiler.json", "compiler_metadata_sha256"),
+                      ("java-compiler-identity.json", "compiler_identity_sha256"),
+                      ("prepared-application.json", "prepared_application_sha256")):
+        assert sha(folder / name) == record[key]
+    metadata = json.loads((folder / "java-compiler.json").read_text())
+    identity = json.loads((folder / "java-compiler-identity.json").read_text())
+    application = json.loads((folder / "prepared-application.json").read_text())
+    original_project, original_classes = map(Path, identity["argv"][4:6])
+    assert metadata == json.loads((folder / "build/stdout").read_text())
+    assert identity["compiler_metadata_sha256"] == record["compiler_metadata_sha256"]
+    assert len(identity["inputs_sha256"]) == 3
+    assert all(sha(Path(name)) == value for name, value in identity["inputs_sha256"].items())
+    assert application["schema_version"] == 1 and application["classpath"] == [str(original_classes)]
+    assert application["main_class"] == record["main_class"] and application["main_class"] in application["bindings"]
+    assert metadata["success"] is True and len(metadata["outputs"]) == len(application["bindings"]) == len(record["classes_sha256"])
+    assert {output["class"] for output in metadata["outputs"]} == set(application["bindings"])
+    assert {name.replace(".", "/") + ".class" for name in application["bindings"]} == set(record["classes_sha256"])
+    for source, expected in metadata["source_reads_sha256"].items():
+        assert sha(project / Path(source).relative_to(original_project)) == expected
+    for output in metadata["outputs"]:
+        source, = output["origins"]
+        binding = application["bindings"][output["class"]]
+        copied_source = project / Path(source).relative_to(original_project)
+        assert binding["source"] == source and binding["source_sha256"] == metadata["source_reads_sha256"][source] == sha(copied_source)
+        relative = output["class"].replace(".", "/") + ".class"
+        assert output["output"] == str(original_classes / relative) and binding["class_sha256"] == sha(classes / relative)
+        assert binding["provenance"] == "oteleq.jdk-file-manager-v1:" + record["compiler_identity_sha256"]
+    return len(application["bindings"])
+
+
+def verify_builds(folder: Path) -> dict:
+    """Keep copied shrink evidence separate from unique compiler identities."""
+    manifests = list(folder.rglob("prepared-application.json"))
+    assert manifests
+    counts = [check_build(path.parent) for path in manifests]
+    unique = {hashlib.sha256(path.read_bytes()).hexdigest() for path in manifests}
+    return {"retained_manifests": len(manifests), "unique_manifest_identities": len(unique),
+            "retained_class_bindings": sum(counts)}
+
+
 def verify_launches(folder: Path, expected: int) -> dict:
     """Copied original shrink evidence must not inflate the actual launch count."""
     raw = commands(folder)
@@ -236,9 +288,11 @@ def main() -> None:
     launches += refused_launches
     refusal_controls += source_guards(cli, workspace, destination, report)
     counts = verify_launches(destination, launches)
+    builds = verify_builds(destination)
     result = {"claim": "equivalence over these tests and observations", "artefact_class": "diagnostic",
               "cases": len(METHODS), "matching_cases": 6, "same_return_state_differences": 2,
               "actual_launches": launches, **counts,
+              "compiler_builds": builds,
               "refusal_controls": refusal_controls, "scalar_shrink": {"original": [7], "reduced": [0]},
               "routes": ["run", "replay", "generated", "exported"],
               "cli_sha256": hashlib.sha256(cli.read_bytes()).hexdigest(), "source_preserved": True}
