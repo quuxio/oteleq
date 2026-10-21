@@ -78,3 +78,11 @@ make generation-java-receiver-otelc JAVA_BACKEND=prepared \
 ```
 
 The default `JAVA_BACKEND=legacy` preserves the earlier qualification route. Both modes check complete independent receiver/static/return/error graphs for every repeat, generated/exported suites, replay, shrinking and source/refusal controls. Prepared mode additionally rechecks actual JVM identities, every retained runtime file and actual protobuf batch/unit accounting. These checks do not qualify a different provider revision or platform.
+
+## Published qualification
+
+The [21 October record](qualification/java-prepared-2026-10-21.json) qualifies runtime `a0f6eea` with frozen SDK `f3279fd` on macOS ARM64/JDK 21. The receiver corpus completes 151 actual JVM launches: six matching cases, two deliberate same-return state differences, generated suites, per-case replay, exported suites with the original source temporarily unavailable, scalar shrinking from seven to zero and seven refusal controls.
+
+All 155 retained compiler manifests, 467 class bindings and 155 runtime archives are checked independently. Four copied original shrink attempts remain retained evidence and do not inflate the 151 actual JVMs. Both 62-file SDK source copies and both Java products remain unchanged; all original short runtime directories are removed.
+
+Four additional JVMs qualify a packaged recursive method with exact nonempty application stdout/stderr, complete independently expected scalar state and two spans per instrumented repeat. Eight additional JVMs check matching and deliberately different receivers through the legacy provider. The complete local gate passes 619 distinct regressions, with 97.32% Rust product line coverage and 99% to 100% coverage for the four new Python modules. This evidence retains the profile limits above and leaves the full [completion checklist](completion.md) open.

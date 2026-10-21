@@ -45,6 +45,8 @@ Generated tests live in a new private directory outside the application reposito
 
 **Provider compatibility:** the default generated workflows use qualified pre-rebuild otelc APIs, such as the frozen [`d6d03b7` provider](docs/qualification/integrated-provider-2026-10-20.json). Java can explicitly select the replacement SDK's [prepared provider](docs/java-prepared-provider.md) with `[adapters.java] backend = "prepared"`. It verifies the public launch recipe, compiler bindings, loaded class origins, actual JVM PID and direct health/OTLP receipt. The replacement SDK's other language placeholders cannot replace the recorded adapters. Prepare the matching tools from the provider revision being used.
 
+The [prepared Java qualification](docs/qualification/java-prepared-2026-10-21.json) completes 151 receiver JVM launches through generated/exported suites, replay, shrinking and refusal controls, plus four packaged recursive and eight legacy-compatibility launches. It verifies complete independent state/outcome oracles, actual PID/health/OTLP accounting and removal of owned short runtimes.
+
 Generated Java builds retain [compiler-owned source/class bindings](docs/java-build-bundles.md), actual class products and the selected JDK module-image identity. They require a complete JDK 21 and use a fixed UTF-8 profile with annotation processing disabled. The prepared manifest supports ongoing SDK integration; general Java classpath/module builds remain open.
 
 Declared [ordered Node receiver calls/release](docs/ordered-sequences.md) retain intermediate state, with bounded JavaScript collection observations and [148-launch qualification](docs/qualification/ordered-sequences-2026-10-20.json). Missing collection stays inconclusive.
