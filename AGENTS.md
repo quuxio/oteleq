@@ -1,5 +1,7 @@
 # Repository guidance
 
+- Node callers retain actual original/private/caller loader receipts, including package bytes and the selected Node identity. Module-format inspection must replace the selected module before evaluation and must not execute application initialisers. Preserve pre-startup observer/binding capture for CommonJS and ES modules; receiver fixtures cannot clear a context blocker. See `docs/node-source-context.md`; dependency and general TypeScript project integration remain incomplete.
+
 - Prepared Java launch profiles are explicit: stock-methods-v1 retains the original fixed recipe; safe-methods-v1 fixes the corrected advice flags and pinned bootstrap parser patch. Never infer a profile from filenames or loosen the stock argv/properties/tooling refusal. Freeze and recheck the safe JAR, parser bytes and licence sources. Actual-provider qualification remains separate from metadata acceptance.
 
 - If `~/.agents/AGENTS.md` exists, read it and follow the relevant guidance.

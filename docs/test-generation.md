@@ -37,6 +37,8 @@ Explicit [Java source/dependency context](java-project-context.md) additionally 
 
 Java also retains [compiler-owned source/class bindings](java-build-bundles.md), the exact frontend, JDK module-image identity, class products and a prepared-application manifest. Its fixed UTF-8 classpath profile disables annotation processing; arbitrary project/module builds remain unsupported.
 
+Node attempts also retain [original/private/caller module context](node-source-context.md), including actual loader formats, package hashes and bounded prelaunch inspection output. The selected application is replaced with empty source during each inspection; these tooling processes do not execute application code.
+
 ## Retention and cleanup
 
 | User choice | Current result |

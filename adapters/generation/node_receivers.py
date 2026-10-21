@@ -2,6 +2,7 @@
 import json
 from pathlib import Path
 import posixpath
+import node_project
 
 
 def factory(entry: dict, discovered: dict, name: str) -> tuple[dict, str]:
@@ -31,7 +32,7 @@ def driver(entry: dict, arguments: list, source: str, sequence: list | None = No
     helper = helper if helper.startswith(".") else "./" + helper
     fixture = entry["receiver_fixture"]
     factory_name = fixture["factory"] if fixture["kind"] == "function" else "undefined"
-    commonjs = Path(entry["path"]).suffix in (".cjs", ".cts")
+    commonjs = node_project.commonjs(entry)
     observer = ("const __oteleqObserver=require(" + json.dumps(helper) + ");" if commonjs
                 else "import * as __oteleqObserver from " + json.dumps(helper) + ";")
     bootstrap = ";" + observer + "let __oteleqClass;const __oteleqFactory=" + factory_name + ";\n"

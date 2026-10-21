@@ -14,6 +14,7 @@ import cpp_receivers
 import cpp_worker
 import native_names
 import node_receivers
+import node_project
 import java_receivers
 import python_project
 import sequences
@@ -334,13 +335,17 @@ def js_driver(entry, args, source):
     position = entry.get("binding_capture_offset", 0)
     helper = posixpath.relpath("_oteleq_generated/node_observe.mjs", str(Path(entry["path"]).parent))
     helper = helper if helper.startswith(".") else "./" + helper
-    capture = (";const __oteleqSelected=" + entry["name"] + ";\nconst __oteleqObserver=await import(" + json.dumps(helper) + ");\n").encode()
+    commonjs = node_project.commonjs(entry)
+    observer = ("require(" + json.dumps(helper) + ")" if commonjs
+                else "await import(" + json.dumps(helper) + ")")
+    capture = (";const __oteleqSelected=" + entry["name"] + ";\nconst __oteleqObserver=" + observer + ";\n").encode()
     source = (raw[:position] + capture + raw[position:]).decode()
-    return source + f'''
+    start, finish = ("void(async()=>{\n", "})();\n") if commonjs else ("", "")
+    return source + start + f'''
 const __oteleqArguments={json.dumps(args)};
 const __oteleqRoots=()=>({{{roots}arguments:__oteleqArguments}});
 await __oteleqObserver.run(__oteleqSelected,__oteleqArguments,__oteleqRoots,{str(bool(entry.get('async'))).lower()},()=>typeof __oteleqSelected==='function' && {entry['name']}===__oteleqSelected);
-'''
+''' + finish
 
 
 def native_guards(language: str) -> str:

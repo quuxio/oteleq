@@ -74,6 +74,7 @@ generation-check: node-observer-check node-sequence-check java-observer-check go
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_build.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_project.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_classpath.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/node_project.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_health.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_provider.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_profiles.py' --fail-under=80
