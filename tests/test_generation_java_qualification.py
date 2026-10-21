@@ -101,7 +101,8 @@ class JavaQualificationTests(unittest.TestCase):
             path = folder / "case/typed-bundle.json"
             path.write_text(json.dumps({"cases": [bundle]}))
             self.assertEqual(qualifier.check_report(folder / "report.json", 1)[0], 4)
-            for kind in ("private", "static", "initial", "alias", "cycle", "return", "witness", "gap"):
+            for kind in ("private", "static", "initial", "alias", "cycle", "return", "witness", "gap",
+                         "type", "width", "signed", "argument", "extra-root", "extra-field", "extra-node", "duplicate-node"):
                 changed = copy.deepcopy(bundle)
                 target = changed["instrumented_on"][0]
                 observed = target["observation"]
@@ -119,11 +120,75 @@ class JavaQualificationTests(unittest.TestCase):
                     observed["outcome"]["graph"]["roots"]["result"] = reference(1)
                 elif kind == "witness":
                     target["execution"]["witness"]["functions"]["Counter.identity(int)"] = 2
+                elif kind == "type":
+                    observed["after"]["nodes"][0]["fields"]["value"]["type"] = "java.lang.Integer"
+                elif kind == "width":
+                    observed["after"]["nodes"][0]["fields"]["value"]["bits"] = 32.0
+                elif kind == "signed":
+                    observed["after"]["nodes"][0]["fields"]["value"]["signed"] = 1
+                elif kind == "argument":
+                    observed["after"]["roots"]["argument:0"] = integer(6)
+                elif kind == "extra-root":
+                    observed["after"]["roots"]["extra"] = integer(0)
+                elif kind == "extra-field":
+                    observed["after"]["nodes"][0]["fields"]["extra"] = integer(0)
+                elif kind == "extra-node":
+                    observed["after"]["nodes"].append({"id": "extra", "type": "opaque", "fields": {}})
+                elif kind == "duplicate-node":
+                    observed["after"]["nodes"].append(copy.deepcopy(observed["after"]["nodes"][0]))
                 else:
                     observed["gaps"] = ["missing observation"]
                 path.write_text(json.dumps({"cases": [changed]}))
                 with self.subTest(kind=kind), self.assertRaises(AssertionError):
                     qualifier.check_report(folder / "report.json", 1)
+
+    def test_local_node_labels_and_node_list_order_are_not_object_identity(self):
+        graph = state(17, 7)
+        receiver, shared = {"kind": "reference", "node_id": "receiver"}, {"kind": "reference", "node_id": "array"}
+        graph["roots"]["receiver"] = receiver
+        graph["nodes"][0].update(id="receiver", fields={"value": integer(17), "self": receiver, "shared": shared})
+        graph["nodes"][1].update(id="array", fields={"length": integer(2), "item:0": receiver, "item:1": shared})
+        graph["nodes"].reverse()
+        qualifier.check_state(graph, 17, 7, 7)
+
+    def test_fixture_owner_and_signature_cannot_be_substituted_with_matching_witness_names(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary);(root / "case").mkdir()
+            for function in ("Other.identity(int)", "Counter.identity(long)"):
+                attempts = [attempt(), attempt()]
+                for item in attempts:
+                    item["execution"]["witness"]["functions"] = {function: 1}
+                bundle = {"contract": {"required_roots": ["receiver", "argument:0", "static:Counter.total"]},
+                          "baseline": attempts, "instrumented_on": attempts}
+                (root / "case/typed-bundle.json").write_text(json.dumps({"cases": [bundle]}))
+                report = {"source_preserved": True, "blocked": [], "cases": [{"case": "case", "function": function,
+                          "exit_code": 0, "arguments": [7], "receiver_fixture": {"arguments": [10]}}]}
+                (root / "report.json").write_text(json.dumps(report))
+                with self.subTest(function=function), self.assertRaises(AssertionError):qualifier.check_report(root / "report.json", 1)
+
+    def test_every_declared_result_and_exception_has_complete_literal_nodes(self):
+        for method in qualifier.METHODS:
+            value = 10 if method == "static_only" else 17
+            total = 7 if method in ("identity", "static_only") else 0
+            graph = state(value, total)
+            if method == "fail":
+                graph["roots"]["error"] = reference(2)
+                graph["nodes"] += [{"id": "n2", "type": "java.lang.IllegalArgumentException", "fields": {"message": reference(3)}},
+                                    {"id": "n3", "type": "java.object:java.lang.String", "fields": {"value": {
+                                        "kind": "string", "type": "java.lang.String", "encoding": "utf16_be", "value": "00650078007000650063007400650064"}}}]
+            elif method == "text":
+                graph["roots"]["result"] = reference(2)
+                graph["nodes"].append({"id": "n2", "type": "java.object:java.lang.String", "fields": {"value": {
+                    "kind": "string", "type": "java.lang.String", "encoding": "utf16_be", "value": "007a0000d800"}}})
+            else:
+                results = {"identity": reference(0), "array": reference(1), "touch": {"kind": "undefined"},
+                           "secret": integer(value), "instance": integer(7), "static_only": integer(7)}
+                graph["roots"]["result"] = results[method]
+            with self.subTest(method=method):
+                qualifier.check_state(graph, value, total, 7, method=method)
+                changed = copy.deepcopy(graph)
+                changed["nodes"][0]["fields"]["value"]["type"] = "java.long"
+                with self.assertRaises(AssertionError):qualifier.check_state(changed, value, total, 7, method=method)
 
     def test_main_uses_per_case_replay_and_explicit_export_application(self):
         with tempfile.TemporaryDirectory() as temporary:

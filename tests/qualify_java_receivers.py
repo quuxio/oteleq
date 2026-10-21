@@ -56,23 +56,79 @@ def prepare(cli: Path, provider: Path, folder: Path, source_text: str = SOURCE,
     return workspace
 
 
-def node(graph: dict, value: dict) -> dict:
-    """Resolve local graph identity, never application equality or formatting."""
-    return next(item for item in graph["nodes"] if item["id"] == value["node_id"])
+def integer(value: int) -> dict:
+    """The fixture declares primitive Java int fields, parameters and results."""
+    return {"kind": "integer", "type": "java.int", "value": str(value), "bits": 32, "signed": True}
 
 
-def check_state(graph: dict, value: int, total: int) -> None:
-    """Independent literal oracles cover private fields, aliases and array cycles."""
-    roots = graph["roots"]
-    fields = node(graph, roots["receiver"])["fields"]
-    assert fields["value"]["value"] == str(value)
-    assert roots["static:Counter.total"]["value"] == str(total)
-    assert fields["self"] == roots["receiver"]
-    array = node(graph, fields["shared"])
-    assert array["type"] == "java.object:[Ljava.lang.Object;"
-    assert array["fields"]["length"]["value"] == "2"
-    assert array["fields"]["item:0"] == roots["receiver"]
-    assert array["fields"]["item:1"] == fields["shared"]
+def reference_id(value: dict) -> str:
+    """Local node labels may vary; reference shape and relationships may not."""
+    assert type(value) is dict and set(value) == {"kind", "node_id"} and value["kind"] == "reference"
+    assert type(value["node_id"]) is str and value["node_id"]
+    return value["node_id"]
+
+
+def graph_nodes(graph: dict) -> dict:
+    """Do not hide duplicate nodes, malformed fields or extra graph dimensions."""
+    assert type(graph) is dict and set(graph) == {"roots", "nodes"}
+    assert type(graph["roots"]) is dict and type(graph["nodes"]) is list
+    for item in graph["nodes"]:
+        assert type(item) is dict and set(item) == {"id", "type", "fields"}
+        assert type(item["id"]) is str and item["id"] and type(item["fields"]) is dict
+    result = {item["id"]: item for item in graph["nodes"]}
+    assert len(result) == len(graph["nodes"])
+    return result
+
+
+def string_node(identity: str, units: str) -> dict:
+    """Expected UTF-16 units come from the fixed source, never its observations."""
+    return {"id": identity, "type": "java.object:java.lang.String", "fields": {
+        "value": {"kind": "string", "type": "java.lang.String", "encoding": "utf16_be", "value": units}}}
+
+
+def result_nodes(graph: dict, nodes: dict, method: str, value: int, receiver: dict, shared: dict) -> tuple:
+    """Construct the complete declared result/error graph with opaque local IDs."""
+    key = "error" if method == "fail" else "result"
+    assert key in graph["roots"]
+    result = graph["roots"][key]
+    if method == "fail":
+        error = reference_id(result)
+        assert error in nodes and "message" in nodes[error]["fields"]
+        message = nodes[error]["fields"]["message"]
+        text = reference_id(message)
+        return key, result, [{"id": error, "type": "java.lang.IllegalArgumentException", "fields": {"message": message}},
+                             string_node(text, "00650078007000650063007400650064")]
+    if method == "text":
+        return key, result, [string_node(reference_id(result), "007a0000d800")]
+    values = {"identity": receiver, "array": shared, "touch": {"kind": "undefined"},
+              "secret": integer(value), "instance": integer(7), "static_only": integer(7)}
+    assert method in values
+    return key, values[method], []
+
+
+def check_state(graph: dict, value: int, total: int, amount: int, *, method: str | None = None) -> None:
+    """Require every literal type, value, root, field and alias in this fixture."""
+    nodes = graph_nodes(graph)
+    assert "receiver" in graph["roots"]
+    receiver = graph["roots"]["receiver"]
+    receiver_id = reference_id(receiver)
+    assert receiver_id in nodes and "shared" in nodes[receiver_id]["fields"]
+    shared = nodes[receiver_id]["fields"]["shared"]
+    array_id = reference_id(shared)
+    roots = {"receiver": receiver, "argument:0": integer(amount), "static:Counter.total": integer(total)}
+    expected = {receiver_id: {"id": receiver_id, "type": "java.object:Counter", "fields": {
+        "value": integer(value), "self": receiver, "shared": shared}},
+        array_id: {"id": array_id, "type": "java.object:[Ljava.lang.Object;", "fields": {
+            "length": integer(2), "item:0": receiver, "item:1": shared}}}
+    assert receiver_id != array_id
+    if method is not None:
+        key, result, additional = result_nodes(graph, nodes, method, value, receiver, shared)
+        roots[key] = result
+        for item in additional:
+            assert item["id"] not in expected
+            expected[item["id"]] = item
+    assert json.dumps(graph["roots"], sort_keys=True) == json.dumps(roots, sort_keys=True)
+    assert json.dumps(nodes, sort_keys=True) == json.dumps(expected, sort_keys=True)
 
 
 def check_report(path: Path, expected_cases: int) -> tuple[int, dict]:
@@ -83,8 +139,10 @@ def check_report(path: Path, expected_cases: int) -> tuple[int, dict]:
     for case in report["cases"]:
         method = case["function"].split(".")[-1].split("(")[0]
         assert method in METHODS
+        assert case["function"] == "Counter." + method + "(int)"
         assert case["exit_code"] == int(method in DIFFERENCES)
         assert case["receiver_fixture"]["arguments"] == [10]
+        assert len(case["arguments"]) == 1 and type(case["arguments"][0]) is int and 0 <= case["arguments"][0] <= 7
         bundle = json.loads((path.parent / case["case"] / "typed-bundle.json").read_text())["cases"][0]
         assert set(bundle["contract"]["required_roots"]) == {"receiver", "argument:0", "static:Counter.total"}
         for lane in ("baseline", "instrumented_on"):
@@ -93,32 +151,17 @@ def check_report(path: Path, expected_cases: int) -> tuple[int, dict]:
                 launches += 1
                 observed = attempt["observation"]
                 assert not observed["gaps"]
-                check_state(observed["before"], 10, 0)
                 amount, active = case["arguments"][0], int(lane == "instrumented_on")
+                check_state(observed["before"], 10, 0, amount)
                 value = 10 if method == "static_only" else 10 + amount + (active if method == "instance" else 0)
                 total = amount + active if method == "static_only" else amount if method == "identity" else 0
-                check_state(observed["after"], value, total)
+                check_state(observed["after"], value, total, amount)
                 outcome = observed["outcome"]
-                check_state(outcome["graph"], value, total)
+                check_state(outcome["graph"], value, total, amount, method=method)
                 if method == "fail":
                     assert outcome["kind"] == "error" and outcome["category"] == "exception"
-                    error = node(outcome["graph"], outcome["graph"]["roots"]["error"])
-                    assert error["type"] == "java.lang.IllegalArgumentException"
-                    message = node(outcome["graph"], error["fields"]["message"])["fields"]["value"]
-                    assert message["value"] == "00650078007000650063007400650064"
                 else:
-                    result = outcome["graph"]["roots"]["result"]
                     assert outcome["kind"] == "return"
-                    if method == "identity":
-                        assert result == outcome["graph"]["roots"]["receiver"]
-                    elif method == "array":
-                        assert result == node(outcome["graph"], outcome["graph"]["roots"]["receiver"])["fields"]["shared"]
-                    elif method == "text":
-                        assert node(outcome["graph"], result)["fields"]["value"]["value"] == "007a0000d800"
-                    elif method == "touch":
-                        assert result == {"kind": "undefined"}
-                    else:
-                        assert result["value"] == str(value if method == "secret" else 7)
                 if lane == "instrumented_on":
                     assert attempt["execution"]["witness"]["functions"] == {case["function"]: 1}
     return launches, report
