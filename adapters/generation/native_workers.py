@@ -6,6 +6,8 @@ import harness
 import native_names
 import native_project
 
+C_LINKAGE = 'extern "C" '
+
 
 def require(condition: bool, reason: str) -> None:
     """Incomplete state or an unsafe build recipe cannot become a passing case."""
@@ -62,7 +64,7 @@ def copied_value(expression: str, type_: str, language: str) -> str:
 def invocation(entry: dict, args: list) -> str:
     """Freeze one exact scalar signature and its concrete invocation inputs."""
     language = entry['language']
-    linkage = 'extern "C" ' if language == 'cpp' else ''
+    linkage = C_LINKAGE if language == 'cpp' else ''
     parameters = ','.join(harness.native_literal(value, harness.scalar_type(type_), language)
                           for value, type_ in zip(args, entry['parameters']))
     name = ('::' if language == 'cpp' else '') + entry['name']
@@ -83,7 +85,7 @@ def invocation(entry: dict, args: list) -> str:
 def application_helpers(entry: dict, args: list, key: str) -> str:
     """Append header-free accessors after the original application bytes."""
     language = entry['language']
-    linkage = 'extern "C" ' if language == 'cpp' else ''
+    linkage = C_LINKAGE if language == 'cpp' else ''
     functions = []
     for index, item in enumerate(entry['globals']):
         if item['unit'] != key:
@@ -104,7 +106,7 @@ def application_helpers(entry: dict, args: list, key: str) -> str:
 def driver(entry: dict) -> str:
     """One clean translation unit frames the complete before/return/after record."""
     cpp = entry['language'] == 'cpp'
-    linkage = 'extern "C" ' if cpp else ''
+    linkage = C_LINKAGE if cpp else ''
     names = ['__oteleq_root_' + str(index) for index in range(len(entry['globals']))] + ['__oteleq_invoke']
     declarations = ''.join(linkage + 'unsigned long long ' + name + '(unsigned char*);\n' for name in names)
     state = ''.join('if(!__oteleq_read(out,' + name + ',' + json.dumps(item['name'] + ':' + item['type']) +
