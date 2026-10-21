@@ -139,7 +139,7 @@ The [integrated-provider corpus](qualification/integrated-provider-2026-10-20.js
 
 Dependencies must already be available to the qualified local tools; generation does not install them into the application.
 
-Java uses a complete JDK 21 and a fixed UTF-8 profile with annotation processing disabled. [Retained Java compiler bindings](java-build-bundles.md) record actual source reads and class origins, including nested/anonymous and implicit source classes. The prepared manifest is a build foundation; general classpath/module builds and replacement-SDK runtime integration remain open.
+Java uses a complete JDK 21 and a fixed UTF-8 profile with annotation processing disabled. [Retained Java compiler bindings](java-build-bundles.md) record actual source reads and class origins, including nested/anonymous and implicit source classes. The explicit [prepared provider](java-prepared-provider.md) uses those bindings for replacement-SDK execution, fixed launch verification and direct health/OTLP receipt. General classpath/module builds, live controls and invocation attribution remain open.
 
 Python supports an explicit [regular source-package context](python-package-context.md) through `[adapters.python] import_roots`. Private source roots preserve relative imports, package initialisers and `src` layouts under their actual module names. Namespace packages and ambiguous/shadowed targets are blocked; installed-project metadata, dependency installation and imported-module observation remain outside this capability.
 
