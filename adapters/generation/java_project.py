@@ -19,7 +19,9 @@ def require(condition: bool, reason: str) -> None:
 
 def path_list(value: object, label: str, *, relative: bool) -> list[str]:
     """Configuration paths are literal inputs, never JVM options or globs."""
-    require(type(value) is list and len(value) <= MAX_ENTRIES, "invalid " + label)
+    if type(value) is not list:
+        raise ValueError("Java project: invalid " + label)
+    require(len(value) <= MAX_ENTRIES, "invalid " + label)
     result = []
     for name in value:
         require(type(name) is str and 0 < len(name) <= 4096 and not any(ord(char) < 32 for char in name)
@@ -59,7 +61,7 @@ def source_files(source: Path, options: dict, ignored: set[str]) -> list[str]:
                     require(path.is_file(), "Java source is not a regular file")
                     require(name != "module-info.java", "named Java modules need a separate build profile")
                     result.add(path.relative_to(source).as_posix())
-    require(result, "source roots contain no Java units")
+    require(bool(result), "source roots contain no Java units")
     return sorted(result)
 
 
@@ -70,6 +72,16 @@ def source_manifest(source: Path, options: dict, contents: dict, ignored: set[st
         for name in source_files(source, options, ignored):
             result[name] = classpath.digest(source / name)
     return result
+
+
+def bind_entry(entry: dict, context: dict | None) -> None:
+    """Bind Java callables to the declared source-unit set without hiding blockers."""
+    if entry["language"] != "java" or context is None or entry["status"] == "excluded":
+        return
+    if entry["path"] not in context["source_units"]:
+        entry.update(status="blocked", reason="selected Java source is outside declared source roots")
+    else:
+        entry["java_context_profile"] = PROFILE
 
 
 def snapshot_exclusions(source: Path, options: dict) -> list[str]:

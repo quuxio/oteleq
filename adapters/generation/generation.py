@@ -447,11 +447,7 @@ def inventory_tree(contents, root, snapshot, workspace, args, native_projects=No
         discovered["entrypoints"] = [function for function in discovered["functions"] if is_entrypoint(function, language)]
         for function in discovered["functions"]:
             entry = inventory_entry(function, discovered, name, language, sha, snapshot, args)
-            if language == "java" and java_context is not None and entry["status"] != "excluded":
-                if name not in java_context["source_units"]:
-                    entry.update(status="blocked", reason="selected Java source is outside declared source roots")
-                else:
-                    entry["java_context_profile"] = java_project.PROFILE
+            java_project.bind_entry(entry, java_context)
             filesystem_effects.bind(entry, args.configuration)
             typescript_provider.bind(entry, root, workspace, tools.get(language, {}), execute, policy)
             java_provider.bind(entry, root, workspace, tools.get(language, {}), execute)
@@ -763,21 +759,8 @@ def build_command(root, project, entry, driver, config, tools, env, folder, scra
     if language in ("c", "cpp"):
         return native_command(prefix, project, language, driver, tools, env, folder, scratch, lane)
     if language == "java":
-        classes = scratch / "classes"
-        main = (entry["package"] + "." if entry["package"] else "") + "OteleqDriver"
-        options = {"context": java_context} if java_context is not None else {}
-        java_build.build(project, [project / entry["path"], driver], main, tools["java"],
-                         classes, folder, env, execute, **options)
-        if java_provider.prepared(entry):
-            java_provider.require(prepared_runtime is not None, "missing owned runtime context")
-            return java_launch.prepare(root, project, folder, tools, prepared_runtime, entry,
-                                       tomllib.loads(config.read_text()), lane == "baseline", env, execute, **options)
-        paths = os.pathsep.join(map(str, java_project.runtime_classpath(classes, java_context)))
-        java_flags = ["-Xshare:off"]
-        if java_context is not None:
-            java_flags.append("-Xlog:class+load=info:file=" + str(folder / java_launch.CLASS_LOG))
-        command = [tools["java"], *java_flags, "-cp", paths, main] if lane == "baseline" else prefix + ["java", *java_flags, "-cp", paths, main]
-        return command
+        return java_command(root, project, entry, driver, config, tools, env, folder, scratch, lane,
+                            prepared_runtime=prepared_runtime, context=java_context)
     # Use the proven build recipes, with bounded execution for every build and launch.
     old_execute = capture.execute
     capture.execute = lambda command, cwd, environment, timeout=180: execute(command, cwd, environment, folder / ("build-" + uuid.uuid4().hex), timeout)
@@ -795,6 +778,25 @@ def build_command(root, project, entry, driver, config, tools, env, folder, scra
     finally:
         capture.execute = old_execute
     return plain if lane == "baseline" else on
+
+
+def java_command(root, project, entry, driver, config, tools, env, folder, scratch, lane, *, prepared_runtime=None, context=None):
+    """Keep the fixed compiler and launch recipe together for both Java providers."""
+    classes = scratch / "classes"
+    main = (entry["package"] + "." if entry["package"] else "") + "OteleqDriver"
+    options = {"context": context} if context is not None else {}
+    java_build.build(project, [project / entry["path"], driver], main, tools["java"],
+                     classes, folder, env, execute, **options)
+    if java_provider.prepared(entry):
+        java_provider.require(prepared_runtime is not None, "missing owned runtime context")
+        return java_launch.prepare(root, project, folder, tools, prepared_runtime, entry,
+                                   tomllib.loads(config.read_text()), lane == "baseline", env, execute, **options)
+    paths = os.pathsep.join(map(str, java_project.runtime_classpath(classes, context)))
+    flags = ["-Xshare:off"]
+    if context is not None:
+        flags.append("-Xlog:class+load=info:file=" + str(folder / java_launch.CLASS_LOG))
+    prefix = [root / "target/debug/quux-otelc", "--config", config, "--language", "java", "java"]
+    return ([tools["java"]] if lane == "baseline" else prefix) + [*flags, "-cp", paths, main]
 
 
 def go_build_request(project, entry, driver):
@@ -921,9 +923,7 @@ def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, ht
             command = native_profile.build(sys.modules[__name__], workspace, data, entry, case,
                                            project, prefix, env, folder, lane)
         else:
-            options = {"prepared_runtime": runtime} if runtime is not None else {}
-            if java_context is not None:
-                options["java_context"] = java_context
+            options = attempt_build_options(runtime, java_context)
             command = build_command(root, project, entry, driver, config, tools, env, folder, scratch, lane, **options)
         launch = read(folder / java_launch.LAUNCH_FILE) if runtime is not None else None
         write(folder / "command.json", [str(p) for p in command])
@@ -960,6 +960,11 @@ def execution_options(entry, case, lane, folder, runtime, bodies, env):
         env.update(interaction.environment())
         options["interaction"] = interaction
     return options
+
+
+def attempt_build_options(runtime, context):
+    """Pass only explicitly present Java runtime and compiler contexts to builders."""
+    return {key: value for key, value in (("prepared_runtime", runtime), ("java_context", context)) if value is not None}
 
 
 def verify_attempt_inputs(data, entry, project, folder, scratch, tools, immutable, runtime, launch, config, *, lane, java_context=None):

@@ -132,7 +132,7 @@ class JavaProjectTests(unittest.TestCase):
         self.assertEqual((result.returncode, result.stdout, result.stderr), (0, b"43:jar-data:directory-data", b""))
         java_launch.origins(folder, folder, {"otelc_function": "app.App.selected(int)"}, context=context)
         origins = generation.read(folder / "verified-origins.json")
-        self.assertTrue({"app.App", "app.OteleqDriver", "dep.Library", "other.More"} <= set(origins))
+        self.assertLessEqual({"app.App", "app.OteleqDriver", "dep.Library", "other.More"}, set(origins))
         java_build.verify(project, classes, folder)
         for fault in ("options", "schema", "foreign-read", "changed-read"):
             altered = copy.deepcopy(metadata)
@@ -140,8 +140,9 @@ class JavaProjectTests(unittest.TestCase):
             elif fault == "schema": altered["schema_version"] = 1
             elif fault == "foreign-read": altered["class_reads_sha256"]["file:/outside.class"] = "0" * 64
             else: altered["class_reads_sha256"][next(iter(reads))] = "0" * 64
+            original, generated = java_build.files(project), set()
             with self.subTest(fault=fault), self.assertRaises(ValueError):
-                java_build.bindings(altered, project, classes, java_build.files(project), set(), "fixture", context=context)
+                java_build.bindings(altered, project, classes, original, generated, "fixture", context=context)
 
     def test_context_freezes_resources_empty_directories_and_guards_original_and_private_bytes(self):
         workspace, data = self.workspace()
@@ -251,8 +252,9 @@ class JavaProjectTests(unittest.TestCase):
             generation.load_workspace(destination, generated=True)
             edited = destination / "java-context/classpath/0001/directory-resource.txt"
             original = edited.read_bytes();edited.write_bytes(b"changed")
+            cleanup = argparse.Namespace(workspace=destination)
             with self.assertRaisesRegex(ValueError, "Java context changed"):
-                generation.clean(argparse.Namespace(workspace=destination))
+                generation.clean(cleanup)
             edited.write_bytes(original)
             self.assertEqual(generation.clean(argparse.Namespace(workspace=destination)), 0)
             self.assertEqual(generation.clean(argparse.Namespace(workspace=workspace)), 0)
@@ -267,8 +269,9 @@ class JavaProjectTests(unittest.TestCase):
         generation.write(workspace / generation.PLAN_FILE, data)
         generation.write(workspace / generation.OWNED_MARKER, {"schema_version": 1, "plan_sha256": generation.identity(data)})
         original = probe.read_bytes();probe.write_bytes(b"changed")
+        cleanup = argparse.Namespace(workspace=workspace)
         with self.assertRaisesRegex(ValueError, "provider probes changed"):
-            generation.clean(argparse.Namespace(workspace=workspace))
+            generation.clean(cleanup)
         probe.write_bytes(original)
         shutil.rmtree(self.source)
         shutil.rmtree(self.directory)

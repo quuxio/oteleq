@@ -10,7 +10,11 @@ languages = ["java"]
 backend = "prepared"
 profile = "safe-methods-v1"
 source_roots = ["src/main/java", "target/generated-sources/example"]
-classpath = ["/absolute/dependencies/library.jar", "target/dependency-classes", "src/main/resources"]
+classpath = [
+  "/absolute/dependencies/library.jar",
+  "target/dependency-classes",
+  "src/main/resources",
+]
 ```
 
 Run the ordinary [planning and generation commands](automatic-generation.md#build-and-run) with `--config /absolute/path/to/equivalence.toml`. Prepare generated sources and dependency products before planning. oteleq does not invoke Maven or Gradle, resolve dependencies, run annotation processors or write build products into the application.
