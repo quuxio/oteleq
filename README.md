@@ -45,6 +45,8 @@ Generated tests live in a new private directory outside the application reposito
 
 Declared [ordered Node receiver calls/release](docs/ordered-sequences.md) retain intermediate state, with bounded JavaScript collection observations and [148-launch qualification](docs/qualification/ordered-sequences-2026-10-20.json). Missing collection stays inconclusive.
 
+[Native project integration](docs/native-project-context.md) is under development. Internal compilation-database inventories, target-wide scalar workers and fresh-root input checks have compiler regressions; public plan/build/replay/export integration and SDK-bound object transformation remain open.
+
 Start with [automatic generation](docs/automatic-generation.md), [fixed eight-language workloads](docs/eight-language-capture.md) or [workload comparison](docs/workload-comparison.md). See [usefulness and limits](docs/adoption.md), the [design](docs/design.md) and [roadmap](docs/roadmap.md).
 
 Observers refuse unsupported application formatters and exception accessors. Such capture failures remain incomplete evidence; see the [qualified codec limits](docs/automatic-generation.md#selection-and-inputs).
