@@ -218,7 +218,8 @@ class JavaProjectTests(unittest.TestCase):
                                      config=configuration, language=None, exclude=[], cases=1)
         with patch.dict(os.environ, {"OTELEQ_EXECUTABLE": str(cli)}), \
              patch.object(generation.capture, "selected_tools", return_value={"java": JAVA}), \
-             patch.object(generation.capture, "artefacts", return_value={"unit": "fixed"}):
+             patch.object(generation.capture, "artefacts", return_value={"unit": "fixed"}), \
+             patch.object(generation, "decoder", return_value=None):
             with redirect_stdout(io.StringIO()) as output:
                 generation.plan(request)
             workspace = Path(output.getvalue().strip())
