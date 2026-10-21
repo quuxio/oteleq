@@ -33,6 +33,7 @@ struct State {
   bool complete = true;
   std::size_t bytes = 0;
   std::set<std::string> files;
+  std::map<unsigned, std::string> projectFiles;
   llvm::json::Array probes;
   // Growing the retained inventory must not deep-copy entire declaration
   // graphs.
@@ -138,6 +139,7 @@ struct Annotation {
   std::string file;
   std::string begin;
   std::string end;
+  int internal = -1;
 };
 
 class Types final : public clang::RecursiveASTVisitor<Types> {
@@ -149,12 +151,18 @@ class Types final : public clang::RecursiveASTVisitor<Types> {
     location = sources.getExpansionLoc(location);
     if (!location.isValid())
       return {};
-    auto entry = sources.getFileEntryRefForID(sources.getFileID(location));
+    auto file = sources.getFileID(location);
+    auto cached = state.projectFiles.find(file.getHashValue());
+    if (cached != state.projectFiles.end())
+      return cached->second;
+    auto entry = sources.getFileEntryRefForID(file);
     llvm::SmallString<256> physical;
-    if (!entry || llvm::sys::fs::real_path(entry->getName(), physical) ||
-        !llvm::StringRef(physical).starts_with(state.root + "/"))
-      return {};
-    return std::string(physical);
+    std::string result;
+    if (entry && !llvm::sys::fs::real_path(entry->getName(), physical) &&
+        llvm::StringRef(physical).starts_with(state.root + "/"))
+      result = std::string(physical);
+    state.projectFiles[file.getHashValue()] = result;
+    return result;
   }
 
   static std::string id(const clang::Decl *declaration) {
@@ -200,6 +208,13 @@ public:
     return state.complete;
   }
 
+  bool VisitVarDecl(clang::VarDecl *declaration) {
+    auto found = annotations.find(id(declaration));
+    if (found != annotations.end())
+      found->second.internal = !declaration->isExternallyVisible();
+    return state.complete;
+  }
+
   bool VisitTypedefNameDecl(clang::TypedefNameDecl *declaration) {
     type(declaration, declaration->getUnderlyingType());
     return state.complete;
@@ -224,6 +239,8 @@ void annotate(llvm::json::Value &value,
       auto found = annotations.find(id->str());
       if (found != annotations.end()) {
         const auto &item = found->second;
+        if (item.internal >= 0)
+          (*object)["oteleq_internal_linkage"] = bool(item.internal);
         if (auto *type = object->getObject("type"); type && !item.type.empty())
           (*type)["desugaredQualType"] = item.type;
         location(object->getObject("loc"), item.file);
@@ -248,24 +265,15 @@ public:
   explicit Declarations(State &state) : state(state) {}
 
   void HandleTranslationUnit(clang::ASTContext &context) override {
-    auto &sources = context.getSourceManager();
     for (const auto *declaration : context.getTranslationUnitDecl()->decls()) {
       if (!state.complete)
         break;
-      auto location = sources.getExpansionLoc(declaration->getLocation());
-      if (!location.isValid())
-        continue;
-      auto entry = sources.getFileEntryRefForID(sources.getFileID(location));
-      if (!entry)
-        continue;
-      llvm::SmallString<256> physical;
-      if (llvm::sys::fs::real_path(entry->getName(), physical) ||
-          !llvm::StringRef(physical).starts_with(state.root + "/"))
-        continue;
       Types types(context, state);
       types.TraverseDecl(const_cast<clang::Decl *>(declaration));
       if (!state.complete)
         break;
+      if (types.annotations.empty())
+        continue;
       std::string buffer;
       llvm::raw_string_ostream stream(buffer);
       declaration->dump(stream, false, clang::ADOF_JSON);

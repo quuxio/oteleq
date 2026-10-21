@@ -122,6 +122,15 @@ class NativeFrontendTests(unittest.TestCase):
         self.assertTrue(all(item['physical'] and item['fields'][0]['canonical'] == 'int'
                             for item in inventory['cpp_records'].values()))
 
+    def test_project_declarations_inside_an_external_namespace_remain_in_the_inventory(self):
+        header = self.project / 'local.hpp'
+        header.write_text('int selected(short value){return value;}\n')
+        (self.root / 'external.hpp').write_text('namespace external {\n#include "project/local.hpp"\n}\n')
+        data = self.inspect('#include "../external.hpp"\n', cpp=True)
+        inventory = discovery.native_inventory(data['ast'], header, cpp=True)
+        self.assertEqual([item['name'] for item in inventory['functions']], ['external::selected'])
+        self.assertEqual(inventory['functions'][0]['parameters'], ['short'])
+
     def test_discovery_never_executes_application_static_initialisers(self):
         marker = self.project / 'INITIALISER_RAN'
         source = ('#include <cstdio>\nint initialise(){auto f=std::fopen("INITIALISER_RAN","w");'

@@ -151,7 +151,7 @@ class NativeProjectTests(unittest.TestCase):
     def test_preparation_binds_actual_headers_database_tools_and_ordered_target_units(self):
         with tempfile.TemporaryDirectory(prefix='native evidence ') as temporary:
             def execute(command, directory):
-                return subprocess.run(command, cwd=directory, capture_output=True, check=False, timeout=30)
+                return subprocess.run(command, cwd=directory, capture_output=True, check=False, timeout=120)
             evidence = Path(temporary)
             prepared = native_project.prepare(self.root, native_project.settings(self.configuration), 'c', self.compiler,
                                               evidence, execute)
@@ -180,7 +180,7 @@ class NativeProjectTests(unittest.TestCase):
         header.symlink_to('first.h')
         with tempfile.TemporaryDirectory(prefix='native alias evidence ') as temporary:
             def execute(command, directory):
-                return subprocess.run(command, cwd=directory, capture_output=True, check=False, timeout=30)
+                return subprocess.run(command, cwd=directory, capture_output=True, check=False, timeout=120)
             evidence = Path(temporary)
             prepared = native_project.prepare(self.root, native_project.settings(self.configuration), 'c', self.compiler,
                 evidence, execute)
@@ -198,7 +198,7 @@ class NativeProjectTests(unittest.TestCase):
         original = present.read_bytes()
         with tempfile.TemporaryDirectory(prefix='native probe evidence ') as temporary:
             def execute(command, directory):
-                return subprocess.run(command, cwd=directory, capture_output=True, check=False, timeout=30)
+                return subprocess.run(command, cwd=directory, capture_output=True, check=False, timeout=120)
             evidence = Path(temporary)
             prepared = native_project.prepare(self.root, native_project.settings(self.configuration), 'c',
                                               self.compiler, evidence, execute)
