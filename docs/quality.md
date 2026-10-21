@@ -4,6 +4,8 @@ CI caches only the pinned `cargo-llvm-cov` executable using an OS, architecture,
 
 ## Current scope
 
+The explicit prepared Java recipe validator has its own 80% line coverage floor. Its regressions reject cross-profile substitutions, altered bootstrap parser bytes, foreign/duplicate JAR entries, missing tooling and changed frozen inputs.
+
 The optional [Java live metric profile](java-metric-controls.md) adds separate 80% line floors for `java_control.py`, `java_live.py` and `java_control_receipt.py`. Private-socket, malformed-data, process cleanup, checkpoint/state, independent counter and receipt regressions are contributor gates. Actual-provider qualification additionally needs same-PID four-state execution, direct exported data and complete independent application-state oracles.
 
 The [Java ordered-call record](qualification/java-sequences-2026-10-21.json) qualifies runtime `dc8fa3d` through 240 actual JVMs across frozen prepared/legacy providers. It checks every intermediate source graph, private factories, expected exceptions, recursive roots, detached export and scalar shrinking. The runtime gate passes 633 distinct regressions; verifier `8d08d65` adds launch-count and receipt/refusal checks and rechecks all 46 retained reports without new JVMs. Final delivery gates are recorded separately with [PR #50](https://github.com/quuxio/oteleq/pull/50/checks). This leaves Java release/collection, invocation attribution and the full completion checklist open.

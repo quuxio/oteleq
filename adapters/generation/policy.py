@@ -12,6 +12,7 @@ import domains
 import filesystem_effects
 import http_effects
 import java_provider
+import java_profiles
 import go_project
 import native_project
 import python_project
@@ -154,11 +155,12 @@ def adapters(value: Any) -> dict[str, Any]:
     typed = value.get("typescript", {})
     keys(typed, {"backend"}, "adapters.typescript")
     java = value.get("java", {})
-    keys(java, {"backend"}, "adapters.java")
+    keys(java, {"backend", "profile"}, "adapters.java")
+    java_provider.backend(java.get("backend", "legacy"))
     return {**{language: native_project.settings(value[language]) for language in ('c', 'cpp') if language in value},
             "rust": {"backend": backend},
             "typescript": {"backend": typescript_provider.backend(typed.get("backend", "source"))},
-            "java": {"backend": java_provider.backend(java.get("backend", "legacy"))},
+            "java": java_profiles.settings(java),
             "python": {"import_roots": python_project.import_roots(python.get("import_roots", []))},
             "go": go_project.settings(value.get("go", {}))}
 

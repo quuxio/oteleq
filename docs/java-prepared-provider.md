@@ -28,6 +28,14 @@ Use the ordinary `plan`, `generate`, `run`, `replay`, `shrink` and `export-tests
 
 `backend = "legacy"` remains the default. Selecting `prepared` never silently falls back to that launcher. The replacement SDK currently provides Java; this setting does not make its other language placeholders executable adapters.
 
+### Select the fixed launch profile
+
+Prepared Java defaults to `profile = "stock-methods-v1"`, the original frozen `f3279fd` recipe. For the corrected SDK, explicitly add `profile = "safe-methods-v1"` under `[adapters.java]`, alongside `backend = "prepared"`.
+
+The safe recipe disables the stock method advice, enables the SDK's exception-safe method advice and adds its pinned bootstrap parser patch. The method scope remains `io.opentelemetry.methods` / `2.32.0-alpha`, with the original owner/function attributes. The runner independently fixes complete argv and properties for each profile. It never selects a profile from provider filenames or accepts additional flags from metadata. Unknown profiles, profiles on a legacy backend and cross-profile launch recipes are refused.
+
+The safe profile also requires `adapters/java/target/java-extension-0.2.0-SNAPSHOT-bootstrap-patch.jar` and its declared licence/notice sources. The bounded JAR must contain only the pinned shaded `W3CTraceContextEncoding.class` and those two notices, with no duplicate or foreign entries. Its complete bytes and sources become frozen plan inputs and are rechecked before replay. Build it through the matching SDK's `make java-build` before planning. Actual-provider qualification is separate from metadata acceptance.
+
 The provider must contain:
 
 - Its public `otelc` Python package, including prepared-launch, health and control APIs.
@@ -80,6 +88,8 @@ make generation-java-receiver-otelc JAVA_BACKEND=prepared \
 The default `JAVA_BACKEND=legacy` preserves the earlier qualification route. Both modes check complete independent receiver/static/return/error graphs for every repeat, generated/exported suites, replay, shrinking and source/refusal controls. Prepared mode additionally rechecks actual JVM identities, every retained runtime file and actual protobuf batch/unit accounting. These checks do not qualify a different provider revision or platform.
 
 ## Published qualification
+
+The explicit `safe-methods-v1` recipe has separate [164-JVM qualification](qualification/java-safe-profile-2026-10-21.json) at runtime `b4f2024` / SDK `e4aaafa`, whose tree matches producer main `9956bd9`. It covers generated/replayed/detached-exported/reduced live sequences, the corrected getter regression and ordinary prepared/legacy calls. All original `stock-methods-v1` evidence below keeps its own frozen provider identity and known getter limitation.
 
 The [21 October record](qualification/java-prepared-2026-10-21.json) qualifies runtime `fae3874` with frozen SDK `f3279fd` on macOS ARM64/JDK 21. The receiver corpus completes 151 actual JVM launches: six matching cases, two deliberate same-return state differences, generated suites, per-case replay, exported suites with the original source temporarily unavailable, scalar shrinking from seven to zero and seven refusal controls.
 

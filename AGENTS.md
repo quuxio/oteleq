@@ -1,5 +1,7 @@
 # Repository guidance
 
+- Prepared Java launch profiles are explicit: stock-methods-v1 retains the original fixed recipe; safe-methods-v1 fixes the corrected advice flags and pinned bootstrap parser patch. Never infer a profile from filenames or loosen the stock argv/properties/tooling refusal. Freeze and recheck the safe JAR, parser bytes and licence sources. Actual-provider qualification remains separate from metadata acceptance.
+
 - If `~/.agents/AGENTS.md` exists, read it and follow the relevant guidance.
 - Rust `compare-workload` compares repeated byte channels; `compare-observations` adds versioned typed boundary graphs and field differences. The embedded scalar generator implements plan/generate/run/replay/shrink/export-tests/clean with AST inventories for all eight languages, private paired execution and explicit blockers. Shrinking requires declared independent domains, preserves the original qualified failure and retains original/trial/final evidence plus a sealed replay suite. Generated scalar workers emit shared typed observations with explicit fixture expectations. Full semantic/build-aware adapters, richer object/factory codecs and action-scoped witness binding remain incomplete. Keep actual capabilities and design interfaces distinct.
 - Use the `quuxio` GitHub account and credentials for all remote operations. Verify the API identity before each operation. Never use `stephenlclarke` credentials. Use `/opt/homebrew/bin/gh` directly on Stephen's Mac because other wrappers may override explicitly supplied credentials.

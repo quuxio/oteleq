@@ -12,6 +12,7 @@ import tempfile
 from urllib.parse import unquote
 
 import java_provider as provider
+import java_profiles
 import otelc_capture as capture
 
 MAX_RUNTIME_BYTES = 32 * 1024 * 1024
@@ -53,9 +54,9 @@ def files(records: list, expected: set[Path]) -> None:
                          and row == identity(Path(row["path"])), "prepared input changed: " + row["path"])
 
 
-def agent_values(data: dict, owner: str, method: str) -> dict:
+def agent_values(data: dict, owner: str, method: str, profile: str = java_profiles.STOCK) -> dict:
     """The generated profile enables one source-bound method and no lifetimes."""
-    return {"otel.javaagent.enabled": "true", "otel.sdk.disabled": "false",
+    values = {"otel.javaagent.enabled": "true", "otel.sdk.disabled": "false",
             "otel.service.name": data["resource"]["service_name"], "otel.resource.attributes": "otelc.language=java",
             "otel.exporter.otlp.endpoint": data["export"]["endpoint"], "otel.exporter.otlp.protocol": "http/protobuf",
             "otel.exporter.otlp.timeout": str(data["export"]["timeout_ms"]),
@@ -66,6 +67,10 @@ def agent_values(data: dict, owner: str, method: str) -> dict:
             "otel.instrumentation.otelc-lifetimes.enabled": "true",
             "otel.instrumentation.opentelemetry-api.enabled": "true",
             "otel.instrumentation.methods.include": owner + "[" + method + "]"}
+    if java_profiles.name(profile) == java_profiles.SAFE:
+        values["otel.instrumentation.methods.enabled"] = "false"
+        values["otel.instrumentation.otelc-methods.enabled"] = "true"
+    return values
 
 
 def properties(values: dict) -> str:
@@ -94,18 +99,20 @@ def target(entry: dict, application: dict, project: Path) -> tuple[str, str]:
 
 
 def expected_argv(root: Path, java: Path, classes: Path, main: str, runtime: Path,
-                  data: dict, owner: str, method: str, plain: bool) -> list[str]:
+                  data: dict, owner: str, method: str, plain: bool, profile: str = java_profiles.STOCK) -> list[str]:
     """SDK metadata may verify this recipe; it cannot choose executables or flags."""
     args = [str(java), "-Xshare:off", "-Xlog:class+load=info:file=" + str(runtime / CLASS_LOG)]
     if not plain:
         args[1:1] = ["-Dotel.javaagent.logging=simple",
                      "-Dio.opentelemetry.javaagent.slf4j.simpleLogger.logFile=" + str(runtime / "agent.log")]
+        if java_profiles.name(profile) == java_profiles.SAFE:
+            args += ["-Xbootclasspath/a:" + str(root / java_profiles.PATCH)]
         args += ["-javaagent:" + str(root / provider.AGENT), "-Dotel.javaagent.extensions=" + str(root / provider.EXTENSION),
                  "-Dotel.javaagent.configuration-file=" + str(runtime / AGENT_CONFIG),
                  "-Dotelc.plan=" + str(runtime / PLAN_CONFIG), "-Dotelc.traces.enabled=true",
                  "-Dotelc.lifetime.types=", "-Dotelc.lifetime.resources=", "-Dotelc.lifetime.max-live=4096",
                  "-Dotelc.lifetime.release=close"]
-        args += ["-D" + key + "=" + value for key, value in sorted(agent_values(data, owner, method).items())]
+        args += ["-D" + key + "=" + value for key, value in sorted(agent_values(data, owner, method, profile).items())]
     return args + ["-cp", str(classes), main]
 
 
@@ -126,12 +133,13 @@ def verify(launch: dict, *, root: Path, project: Path, folder: Path, tools: dict
     classes = folder / "scratch/classes"
     java = tools["java"].resolve(strict=True)
     owner, method = target(entry, application, project)
+    profile = java_profiles.name(entry.get("java_profile", java_profiles.STOCK))
     provider.require(type(launch) is dict and set(launch) == LAUNCH_FIELDS
                      and type(launch["schema_version"]) is int and launch["schema_version"] == 1
                      and launch["language"] == "java" and launch["plain"] is plain
                      and launch["jvm_profile"] == "diagnostic-no-cds", "unsupported prepared launch identity")
     provider.require(launch["argv"] == expected_argv(root, java, classes, application["main_class"], runtime,
-                                                   data, owner, method, plain), "SDK changed the fixed Java launch recipe")
+                                                   data, owner, method, plain, profile), "SDK changed the fixed Java launch recipe")
     provider.require(launch["main_class"] == application["main_class"] and launch["ordered_classpath"] == [str(classes)]
                      and type(launch["java_version"]) is str and launch["java_version"], "prepared main/classpath/version differs")
     provider.require(launch["policy_sha256"] == provider.digest(data)
@@ -147,11 +155,13 @@ def verify(launch: dict, *, root: Path, project: Path, folder: Path, tools: dict
         provider.require(launch["selection_sha256"] == provider.digest(selection)
                          and capture.strict_json((runtime / "selection.json").read_bytes()) == selection,
                          "SDK changed resolved method selection")
-        provider.require((runtime / AGENT_CONFIG).read_text() == properties(agent_values(data, owner, method))
+        provider.require((runtime / AGENT_CONFIG).read_text() == properties(agent_values(data, owner, method, profile))
                          and (runtime / PLAN_CONFIG).read_text() == properties(plan_values(runtime, data, selection)),
                          "SDK changed agent configuration or live controls")
         tooling |= {root / provider.AGENT, root / provider.EXTENSION,
                     runtime / AGENT_CONFIG, runtime / PLAN_CONFIG, runtime / "selection.json"}
+        if profile == java_profiles.SAFE:
+            tooling.add(root / java_profiles.PATCH)
     files(launch["tooling"], tooling)
 
 

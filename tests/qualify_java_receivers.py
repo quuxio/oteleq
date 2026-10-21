@@ -32,7 +32,7 @@ DIFFERENCES = {"instance", "static_only"}
 
 
 def prepare(cli: Path, provider: Path, folder: Path, source_text: str = SOURCE,
-            methods: tuple[str, ...] = METHODS, factory: str | None = None, *, backend: str = "legacy") -> Path:
+            methods: tuple[str, ...] = METHODS, factory: str | None = None, *, backend: str = "legacy", profile: str | None = None) -> Path:
     """Freeze eight explicit methods and independent constructor/factory inputs."""
     folder.mkdir()
     source = folder / "application"
@@ -42,6 +42,8 @@ def prepare(cli: Path, provider: Path, folder: Path, source_text: str = SOURCE,
     (source / "Counter.java").write_text(source_text)
     policy = folder / "equivalence.toml"
     text = 'schema_version=1\nlanguages=["java"]\n[adapters.java]\nbackend=' + json.dumps(backend)
+    if profile is not None:
+        text += '\nprofile=' + json.dumps(profile)
     text += '\n[functions]\ninclude=' + json.dumps(["Counter." + name + "(int)" for name in methods]) + '\n'
     for name in methods:
         text += '\n[[fixtures]]\nfunction=' + json.dumps("Counter." + name + "(int)") + '\ncases=[[7]]\n'
