@@ -430,6 +430,17 @@ def plan_configuration(args):
     return configuration
 
 
+def validate_fixture_inventory(configuration: dict, inventory: list, languages: list, workspace: Path) -> None:
+    """An unmatched selected fixture retains discovery evidence instead of a plan."""
+    for fixture in configuration["fixtures"]:
+        if fixture["language"] is not None and fixture["language"] not in languages:
+            continue
+        if not any(project_policy.fixture_matches(entry, fixture) for entry in inventory):
+            write(workspace / "discovery-failure.json", {"schema_version": VERSION,
+                  "inventory": inventory, "unmatched_fixture": fixture})
+            raise ValueError(f"configured fixture matches no selected callable: {fixture['function']}; partial workspace: {workspace}")
+
+
 def plan(args):
     if sys.version_info < (3, 12):
         raise ValueError("generation requires Python 3.12+")
@@ -450,13 +461,7 @@ def plan(args):
     snapshot = snapshot_source(source, workspace, contents)
     native_profile.directories(snapshot, native_projects)
     tools, artefacts, inventory = inventory_tree(contents, root, snapshot, workspace, args, native_projects)
-    for fixture in configuration["fixtures"]:
-        if fixture["language"] is not None and fixture["language"] not in args.language:
-            continue
-        if not any(project_policy.fixture_matches(entry, fixture) for entry in inventory):
-            write(workspace / "discovery-failure.json", {"schema_version": VERSION,
-                  "inventory": inventory, "unmatched_fixture": fixture})
-            raise ValueError(f"configured fixture matches no selected callable: {fixture['function']}; partial workspace: {workspace}")
+    validate_fixture_inventory(configuration, inventory, args.language, workspace)
     if native_profile.source_manifest(sys.modules[__name__], source, native_projects) != contents or manifest(snapshot) != contents:
         raise ValueError("source changed during discovery")
     data = {"schema_version": VERSION, "source": str(source), "otelc_root": str(root), "source_manifest": contents,
