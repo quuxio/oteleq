@@ -20,7 +20,8 @@ class QualificationRecipeTests(unittest.TestCase):
             for flag in ("--cli", "--comparator"):
                 if line.startswith("\t") and flag + " " in line:
                     targets[target] = flag
-        self.assertEqual(len(targets), 25)
+        self.assertEqual(len(targets), 26)
+        self.assertIn("generation-node-project-otelc", targets)
         self.assertIn("generation-native-project-otelc", targets)
         self.assertIn("generation-http-otelc", targets)
         self.assertIn("generation-java-receiver-otelc", targets)
@@ -62,6 +63,7 @@ class QualificationRecipeTests(unittest.TestCase):
         self.assertIn("generation-http-otelc Qualify scripted HTTP", result.stdout)
         self.assertIn("generation-native-project-otelc Qualify explicit C/C++ targets", result.stdout)
         self.assertIn("generation-java-project-otelc Qualify Java roots", result.stdout)
+        self.assertIn("generation-node-project-otelc Qualify Node module formats", result.stdout)
 
 
 if __name__ == "__main__":
