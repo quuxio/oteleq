@@ -7,6 +7,8 @@ from pathlib import Path
 
 import java_health
 import java_launch
+import java_control_receipt
+import java_live
 import java_provider as provider
 import otelc_capture as capture
 import sequences
@@ -42,7 +44,7 @@ def decode(decoder, body):
         raise ValueError("Java prepared provider: invalid OTLP protobuf receipt") from error
 
 
-def trace(message, service: str, owner: str, method: str, nodes: dict) -> tuple[int, int]:
+def trace(message, service: str, owner: str, method: str, nodes: dict, intervals: dict) -> tuple[int, int]:
     """Check each selected method, ID, parent and unambiguous source owner."""
     spans, errors = 0, 0
     for group in message.resource_spans:
@@ -61,6 +63,7 @@ def trace(message, service: str, owner: str, method: str, nodes: dict) -> tuple[
                 provider.require(span.dropped_attributes_count == span.dropped_events_count == span.dropped_links_count == 0,
                                  "selected span contains dropped observations")
                 nodes[key] = (span.trace_id, span.parent_span_id) if span.parent_span_id else None
+                intervals[key] = (span.start_time_unix_nano, span.end_time_unix_nano)
                 spans += 1
                 errors += int(span.status.code == 2)
     return spans, errors
@@ -119,26 +122,35 @@ def scope_metrics(scope, method: str, recorded: dict) -> int:
     return count
 
 
-def receipt(bodies: list, service: str, entry: dict, trace_decoder, metric_decoder) -> dict:
+def receipt(bodies: list, service: str, entry: dict, trace_decoder, metric_decoder, *, controls: dict | None = None) -> dict:
     """Require the declared call roots and complete matching cumulative metrics."""
     owner, method = entry["otelc_function"].split("(", 1)[0].rsplit(".", 1)
-    nodes, batches = {}, Counter()
+    nodes, intervals, by_body, batches = {}, {}, {}, Counter()
     recorded = {CALLS: [], DURATION: []}
     spans, errors, points = 0, 0, 0
-    for path, body in bodies:
+    for index, (path, body) in enumerate(bodies):
         provider.require(path in (capture.TRACE_PATH, "/v1/metrics"), "unexpected OTLP route")
         batches[path] += 1
         if path == capture.TRACE_PATH:
-            calls, failed = trace(decode(trace_decoder, body), service, owner, method, nodes)
+            calls, failed = trace(decode(trace_decoder, body), service, owner, method, nodes, intervals)
             spans += calls;errors += failed
         else:
-            points += metrics(decode(metric_decoder, body), service, method, recorded)
+            current = {CALLS: [], DURATION: []}
+            points += metrics(decode(metric_decoder, body), service, method, current)
+            by_body[index] = current
+            for name, values in current.items():
+                recorded[name].extend(values)
     provider.require(spans > 0 and capture.trace_roots(nodes) == sequences.call_count(entry),
                      "missing complete selected invocation tree(s) for declared calls")
+    expected = spans
+    if sequences.controls(entry):
+        provider.require(controls is not None, "missing required live metric-control receipt")
+        sizes = java_control_receipt.trees(nodes, intervals)
+        expected = java_control_receipt.qualify(controls, controls["pid"], bodies, sizes, by_body)
     for name, values in recorded.items():
         ordered = [value for _, value in sorted(values)]
-        provider.require(ordered and all(0 <= value <= spans for value in ordered)
-                         and ordered == sorted(ordered) and ordered[-1] == spans,
+        provider.require(ordered and all(0 <= value <= expected for value in ordered)
+                         and ordered == sorted(ordered) and ordered[-1] == expected,
                          "missing, reset or mismatched direct function metric: " + name)
     return {"trace_batches": batches[capture.TRACE_PATH], "spans": spans,
             "metric_batches": batches["/v1/metrics"], "metric_points": points, "errors": errors}
@@ -147,11 +159,16 @@ def receipt(bodies: list, service: str, entry: dict, trace_decoder, metric_decod
 def witness(runtime: Path, folder: Path, entry: dict, bodies: list, service: str, trace_decoder) -> dict:
     """Qualify real health directly without fabricating the legacy runtime report."""
     from opentelemetry.proto.collector.metrics.v1.metrics_service_pb2 import ExportMetricsServiceRequest
-    received = receipt(bodies, service, entry, trace_decoder.FromString, ExportMetricsServiceRequest.FromString)
     launch = capture.strict_json((folder / java_launch.LAUNCH_FILE).read_bytes())
     process = capture.strict_json((folder / "process.json").read_bytes())
     provider.require(type(process) is dict and set(process) == {"pid", "argv"} and process["argv"] == launch["argv"],
                      "missing actual JVM process identity")
+    controls = java_control_receipt.read(folder, entry, process["pid"], bodies, plain=False) if sequences.controls(entry) else None
+    received = receipt(bodies, service, entry, trace_decoder.FromString, ExportMetricsServiceRequest.FromString, controls=controls)
+    if controls is not None:
+        (folder / "verified-controls.json").write_text(json.dumps({"control_record_sha256": controls["record_sha256"],
+                  "pid": process["pid"], "selected_spans": received["spans"],
+                  "collected_spans": controls["restored"]["flush"]["completed"], "source": java_live.RECORD}, indent=2) + "\n")
     health = java_health.read(runtime)
     verified = java_health.qualify(health, pid=process["pid"], policy_sha256=launch["policy_sha256"],
                                    selection_sha256=launch["selection_sha256"],
@@ -160,7 +177,8 @@ def witness(runtime: Path, folder: Path, entry: dict, bodies: list, service: str
     raw = hashlib.sha256()
     for _, body in bodies:
         raw.update(body)
-    return {"decoder": "opentelemetry-proto traces/metrics and Java SDK health1", "raw_otlp_sha256": raw.hexdigest(),
+    decoder = "opentelemetry-proto traces/metrics and Java SDK health1" + ("; bounded live metric controls1" if controls is not None else "")
+    return {"decoder": decoder, "raw_otlp_sha256": raw.hexdigest(),
             "functions": {entry["otelc_function"]: received["spans"]}, "spans": received["spans"],
             "losses": {"sdk.queue_dropped": int(health["span_accounting"]["queue_dropped"]),
                        "sdk.trace_export_failed": int(health["trace_exports"]["units_failed"]),

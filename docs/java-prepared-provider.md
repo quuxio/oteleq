@@ -64,7 +64,7 @@ The SDK requires a short Unix-domain socket path. Each attempt creates an owned 
 
 The runtime archive is limited to 64 entries and 32 MiB. Links and special files are refused. Final health reads require an owned canonical 0700 runtime, an owned regular 0600 report and a 4 KiB size limit. Descriptor-relative reads refuse symbolic links and do not wait on FIFOs.
 
-This profile requires POSIX sockets and the qualified JDK/platform. It is trusted local execution. The fixed source-classpath compiler profile excludes external dependencies, annotation processing, modules, custom classloaders and arbitrary JVM flags. SDK method-name selection may reject ambiguous overloads. General project integration, live metric-control sequences, broader receivers and shipping-artefact qualification remain open.
+This profile requires POSIX sockets and the qualified JDK/platform. It is trusted local execution. The fixed source-classpath compiler profile excludes external dependencies, annotation processing, modules, custom classloaders and arbitrary JVM flags. SDK method-name selection may reject ambiguous overloads. [Live metric controls](java-metric-controls.md) are explicit per-call settings for declared receiver sequences. They retain the actual process/build, acknowledgements, export-off windows and restored measurements. General project integration, broader SDK-instrument/control profiles, receivers and shipping-artefact qualification remain open.
 
 ## Reproduce the receiver qualification
 

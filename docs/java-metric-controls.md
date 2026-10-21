@@ -1,0 +1,78 @@
+# Live Java metric controls
+
+Declared Java receiver sequences can change metric collection and emission independently while one instrumented JVM and build remain in place. The plain lane executes the same calls and private checkpoints in its own process. Application and dependency sources remain unchanged; no application SDK calls are required.
+
+This profile uses the [prepared Java provider](java-prepared-provider.md), its existing private control socket and the ordinary [Java receiver codecs](java-receivers.md). It supports **equivalence over these tests and observations**, including each call's result, supported state and exact stdout/stderr. Its metric proof applies to the selected synchronous method trees. General SDK instruments, arbitrary callbacks, concurrent schedules and shipping artefacts require separate qualification.
+
+## Declare a sequence
+
+For the existing `Counter.add(int)` receiver example, use:
+
+```toml
+schema_version = 1
+languages = ["java"]
+
+[adapters.java]
+backend = "prepared"
+
+[functions]
+include = ["Counter.add(int)"]
+
+[limits]
+case_timeout_ms = 20000
+
+[[fixtures]]
+function = "Counter.add(int)"
+cases = [[7]]
+receiver = { factory = "Counter", arguments = [10] }
+domains = [{ kind = "integer", minimum = 0, maximum = 7 }]
+sequence = [
+  { action = "call", arguments = "case", metrics = { collection = true, emission = true } },
+  { action = "call", arguments = [2], metrics = { collection = false, emission = true } },
+  { action = "call", arguments = [3], metrics = { collection = true, emission = false } },
+  { action = "call", arguments = [4], metrics = { collection = false, emission = false } },
+]
+```
+
+Use the normal `plan --config`, `generate`, `run`, `replay`, `shrink` and `export-tests` commands. The first call must provide a collection-on/emission-on positive control. Every call in a live schedule must declare both booleans. Fixed arguments, construction inputs, required roots and states remain frozen through generated suites, export and scalar shrinking. Other provider/language profiles remain explicit blockers.
+
+| Requested state | Selected function measurements | Metric export | Tracing |
+| --- | --- | --- | --- |
+| Collection on, emission on | Recorded | Exported | Remains active |
+| Collection off, emission on | No new recordings | May export earlier aggregates | Remains active |
+| Collection on, emission off | Recorded and retained | No metric requests in the measured off window | Remains active |
+| Collection off, emission off | No new recordings | No metric requests in the measured off window | Remains active |
+
+The host restores both controls and flushes before the JVM exits. The final direct function counter and duration count must include calls made while collection was enabled, including retained emission-off measurements, and exclude calls made while collection was disabled. Traces must still cover every declared call tree, including recursive invocations and declared errors. A no-op exporter or missing telemetry cannot substitute for these checks.
+
+## What is checked
+
+The generated caller uses private file checkpoints before and after each call. A separate host client sends the public socket commands. Both lanes use the same caller code; the plain lane records no fabricated SDK responses. Each process keeps its PID, executable, source/classes, policy and loaded origins throughout the schedule.
+
+Control replies have a closed schema, actual PID, explicit flags and available counters. Unknown counters, losses, changed processes and contradictory acknowledgements fail the gate. Each setter must preserve the other control. Emission-off waits for zero in-flight exports and the effective-off acknowledgement before releasing the next call. Each off window includes a forced flush and at least one complete 1,000 ms export interval. The host continues to enforce the shared case time/output budgets; increase the explicit timeout for longer functions or schedules.
+
+Direct OTLP receipt independently checks each selected trace, complete root/parent graphs, scope, method identity and cumulative metric series. Synchronous root trees must have an unambiguous serial order, with children contained in their root interval. Their sizes determine the expected recorded-call denominator for each declared collection state. Positive and restoration flushes must supply both actual function metric series. Final SDK health remains separate and must match the actual PID, policy/selection and all received export batches/units without pending or lost evidence.
+
+This remains a named-tree witness. It does not add the [proposed invocation cookies](action-witness.md) or qualify hidden concurrent activity. Application snapshots remain call boundaries; broader asynchronous or resource actions need their own observations.
+
+## Retained evidence
+
+Each attempt adds `java-controls.json`, containing actual control histories, receiver positions, measured off windows and restoration. `verified-controls.json` binds its digest, actual PID, all selected spans and collected spans. The existing compiler products, launch/PID records, raw OTLP and final health are retained. Original short SDK runtimes are archived and removed normally. Missing checkpoints, unsafe files and incomplete control schedules cannot pass.
+
+The client accepts at most 4 KiB per reply, 256 status records per transition and 512 in total. The full control record is capped at 256 KiB. These are additional observer budgets; the existing application and telemetry budgets still apply. This is trusted local execution, not a hostile-code sandbox.
+
+## Maintainer qualification
+
+```sh
+make generation-java-controls-otelc \
+  PYTHON=/absolute/path/to/qualified/python \
+  OTELC_ROOT=/absolute/path/to/frozen/prepared-sdk \
+  LEGACY_OTELC_ROOT=/absolute/path/to/frozen/legacy-sdk \
+  REPORT_DIR=/absolute/path/to/new-qualification
+```
+
+The primary corpus covers six methods, complete intermediate graphs, private factories, nonempty application stdout/stderr, recursive trees, a declared error while collection is off, and state differences during both off modes. It exercises direct/generated/detached-exported routes, per-case replay and scalar shrinking. Ordinary prepared/legacy calls are checked separately so live controls remain opt-in. Contributor gates enforce 80% line coverage separately for the client, checkpoint host and receipt validator; actual-provider qualification is a separate requirement.
+
+The cause-getter regression uses an exact supported outer `RuntimeException("outer", cause)`. Its custom cause mutates a private receiver field when the SDK formats the exception. Frozen SDK `f3279fd` causes one extra mutation per call; the comparison correctly reports a difference. The cause internals remain outside the observation codec. This is a known producer defect and is delegated to the otelc owner. `GETTER_EXPECTATION=different` records that known result; select `equivalent` only when qualifying a corrected immutable SDK. A summary cannot reclassify retained failing observations as equivalent.
+
+The qualifier's `--recheck` validates completed retained reports, compiler products, checkpoint pairs and raw receipt/health without new JVM launches. Keep failed or partial evidence separate; it does not restart incomplete routes.

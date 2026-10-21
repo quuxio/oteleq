@@ -47,6 +47,8 @@ Generated tests live in a new private directory outside the application reposito
 
 The [prepared Java qualification](docs/qualification/java-prepared-2026-10-21.json) completes 151 receiver JVM launches through generated/exported suites, replay, shrinking and refusal controls, plus four packaged recursive and eight legacy-compatibility launches. It verifies complete independent state/outcome oracles, actual PID/health/OTLP accounting and removal of owned short runtimes.
 
+Prepared Java receiver sequences can also request [live metric collection and emission controls](docs/java-metric-controls.md). One unchanged JVM executes the declared states; direct metric receipt distinguishes recording suppression from transport silence while traces remain active. The scope is selected synchronous method trees.
+
 Generated Java builds retain [compiler-owned source/class bindings](docs/java-build-bundles.md), actual class products and the selected JDK module-image identity. They require a complete JDK 21 and use a fixed UTF-8 profile with annotation processing disabled. The prepared manifest supports ongoing SDK integration; general Java classpath/module builds remain open.
 
 Declared [ordered Java calls and Node calls/release](docs/ordered-sequences.md) retain intermediate state. The [Java call-only corpus](docs/qualification/java-sequences-2026-10-21.json) qualifies 240 actual JVMs across prepared/legacy providers, including a state difference restored before the final boundary. The earlier [148-launch qualification](docs/qualification/ordered-sequences-2026-10-20.json) covers Node calls/release and bounded JavaScript collection. Missing collection stays inconclusive.

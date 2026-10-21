@@ -110,6 +110,18 @@ const RESOURCES: &[(&str, &str)] = &[
         include_str!("../adapters/generation/java_health.py"),
     ),
     (
+        "java_control.py",
+        include_str!("../adapters/generation/java_control.py"),
+    ),
+    (
+        "java_live.py",
+        include_str!("../adapters/generation/java_live.py"),
+    ),
+    (
+        "java_control_receipt.py",
+        include_str!("../adapters/generation/java_control_receipt.py"),
+    ),
+    (
         "java_launch.py",
         include_str!("../adapters/generation/java_launch.py"),
     ),

@@ -2,6 +2,7 @@
 from collections.abc import Callable
 import json
 from pathlib import Path
+import java_live
 
 
 PRIMITIVES = {"boolean", "byte", "short", "int", "long", "char", "float", "double"}
@@ -80,15 +81,20 @@ def execution(entry: dict, arguments: list, literal: Callable, sequence: list[di
     if sequence is None:
         return 'java.lang.String capture="{\\\"java_receiver_schema_version\\\":1,"+boundaries(call(receiver,' + inputs(arguments) + ',target))+"}";'
     schedule = ",".join(inputs(step["arguments"]) for step in sequence)
+    controlled = any("metrics" in step for step in sequence)
+    before = 'checkpoint("before-"+index);' if controlled else ""
+    after = 'checkpoint("after-"+index);' if controlled else ""
     return '''java.lang.Object[][] schedule=new java.lang.Object[][]{''' + schedule + '''};
 java.lang.String[] first=null,last=null;
 java.lang.StringBuilder steps=new java.lang.StringBuilder();
 for(int index=0;index<schedule.length;index++){
+''' + before + '''
  java.lang.String[] current=call(receiver,schedule[index],target);
  if(first==null)first=current;
  last=current;
  if(index>0)steps.append(',');
  steps.append("{\\\"id\\\":\\\"step-").append(index).append("\\\",\\\"action\\\":\\\"call\\\",").append(boundaries(current)).append('}');
+''' + after + '''
 }
 java.lang.String capture="{\\\"java_receiver_schema_version\\\":2,\\\"before\\\":"+first[0]+",\\\"outcome\\\":"+last[1]+",\\\"after\\\":"+last[2]+",\\\"steps\\\":["+steps+"]}";'''
 
@@ -117,6 +123,7 @@ constructed=factory.invoke(null,new java.lang.Object[]{{{factory_args}}});'''
     model_types = ",".join("new java.lang.Class<?>[]{" + ",".join(field["type"] + CLASS_LITERAL for field in model["fields"]) + "}" for model in models)
     model_modifiers = ",".join("new int[]{" + ",".join(str(field["modifiers"]) for field in model["fields"]) + "}" for model in models)
     template = r'''class OteleqDriver {
+@CHECKPOINT_HELPER@
 static OteleqGraph observer() throws java.lang.Exception {
 return new OteleqGraph(new java.lang.Class<?>[]{@MODELS@},new java.lang.String[][]{@FIELDS@},new java.lang.Class<?>[][]{@TYPES@},new int[][]{@MODIFIERS@});
 }
@@ -151,6 +158,7 @@ if(constructed==null || constructed.getClass()!=@OWNER@.class)throw new java.lan
 @OWNER@ receiver=(@OWNER@)constructed;
 @EXECUTION@
 java.nio.file.Files.writeString(java.nio.file.Path.of(java.lang.System.getenv("OTELEQ_OBSERVATION")),capture);
+@FINAL_CHECKPOINT@
 }
 }
 '''
@@ -160,7 +168,9 @@ java.nio.file.Files.writeString(java.nio.file.Path.of(java.lang.System.getenv("O
                      "VALUES": ",".join(values), "ROOT_TYPES": ",".join(type_ + CLASS_LITERAL for type_ in types),
                      "OUTPUT": entry["output"], "METHOD": json.dumps(entry["name"].rsplit(".", 1)[-1]),
                      "PARAMS": ("," + params) if params else "", "CONSTRUCT": construct,
-                     "EXECUTION": execution(entry, arguments, literal, sequence)}
+                     "EXECUTION": execution(entry, arguments, literal, sequence),
+                     "CHECKPOINT_HELPER": java_live.HELPER if sequence and any("metrics" in step for step in sequence) else "",
+                     "FINAL_CHECKPOINT": 'checkpoint("finish");' if sequence and any("metrics" in step for step in sequence) else ""}
     for name, value in substitutions.items():
         template = template.replace("@" + name + "@", value)
     package = "package " + entry["package"] + ";\n" if entry["package"] else ""

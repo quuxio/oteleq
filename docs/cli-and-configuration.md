@@ -124,6 +124,10 @@ Differences include typed values and graph paths. The comparator must handle ali
 
 Mixed-result precedence is tool error, invalid plan, difference, incompleteness, then success. Reports retain every outcome regardless of exit precedence. Inventory/plan success is separate from execution success, and zero executed cases cannot produce a successful comparison.
 
+### Live Java metric controls
+
+A prepared Java receiver call can include `metrics = { collection = false, emission = true }`. Every call in that schedule must declare both booleans, and the first must enable both as a positive control. The host controls one unchanged JVM through private checkpoints, waits for an effective export-off barrier, and restores both settings before shutdown. [The control guide](java-metric-controls.md) defines direct trace/metric/health checks, budgets and limitations. The ordinary plain/on workflow is unchanged when controls are absent.
+
 ### Ordered receiver sequences
 
 A receiver fixture can declare `sequence = [{ action = "call", arguments = "case" }, { action = "call", arguments = [2] }, { action = "release" }]`. [The sequence contract](ordered-sequences.md) records intermediate states, explicit errors and unavailable actions. JavaScript/TypeScript can append `{ action = "collect", gc_rounds = 64, settle_turns = 4 }` with a qualified provider; TypeScript additionally uses the explicit emitter/capability gate. Java supports the call-only schedule with its declared source receiver profile; release/collection and other requested runners remain visible blockers. Both Java providers validate the declared root-tree count, and prepared mode retains direct cumulative metrics and final health.
