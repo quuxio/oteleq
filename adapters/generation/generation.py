@@ -385,6 +385,28 @@ def configure_go_context(entry: dict, discovered: dict, configuration: dict) -> 
         entry["otelc_runtime_function"] = str(relative.with_suffix("")).replace("/", ".") + "." + entry["name"]
 
 
+def configure_entry_context(entry, discovered, configuration, snapshot, excluded):
+    """Apply explicit per-language provider settings and source-context bindings."""
+    language = entry["language"]
+    adapters = configuration["adapters"]
+    if language in ("javascript", "typescript"):
+        node_project.bind_entry(entry, discovered)
+    if language == "typescript":
+        entry["typescript_backend"] = adapters["typescript"]["backend"]
+    if language == "rust":
+        entry["rust_backend"] = adapters["rust"]["backend"]
+    if language == "java":
+        entry["java_backend"] = adapters.get("java", {}).get("backend", "legacy")
+        entry["java_profile"] = adapters.get("java", {}).get("profile", java_profiles.STOCK)
+    if language == "go":
+        configure_go_context(entry, discovered, configuration)
+    if language == "python" and not excluded and adapters["python"]["import_roots"]:
+        try:
+            entry["python_import"] = python_project.context(snapshot, entry["path"], adapters["python"]["import_roots"])
+        except ValueError as error:
+            entry["reason"] = entry["reason"] or str(error)
+
+
 def inventory_entry(function, discovered, name, language, source_hash, snapshot, args):
     entry = {**function, "path": name, "language": language, "globals": discovered["globals"],
              "parser": discovered.get("parser", "unavailable"), "package": discovered.get("package", ""),
@@ -402,22 +424,7 @@ def inventory_entry(function, discovered, name, language, source_hash, snapshot,
         # An unknown callable set cannot prove that the function filter excludes it.
         excluded = False
     entry["generation_seed"] = args.configuration["generation"]["seed"]
-    if language in ("javascript", "typescript"):
-        node_project.bind_entry(entry, discovered)
-    if language == "typescript":
-        entry["typescript_backend"] = args.configuration["adapters"]["typescript"]["backend"]
-    if language == "rust":
-        entry["rust_backend"] = args.configuration["adapters"]["rust"]["backend"]
-    if language == "java":
-        entry["java_backend"] = args.configuration["adapters"].get("java", {}).get("backend", "legacy")
-        entry["java_profile"] = args.configuration["adapters"].get("java", {}).get("profile", java_profiles.STOCK)
-    if language == "go":
-        configure_go_context(entry, discovered, args.configuration)
-    if language == "python" and not excluded and args.configuration["adapters"]["python"]["import_roots"]:
-        try:
-            entry["python_import"] = python_project.context(snapshot, name, args.configuration["adapters"]["python"]["import_roots"])
-        except ValueError as error:
-            entry["reason"] = entry["reason"] or str(error)
+    configure_entry_context(entry, discovered, args.configuration, snapshot, excluded)
     fixture = project_policy.matching_fixture(entry, args.configuration) if not excluded else None
     configure_fixture(entry, discovered, fixture)
     entry["status"] = "excluded" if excluded else qualify_entry(entry, snapshot, args.cases)
