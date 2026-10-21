@@ -35,7 +35,7 @@ Each successful compilation retains the following outside the private applicatio
 | `prepared-application.json` | Schema-1 main class, classpath and source/class bindings |
 | `build-identities.json` | Complete private source/product inventories and retained metadata hashes |
 
-The prepared manifest follows the replacement otelc SDK's published Java input format. Producing it does not make the generic generator compatible with that SDK's runtime, health or live controls. Generated paired execution continues to require the [qualified pre-rebuild provider](automatic-generation.md#build-and-run). Replacement-SDK runtime integration and invocation attribution remain open.
+The prepared manifest follows the replacement otelc SDK's published Java input format. The public loader is checked separately against an immutable SDK source revision; that read-only check starts no application JVM. Producing it does not make the generic generator compatible with that SDK's runtime, health or live controls. Generated paired execution continues to require the [qualified pre-rebuild provider](automatic-generation.md#build-and-run). Replacement-SDK runtime integration and invocation attribution remain open.
 
 ## Validation
 
@@ -44,3 +44,9 @@ The prepared manifest follows the replacement otelc SDK's published Java input f
 `make generation-java-receiver-otelc` rechecks compiler bindings and every retained class product alongside its complete independent state/result oracles, generated/exported suites, replay and scalar reduction. Its exact-revision qualification is separate from ordinary compiler regressions and does not qualify another SDK or platform.
 
 The file-manager hooks are documented in the [JDK 21 API](https://docs.oracle.com/en/java/javase/21/docs/api/java.compiler/javax/tools/ForwardingJavaFileManager.html). Both output methods are covered by the compiled probes; the newer method must not record an output a second time through the older override.
+
+## Published qualification
+
+The [21 October record](qualification/java-compiler-2026-10-21.json) names runtime `8843816`, its frozen executable and the unchanged pre-rebuild provider `d6d03b7` on macOS ARM64/JDK 21. Its eight-case corpus completes 151 actual application launches: six matching cases, two deliberate same-return state differences, seven refusal controls, generated/exported suites, per-case replay and scalar shrinking from seven to zero. All 155 retained manifests and 467 retained class bindings are checked independently; four copied original shrink attempts are counted once.
+
+The frozen replacement SDK `760a526` separately accepts all 151 unique manifests and 455 class bindings through its public `PreparedApplication.load` interface. Four altered-manifest controls are refused. All 7,360 legacy-provider records and 55 frozen replacement-SDK source files remain unchanged. This loader check starts no application JVM and does not qualify generic replacement-SDK execution.
