@@ -21,6 +21,7 @@ CLASS_LOG = "class-load.log"
 AGENT_CONFIG = "agent.properties"
 PLAN_CONFIG = "plan.properties"
 APPLICATION_FILE = "prepared-application.json"
+CONTROL_SOCKET = "control.sock"
 IDENTITY_FIELDS = {"path", "sha256", "size", "inode", "device", "mtime_ns"}
 LAUNCH_FIELDS = {"schema_version", "language", "plain", "jvm_profile", "agent_diagnostics", "health_report",
                  "selection_sha256", "argv", "main_class", "ordered_classpath", "application", "tooling",
@@ -110,7 +111,7 @@ def expected_argv(root: Path, java: Path, classes: Path, main: str, runtime: Pat
 
 def plan_values(runtime: Path, data: dict, selection: dict) -> dict:
     """Verify policy-owned controls, hashes and shutdown budget independently."""
-    return {"control.socket": str(runtime / "control.sock"), "metrics.collection": "true", "metrics.emission": "true",
+    return {"control.socket": str(runtime / CONTROL_SOCKET), "metrics.collection": "true", "metrics.emission": "true",
             "metrics.buckets": ",".join(map(str, data["metrics"]["histogram_boundaries_seconds"])),
             "health.report": str(runtime / "health.json"), "health.policy-sha256": provider.digest(data),
             "health.selection-sha256": provider.digest(selection),
@@ -135,7 +136,7 @@ def verify(launch: dict, *, root: Path, project: Path, folder: Path, tools: dict
                      and type(launch["java_version"]) is str and launch["java_version"], "prepared main/classpath/version differs")
     provider.require(launch["policy_sha256"] == provider.digest(data)
                      and launch["loaded_origins"] == str(runtime / CLASS_LOG), "prepared policy/origin identity differs")
-    for key, filename in (("agent_diagnostics", "agent.log"), ("health_report", "health.json"), ("control_socket", "control.sock")):
+    for key, filename in (("agent_diagnostics", "agent.log"), ("health_report", "health.json"), ("control_socket", CONTROL_SOCKET)):
         provider.require(launch[key] == (None if plain else str(runtime / filename)), "prepared runtime path differs: " + key)
     verify_application(launch["application"], application, application_path, classes)
     tooling = {java}
@@ -211,7 +212,7 @@ def runtime(entry: dict, folder: Path, *, source_roots: tuple[Path, ...] = ()) -
     provider.require(os.name == "posix", "prepared runtime requires qualified POSIX control sockets")
     with tempfile.TemporaryDirectory(prefix="oej-", dir=capture.temporary_parent(*source_roots)) as temporary:
         path = Path(temporary).resolve() / "r"
-        provider.require(len(os.fsencode(path / "control.sock")) <= 100,
+        provider.require(len(os.fsencode(path / CONTROL_SOCKET)) <= 100,
                          "runtime socket path exceeds 100 bytes; select a shorter TMPDIR before planning")
         try:
             yield path
