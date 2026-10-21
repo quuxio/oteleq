@@ -112,26 +112,34 @@ def check_attempt(attempt: dict, entry: dict, lane: str) -> None:
         assert execution["witness"] is None
 
 
-def framework(workspace: Path, folder: Path, name: str) -> int:
+def framework(workspace: Path, folder: Path, name: str, *, resume: bool = False) -> int:
     """A strict generated suite fails on the eight deliberately invalid fixtures."""
-    output = command([sys.executable, workspace / "tests/test_equivalence.py"], folder, name, expected=1)
+    retained = folder / (name + ".stdout")
+    output = retained.read_text() if resume else command([sys.executable, workspace / "tests/test_equivalence.py"], folder, name, expected=1)
     records = [json.loads(line) for line in output.splitlines()]
     assert len(records) == 16
     return sum(check_report(Path(record["report"]), 1) for record in records)
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--otelc-root", type=Path, required=True)
-    parser.add_argument("--report-dir", type=Path, required=True)
-    parser.add_argument("--cli", type=Path, required=True)
-    args = parser.parse_args()
-    provider, cli = args.otelc_root.resolve(strict=True), args.cli.resolve(strict=True)
-    destination = args.report_dir.resolve()
-    if any(destination.is_relative_to(root) for root in (provider, Path(__file__).resolve().parents[1])):
-        parser.error("qualification directory must be new and external")
+def resume_routes(cli: Path, provider: Path, folder: Path) -> tuple[Path, int]:
+    """Recheck completed routes and the sealed export before any new launch."""
+    required = ("comparison/report.json", "framework.stdout", "export-comparison/report.json",
+                "export-framework.stdout", "exported/plan.json", "exported/tests/corpus.json")
+    if not all((folder / name).is_file() for name in required):
+        raise ValueError("resume requires all four completed execution routes")
+    exported = folder / "exported"
+    if Path(json.loads((exported / "plan.json").read_text())["otelc_root"]).resolve() != provider:
+        raise ValueError("resume provider differs from the retained plan")
+    command([cli, "export-tests", "--workspace", exported, "--destination", folder / "resume-identity-check"], folder, "resume-identity-check")
+    launches = sum(check_report(folder / name) for name in ("comparison/report.json", "export-comparison/report.json"))
+    launches += framework(exported, folder, "framework", resume=True)
+    launches += framework(exported, folder, "export-framework", resume=True)
+    return exported, launches
+
+
+def fresh_routes(cli: Path, provider: Path, destination: Path) -> tuple[Path, int]:
+    """Execute the four independent public/framework routes once."""
     destination.mkdir(mode=0o700, exist_ok=False)
-    os.environ["OTELEQ_PYTHON"] = sys.executable
     application, workspace = prepare(cli, provider, destination)
     command([cli, "run", "--workspace", workspace, "--report-dir", destination / "comparison"], destination, "run", expected=2)
     launches = check_report(destination / "comparison/report.json")
@@ -142,8 +150,34 @@ def main() -> None:
     command([cli, "run", "--workspace", exported, "--report-dir", destination / "export-comparison"], destination, "export-run", expected=2)
     launches += check_report(destination / "export-comparison/report.json")
     launches += framework(exported, destination, "export-framework")
-    first = json.loads((exported / "tests/corpus.json").read_text())[0]
-    expected_exit = 2 if "wrong_fixture" in first["function"] else 0
+    return exported, launches
+
+
+def first_case(exported: Path) -> tuple[dict, int]:
+    """Resolve a corpus function ID through its frozen inventory identity."""
+    case = json.loads((exported / "tests/corpus.json").read_text())[0]
+    inventory = json.loads((exported / "plan.json").read_text())["inventory"]
+    selected = [entry for entry in inventory if entry["id"] == case["function_id"]]
+    if len(selected) != 1:
+        raise ValueError("replay target has no unique retained callable")
+    return case, 2 if "wrong_fixture" in selected[0]["otelc_function"] else 0
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--otelc-root", type=Path, required=True)
+    parser.add_argument("--report-dir", type=Path, required=True)
+    parser.add_argument("--cli", type=Path, required=True)
+    parser.add_argument("--resume", action="store_true", help="recheck four completed routes before finishing replay")
+    args = parser.parse_args()
+    provider, cli = args.otelc_root.resolve(strict=True), args.cli.resolve(strict=True)
+    destination = args.report_dir.resolve()
+    if any(destination.is_relative_to(root) for root in (provider, Path(__file__).resolve().parents[1])):
+        parser.error("qualification directory must be new and external")
+    os.environ["OTELEQ_PYTHON"] = sys.executable
+    routes = resume_routes if args.resume else fresh_routes
+    exported, launches = routes(cli, provider, destination)
+    first, expected_exit = first_case(exported)
     replay = json.loads(command([cli, "replay", "--workspace", exported, "--case", first["id"]], destination, "replay", expected=expected_exit))
     launches += check_report(Path(replay["report"]), 1)
     result = {"claim": "equivalence over these tests and observations", "languages": list(LANGUAGES),

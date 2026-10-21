@@ -42,3 +42,5 @@ make generation-return-otelc PYTHON=/absolute/path/to/otelc/.venv/bin/python \
 ```
 
 The corpus checks an independently expected result and a deliberately wrong expectation in each language. It exercises public run, generated suites, detached export and replay. The wrong expectations must fail the strict suite. This route uses the existing provider contracts; the replacement SDK needs separate adapter integration and qualification.
+
+If the final replay is interrupted after all four initial execution routes complete, the Python qualifier accepts `--resume` with the same paths. It rechecks every retained report and the sealed export/tool identities before launching another replay. Missing routes and changed providers are refused.

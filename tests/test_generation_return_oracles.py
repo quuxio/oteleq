@@ -21,6 +21,23 @@ def attempt(language: str, lane: str) -> dict:
 
 
 class ReturnQualificationTests(unittest.TestCase):
+    def test_replay_resolves_the_corpus_function_id_and_resume_refuses_missing_routes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            (folder / "tests").mkdir()
+            case = {"id": "case", "function_id": "target"}
+            (folder / "tests/corpus.json").write_text(json.dumps([case]))
+            for name, expected in (("App.selected_match(int)", 0), ("App.selected_wrong_fixture(int)", 2)):
+                (folder / "plan.json").write_text(json.dumps({"inventory": [{"id": "target", "otelc_function": name}]}))
+                self.assertEqual(qualify.first_case(folder), (case, expected))
+            (folder / "plan.json").write_text(json.dumps({"inventory": []}))
+            with self.assertRaisesRegex(ValueError, "unique retained callable"):
+                qualify.first_case(folder)
+            with patch.object(qualify, "command") as command:
+                with self.assertRaisesRegex(ValueError, "four completed"):
+                    qualify.resume_routes(Path("cli"), Path("provider"), folder)
+                command.assert_not_called()
+
     def test_fixture_patterns_match_source_and_signature_qualified_identities(self):
         with tempfile.TemporaryDirectory() as temporary:
             folder = Path(temporary)
