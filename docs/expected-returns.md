@@ -18,7 +18,7 @@ This expectation applies to every concrete case matched by this fixture. Choose 
 
 ## Supported values
 
-Expectations use complete scalar records: `null`, `undefined`, `unit`, `boolean`, `integer`, `float`, `string` and `bytes`. Their type labels must match the selected language codec exactly. For example, Java `int` returns use `java.lang.Integer`; a native C `int` uses `c.int` with its actual compiler width. Inspect the documented codec or a retained typed bundle to find the representation, then review the expected value independently.
+Expectations use complete scalar records: `null`, `undefined`, `unit`, `boolean`, `integer`, `float`, `string` and `bytes`. Their type labels must match the selected language and observer profile exactly. For example, standalone scalar Java `int` returns use `java.lang.Integer`, while the source receiver codec preserves `java.int`. A native C `int` uses `c.int` with its actual compiler width. Inspect the documented codec or a retained typed bundle to find the representation, then review the expected value independently.
 
 Integers use canonical decimal strings, an explicit `signed` flag and an optional `bits` width. An omitted width becomes an explicit unbounded width in the frozen plan; it does not match a fixed-width integer. Policy integer expectations are limited to 4,096 characters. Floats use exact lowercase hexadecimal bits, including signed zero and NaN payloads. Strings use exact hexadecimal code units with `utf8`, `utf16_be`, `codepoints32_be` or `raw_bytes` encoding. No value, type or encoding is normalised for comparison.
 
