@@ -14,7 +14,7 @@ LANGUAGES = {".c": "c", ".h": "c", ".cc": "cpp", ".cpp": "cpp", ".cxx": "cpp", "
              ".cjs": "javascript", ".jsx": "javascript", ".ts": "typescript", ".mts": "typescript", ".cts": "typescript", ".tsx": "typescript", ".go": "go"}
 IGNORED = {".git", "target", "node_modules", ".venv", "__pycache__", "build", "dist"}
 ANONYMOUS = "<anonymous>"
-NATIVE_CALLABLE_KINDS = {"FunctionDecl", "CXXMethodDecl", "CXXConstructorDecl", "CXXDestructorDecl", "LambdaExpr"}
+NATIVE_CALLABLE_KINDS = cpp_models.FUNCTION_KINDS | {"LambdaExpr"}
 
 
 def contains_yield(node):
@@ -112,7 +112,8 @@ def native_function(node, scope, inside):
     kind, name = node["kind"], node.get("name", ANONYMOUS)
     original_location = node.get("loc", {})
     location = original_location.get("expansionLoc", original_location)
-    params = [n["type"]["qualType"] for n in node.get("inner", []) if n["kind"] == "ParmVarDecl"]
+    params = [n["type"].get("desugaredQualType", n["type"]["qualType"])
+              for n in node.get("inner", []) if n["kind"] == "ParmVarDecl"]
     body = any(n["kind"] in ("CompoundStmt", "CXXTryStmt") for n in node.get("inner", []))
     reason = "" if kind == "FunctionDecl" and body and not inside else "method, lambda or external callable needs a fixture"
     if node.get("variadic"):
@@ -121,7 +122,7 @@ def native_function(node, scope, inside):
         reason = "macro-expanded callable needs a build-aware fixture"
     return {"name": "::".join((*scope, name)), "line": location.get("line", 1), "column": location.get("col", 1),
             "declaration_only": kind == "FunctionDecl" and not body, "parameters": params,
-            "output": node.get("type", {}).get("qualType", "unknown").split(" (")[0],
+            "output": node.get("type", {}).get("desugaredQualType", node.get("type", {}).get("qualType", "unknown")).split(" (")[0],
             "reason": reason, "symbol": node.get("mangledName", name),
             "source_offset": location.get("offset", -1), "native_kind": kind}
 
@@ -131,7 +132,7 @@ def native_storage(node: dict, scope: tuple[str, ...], inside: bool) -> dict | N
     original = node["loc"]
     location = original.get("expansionLoc", original)
     name = "::".join((*scope, node.get("name", ANONYMOUS)))
-    type_ = node.get("type", {}).get("qualType", "unknown")
+    type_ = node.get("type", {}).get("desugaredQualType", node.get("type", {}).get("qualType", "unknown"))
     if node.get("tls"):
         return {"name": "<thread-local:" + name + "@" + str(location["offset"]) + ">", "type": type_,
                 "inaccessible": True, "reason": "thread-local storage needs an explicit initialisation and thread fixture"}

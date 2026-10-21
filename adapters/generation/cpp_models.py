@@ -7,7 +7,7 @@ from pathlib import Path
 BUILTINS = {"bool", "char", "signed char", "unsigned char", "short", "unsigned short", "int", "unsigned int",
             "long", "unsigned long", "long long", "unsigned long long", "float", "double", "void"}
 ARRAY = re.compile(r"([^\[\]]+)\[(\d+)\]((?:\[\d+\])*)$", re.ASCII)
-FUNCTION_KINDS = {"FunctionDecl", "CXXMethodDecl", "CXXConstructorDecl", "CXXDestructorDecl"}
+FUNCTION_KINDS = {"FunctionDecl", "CXXMethodDecl", "CXXConstructorDecl", "CXXDestructorDecl", "CXXConversionDecl"}
 
 
 def bind_symbols(inventory: dict, demangler: Path, directory: Path, execute) -> None:
@@ -44,7 +44,8 @@ def physical(location: dict, path: Path) -> bool:
 def signature(node: dict) -> dict:
     """Keep checked spellings separately from their underlying scalar domains."""
     parameters = [item["type"] for item in node.get("inner", []) if item["kind"] == "ParmVarDecl"]
-    function = node.get("type", {}).get("qualType", "unknown")
+    type_ = node.get("type", {})
+    function = type_.get("desugaredQualType", type_.get("qualType", "unknown"))
     output, separator, tail = function.partition("(")
     depth, qualifiers = 1, ""
     for index, char in enumerate(tail):
