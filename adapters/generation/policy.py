@@ -12,6 +12,7 @@ import domains
 import filesystem_effects
 import http_effects
 import go_project
+import native_project
 import python_project
 import sequences
 import typescript_provider
@@ -137,7 +138,7 @@ def load(path: Path | None) -> dict[str, Any]:
 
 def adapters(value: Any) -> dict[str, Any]:
     """Freeze explicit provider selection without guessing execution support."""
-    keys(value, {"rust", "python", "go", "typescript"}, "adapters")
+    keys(value, {"c", "cpp", "rust", "python", "go", "typescript"}, "adapters")
     rust = value.get("rust", {})
     keys(rust, {"backend"}, "adapters.rust")
     backend = rust.get("backend", "compiler")
@@ -147,7 +148,8 @@ def adapters(value: Any) -> dict[str, Any]:
     keys(python, {"import_roots"}, "adapters.python")
     typed = value.get("typescript", {})
     keys(typed, {"backend"}, "adapters.typescript")
-    return {"rust": {"backend": backend},
+    return {**{language: native_project.settings(value[language]) for language in ('c', 'cpp') if language in value},
+            "rust": {"backend": backend},
             "typescript": {"backend": typescript_provider.backend(typed.get("backend", "source"))},
             "python": {"import_roots": python_project.import_roots(python.get("import_roots", []))},
             "go": go_project.settings(value.get("go", {}))}

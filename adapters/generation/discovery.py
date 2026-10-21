@@ -9,7 +9,7 @@ from otelc_capture import native_flags
 
 NATIVE_METADATA_BYTES = 64 * 1024 * 1024
 
-LANGUAGES = {".c": "c", ".h": "c", ".cc": "cpp", ".cpp": "cpp", ".cxx": "cpp", ".hpp": "cpp", ".hh": "cpp", ".hxx": "cpp", ".rs": "rust",
+LANGUAGES = {".c": "c", ".h": "c", ".C": "cpp", ".cc": "cpp", ".cpp": "cpp", ".cxx": "cpp", ".hpp": "cpp", ".hh": "cpp", ".hxx": "cpp", ".rs": "rust",
              ".py": "python", ".java": "java", ".js": "javascript", ".mjs": "javascript",
              ".cjs": "javascript", ".jsx": "javascript", ".ts": "typescript", ".mts": "typescript", ".cts": "typescript", ".tsx": "typescript", ".go": "go"}
 IGNORED = {".git", "target", "node_modules", ".venv", "__pycache__", "build", "dist"}
