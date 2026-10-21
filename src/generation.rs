@@ -6,6 +6,38 @@ use syn::{spanned::Spanned, visit::Visit};
 
 const RESOURCES: &[(&str, &str)] = &[
     (
+        "native_profile.py",
+        include_str!("../adapters/generation/native_profile.py"),
+    ),
+    (
+        "native_project.py",
+        include_str!("../adapters/generation/native_project.py"),
+    ),
+    (
+        "native_dependencies.py",
+        include_str!("../adapters/generation/native_dependencies.py"),
+    ),
+    (
+        "native_frontend.py",
+        include_str!("../adapters/generation/native_frontend.py"),
+    ),
+    (
+        "native_discover.cpp",
+        include_str!("../adapters/generation/native_discover.cpp"),
+    ),
+    (
+        "native_context.py",
+        include_str!("../adapters/generation/native_context.py"),
+    ),
+    (
+        "native_workers.py",
+        include_str!("../adapters/generation/native_workers.py"),
+    ),
+    (
+        "native_workspace.py",
+        include_str!("../adapters/generation/native_workspace.py"),
+    ),
+    (
         "native_names.py",
         include_str!("../adapters/generation/native_names.py"),
     ),

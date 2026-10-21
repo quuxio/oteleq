@@ -22,6 +22,7 @@ import http_effects
 import harness
 import java_receivers
 import node_receivers
+import native_profile
 import otelc_capture as capture
 import otelc_collection
 import policy as project_policy
@@ -54,7 +55,7 @@ def read(path):
     return capture.strict_json(path.read_text())
 
 
-def manifest(root: Path, *, excluded: Collection[str] = ()) -> dict[str, str]:
+def manifest(root: Path, *, excluded: Collection[str] = (), max_file_bytes: int | None = None) -> dict[str, str]:
     """Fingerprint all private contents; only original source walks exclude build trees."""
     result, total = {}, 0
     for directory, names, files in os.walk(root, followlinks=False):
@@ -69,7 +70,7 @@ def manifest(root: Path, *, excluded: Collection[str] = ()) -> dict[str, str]:
                 raise ValueError("source contains a non-regular file")
             size = path.stat().st_size
             total += size
-            if size > MAX_FILE or total > MAX_TREE or len(result) >= 10000:
+            if size > (MAX_FILE if max_file_bytes is None else max_file_bytes) or total > MAX_TREE or len(result) >= 10000:
                 raise ValueError("source snapshot limit exceeded")
             result[path.relative_to(root).as_posix()] = capture.file_digest(path)
     return result
@@ -387,16 +388,26 @@ def configure_fixture(entry, discovered, fixture):
                 entry["reason"] = entry["reason"] or str(error)
 
 
-def inventory_tree(contents, root, snapshot, workspace, args):
-    tools, artefacts, inventory = {}, {}, []
+def inventory_tree(contents, root, snapshot, workspace, args, native_projects=None):
+    native_projects = native_projects or {}
+    tools, artefacts, inventory, covered = native_profile.inventory(
+        sys.modules[__name__], native_projects, root, snapshot, workspace, args)
+    native_files = {name for _, name in covered}
     adapter_state = {"configuration": args.configuration["adapters"], "go_cache": {}}
     for name, sha in contents.items():
         language = discovery.LANGUAGES.get(Path(name).suffix)
         if (not language or language not in args.language
                 or not project_policy.selected(name, args.configuration["sources"])):
             continue
-        discovered = discover_file(name, language, root, snapshot, workspace, tools, artefacts,
-                                   adapter_state)
+        if language in ('c', 'cpp') and name in native_files:
+            continue
+        if language in native_projects:
+            discovered = {"functions": [{"name": "<undeclared-native-build>", "line": 1, "parameters": [],
+                "output": "unknown", "reason": "selected native file has no declared target compile context",
+                "inventory_gap": True}], "globals": []}
+        else:
+            discovered = discover_file(name, language, root, snapshot, workspace, tools, artefacts,
+                                       adapter_state)
         discovered["entrypoints"] = [function for function in discovered["functions"] if is_entrypoint(function, language)]
         for function in discovered["functions"]:
             entry = inventory_entry(function, discovered, name, language, sha, snapshot, args)
@@ -430,12 +441,20 @@ def plan(args):
     temporary = capture.temporary_parent(source, root)
     parent = source_outside(args.workspace_parent or temporary, source, root)
     contents = manifest(source, excluded=discovery.IGNORED)
-    if not contents:
+    if not contents and not any(configuration['adapters'].get(language, {}).get('compilation_database')
+                                for language in ('c', 'cpp') if language in configuration['languages']):
         raise ValueError("empty source tree")
     workspace = Path(tempfile.mkdtemp(prefix="oteleq-run-", dir=parent))
     write(workspace / OWNED_MARKER, {"schema_version": VERSION, "id": uuid.uuid4().hex})
+    native_projects = native_profile.prepare(sys.modules[__name__], source, root, workspace, configuration)
+    if native_projects:
+        required = native_profile.source_manifest(sys.modules[__name__], source, native_projects)
+        if any(required.get(name) != digest for name, digest in contents.items()):
+            raise ValueError("source changed during native build discovery")
+        contents = required
     snapshot = snapshot_source(source, workspace, contents)
-    tools, artefacts, inventory = inventory_tree(contents, root, snapshot, workspace, args)
+    native_profile.directories(snapshot, native_projects)
+    tools, artefacts, inventory = inventory_tree(contents, root, snapshot, workspace, args, native_projects)
     for fixture in configuration["fixtures"]:
         if fixture["language"] is not None and fixture["language"] not in args.language:
             continue
@@ -443,7 +462,7 @@ def plan(args):
             write(workspace / "discovery-failure.json", {"schema_version": VERSION,
                   "inventory": inventory, "unmatched_fixture": fixture})
             raise ValueError(f"configured fixture matches no selected callable: {fixture['function']}; partial workspace: {workspace}")
-    if manifest(source, excluded=discovery.IGNORED) != contents or manifest(snapshot) != contents:
+    if native_profile.source_manifest(sys.modules[__name__], source, native_projects) != contents or manifest(snapshot) != contents:
         raise ValueError("source changed during discovery")
     data = {"schema_version": VERSION, "source": str(source), "otelc_root": str(root), "source_manifest": contents,
             "source_sha256": identity(contents), "tools": {lang: {k: str(v) for k, v in selected.items()} for lang, selected in tools.items()},
@@ -452,6 +471,8 @@ def plan(args):
             "excluded_files": [name for name in contents if not project_policy.selected(name, configuration["sources"])],
             "excluded_directories": sorted(discovery.IGNORED), "excluded_languages": sorted(set(discovery.LANGUAGES.values()) - set(args.language or discovery.LANGUAGES.values())),
             "generator_sha256": generator_identity(), "cli_sha256": capture.file_digest(Path(os.environ["OTELEQ_EXECUTABLE"]))}
+    if native_projects:
+        data.update(native_projects=native_projects, native_context_manifest=native_profile.context_manifest(sys.modules[__name__], workspace))
     write(workspace / PLAN_FILE, data)
     marker = read(workspace / OWNED_MARKER)
     marker["plan_sha256"] = identity(data)
@@ -488,6 +509,9 @@ def generator_identity():
     here = Path(__file__).parent
     names = ("generation.py", "policy.py", "filesystem_effects.py", "http_effects.py", "domains.py", "shrinking.py", "sequences.py", "typescript_provider.py", "python_project.py", "go_project.py", "go_receivers.py", "go_graph.py", "go_observe.go", "node_receivers.py", "java_receivers.py", "java_graph.py", "OteleqGraph.java", "cpp_models.py", "cpp_receivers.py", "cpp_worker.py", "cpp_graph.py", "cpp_observe.hpp", "native_names.py", "discovery.py", "harness.py", "observe.py", "node_observe.mjs", "node_sequence.mjs", "typed_capture.py", "discover.mjs", "discover.go", "Discover.java")
     files = {name: capture.file_digest(here / name) for name in names}
+    files.update({name: capture.file_digest(here / name) for name in (
+        'native_profile.py', 'native_project.py', 'native_dependencies.py', 'native_frontend.py',
+        'native_discover.cpp', 'native_context.py', 'native_workers.py', 'native_workspace.py')})
     files["host-python"] = capture.file_digest(Path(sys.executable))
     files["host-version"] = sys.version
     files.update(decoder_files())
@@ -506,8 +530,9 @@ def load_workspace(path, generated=False):
     if (data["configuration_sha256"] != identity(data["configuration"])
             or project_policy.validate(data["configuration"]) != data["configuration"]):
         raise ValueError("configuration identity or schema changed; create a new plan")
-    if manifest(Path(data["source"]), excluded=discovery.IGNORED) != data["source_manifest"] or manifest(workspace / "snapshot") != data["source_manifest"]:
+    if native_profile.source_manifest(sys.modules[__name__], Path(data["source"]), data.get('native_projects', {})) != data["source_manifest"] or manifest(workspace / "snapshot") != data["source_manifest"]:
         raise ValueError("application source or immutable snapshot changed")
+    native_profile.verify(sys.modules[__name__], workspace, data)
     if generated and manifest(workspace / "tests") != read(workspace / GENERATED_MANIFEST):
         raise ValueError("generated suite or corpus changed; create a new plan")
     return workspace, data
@@ -571,6 +596,9 @@ if __name__=="__main__":unittest.main()
     for case in cases:
         entry = next(e for e in data["inventory"] if e["id"] == case["function_id"])
         preview = destination / "harnesses" / case["id"]
+        if 'native_context' in entry:
+            native_profile.preview(sys.modules[__name__], workspace, entry, case, preview, data)
+            continue
         for name in entry.get("go_context", {}).get("files", [entry["path"]]):
             target = preview / name
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -756,7 +784,8 @@ def attempt(workspace, data, entry, case, lane, folder, decoder, *, http_fixture
     folder.mkdir(parents=True)
     project = folder / "project"
     shutil.copytree(workspace / "snapshot", project)
-    shutil.copytree(workspace / "tests/harnesses" / case["id"], project, dirs_exist_ok=True)
+    if 'native_context' not in entry:
+        shutil.copytree(workspace / "tests/harnesses" / case["id"], project, dirs_exist_ok=True)
     driver = driver_path(project, entry)
     service = "oteleq-gen-" + uuid.uuid4().hex
     env = capture.environment(project, tools, service, root)
@@ -777,7 +806,12 @@ def attempt(workspace, data, entry, case, lane, folder, decoder, *, http_fixture
             env["OTELC_TYPESCRIPT_BACKEND"] = capture.typescript_backend(root, language, entry, config.read_bytes())
             write(folder / "typescript-controls.json", {"OTELC_TYPESCRIPT_BACKEND": env["OTELC_TYPESCRIPT_BACKEND"],
                                                         "provider": entry.get("typescript_provider")})
-        command = build_command(root, project, entry, driver, config, tools, env, folder, scratch, lane)
+        if 'native_context' in entry:
+            prefix = [root / 'target/debug/quux-otelc', '--config', config, '--language', language]
+            command = native_profile.build(sys.modules[__name__], workspace, data, entry, case,
+                                           project, prefix, env, folder, lane)
+        else:
+            command = build_command(root, project, entry, driver, config, tools, env, folder, scratch, lane)
         write(folder / "command.json", [str(p) for p in command])
         working_directory = project / entry["go_context"]["module_root"] if "go_context" in entry else project
         write(folder / "working-directory.json", str(working_directory))
@@ -797,6 +831,8 @@ def attempt(workspace, data, entry, case, lane, folder, decoder, *, http_fixture
     effect_channels.update(request_channels)
     complete &= request_complete
     validate_private_sources(project, immutable, folder)
+    if 'native_context' in entry:
+        native_profile.verify_build(sys.modules[__name__], folder)
     capture.stable(root, language, tools, data["artefacts"][language], rust_backend=entry.get("rust_backend", "compiler"))
     return qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, decoder,
                            extra_channels=effect_channels, capture_complete=complete)
@@ -932,11 +968,16 @@ def export_tests(args):
     if destination.exists() or destination.is_relative_to(workspace) or workspace.is_relative_to(destination):
         raise ValueError("export destination must be new and independent of the workspace")
     if not args.apply:
-        print(json.dumps({"destination": str(destination), "copy": ["snapshot", "tests", PLAN_FILE, README_FILE], "mode": "dry-run"}))
+        files = ["snapshot", "tests", PLAN_FILE, README_FILE]
+        if data.get('native_projects'):
+            files.append(native_profile.DIRECTORY)
+        print(json.dumps({"destination": str(destination), "copy": files, "mode": "dry-run"}))
         return 0
     destination.mkdir(mode=0o700)
     for name in ("snapshot", "tests"):
         shutil.copytree(workspace / name, destination / name)
+    if data.get('native_projects'):
+        shutil.copytree(workspace / native_profile.DIRECTORY, destination / native_profile.DIRECTORY)
     for name in (OWNED_MARKER, GENERATED_MANIFEST, README_FILE):
         shutil.copyfile(workspace / name, destination / name)
     data["original_source"] = data["source"]
@@ -954,7 +995,7 @@ def clean(args):
     workspace = args.workspace.resolve(strict=True)
     if args.workspace.is_symlink() or workspace.parent == workspace or read(workspace / OWNED_MARKER)["schema_version"] != VERSION:
         raise ValueError("refusing to remove an unowned workspace")
-    allowed = {OWNED_MARKER, PLAN_FILE, "snapshot", "tests", GENERATED_MANIFEST, README_FILE, "runs", "go-cache"}
+    allowed = {OWNED_MARKER, PLAN_FILE, "snapshot", "tests", GENERATED_MANIFEST, README_FILE, "runs", "go-cache", native_profile.DIRECTORY}
     if any(p.name not in allowed for p in workspace.iterdir()):
         raise ValueError("workspace contains unowned files; retain and inspect it")
     marker = read(workspace / OWNED_MARKER)
@@ -963,6 +1004,9 @@ def clean(args):
     data = read(workspace / PLAN_FILE)
     if marker.get("plan_sha256") != identity(data):
         raise ValueError("plan identity changed; retain and inspect it")
+    if (workspace / native_profile.DIRECTORY).exists() and (not data.get('native_projects') or
+            native_profile.context_manifest(sys.modules[__name__], workspace) != data.get('native_context_manifest')):
+        raise ValueError('native context was edited or is unowned; retain and inspect it')
     if manifest(workspace / "snapshot") != data["source_manifest"]:
         raise ValueError("snapshot was edited; retain and inspect it")
     if (workspace / "tests").exists() and not (workspace / GENERATED_MANIFEST).is_file():

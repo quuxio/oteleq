@@ -1,0 +1,200 @@
+"""Public native-project planning and immutable copied-root context management."""
+from pathlib import Path
+import uuid
+
+import discovery
+import harness
+import native_context
+import native_frontend
+import native_project
+import native_workers
+import native_workspace
+
+DIRECTORY = 'native-context'
+
+
+def context_manifest(workflow, workspace: Path) -> dict:
+    """Compiled tooling has a separate file budget from application source files."""
+    return workflow.manifest(workspace / DIRECTORY, max_file_bytes=workflow.MAX_TREE)
+
+
+def executor(workflow, workspace: Path, root: Path, tools: dict):
+    """Compiler inventory writes and temporary files remain in the owned workspace."""
+    scratch = workspace / 'scratch'
+    scratch.mkdir(parents=True, exist_ok=True)
+    environment = workflow.capture.environment(workspace, tools, 'oteleq-native-discovery', root)
+    environment.update(HOME=str(scratch), TMPDIR=str(scratch))
+
+    def execute(command, directory, input_data=None):
+        return workflow.execute(command, directory, environment, timeout=120, input_data=input_data,
+                                max_output_bytes=native_frontend.MAX_METADATA_BYTES)
+
+    return execute
+
+
+def required_directories(prepared: dict) -> list[str]:
+    """Working and explicit include directories can be empty but still required."""
+    root = Path(prepared['source_root'])
+    paths = set()
+    for unit in prepared['units'].values():
+        directory = root / unit['directory']
+        paths.add(unit['directory'])
+        for index, flag in enumerate(unit['flags'][:-1]):
+            if flag in native_project.PATH_OPTIONS:
+                path = (directory / unit['flags'][index + 1]).resolve()
+                if path.is_dir():
+                    paths.add(path.relative_to(root).as_posix())
+    return sorted(paths)
+
+
+def capability(workflow, root: Path, retained: Path, execute) -> dict:
+    """Freeze interface availability; successful cases still require real witnesses."""
+    command = [root / workflow.capture.OTELC_CLI_PATH, 'object', 'rename-main', '--help']
+    result = execute(command, retained)
+    workflow.write(retained / 'object-transform-request.json', list(map(str, command)))
+    (retained / 'object-transform.stdout').write_bytes(result.stdout)
+    (retained / 'object-transform.stderr').write_bytes(result.stderr)
+    native_project.require(result.returncode == 0 and b'--symbol' in result.stdout and b'rename-main' in result.stdout,
+                           'selected SDK does not provide the validated object rename-main interface')
+    return {'operation': 'rename-main', 'help_sha256': workflow.capture.file_digest(retained / 'object-transform.stdout')}
+
+
+def prepare(workflow, source: Path, root: Path, workspace: Path, configuration: dict) -> dict:
+    """Resolve requested native builds before excluded build inputs are snapshotted."""
+    profiles = {}
+    for language in ('c', 'cpp'):
+        options = configuration['adapters'].get(language, {})
+        if language not in configuration['languages'] or not options.get('compilation_database'):
+            continue
+        tools = workflow.capture.selected_tools(root, language)
+        artefacts = workflow.capture.artefacts(root, language, tools)
+        selected = tools['clang++' if language == 'cpp' else 'clang']
+        retained = workspace / DIRECTORY / language
+        execute = executor(workflow, retained, root, tools)
+        transform = capability(workflow, root, retained, execute)
+        profile = native_project.prepare(source, options, language, selected, retained, execute)
+        profile.update(tools={name: str(path) for name, path in tools.items()}, artefacts=artefacts,
+                       object_transform=transform)
+        profile['directories'] = required_directories(profile)
+        profiles[language] = profile
+    return profiles
+
+
+def source_manifest(workflow, source: Path, profiles: dict) -> dict:
+    """Explicit compiler inputs supplement the normal source walk and its budgets."""
+    contents = workflow.manifest(source, excluded=discovery.IGNORED)
+    for profile in profiles.values():
+        for name in profile['directories']:
+            path = source / name
+            native_project.require(path.is_dir() and path.resolve() == path,
+                                   'required directory changed or is a symlink: ' + name)
+        for name, expected in profile['local_inputs'].items():
+            path = source / name
+            native_project.require(path.is_file() and path.resolve() == path and not path.is_symlink(),
+                                   'required input changed or is a symlink: ' + name)
+            native_project.require(path.stat().st_size <= workflow.MAX_FILE, 'required input exceeds snapshot limit')
+            actual = workflow.capture.file_digest(path)
+            native_project.require(actual == expected, 'required compiler input changed: ' + name)
+            contents[name] = actual
+    native_project.require(len(contents) <= 10000 and
+                           sum((source / name).stat().st_size for name in contents) <= workflow.MAX_TREE,
+                           'required inputs exceed the source snapshot budget')
+    return contents
+
+
+def directories(project: Path, profiles: dict) -> None:
+    """Materialise retained empty working/include directories in a fresh copy."""
+    for profile in profiles.values():
+        for name in profile['directories']:
+            (project / name).mkdir(parents=True, exist_ok=True)
+
+
+def inventory(workflow, profiles: dict, root: Path, snapshot: Path, workspace: Path, args) -> tuple:
+    """Each target/unit variant gets a distinct entry with complete target state."""
+    tools, artefacts, entries, covered = {}, {}, [], set()
+    for language, profile in profiles.items():
+        selected = {name: Path(path) for name, path in profile['tools'].items()}
+        tools[language], artefacts[language] = selected, profile['artefacts']
+        retained = workspace / DIRECTORY / language
+        execute = executor(workflow, retained, root, selected)
+        found = native_context.target_inventory(profile, retained, selected.get('cpp-demangler'), execute)
+        covered.update((language, name) for name in profile['local_inputs'])
+        for item in found:
+            function = item['function']
+            name = function['source_file']
+            if not workflow.project_policy.selected(name, args.configuration['sources']):
+                continue
+            discovered = {**item['models'], 'globals': item['globals'], 'functions': [function], 'entrypoints': []}
+            entry = workflow.inventory_entry(function, discovered, name, language,
+                profile['local_inputs'][name], snapshot, args)
+            entry.update(target=item['target'], unit=item['unit'], native_context={'language': language})
+            entry['id'] = workflow.identity({'entry': entry['id'], 'target': item['target'], 'unit': item['unit'],
+                                             'inputs': profile['local_inputs']})[:20]
+            if entry['status'] == 'ready':
+                try:
+                    native_workers.validate(profile, entry, harness.corpus(entry, args.cases)[0])
+                except ValueError as error:
+                    entry.update(status='blocked', reason=str(error))
+            workflow.filesystem_effects.bind(entry, args.configuration)
+            entries.append(entry)
+    return tools, artefacts, entries, covered
+
+
+def verify(workflow, workspace: Path, data: dict) -> None:
+    """Verify retained context and recheck searches against the current source root."""
+    profiles = data.get('native_projects', {})
+    if not profiles:
+        return
+    native_project.require(context_manifest(workflow, workspace) == data['native_context_manifest'],
+                           'retained native context changed')
+    for language, profile in profiles.items():
+        selected = {name: Path(path) for name, path in profile['tools'].items()}
+        retained = workspace / DIRECTORY / language
+        check = workspace / 'runs' / ('native-input-check-' + uuid.uuid4().hex) / language
+        native_workspace.verify_copy(profile, retained, Path(data['source']), check,
+                                     executor(workflow, check.parent, Path(data['otelc_root']), selected))
+
+
+def preview(workflow, workspace: Path, entry: dict, case: dict, destination: Path, data: dict) -> None:
+    """Review helpers reference the one immutable snapshot instead of copying it per case."""
+    profile = data['native_projects'][entry['language']]
+    project = workspace / 'snapshot'
+    recipe = native_workers.materialise(project, profile, entry, case['arguments'], destination / 'helpers')
+    workflow.write(destination / 'recipe.json', recipe)
+
+
+def build(workflow, workspace: Path, data: dict, entry: dict, case: dict, project: Path,
+          prefix: list, environment: dict, folder: Path, lane: str) -> list:
+    """Compile actual unit recipes and retain every command, object and final binary."""
+    native_project.require(lane in ('baseline', 'instrumented_on'), 'unsupported execution lane')
+    profile = data['native_projects'][entry['language']]
+    directories(project, {entry['language']: profile})
+    retained = workspace / DIRECTORY / entry['language']
+    native_workspace.verify_copy(profile, retained, project, folder / 'input-check',
+        executor(workflow, folder / 'discovery', Path(data['otelc_root']),
+                 {name: Path(path) for name, path in profile['tools'].items()}))
+    recipe = native_workers.materialise(project, profile, entry, case['arguments'], folder / 'helpers')
+    workflow.write(folder / 'native-build.json', recipe)
+    identities = {'helpers': recipe['assets'], 'outputs': {}}
+    for index, step in enumerate(recipe['steps']):
+        command = (native_workers.instrumented_command(step, list(map(str, prefix)), entry['language'])
+                   if lane == 'instrumented_on' else step['command'])
+        evidence = folder / ('build-' + str(index) + '-' + step['kind'])
+        evidence.mkdir()
+        workflow.write(evidence / 'command.json', list(map(str, command)))
+        workflow.write(evidence / 'working-directory.json', step['directory'])
+        result = workflow.execute(command, step['directory'], environment, evidence, timeout=120)
+        native_project.require(result.returncode == 0, 'target build failed; inspect ' + str(evidence))
+        identities['outputs'][step['output']] = workflow.capture.file_digest(Path(step['output']))
+    native_project.require({name: workflow.capture.file_digest(Path(name)) for name in recipe['assets']} == recipe['assets'],
+                           'generated native helper changed during the build')
+    identities['build_assets'] = workflow.manifest(folder / 'helpers', max_file_bytes=workflow.MAX_TREE)
+    workflow.write(folder / workflow.BUILD_IDENTITIES, identities)
+    return [recipe['binary']] if lane == 'baseline' else [*prefix, 'run', recipe['binary']]
+
+
+def verify_build(workflow, folder: Path) -> None:
+    """Application execution cannot alter retained objects, SDK markers or helpers."""
+    expected = workflow.read(folder / workflow.BUILD_IDENTITIES)['build_assets']
+    native_project.require(workflow.manifest(folder / 'helpers', max_file_bytes=workflow.MAX_TREE) == expected,
+                           'native build assets changed during application execution')
