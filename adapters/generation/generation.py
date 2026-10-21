@@ -55,9 +55,17 @@ def read(path):
     return capture.strict_json(path.read_text())
 
 
-def manifest(root: Path, *, excluded: Collection[str] = (), max_file_bytes: int = MAX_FILE) -> dict[str, str]:
+def snapshot_file_size(path: Path) -> int:
+    """Reject non-regular snapshot entries before measuring or hashing their bytes."""
+    if not path.is_file():
+        raise ValueError("source contains a non-regular file")
+    return path.stat().st_size
+
+
+def manifest(root: Path, *, excluded: Collection[str] = (), max_file_bytes: int | None = None) -> dict[str, str]:
     """Fingerprint all private contents; only original source walks exclude build trees."""
     result, total = {}, 0
+    file_limit = MAX_FILE if max_file_bytes is None else max_file_bytes
     for directory, names, files in os.walk(root, followlinks=False):
         base = Path(directory)
         names[:] = sorted(n for n in names if n not in excluded)
@@ -66,11 +74,9 @@ def manifest(root: Path, *, excluded: Collection[str] = (), max_file_bytes: int 
                 raise ValueError("source symlink requires an explicit build recipe: " + str(base / name))
         for name in sorted(files):
             path = base / name
-            if not path.is_file():
-                raise ValueError("source contains a non-regular file")
-            size = path.stat().st_size
+            size = snapshot_file_size(path)
             total += size
-            if size > max_file_bytes or total > MAX_TREE or len(result) >= 10000:
+            if size > file_limit or total > MAX_TREE or len(result) >= 10000:
                 raise ValueError("source snapshot limit exceeded")
             result[path.relative_to(root).as_posix()] = capture.file_digest(path)
     return result
