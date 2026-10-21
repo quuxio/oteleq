@@ -18,10 +18,38 @@ pub enum ErrorCategory {
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum ExpectedOutcome {
     Return,
+    ReturnValue {
+        value: Value,
+    },
     Error {
         category: ErrorCategory,
         r#type: String,
     },
+}
+impl ExpectedOutcome {
+    fn validate(&self) -> Result<(), String> {
+        match self {
+            Self::Error { r#type, .. } if !identifier(r#type) => {
+                Err("expected error requires a qualified payload type".into())
+            }
+            Self::ReturnValue { value } => validate_return_value(value),
+            _ => Ok(()),
+        }
+    }
+}
+fn validate_return_value(value: &Value) -> Result<(), String> {
+    if matches!(
+        value,
+        Value::Reference { .. } | Value::Opaque { .. } | Value::Unbound
+    ) {
+        return Err("expected return requires a complete scalar value".into());
+    }
+    let expected = Snapshot {
+        roots: [("result".into(), value.clone())].into(),
+        nodes: Vec::new(),
+    };
+    graph::inspect(&expected, "expected")?;
+    Ok(())
 }
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -146,11 +174,7 @@ impl Contract {
         {
             return Err("invalid observation contract version, identity or root set".into());
         }
-        if let ExpectedOutcome::Error { r#type, .. } = &self.expected_baseline {
-            if !identifier(r#type) {
-                return Err("expected error requires a qualified payload type".into());
-            }
-        }
+        self.expected_baseline.validate()?;
         crate::sequence::validate(self)
     }
 }
@@ -234,6 +258,9 @@ fn value_type<'a>(value: &'a Value, graph: &'a Snapshot) -> Option<&'a str> {
 fn baseline_valid(observation: &Observation, contract: &Contract) -> Option<bool> {
     match (&observation.outcome, &contract.expected_baseline) {
         (Outcome::Return { .. }, ExpectedOutcome::Return) => Some(true),
+        (Outcome::Return { graph }, ExpectedOutcome::ReturnValue { value }) => {
+            graph.roots.get("result").map(|actual| actual == value)
+        }
         (
             Outcome::Error { category, graph },
             ExpectedOutcome::Error {
@@ -328,7 +355,7 @@ pub(crate) fn compare_boundaries(
         }
     }
     if baseline_valid(left, contract) == Some(false) {
-        result.reasons.push("baseline outcome violates its declared contract; provide valid inputs or an explicit expected-error fixture".into());
+        result.reasons.push("baseline outcome violates its declared contract; check the inputs and declared return or error expectation".into());
         result.verdict = Verdict::Blocked;
     }
     changed(

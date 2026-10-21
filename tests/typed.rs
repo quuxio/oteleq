@@ -30,6 +30,108 @@ fn evaluate(value: Value) -> typed::Report {
     typed::compare(serde_json::from_value(value).unwrap()).unwrap()
 }
 #[test]
+fn declared_returns_reject_equal_wrong_values_in_every_language() {
+    for language in [
+        "c",
+        "cpp",
+        "rust",
+        "python",
+        "java",
+        "javascript",
+        "typescript",
+        "go",
+    ] {
+        let mut data = fixture();
+        data["scope"]["language"] = json!(language);
+        let expected = data["cases"][0]["baseline"][0]["observation"]["outcome"]["graph"]["roots"]
+            ["result"]
+            .clone();
+        data["cases"][0]["contract"]["expected_baseline"] =
+            json!({"kind":"return_value", "value":expected});
+        assert_eq!(evaluate(data.clone()).verdict, Verdict::EquivalentObserved);
+        for lane in ["baseline", "instrumented_on"] {
+            for attempt in data["cases"][0][lane].as_array_mut().unwrap() {
+                attempt["observation"]["outcome"]["graph"]["roots"]["result"]["value"] = json!("5");
+            }
+        }
+        let report = evaluate(data);
+        assert_eq!(report.verdict, Verdict::Blocked);
+        assert!(report.cases[0]
+            .reasons
+            .iter()
+            .any(|reason| reason.contains("declared contract")));
+    }
+}
+
+#[test]
+fn declared_scalar_returns_keep_exact_types_bits_and_string_units() {
+    let values = [
+        json!({"kind":"null"}),
+        json!({"kind":"undefined"}),
+        json!({"kind":"unit","type":"rust.unit"}),
+        json!({"kind":"boolean","type":"python.bool","value":true}),
+        json!({"kind":"float","type":"java.double","bits":"8000000000000000"}),
+        json!({"kind":"string","type":"java.lang.String","encoding":"utf16_be","value":"d800"}),
+        json!({"kind":"bytes","type":"python.bytes","hex":"00ff"}),
+    ];
+    for expected in values {
+        let mut data = fixture();
+        data["cases"][0]["contract"]["expected_baseline"] =
+            json!({"kind":"return_value", "value":expected});
+        for lane in ["baseline", "instrumented_on"] {
+            for attempt in data["cases"][0][lane].as_array_mut().unwrap() {
+                attempt["observation"]["outcome"]["graph"]["roots"]["result"] = expected.clone();
+            }
+        }
+        assert_eq!(evaluate(data.clone()).verdict, Verdict::EquivalentObserved);
+        for attempt in data["cases"][0]["instrumented_on"].as_array_mut().unwrap() {
+            attempt["observation"]["outcome"]["graph"]["roots"]["result"] =
+                json!({"kind":"integer","type":"i32","value":"4","bits":32,"signed":true});
+        }
+        assert_eq!(evaluate(data).verdict, Verdict::DifferentObserved);
+    }
+}
+
+#[test]
+fn incomplete_or_malformed_declared_values_are_invalid_contracts() {
+    for expected in [
+        json!({"kind":"reference","node_id":"n0"}),
+        json!({"kind":"opaque","type":"T","reason":"unknown"}),
+        json!({"kind":"unbound"}),
+        json!({"kind":"integer","type":"i32","value":"01","bits":32,"signed":true}),
+    ] {
+        let mut data = fixture();
+        data["cases"][0]["contract"]["expected_baseline"] =
+            json!({"kind":"return_value", "value":expected});
+        let bundle = serde_json::from_value(data).unwrap();
+        assert!(typed::compare(bundle).is_err());
+    }
+}
+
+#[test]
+fn declared_values_are_checked_for_every_repeat_and_intermediate_call() {
+    let mut data = fixture();
+    let expected = data["cases"][0]["baseline"][0]["observation"]["outcome"]["graph"]["roots"]
+        ["result"]
+        .clone();
+    data["cases"][0]["contract"]["expected_baseline"] =
+        json!({"kind":"return_value", "value":expected});
+    data["cases"][0]["baseline"][1]["observation"]["outcome"]["graph"]["roots"]["result"]["type"] =
+        json!("another.i32");
+    assert_eq!(evaluate(data).verdict, Verdict::Blocked);
+    let mut data = sequence_fixture();
+    data["cases"][0]["contract"]["steps"][0]["expected_baseline"] =
+        json!({"kind":"return_value", "value":expected});
+    assert_eq!(evaluate(data.clone()).verdict, Verdict::EquivalentObserved);
+    for lane in ["baseline", "instrumented_on"] {
+        for attempt in data["cases"][0][lane].as_array_mut().unwrap() {
+            attempt["observation"]["steps"][0]["outcome"]["graph"]["roots"]["result"]["value"] =
+                json!("8");
+        }
+    }
+    assert_eq!(evaluate(data).verdict, Verdict::Blocked);
+}
+#[test]
 fn required_effect_bytes_apply_to_all_eight_languages_and_cannot_disappear() {
     for language in [
         "c",

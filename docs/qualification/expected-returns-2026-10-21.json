@@ -1,0 +1,76 @@
+{
+  "qualification_schema_version": 1,
+  "date": "2026-10-21",
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "platform": {
+    "os": "macOS-27.0.1-arm64-arm-64bit",
+    "architecture": "arm64"
+  },
+  "runtime": {
+    "source_commit": "38d10ae8a186cb989c9e872434564f70966884bd",
+    "cli_sha256": "41b5634b5cd4799bd4b88c56e5910aea20b204c9b3fce76aa1dc4227416e5b72",
+    "source_archive_sha256": "7ce9a677f8169c296d3a279fc011cb4224f93e8576602992b9ccafc503cc29f3",
+    "provider_manifest_sha256": "2a8dbf239c6444c0fb536dff049993beade7eaed6578c9654c1e2d7233e9431f",
+    "qualifier_commit": "07754ba9623679567c76afca20208a182220c984",
+    "qualifier_sha256": "80f769dedaffbde31849c5f56ee7904bca51119aca2416f0d73ae727616f9a80",
+    "scope": "CLI product inputs unchanged between runtime and qualifier revisions; the later change fixes qualification replay lookup/resume only."
+  },
+  "provider": {
+    "source_commit": "d6d03b72026cde8962b11ce3cc184ff3ebcb60d4",
+    "manifest_sha256": "2a8dbf239c6444c0fb536dff049993beade7eaed6578c9654c1e2d7233e9431f",
+    "declared_records_unchanged_before_and_after": 7360,
+    "original_application_files_preserved": 8
+  },
+  "results": {
+    "claim": "equivalence over these tests and observations",
+    "languages": [
+      "c",
+      "cpp",
+      "rust",
+      "python",
+      "java",
+      "javascript",
+      "typescript",
+      "go"
+    ],
+    "cases": 16,
+    "matching_cases_per_route": 8,
+    "invalid_baseline_cases_per_route": 8,
+    "actual_application_launches": 260,
+    "routes": [
+      "run",
+      "framework",
+      "export-run",
+      "export-framework",
+      "replay"
+    ],
+    "cli_sha256": "41b5634b5cd4799bd4b88c56e5910aea20b204c9b3fce76aa1dc4227416e5b72",
+    "scope": "Frozen diagnostic scalar callers, declared host primitive values and every retained repeat; not shipping artefacts or replacement-SDK compatibility.",
+    "unique_actual_command_and_cwd_pairs": 260,
+    "case_evaluations": 65,
+    "matching_case_evaluations": 33,
+    "blocked_invalid_baseline_evaluations": 32,
+    "launches_by_route": {
+      "run": 64,
+      "framework": 64,
+      "export-run": 64,
+      "export-framework": 64,
+      "replay": 4
+    }
+  },
+  "checks": [
+    "Each input is three; each actual return is the independently expected seven with its exact native/managed type and representation.",
+    "The matching fixtures declare seven; deliberately invalid fixtures declare eight. Equal returns cannot pass the invalid fixture.",
+    "Every baseline/on repeat retains complete observations, exit0, exact empty stdout/stderr and the required local decoded selected-function witness.",
+    "Both generated suites contain 16 tests and exactly eight intentional assertion failures.",
+    "Exported run, suite and replay use the sealed copy after the original fixture tree is moved offline.",
+    "The final replay resolves a corpus function ID through its frozen inventory; resume revalidates all four retained routes and export/tool identities."
+  ],
+  "limits": [
+    "One scalar expectation applies to all cases in a fixture; expected object graphs and per-input expected-value lists remain open.",
+    "These standalone diagnostic callers do not qualify a shipping artefact or replacement-SDK API.",
+    "Expected values are user declarations; independent business correctness and general input/schedule coverage are not established.",
+    "External tool identities are recorded in the frozen plan; compiler sysroots and OS libraries remain outside the provider content manifest."
+  ]
+}

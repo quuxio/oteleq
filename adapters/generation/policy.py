@@ -14,6 +14,7 @@ import http_effects
 import go_project
 import native_project
 import python_project
+import return_expectations
 import sequences
 import typescript_provider
 
@@ -60,14 +61,16 @@ def integer(value: Any, minimum: int, maximum: int, label: str) -> int:
 
 def expected_baseline(value: Any) -> dict[str, Any]:
     """An intentional error is declared by the caller, never inferred from lanes."""
-    keys(value, {"kind", "category", "type"}, "expected_baseline")
+    keys(value, {"kind", "category", "type", "value"}, "expected_baseline")
     if value.get("kind") == "return" and set(value) == {"kind"}:
         return {"kind": "return"}
+    if value.get("kind") == "return_value" and set(value) == {"kind", "value"}:
+        return {"kind": "return_value", "value": return_expectations.validate(value["value"])}
     if (set(value) == {"kind", "category", "type"} and value.get("kind") == "error"
             and value.get("category") in ("exception", "panic") and type(value.get("type")) is str
             and 0 < len(value["type"]) <= 1024 and value["type"].strip()):
         return value.copy()
-    raise ValueError("expected_baseline requires return or an explicit error category/type")
+    raise ValueError("expected_baseline requires return, a typed return_value or an explicit error category/type")
 
 
 def scalar_arguments(value: Any) -> bool:
