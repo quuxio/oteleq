@@ -128,6 +128,28 @@ class ReceiverTests(unittest.TestCase):
         self.server.require_complete()
         self.assertEqual(self.server.bodies, [("/v1/traces", b"\x00\xff")])
 
+    def test_aggregate_byte_budget_rejects_overflow_without_recording_it(self):
+        self.server.max_bytes = 4
+        self.assertEqual(self.request(b"ab"), 200)
+        self.assertEqual(self.request(b"cd"), 200)
+        self.assertEqual(self.server.received_bytes, 4)
+        self.assertEqual(self.request(b"e"), 413)
+        self.assertEqual(self.server.received_bytes, 4)
+        self.assertEqual(self.server.bodies, [("/v1/traces", b"ab"), ("/v1/traces", b"cd")])
+        with self.assertRaises(ValueError):self.server.require_complete()
+
+    def test_prepared_request_allowance_retains_the_same_byte_budget(self):
+        with capture.receiver(max_requests=64, max_bytes=33) as (endpoint, bodies, errors):
+            host, port = endpoint.removeprefix("http://").split(":")
+            for _ in range(33):
+                with closing(http.client.HTTPConnection(host, int(port), timeout=3)) as connection:
+                    connection.request("POST", "/v1/metrics", b"x")
+                    response = connection.getresponse()
+                    self.assertEqual(response.status, 200)
+                    response.read()
+            self.assertEqual(len(bodies), 33)
+            self.assertFalse(errors)
+
     def test_truncated_body_is_not_acknowledged_or_recorded_as_complete(self):
         response = self.raw_request(b"POST /v1/traces HTTP/1.0\r\nContent-Length: 5\r\n\r\nx")
         self.assertIn(b"400", response.split(b"\r\n")[0])

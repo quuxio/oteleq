@@ -25,6 +25,11 @@ max_capture_bytes = 262144
 [adapters.rust]
 backend = "compiler"
 
+# The replacement SDK's Java prepared-launch API requires explicit selection.
+# See docs/java-prepared-provider.md; other SDK language placeholders remain blocked.
+[adapters.java]
+backend = "legacy"
+
 # Opt into ordinary Go package/type context with explicit source-relative module roots.
 # Empty roots retain standalone file mode. Tags require module roots.
 [adapters.go]

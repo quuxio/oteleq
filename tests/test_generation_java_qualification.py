@@ -1,14 +1,19 @@
 """Independent Java qualification oracles reject altered state and route drift."""
 import copy
+import hashlib
 import json
 from pathlib import Path
 import sys
 import tempfile
+import tomllib
+from types import SimpleNamespace as NS
 import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import qualify_java_receivers as qualifier
+from test_generation_java_health import report as health_report
+from test_generation_java_telemetry import metrics, traces
 
 
 def integer(number: int) -> dict:
@@ -34,6 +39,55 @@ def attempt() -> dict:
 
 
 class JavaQualificationTests(unittest.TestCase):
+    def test_prepared_policy_and_actual_agent_control_are_explicit(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary) / "case"
+            with patch.object(qualifier, "command", return_value=str(folder / "workspace")):
+                qualifier.prepare(Path("/cli"), Path("/provider"), folder, backend="prepared")
+            policy = tomllib.loads((folder / "equivalence.toml").read_text())
+            self.assertEqual(policy["adapters"]["java"]["backend"], "prepared")
+            source = (folder / "application/Counter.java").read_text()
+            self.assertIn("opentelemetry-javaagent-2.32.0.jar", source)
+            self.assertNotIn("java-agent-0.1.0-agent.jar", source)
+
+    def test_retained_prepared_oracle_rechecks_raw_receipt_pid_hashes_and_copies(self):
+        trace, metric = traces(), metrics()
+        trace.resource_spans[0].scope_spans[0].spans[0].name = "Counter.identity"
+        modules = {"opentelemetry.proto.collector.trace.v1.trace_service_pb2": NS(ExportTraceServiceRequest=NS(FromString=lambda _: trace)),
+                   "opentelemetry.proto.collector.metrics.v1.metrics_service_pb2": NS(ExportMetricsServiceRequest=NS(FromString=lambda _: metric))}
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary);folder = root / "case";folder.mkdir()
+            runtime = folder / "sdk-runtime";runtime.mkdir()
+            health = health_report()
+            health["metric_exports"].update(batches_started="1", batches_succeeded="1", units_started="2", units_succeeded="2")
+            (runtime / "health.json").write_text(json.dumps(health))
+            launch = {"argv": ["java", "Class"], "plain": False, "policy_sha256": "a" * 64, "selection_sha256": "b" * 64}
+            for name, data in (("prepared-launch.json", launch), ("process.json", {"argv": launch["argv"], "pid": 123}),
+                               ("command.json", launch["argv"]), ("typed-observation.json", {"function_id": "Counter.identity(int)"}),
+                               ("http-capture.json", {"errors": [], "bodies": [{"path": "/v1/traces", "file": "trace"}, {"path": "/v1/metrics", "file": "metric"}]})):
+                (folder / name).write_text(json.dumps(data))
+            (folder / "trace").write_bytes(b"trace");(folder / "metric").write_bytes(b"metric")
+            original = root / "oej-removed/r"
+            archive = {"original": str(original), "files": {"health.json": {"path": str(original / "health.json"),
+                       "sha256": hashlib.sha256((runtime / "health.json").read_bytes()).hexdigest()}}}
+            (folder / "runtime-archive.json").write_text(json.dumps(archive))
+            with patch.dict(sys.modules, modules):
+                self.assertEqual(qualifier.verify_prepared(root), {"retained_attempts": 1, "unique_processes": 1,
+                                  "retained_instrumented_receipts": 1, "short_runtimes_removed": True})
+                for group, key in (("trace_exports", "units_succeeded"), ("metric_exports", "batches_succeeded"),
+                                   ("span_accounting", "sampled_ended")):
+                    changed = copy.deepcopy(health);changed[group][key] = "2"
+                    (runtime / "health.json").write_text(json.dumps(changed))
+                    with self.subTest(group=group), self.assertRaises(AssertionError):
+                        qualifier.verify_receipt(folder, launch, 123, modules[next(iter(modules))].ExportTraceServiceRequest,
+                                                 modules[list(modules)[1]].ExportMetricsServiceRequest)
+                (runtime / "health.json").write_text(json.dumps(health))
+                (folder / "process.json").write_text(json.dumps({"argv": ["other"], "pid": 123}))
+                with self.assertRaises(AssertionError):qualifier.verify_prepared(root)
+                (folder / "process.json").write_text(json.dumps({"argv": launch["argv"], "pid": 123}))
+                (runtime / "health.json").write_text("{}")
+                with self.assertRaises(AssertionError):qualifier.verify_prepared(root)
+
     def test_literal_value_alias_and_witness_oracles_reject_altered_records(self):
         with tempfile.TemporaryDirectory() as temporary:
             folder = Path(temporary)

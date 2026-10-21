@@ -32,14 +32,17 @@ DIFFERENCES = {"instance", "static_only"}
 
 
 def prepare(cli: Path, provider: Path, folder: Path, source_text: str = SOURCE,
-            methods: tuple[str, ...] = METHODS, factory: str | None = None) -> Path:
+            methods: tuple[str, ...] = METHODS, factory: str | None = None, *, backend: str = "legacy") -> Path:
     """Freeze eight explicit methods and independent constructor/factory inputs."""
     folder.mkdir()
     source = folder / "application"
     source.mkdir()
+    if backend == "prepared":
+        source_text = source_text.replace("java-agent-0.1.0-agent.jar", "opentelemetry-javaagent-2.32.0.jar")
     (source / "Counter.java").write_text(source_text)
     policy = folder / "equivalence.toml"
-    text = 'schema_version=1\nlanguages=["java"]\n[functions]\ninclude=' + json.dumps(["Counter." + name + "(int)" for name in methods]) + '\n'
+    text = 'schema_version=1\nlanguages=["java"]\n[adapters.java]\nbackend=' + json.dumps(backend)
+    text += '\n[functions]\ninclude=' + json.dumps(["Counter." + name + "(int)" for name in methods]) + '\n'
     for name in methods:
         text += '\n[[fixtures]]\nfunction=' + json.dumps("Counter." + name + "(int)") + '\ncases=[[7]]\n'
         text += 'receiver={factory=' + json.dumps(factory or ("make" if name == "secret" else "Counter")) + ',arguments=[10]}\n'
@@ -194,6 +197,70 @@ def verify_launches(folder: Path, expected: int) -> dict:
     return {"raw_attempt_folders": len(raw), "unique_command_identities": len(unique)}
 
 
+def verify_prepared(folder: Path) -> dict:
+    """Independently inspect retained PID, archive and actual protobuf accounting."""
+    from opentelemetry.proto.collector.metrics.v1.metrics_service_pb2 import ExportMetricsServiceRequest
+    from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceRequest
+    records, identities, instrumented = [], set(), 0
+    for path in folder.rglob("prepared-launch.json"):
+        attempt = path.parent
+        launch = json.loads(path.read_text())
+        process = json.loads((attempt / "process.json").read_text())
+        assert process["argv"] == launch["argv"] == json.loads((attempt / "command.json").read_text())
+        assert type(process["pid"]) is int and process["pid"] > 0
+        identities.add((process["pid"], tuple(process["argv"])))
+        archive = json.loads((attempt / "runtime-archive.json").read_text())
+        original = Path(archive["original"])
+        assert original.name == "r" and original.parent.name.startswith("oej-") and not original.exists()
+        retained = attempt / "sdk-runtime"
+        files = {item.relative_to(retained).as_posix() for item in retained.rglob("*") if item.is_file()}
+        assert files == set(archive["files"])
+        for name, identity in archive["files"].items():
+            assert hashlib.sha256((retained / name).read_bytes()).hexdigest() == identity["sha256"]
+            assert identity["path"] == str(original / name)
+        records.append(launch)
+        if not launch["plain"]:
+            verify_receipt(attempt, launch, process["pid"], ExportTraceServiceRequest, ExportMetricsServiceRequest)
+            instrumented += 1
+    assert records and instrumented
+    return {"retained_attempts": len(records), "unique_processes": len(identities),
+            "retained_instrumented_receipts": instrumented, "short_runtimes_removed": True}
+
+
+def verify_receipt(attempt: Path, launch: dict, pid: int, trace_decoder, metric_decoder) -> None:
+    """Literal one-call receiver oracles bind real health to all received units."""
+    health = json.loads((attempt / "sdk-runtime/health.json").read_text())
+    http = json.loads((attempt / "http-capture.json").read_text())
+    assert not http["errors"] and health["pid"] == pid
+    assert health["policy_sha256"] == launch["policy_sha256"] and health["selection_sha256"] == launch["selection_sha256"]
+    assert health["phase"] == "final" and health["sdk_attached"] is True
+    assert health["lifecycle"] == {"flush": "succeeded", "shutdown": "succeeded"}
+    spans, points, batches = [], 0, {"/v1/traces": 0, "/v1/metrics": 0}
+    for body in http["bodies"]:
+        route = body["path"];batches[route] += 1
+        raw = (attempt / body["file"]).read_bytes()
+        if route == "/v1/traces":
+            message = trace_decoder.FromString(raw)
+            spans += [span for group in message.resource_spans for scope in group.scope_spans for span in scope.spans]
+        else:
+            message = metric_decoder.FromString(raw)
+            points += sum(len(getattr(metric, metric.WhichOneof("data")).data_points)
+                          for group in message.resource_metrics for scope in group.scope_metrics for metric in scope.metrics)
+    assert len(spans) == 1 and points > 0 and not spans[0].parent_span_id
+    observed = json.loads((attempt / "typed-observation.json").read_text())
+    assert observed["function_id"] in {"Counter." + method + "(int)" for method in METHODS}
+    assert spans[0].name == observed["function_id"].split("(", 1)[0]
+    accounting = health["span_accounting"]
+    assert accounting == {"processors_observed": 1, "batch_processors_observed": 1,
+                          "sampled_started": "1", "sampled_ended": "1", "sampled_active": "0",
+                          "queue_pending": "0", "queue_dropped": "0", "queue_evidence": "derived_after_shutdown"}
+    for group, route, units in (("trace_exports", "/v1/traces", 1), ("metric_exports", "/v1/metrics", points)):
+        exported = health[group]
+        assert exported["batches_started"] == exported["batches_succeeded"] == str(batches[route])
+        assert exported["units_started"] == exported["units_succeeded"] == str(units)
+        assert all(exported[name] == "0" for name in ("batches_failed", "units_failed", "batches_pending"))
+
+
 def reduction(cli: Path, workspace: Path, folder: Path, report: dict) -> int:
     """Keep construction inputs fixed while a same-return static difference shrinks."""
     target = next(case for case in report["cases"] if case["function"] == "Counter.static_only(int)")
@@ -211,7 +278,7 @@ def reduction(cli: Path, workspace: Path, folder: Path, report: dict) -> int:
     return launches + check_report(Path(replay["report"]), 1)[0]
 
 
-def refusals(cli: Path, provider: Path, folder: Path) -> tuple[int, int]:
+def refusals(cli: Path, provider: Path, folder: Path, *, backend: str = "legacy") -> tuple[int, int]:
     """Unavailable fixtures cannot become matching outcomes or trigger formatters."""
     unknown = 'class UnknownException extends RuntimeException {public String toString(){return "APP_CALLBACK";}public String getMessage(){throw new AssertionError("APP_CALLBACK");}}'
     controls = [
@@ -224,7 +291,7 @@ def refusals(cli: Path, provider: Path, folder: Path) -> tuple[int, int]:
     launches = 0
     for name, source, method, factory, expected in controls:
         destination = folder / name
-        workspace = prepare(cli, provider, destination, source, (method,), factory)
+        workspace = prepare(cli, provider, destination, source, (method,), factory, backend=backend)
         comparison = destination / "comparison"
         command([cli, "run", "--workspace", workspace, "--report-dir", comparison], folder, name, expected=expected)
         report = json.loads((comparison / "report.json").read_text())
@@ -260,6 +327,7 @@ def main() -> None:
     parser.add_argument("--otelc-root", type=Path, required=True)
     parser.add_argument("--cli", type=Path, required=True)
     parser.add_argument("--report-dir", type=Path, required=True)
+    parser.add_argument("--java-backend", choices=("legacy", "prepared"), default="legacy")
     args = parser.parse_args()
     cli, provider = args.cli.resolve(strict=True), args.otelc_root.resolve(strict=True)
     destination = args.report_dir.resolve()
@@ -267,7 +335,7 @@ def main() -> None:
         parser.error("report directory must be new and outside both repositories")
     destination.mkdir(mode=0o700, exist_ok=False)
     os.environ["OTELEQ_PYTHON"], os.environ["OTELEQ_CLI"] = sys.executable, str(cli)
-    workspace = prepare(cli, provider, destination / "complete")
+    workspace = prepare(cli, provider, destination / "complete", backend=args.java_backend)
     launches = 0
     command([cli, "run", "--workspace", workspace, "--report-dir", destination / "run"], destination, "run", expected=1)
     launches, report = check_report(destination / "run/report.json", len(METHODS))
@@ -282,17 +350,29 @@ def main() -> None:
     command([cli, "export-tests", "--workspace", workspace, "--destination", exported], destination, "export-dry-run")
     assert not exported.exists()
     command([cli, "export-tests", "--workspace", workspace, "--destination", exported, "--apply"], destination, "export-apply")
-    launches += framework(exported, destination, "exported-framework")
+    source = destination / "complete/application"
+    offline = source.with_name("application-offline")
+    if args.java_backend == "prepared":
+        source.rename(offline)
+    try:
+        launches += framework(exported, destination, "exported-framework")
+    finally:
+        if args.java_backend == "prepared":
+            offline.rename(source)
     launches += reduction(cli, workspace, destination, report)
-    refused_launches, refusal_controls = refusals(cli, provider, destination)
+    refused_launches, refusal_controls = refusals(cli, provider, destination, backend=args.java_backend)
     launches += refused_launches
     refusal_controls += source_guards(cli, workspace, destination, report)
     counts = verify_launches(destination, launches)
     builds = verify_builds(destination)
+    prepared = verify_prepared(destination) if args.java_backend == "prepared" else None
     result = {"claim": "equivalence over these tests and observations", "artefact_class": "diagnostic",
+              "java_backend": args.java_backend,
               "cases": len(METHODS), "matching_cases": 6, "same_return_state_differences": 2,
               "actual_launches": launches, **counts,
               "compiler_builds": builds,
+              "prepared_provider": prepared,
+              "exported_without_original_source": args.java_backend == "prepared",
               "refusal_controls": refusal_controls, "scalar_shrink": {"original": [7], "reduced": [0]},
               "routes": ["run", "replay", "generated", "exported"],
               "cli_sha256": hashlib.sha256(cli.read_bytes()).hexdigest(), "source_preserved": True}

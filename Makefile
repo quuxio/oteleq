@@ -1,6 +1,7 @@
 PYTHON ?= python3
 NODE ?= node
 COVERAGE_ENV ?=
+JAVA_BACKEND ?= legacy
 MARKDOWNLINT ?= ./ci/markdownlint/node_modules/.bin/markdownlint
 
 .PHONY: generation-native-project-otelc generation-return-otelc
@@ -61,6 +62,10 @@ generation-check: node-observer-check node-sequence-check java-observer-check go
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/generation.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/return_expectations.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_build.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_health.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_provider.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_launch.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_telemetry.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/discovery.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/harness.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/python_project.py' --fail-under=80
@@ -143,7 +148,7 @@ generation-receiver-otelc:
 generation-java-receiver-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_java_receivers.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
+	$(PYTHON) tests/qualify_java_receivers.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" --java-backend "$(JAVA_BACKEND)"
 
 generation-node-receiver-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
