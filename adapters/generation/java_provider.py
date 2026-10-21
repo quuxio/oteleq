@@ -16,6 +16,7 @@ SDK_MODULES = {"__init__.py", "__main__.py", "config.py", "java.py", "prepared_j
 SDK_LANGUAGES = {"c", "cpp", "rust", "python", "java", "javascript", "typescript", "go"}
 MAX_METADATA = 256 * 1024
 MAX_TELEMETRY_REQUESTS = 4096
+DIRECTORY = "java-provider"
 
 
 def require(condition: bool, reason: str) -> None:
@@ -100,7 +101,7 @@ def bind(entry: dict, root: Path, workspace: Path, tools: dict, execute: Callabl
     """Retain a public config-only capability response before any application call."""
     if entry["status"] != "ready" or not prepared(entry):
         return
-    folder = workspace / "java-provider" / entry["id"]
+    folder = workspace / DIRECTORY / entry["id"]
     folder.mkdir(parents=True)
     endpoint, service = "http://127.0.0.1:4318", "oteleq-java-provider"
     config = folder / "policy.toml"
@@ -127,3 +128,14 @@ def bind(entry: dict, root: Path, workspace: Path, tools: dict, execute: Callabl
         entry["java_provider"]["resolved"] = value
     except (ValueError, OSError, KeyError) as error:
         entry["status"], entry["reason"] = "blocked", "Java prepared provider unavailable: " + str(error)
+
+
+def verify_probes(workflow, workspace: Path, data: dict) -> None:
+    """Retained capability probes are sealed evidence, not unowned cleanup debris."""
+    root = workspace / DIRECTORY
+    expected = data.get("java_provider_manifest")
+    if expected is None:
+        require(not root.exists() and not root.is_symlink(), "unowned provider probe directory")
+    else:
+        require(root.is_dir() and not root.is_symlink() and workflow.manifest(root) == expected,
+                "frozen provider probes changed")

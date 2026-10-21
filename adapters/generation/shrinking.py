@@ -214,6 +214,8 @@ def run(args: argparse.Namespace, workflow) -> int:
         raise ValueError("shrinking requires explicit fixture domains; create a new configured plan")
     domains.arguments(case["arguments"], entry["input_domains"])
     destination = workflow.source_outside(args.report_dir, original_workspace, Path(original["source"]), Path(original["otelc_root"]))
+    if original.get('java_context'):
+        workflow.java_project.protect_destination(destination, workflow.java_project.original_locations(original))
     destination.mkdir(mode=0o700, exist_ok=False)
     shutil.copyfile(original_workspace / workflow.PLAN_FILE, destination / "parent-plan.json")
     replay = argparse.Namespace(command="replay", workspace=original_workspace, case=case["id"])
@@ -234,6 +236,12 @@ def run(args: argparse.Namespace, workflow) -> int:
     if original.get('native_projects'):
         shutil.copytree(original_workspace / workflow.native_profile.DIRECTORY,
                         workspace / workflow.native_profile.DIRECTORY)
+    if original.get('java_context'):
+        shutil.copytree(original_workspace / workflow.java_project.DIRECTORY,
+                        workspace / workflow.java_project.DIRECTORY)
+    if 'java_provider_manifest' in original:
+        shutil.copytree(original_workspace / workflow.java_provider.DIRECTORY,
+                        workspace / workflow.java_provider.DIRECTORY)
     workflow.write(workspace / workflow.OWNED_MARKER, {"schema_version": workflow.VERSION, "id": uuid.uuid4().hex})
     data = derived_data(workflow, original, entry, case)
     best, trials, status = search(workflow, workspace, data, entry, case["arguments"], wanted, destination, args.trials)
