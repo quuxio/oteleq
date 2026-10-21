@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import sys
 
+import java_profiles
 import otelc_capture as capture
 
 AGENT = "build/tools/opentelemetry-javaagent-2.32.0.jar"
@@ -35,12 +36,14 @@ def prepared(entry: dict) -> bool:
     return entry.get("language") == "java" and entry.get("java_backend", "legacy") == "prepared"
 
 
-def artefacts(root: Path, tools: dict) -> dict:
+def artefacts(root: Path, tools: dict, profile: str = java_profiles.STOCK) -> dict:
     """Bind prebuilt SDK products and every source module without installing them."""
     require(os.name == "posix", "prepared provider requires qualified POSIX control sockets")
     package = root / "otelc"
     require(package.is_dir() and not package.is_symlink(), "missing SDK Python package")
     paths = [root / AGENT, root / EXTENSION, root / "adapters/java/pom.xml"]
+    if java_profiles.name(profile) == java_profiles.SAFE:
+        paths.extend(java_profiles.patch_inputs(root))
     for tree in (package, root / "adapters/java/src/main"):
         require(tree.is_dir() and not tree.is_symlink(), "missing SDK source tree: " + str(tree))
         for path in sorted(tree.rglob("*")):

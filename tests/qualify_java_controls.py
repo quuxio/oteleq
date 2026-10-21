@@ -36,11 +36,12 @@ SOURCE = r'''class Counter {
 '''
 
 
-def prepare(cli: Path, provider: Path, folder: Path) -> Path:
+def prepare(cli: Path, provider: Path, folder: Path, profile: str) -> Path:
     """All states execute in one JVM per lane, using only existing source methods."""
     folder.mkdir();source = folder / "application";source.mkdir()
     (source / "Counter.java").write_text(SOURCE)
     text = 'schema_version=1\nlanguages=["java"]\n[adapters.java]\nbackend="prepared"\n'
+    text += 'profile=' + json.dumps(profile) + '\n'
     text += '[functions]\ninclude=' + json.dumps(list(FUNCTIONS)) + '\n[limits]\ncase_timeout_ms=20000\n'
     for function, method in FUNCTIONS.items():
         text += '\n[[fixtures]]\nfunction=' + json.dumps(function) + '\ncases=[[7]]\n'
@@ -266,8 +267,8 @@ def framework(workspace: Path, folder: Path, name: str, count: int = 6) -> None:
         check_report(Path(row["report"]), 1)
 
 
-def routes(cli: Path, provider: Path, folder: Path) -> None:
-    workspace = prepare(cli, provider, folder / "cases")
+def routes(cli: Path, provider: Path, folder: Path, profile: str) -> None:
+    workspace = prepare(cli, provider, folder / "cases", profile)
     command([cli, "run", "--workspace", workspace, "--report-dir", folder / "comparison"], folder, "run", expected=1)
     check_report(folder / "comparison/report.json", 6)
     report = json.loads((folder / "comparison/report.json").read_text())
@@ -361,7 +362,7 @@ def getter_report(path: Path, delta: int) -> int:
     return 4
 
 
-def getter_case(cli: Path, provider: Path, folder: Path, delta: int) -> dict:
+def getter_case(cli: Path, provider: Path, folder: Path, delta: int, profile: str) -> dict:
     """Retain the requested producer regression without broadening the error codec."""
     folder.mkdir();source = folder / "application";source.mkdir()
     fixture = Path(__file__).parent / "fixtures/java_getter_cause/Counter.java"
@@ -370,6 +371,7 @@ def getter_case(cli: Path, provider: Path, folder: Path, delta: int) -> dict:
     for index, (collection, emission) in enumerate(STATES):
         argument = '"case"' if index == 0 else '[' + str(index + 1) + ']'
         text += ' {action="call",arguments=' + argument + ',expected_baseline={kind="error",category="exception",type="java.lang.RuntimeException"},metrics={collection=' + str(collection).lower() + ',emission=' + str(emission).lower() + '}},\n'
+    text = text.replace('backend="prepared"\n', 'backend="prepared"\nprofile=' + json.dumps(profile) + '\n', 1)
     config = folder / "equivalence.toml";config.write_text(text + ']\n')
     workspace = Path(command([cli, "plan", "--source", source, "--otelc-root", provider, "--config", config,
                               "--workspace-parent", folder], folder, "plan"))
@@ -387,9 +389,10 @@ def getter_case(cli: Path, provider: Path, folder: Path, delta: int) -> dict:
             "scope": "Exact outer RuntimeException class/message; custom cause remains unobserved, while application getter side effects mutate a fully observed private receiver field."}
 
 
-def compatibility(cli: Path, provider: Path, folder: Path, backend: str) -> dict:
+def compatibility(cli: Path, provider: Path, folder: Path, backend: str, profile: str) -> dict:
     """Live controls remain opt-in; ordinary matching/mutation routes still work."""
-    workspace = qualify_java_receivers.prepare(cli, provider, folder, methods=("identity", "instance"), backend=backend)
+    workspace = qualify_java_receivers.prepare(cli, provider, folder, methods=("identity", "instance"), backend=backend,
+                                              profile=profile if backend == "prepared" else None)
     command([cli, "run", "--workspace", workspace, "--report-dir", folder / "comparison"], folder, "run", expected=1)
     launches, _ = qualify_java_receivers.check_report(folder / "comparison/report.json", 2)
     assert launches == 8 and not list((folder / "comparison").rglob("java-controls.json"))
@@ -428,6 +431,7 @@ def main() -> None:
     parser.add_argument("--report-dir", type=Path, required=True)
     parser.add_argument("--cli", type=Path, required=True)
     parser.add_argument("--legacy-root", type=Path)
+    parser.add_argument("--java-profile", choices=("stock-methods-v1", "safe-methods-v1"), default="stock-methods-v1")
     parser.add_argument("--getter-expectation", choices=("different", "equivalent"), default="different")
     parser.add_argument("--recheck", action="store_true")
     args = parser.parse_args()
@@ -438,14 +442,20 @@ def main() -> None:
         folder.mkdir(mode=0o700)
         os.environ.update(OTELEQ_PYTHON=sys.executable, OTELEQ_CLI=str(cli))
         corpus = folder / "corpus";corpus.mkdir()
-        routes(cli, provider, corpus)
-        supplementary = {"getter_cause": getter_case(cli, provider, folder / "getter-cause", int(args.getter_expectation == "different")),
-                         "ordinary_prepared": compatibility(cli, provider, folder / "ordinary-prepared", "prepared")}
+        routes(cli, provider, corpus, args.java_profile)
+        supplementary = {"getter_cause": getter_case(cli, provider, folder / "getter-cause", int(args.getter_expectation == "different"), args.java_profile),
+                         "ordinary_prepared": compatibility(cli, provider, folder / "ordinary-prepared", "prepared", args.java_profile)}
         if args.legacy_root:
-            supplementary["ordinary_legacy"] = compatibility(cli, args.legacy_root.resolve(strict=True), folder / "ordinary-legacy", "legacy")
+            supplementary["ordinary_legacy"] = compatibility(cli, args.legacy_root.resolve(strict=True), folder / "ordinary-legacy", "legacy", args.java_profile)
         (folder / "supplementary.json").write_text(json.dumps(supplementary, indent=2) + "\n")
     result = retained(folder / "corpus", cli)
     result["supplementary"] = recheck_supplementary(folder, int(args.getter_expectation == "different"))
+    for path in folder.rglob("plan.json"):
+        plan = json.loads(path.read_text())
+        for entry in plan["inventory"]:
+            if entry["status"] == "ready" and entry.get("java_backend") == "prepared":
+                assert entry.get("java_profile", "stock-methods-v1") == args.java_profile
+    result["java_profile"] = args.java_profile
     (folder / "qualification.json").write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps(result), flush=True)
 

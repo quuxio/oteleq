@@ -3,6 +3,7 @@ NODE ?= node
 COVERAGE_ENV ?=
 JAVA_BACKEND ?= legacy
 GETTER_EXPECTATION ?= different
+JAVA_PROFILE ?= stock-methods-v1
 MARKDOWNLINT ?= ./ci/markdownlint/node_modules/.bin/markdownlint
 
 .PHONY: generation-native-project-otelc generation-return-otelc generation-java-sequence-otelc generation-java-controls-otelc
@@ -67,6 +68,7 @@ generation-check: node-observer-check node-sequence-check java-observer-check go
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_build.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_health.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_provider.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_profiles.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_launch.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_telemetry.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_control.py' --fail-under=80
@@ -164,7 +166,7 @@ generation-java-sequence-otelc:
 generation-java-controls-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_java_controls.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" --getter-expectation "$(GETTER_EXPECTATION)" $(if $(LEGACY_OTELC_ROOT),--legacy-root "$(LEGACY_OTELC_ROOT)",)
+	$(PYTHON) tests/qualify_java_controls.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" --getter-expectation "$(GETTER_EXPECTATION)" --java-profile "$(JAVA_PROFILE)" $(if $(LEGACY_OTELC_ROOT),--legacy-root "$(LEGACY_OTELC_ROOT)",)
 
 generation-node-receiver-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"

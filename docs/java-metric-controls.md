@@ -6,6 +6,8 @@ This profile uses the [prepared Java provider](java-prepared-provider.md), its e
 
 ## Declare a sequence
 
+Select `profile = "safe-methods-v1"` under `[adapters.java]` for the corrected SDK recipe, or keep the default `stock-methods-v1` for the original frozen provider. Profile selection and getter expectations are independent: neither configuration nor a summary can turn an observed difference into equivalence.
+
 For the existing `Counter.add(int)` receiver example, use:
 
 ```toml
@@ -76,3 +78,5 @@ The primary corpus covers six methods, complete intermediate graphs, private fac
 The cause-getter regression uses an exact supported outer `RuntimeException("outer", cause)`. Its custom cause mutates a private receiver field when the SDK formats the exception. Frozen SDK `f3279fd` causes one extra mutation per call; the comparison correctly reports a difference. The cause internals remain outside the observation codec. This is a known producer defect and is delegated to the otelc owner. `GETTER_EXPECTATION=different` records that known result; select `equivalent` only when qualifying a corrected immutable SDK. A summary cannot reclassify retained failing observations as equivalent.
 
 The qualifier's `--recheck` validates completed retained reports, compiler products, checkpoint pairs and raw receipt/health without new JVM launches. Keep failed or partial evidence separate; it does not restart incomplete routes.
+
+Set `JAVA_PROFILE=safe-methods-v1 GETTER_EXPECTATION=equivalent` when qualifying a corrected SDK. The defaults retain the original stock recipe and known getter difference. The qualifier exposes the same choices as `--java-profile` and `--getter-expectation`; use the same values for `--recheck`.

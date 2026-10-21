@@ -27,6 +27,7 @@ import java_launch
 import java_live
 import java_control_receipt
 import java_provider
+import java_profiles
 import java_telemetry
 import node_receivers
 import native_profile
@@ -227,7 +228,7 @@ def discover_file(name, language, root, snapshot, workspace, tools, artefacts, a
             if language == "java":
                 selected["javac"] = capture.tool_path(str(selected["java"].parent / "javac"))
                 selected["java-modules"] = java_build.module_image(selected["java"])
-            qualified = (java_provider.artefacts(root, selected)
+            qualified = (java_provider.artefacts(root, selected, adapters["java"].get("profile", java_profiles.STOCK))
                          if language == "java" and adapters.get("java", {}).get("backend") == "prepared"
                          else capture.artefacts(root, language, selected, rust_backend=rust_backend))
             tools[language], artefacts[language] = selected, qualified
@@ -383,6 +384,7 @@ def inventory_entry(function, discovered, name, language, source_hash, snapshot,
         entry["rust_backend"] = args.configuration["adapters"]["rust"]["backend"]
     if language == "java":
         entry["java_backend"] = args.configuration["adapters"].get("java", {}).get("backend", "legacy")
+        entry["java_profile"] = args.configuration["adapters"].get("java", {}).get("profile", java_profiles.STOCK)
     if language == "go":
         configure_go_context(entry, discovered, args.configuration)
     if language == "python" and not excluded and args.configuration["adapters"]["python"]["import_roots"]:
@@ -532,7 +534,7 @@ def decoder_files():
 
 def generator_identity():
     here = Path(__file__).parent
-    names = ("generation.py", "policy.py", "return_expectations.py", "filesystem_effects.py", "http_effects.py", "domains.py", "shrinking.py", "sequences.py", "typescript_provider.py", "python_project.py", "go_project.py", "go_receivers.py", "go_graph.py", "go_observe.go", "node_receivers.py", "java_receivers.py", "java_build.py", "java_control.py", "java_live.py", "java_control_receipt.py", "java_health.py", "java_launch.py", "java_provider.py", "java_telemetry.py", "OteleqCompile.java", "java_graph.py", "OteleqGraph.java", "cpp_models.py", "cpp_receivers.py", "cpp_worker.py", "cpp_graph.py", "cpp_observe.hpp", "native_names.py", "discovery.py", "harness.py", "observe.py", "node_observe.mjs", "node_sequence.mjs", "typed_capture.py", "discover.mjs", "discover.go", "Discover.java")
+    names = ("generation.py", "policy.py", "return_expectations.py", "filesystem_effects.py", "http_effects.py", "domains.py", "shrinking.py", "sequences.py", "typescript_provider.py", "python_project.py", "go_project.py", "go_receivers.py", "go_graph.py", "go_observe.go", "node_receivers.py", "java_receivers.py", "java_build.py", "java_control.py", "java_profiles.py", "java_live.py", "java_control_receipt.py", "java_health.py", "java_launch.py", "java_provider.py", "java_telemetry.py", "OteleqCompile.java", "java_graph.py", "OteleqGraph.java", "cpp_models.py", "cpp_receivers.py", "cpp_worker.py", "cpp_graph.py", "cpp_observe.hpp", "native_names.py", "discovery.py", "harness.py", "observe.py", "node_observe.mjs", "node_sequence.mjs", "typed_capture.py", "discover.mjs", "discover.go", "Discover.java")
     files = {name: capture.file_digest(here / name) for name in names}
     files.update({name: capture.file_digest(here / name) for name in (
         'native_profile.py', 'native_project.py', 'native_dependencies.py', 'native_frontend.py',
@@ -812,7 +814,7 @@ def qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, 
 def provider_stable(root, language, tools, expected, entry):
     """Re-enumerate the selected provider without changing its frozen API."""
     if java_provider.prepared(entry):
-        java_provider.require(java_provider.artefacts(root, tools) == expected, "SDK or selected tools changed")
+        java_provider.require(java_provider.artefacts(root, tools, entry.get("java_profile", java_profiles.STOCK)) == expected, "SDK or selected tools changed")
     else:
         capture.stable(root, language, tools, expected, rust_backend=entry.get("rust_backend", "compiler"))
 
