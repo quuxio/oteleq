@@ -115,8 +115,9 @@ class JavaSequenceTests(unittest.TestCase):
                      lambda data: data["outcome"].update(kind="error")):
             altered = copy.deepcopy(raw);edit(altered);variants.append(altered)
         for index, altered in enumerate(variants):
+            encoded = json.dumps(altered).encode()
             with self.subTest(index=index), self.assertRaises(ValueError):
-                java_graph.boundaries(json.dumps(altered).encode(), entry)
+                java_graph.boundaries(encoded, entry)
 
     def test_unavailable_actions_and_invalid_fixed_inputs_remain_inventory_blockers(self):
         for steps in ([*STEPS, {"action": "release"}],

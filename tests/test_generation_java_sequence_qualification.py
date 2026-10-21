@@ -1,12 +1,17 @@
 """Independent sequence fixture oracles reject equal but incorrect captures."""
 import copy
+import json
 from pathlib import Path
 import sys
+import tempfile
+from types import SimpleNamespace as NS
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import qualify_java_sequences as qualifier
 from test_generation_java_qualification import integer, reference, state
+from test_generation_java_health import report as health_report
+from test_generation_java_telemetry import metrics, span, traces
 
 
 def graph(value, total, argument):
@@ -43,6 +48,59 @@ def qualifier_string():
 
 
 class JavaSequenceQualificationTests(unittest.TestCase):
+    def test_receipt_oracle_requires_actual_roots_metrics_and_closed_health_counts(self):
+        left, right = span(), span(b"b" * 8)
+        left.name = right.name = "Counter.identity"
+        right.trace_id = b"u" * 16
+        trace, metric = traces([left, right]), metrics(2)
+        health = health_report()
+        health["span_accounting"].update(sampled_started="2", sampled_ended="2")
+        health["trace_exports"].update(units_started="2", units_succeeded="2")
+        health["metric_exports"].update(batches_started="1", batches_succeeded="1", units_started="2", units_succeeded="2")
+        launch = {"policy_sha256": "a" * 64, "selection_sha256": "b" * 64}
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary);(folder / "sdk-runtime").mkdir()
+            path = folder / "sdk-runtime/health.json"
+            path.write_text(json.dumps(health))
+            (folder / "typed-observation.json").write_text(json.dumps({"function_id": "Counter.identity(int)"}))
+            (folder / "http-capture.json").write_text(json.dumps({"errors": [], "bodies": [
+                {"path": "/v1/traces", "file": "traces"}, {"path": "/v1/metrics", "file": "metrics"}]}))
+            (folder / "traces").write_bytes(b"traces");(folder / "metrics").write_bytes(b"metrics")
+            decoders = (NS(FromString=lambda _: trace), NS(FromString=lambda _: metric))
+            qualifier.verify_receipt(folder, launch, 123, *decoders)
+            for group, key in (("span_accounting", "sampled_ended"), ("trace_exports", "units_succeeded"),
+                               ("metric_exports", "units_failed")):
+                altered = copy.deepcopy(health);altered[group][key] = "1";path.write_text(json.dumps(altered))
+                with self.subTest(group=group), self.assertRaises(AssertionError):
+                    qualifier.verify_receipt(folder, launch, 123, *decoders)
+            path.write_text(json.dumps(health))
+            right.parent_span_id = b"a" * 8
+            with self.assertRaises(AssertionError):
+                qualifier.verify_receipt(folder, launch, 123, *decoders)
+            right.parent_span_id = b""
+            metric.resource_metrics[0].scope_metrics[0].metrics[0].sum.data_points[0].as_int = 3
+            with self.assertRaises(AssertionError):
+                qualifier.verify_receipt(folder, launch, 123, *decoders)
+
+    def test_retained_control_verdicts_and_prelaunch_refusal_cannot_be_omitted(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            for name, verdict in qualifier.CONTROL_VERDICTS.items():
+                (folder / (name + ".stdout")).write_text(json.dumps({"verdict": verdict}))
+            (folder / "changed-source.stderr").write_text("application source or immutable snapshot changed")
+            self.assertEqual(qualifier.verify_controls(folder), 5)
+            (folder / "missing-call.stdout").write_text('{"verdict":"equivalent_observed"}')
+            with self.assertRaises(AssertionError):
+                qualifier.verify_controls(folder)
+
+    def test_original_shrink_confirmation_is_a_new_launch_despite_its_retained_copy(self):
+        launches = {"raw_attempt_folders": 124, "unique_command_identities": 120}
+        self.assertEqual(qualifier.audit_counts(120, launches), 120)
+        for observations, records in ((116, launches), (124, launches),
+                                      (120, {**launches, "raw_attempt_folders": 128})):
+            with self.subTest(observations=observations), self.assertRaises(AssertionError):
+                qualifier.audit_counts(observations, records)
+
     def test_every_outcome_has_complete_literal_graphs_in_both_lanes(self):
         for method in qualifier.METHODS:
             for active in (False, True):

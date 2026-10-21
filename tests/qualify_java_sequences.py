@@ -29,6 +29,9 @@ SOURCE = '''class Counter {
 '''
 SOURCE_METHOD = {method: "transient_value" if method == "transient" else method for method in METHODS}
 FUNCTIONS = {"Counter." + SOURCE_METHOD[method] + "(int)": method for method in METHODS}
+CONTROL_VERDICTS = {"missing-call": "inconclusive", "reordered-calls": "inconclusive",
+                    "missing-field": "different_observed", "missing-method-witness": "inconclusive",
+                    "undeclared-intermediate-error": "blocked"}
 
 
 def prepare(cli: Path, provider: Path, folder: Path, backend: str) -> Path:
@@ -81,7 +84,9 @@ def check_observation(observed: dict, method: str, amount: int, active: bool) ->
 def check_report(path: Path, count: int = 5) -> int:
     """Cross-lane agreement cannot replace the independently fixed fixture oracle."""
     report = json.loads(path.read_text())
-    assert report["source_preserved"] and not report["blocked"] and len(report["cases"]) == count
+    assert count in (1, 5) and report["source_preserved"] and not report["blocked"] and len(report["cases"]) == count
+    functions = {case["function"] for case in report["cases"]}
+    assert len(functions) == count and (count == 1 or functions == set(FUNCTIONS))
     observations = 0
     for case in report["cases"]:
         method = FUNCTIONS[case["function"]]
@@ -180,16 +185,60 @@ def controls(cli: Path, report: Path, folder: Path) -> int:
     return len(variants)
 
 
+def audit_counts(observations: int, launches: dict) -> int:
+    """The selected route sum counts shrink's fresh original confirmation once."""
+    assert observations == launches["unique_command_identities"] == 120
+    assert launches["raw_attempt_folders"] == observations + 4
+    return observations
+
+
+def verify_controls(folder: Path) -> int:
+    """Retained refusal evidence must report its separately required verdict."""
+    for name, expected in CONTROL_VERDICTS.items():
+        assert json.loads((folder / (name + ".stdout")).read_text())["verdict"] == expected
+    assert "application source or immutable snapshot changed" in (folder / "changed-source.stderr").read_text()
+    return len(CONTROL_VERDICTS)
+
+
+def retained(folder: Path, cli: Path, backend: str) -> dict:
+    """Recheck every retained report/build/receipt without launching another JVM."""
+    reports = sorted(folder.rglob("report.json"))
+    assert reports
+    observations = sum(check_report(path, len(json.loads(path.read_text())["cases"])) for path in reports)
+    builds = verify_builds(folder)
+    launches = verify_launches(folder, 120)
+    assert observations == launches["raw_attempt_folders"] == 124
+    prepared = verify_prepared(folder, verify_receipt) if backend == "prepared" else None
+    for path in folder.rglob("plan.json"):
+        plan = json.loads(path.read_text())
+        for name, digest in plan["source_manifest"].items():
+            assert hashlib.sha256((Path(plan["source"]) / name).read_bytes()).hexdigest() == digest
+    return {"claim": "equivalence over these tests and observations", "artefact_class": "diagnostic",
+            "backend": backend, "cli_sha256": hashlib.sha256(cli.read_bytes()).hexdigest(),
+            "cases": 5, "matching_cases": 4, "intermediate_difference_controls": 1,
+            "qualified_reports": len(reports), "retained_observations": observations,
+            "actual_jvm_launches": launches["unique_command_identities"], "evidence_refusals": verify_controls(folder),
+            "prelaunch_source_refusals": 1, "source_preserved": True,
+            "detached_export": True, "builds": builds, "launches": launches, "prepared": prepared,
+            "scope": "Two ordered calls on declared Java receivers; private factories, fields/statics, aliases/cycles, expected intermediate exceptions and recursive trees. No release, collection, invocation attribution or shipping artefact claim."}
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--otelc-root", type=Path, required=True)
     parser.add_argument("--report-dir", type=Path, required=True)
     parser.add_argument("--cli", type=Path, required=True)
     parser.add_argument("--java-backend", choices=("legacy", "prepared"), default="prepared")
+    parser.add_argument("--recheck", action="store_true", help="verify completed retained routes without launching JVMs")
     args = parser.parse_args()
     cli, provider, folder = args.cli.resolve(strict=True), args.otelc_root.resolve(strict=True), args.report_dir.resolve()
     if folder.is_relative_to(provider) or folder.is_relative_to(Path(__file__).resolve().parents[1]):
         parser.error("qualification directory must be new and outside both repositories")
+    if args.recheck:
+        result = retained(folder, cli, args.java_backend)
+        (folder / "qualification.json").write_text(json.dumps(result, indent=2) + "\n")
+        print(json.dumps(result), flush=True)
+        return
     folder.mkdir(mode=0o700)
     os.environ.update(OTELEQ_PYTHON=sys.executable, OTELEQ_CLI=str(cli))
     workspace = prepare(cli, provider, folder / "cases", args.java_backend)
@@ -225,18 +274,9 @@ def main() -> None:
     observations += framework(replay, folder, "reduced-framework", 1)
     result = json.loads(command([cli, "replay", "--workspace", replay, "--case", target["case"]], folder, "reduced-replay", expected=1))
     observations += check_report(Path(result["report"]), 1)
-    actual = observations - 4  # Original shrink observations copy the original qualified attempt.
-    assert actual == 116
-    builds = verify_builds(folder)
-    launches = verify_launches(folder, actual)
-    prepared = verify_prepared(folder, verify_receipt) if args.java_backend == "prepared" else None
-    result = {"claim": "equivalence over these tests and observations", "artefact_class": "diagnostic",
-              "backend": args.java_backend, "cli_sha256": hashlib.sha256(cli.read_bytes()).hexdigest(),
-              "cases": 5, "matching_cases": 4, "intermediate_difference_controls": 1,
-              "retained_observations": observations, "actual_jvm_launches": actual, "evidence_refusals": refusals,
-              "prelaunch_source_refusals": 1,
-              "detached_export": True, "builds": builds, "launches": launches, "prepared": prepared,
-              "scope": "Two ordered calls on declared Java receivers; private factories, fields/statics, aliases/cycles, expected intermediate exceptions and recursive trees. No release, collection, invocation attribution or shipping artefact claim."}
+    audit_counts(observations, verify_launches(folder, 120))
+    assert refusals == 5
+    result = retained(folder, cli, args.java_backend)
     (folder / "qualification.json").write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps(result), flush=True)
 
