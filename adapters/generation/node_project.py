@@ -77,6 +77,25 @@ def commonjs(entry: dict) -> bool:
     return Path(entry["path"]).suffix in (".cjs", ".cts")
 
 
+def bind_entry(entry: dict, discovered: dict) -> None:
+    """Retain the file's loader evidence and declared CommonJS access restrictions."""
+    for key in ("node_context", "node_original_context", "node_context_error"):
+        if key in discovered:
+            entry[key] = discovered[key]
+    if entry.get("node_context_error"):
+        entry["reason"] = entry["reason"] or entry["node_context_error"]
+    entry["node_require_shadowed"] = any(item["name"] == "require"
+                                         for item in (*discovered["functions"], *discovered["globals"]))
+
+
+def require_callable(entry: dict) -> None:
+    """Refuse unresolved context or an application-defined CommonJS require."""
+    if entry.get("node_context_error"):
+        raise ValueError(entry["node_context_error"])
+    if entry.get("node_require_shadowed") and commonjs(entry):
+        raise ValueError("CommonJS bootstrap requires an unshadowed module require binding")
+
+
 def verify_attempt(project: Path, entry: dict, provider: Path, node: Path,
                    execute: Callable, folder: Path) -> None:
     """Recheck the materialised caller's actual format and unchanged package bytes."""

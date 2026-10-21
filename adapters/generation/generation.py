@@ -229,20 +229,25 @@ def snapshot_source(source, workspace, contents):
     return snapshot
 
 
+def discovery_tools(root: Path, language: str, adapters: dict) -> tuple[dict, dict]:
+    """Resolve the selected compiler/runtime tools and their provider identities."""
+    rust_backend = adapters.get("rust", {}).get("backend", "compiler")
+    selected = capture.selected_tools(root, language)
+    if language == "java":
+        selected["javac"] = capture.tool_path(str(selected["java"].parent / "javac"))
+        selected["java-modules"] = java_build.module_image(selected["java"])
+    qualified = (java_provider.artefacts(root, selected, adapters["java"].get("profile", java_profiles.STOCK))
+                 if language == "java" and adapters.get("java", {}).get("backend") == "prepared"
+                 else capture.artefacts(root, language, selected, rust_backend=rust_backend))
+    return selected, qualified
+
+
 def discover_file(name, language, root, snapshot, workspace, tools, artefacts, adapter_state=None):
     adapter_state = adapter_state or {}
     adapters = adapter_state.get("configuration", {})
-    rust_backend = adapters.get("rust", {}).get("backend", "compiler")
     try:
         if language not in tools:
-            selected = capture.selected_tools(root, language)
-            if language == "java":
-                selected["javac"] = capture.tool_path(str(selected["java"].parent / "javac"))
-                selected["java-modules"] = java_build.module_image(selected["java"])
-            qualified = (java_provider.artefacts(root, selected, adapters["java"].get("profile", java_profiles.STOCK))
-                         if language == "java" and adapters.get("java", {}).get("backend") == "prepared"
-                         else capture.artefacts(root, language, selected, rust_backend=rust_backend))
-            tools[language], artefacts[language] = selected, qualified
+            tools[language], artefacts[language] = discovery_tools(root, language, adapters)
         def discover_execute(command, cwd, input_data=None, *, max_output_bytes=None):
             environment = capture.environment(snapshot, tools[language], "oteleq-discovery", root)
             environment.update({"GOCACHE": str(workspace / "go-cache/build"), "GOMODCACHE": str(workspace / "go-cache/modules"), "GOTOOLCHAIN": "local",
@@ -271,10 +276,7 @@ def qualify_entry(entry, snapshot, count):
     if entry["reason"]:
         return "blocked"
     try:
-        if entry.get("node_context_error"):
-            raise ValueError(entry["node_context_error"])
-        if entry.get("node_require_shadowed") and node_project.commonjs(entry):
-            raise ValueError("CommonJS bootstrap requires an unshadowed module require binding")
+        node_project.require_callable(entry)
         if entry.get("go_shadowed_recovery", False):
             raise ValueError("shadowed Go panic/recover requires an observation fixture")
         harness.corpus(entry, count)
@@ -401,15 +403,7 @@ def inventory_entry(function, discovered, name, language, source_hash, snapshot,
         excluded = False
     entry["generation_seed"] = args.configuration["generation"]["seed"]
     if language in ("javascript", "typescript"):
-        if "node_context" in discovered:
-            entry["node_context"] = discovered["node_context"]
-        if "node_original_context" in discovered:
-            entry["node_original_context"] = discovered["node_original_context"]
-        if "node_context_error" in discovered:
-            entry["node_context_error"] = discovered["node_context_error"]
-            entry["reason"] = entry["reason"] or discovered["node_context_error"]
-        entry["node_require_shadowed"] = any(item["name"] == "require"
-                                             for item in (*discovered["functions"], *discovered["globals"]))
+        node_project.bind_entry(entry, discovered)
     if language == "typescript":
         entry["typescript_backend"] = args.configuration["adapters"]["typescript"]["backend"]
     if language == "rust":
