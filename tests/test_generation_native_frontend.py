@@ -204,14 +204,16 @@ class NativeFrontendDocumentTests(unittest.TestCase):
             {'ast': {'kind': 'TranslationUnitDecl', 'inner': [1]}},
         ]
         for change in alterations:
+            encoded = json.dumps({**valid, **change}).encode()
             with self.subTest(change=change), self.assertRaises(ValueError):
-                native_frontend.document(json.dumps({**valid, **change}).encode(), 22)
+                native_frontend.document(encoded, 22)
         for change in ({'kind': 'unknown'}, {'source': '/other.c'}, {'offset': True}, {'offset': -1},
                        {'target': '/unrecorded.h'}, {'name': ''}, {'angled': 1}, {'extra': True}):
             data = copy.deepcopy(valid)
             data['probes'][0].update(change)
+            encoded = json.dumps(data).encode()
             with self.subTest(change=change), self.assertRaises(ValueError):
-                native_frontend.document(json.dumps(data).encode(), 22)
+                native_frontend.document(encoded, 22)
         with self.assertRaises(ValueError):
             native_frontend.document(b'{"complete":true,"complete":true}', 22)
         with self.assertRaisesRegex(ValueError, 'byte budget'):
