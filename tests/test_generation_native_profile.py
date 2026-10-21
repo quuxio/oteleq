@@ -163,8 +163,9 @@ class NativeProfileTests(unittest.TestCase):
         path.write_text('{}')
         with self.assertRaisesRegex(ValueError, 'retained native context changed'):
             generation.load_workspace(workspace)
+        cleanup = argparse.Namespace(workspace=workspace)
         with self.assertRaisesRegex(ValueError, 'native context was edited'):
-            generation.clean(argparse.Namespace(workspace=workspace))
+            generation.clean(cleanup)
         self.assertTrue(workspace.exists())
 
     def test_native_policy_is_optional_explicit_and_round_trips(self):
@@ -194,6 +195,26 @@ class NativeProfileTests(unittest.TestCase):
             native_profile.capability(generation, self.provider, retained, absent)
         self.assertEqual(command[-3:], ['object', 'rename-main', '--help'])
         self.assertTrue((retained / 'object-transform-request.json').is_file())
+
+    def test_native_discovery_failures_retain_the_partial_workspace(self):
+        workspace = self.base / 'failed-discovery'
+        workspace.mkdir()
+        for error in (ValueError('unsupported recipe'), OSError('compiler unavailable')):
+            with self.subTest(error=type(error).__name__), \
+                 patch.object(native_profile, 'prepare', side_effect=error), \
+                 self.assertRaisesRegex(ValueError, 'partial workspace:'):
+                native_profile.prepare_inputs(generation, self.source, self.provider, workspace, {}, {})
+            diagnostic = generation.read(workspace / 'discovery-failure.json')
+            self.assertEqual(diagnostic, {'schema_version': generation.VERSION,
+                'error': str(error), 'phase': 'native build context'})
+            self.assertFalse((workspace / generation.PLAN_FILE).exists())
+
+    def test_native_discovery_cannot_replace_previously_observed_source_bytes(self):
+        with patch.object(native_profile, 'prepare', return_value={'c': {}}), \
+             patch.object(native_profile, 'source_manifest', return_value={'app.c': 'changed'}), \
+             self.assertRaisesRegex(ValueError, 'source changed during native build discovery'):
+            native_profile.prepare_inputs(generation, self.source, self.provider, self.base,
+                                          {}, {'app.c': 'original'})
 
 
 if __name__ == '__main__':

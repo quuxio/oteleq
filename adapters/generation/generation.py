@@ -55,7 +55,7 @@ def read(path):
     return capture.strict_json(path.read_text())
 
 
-def manifest(root: Path, *, excluded: Collection[str] = (), max_file_bytes: int | None = None) -> dict[str, str]:
+def manifest(root: Path, *, excluded: Collection[str] = (), max_file_bytes: int = MAX_FILE) -> dict[str, str]:
     """Fingerprint all private contents; only original source walks exclude build trees."""
     result, total = {}, 0
     for directory, names, files in os.walk(root, followlinks=False):
@@ -70,7 +70,7 @@ def manifest(root: Path, *, excluded: Collection[str] = (), max_file_bytes: int 
                 raise ValueError("source contains a non-regular file")
             size = path.stat().st_size
             total += size
-            if size > (MAX_FILE if max_file_bytes is None else max_file_bytes) or total > MAX_TREE or len(result) >= 10000:
+            if size > max_file_bytes or total > MAX_TREE or len(result) >= 10000:
                 raise ValueError("source snapshot limit exceeded")
             result[path.relative_to(root).as_posix()] = capture.file_digest(path)
     return result
@@ -441,22 +441,12 @@ def plan(args):
     temporary = capture.temporary_parent(source, root)
     parent = source_outside(args.workspace_parent or temporary, source, root)
     contents = manifest(source, excluded=discovery.IGNORED)
-    if not contents and not any(configuration['adapters'].get(language, {}).get('compilation_database')
-                                for language in ('c', 'cpp') if language in configuration['languages']):
+    if not contents and not native_profile.configured(configuration):
         raise ValueError("empty source tree")
     workspace = Path(tempfile.mkdtemp(prefix="oteleq-run-", dir=parent))
     write(workspace / OWNED_MARKER, {"schema_version": VERSION, "id": uuid.uuid4().hex})
-    try:
-        native_projects = native_profile.prepare(sys.modules[__name__], source, root, workspace, configuration)
-    except (ValueError, OSError) as error:
-        write(workspace / 'discovery-failure.json', {'schema_version': VERSION, 'error': str(error),
-                                                   'phase': 'native build context'})
-        raise ValueError(str(error) + '; partial workspace: ' + str(workspace)) from error
-    if native_projects:
-        required = native_profile.source_manifest(sys.modules[__name__], source, native_projects)
-        if any(required.get(name) != digest for name, digest in contents.items()):
-            raise ValueError("source changed during native build discovery")
-        contents = required
+    contents, native_projects = native_profile.prepare_inputs(
+        sys.modules[__name__], source, root, workspace, configuration, contents)
     snapshot = snapshot_source(source, workspace, contents)
     native_profile.directories(snapshot, native_projects)
     tools, artefacts, inventory = inventory_tree(contents, root, snapshot, workspace, args, native_projects)

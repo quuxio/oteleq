@@ -13,6 +13,29 @@ import native_workspace
 DIRECTORY = 'native-context'
 
 
+def configured(configuration: dict) -> bool:
+    """An explicit native recipe can consist entirely of normally excluded files."""
+    return any(configuration['adapters'].get(language, {}).get('compilation_database')
+               for language in ('c', 'cpp') if language in configuration['languages'])
+
+
+def prepare_inputs(workflow, source: Path, root: Path, workspace: Path,
+                   configuration: dict, contents: dict) -> tuple[dict, dict]:
+    """Retain native discovery failures and bind added inputs before snapshotting."""
+    try:
+        profiles = prepare(workflow, source, root, workspace, configuration)
+    except (ValueError, OSError) as error:
+        workflow.write(workspace / 'discovery-failure.json', {'schema_version': workflow.VERSION,
+                       'error': str(error), 'phase': 'native build context'})
+        raise ValueError(str(error) + '; partial workspace: ' + str(workspace)) from error
+    if not profiles:
+        return contents, profiles
+    required = source_manifest(workflow, source, profiles)
+    if any(required.get(name) != digest for name, digest in contents.items()):
+        raise ValueError('source changed during native build discovery')
+    return required, profiles
+
+
 def context_manifest(workflow, workspace: Path) -> dict:
     """Compiled tooling has a separate file budget from application source files."""
     return workflow.manifest(workspace / DIRECTORY, max_file_bytes=workflow.MAX_TREE)
