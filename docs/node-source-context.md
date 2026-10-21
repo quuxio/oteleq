@@ -40,8 +40,31 @@ This is diagnostic caller evidence. It preserves the existing [scalar and object
 
 The normal snapshot still excludes `node_modules`. Dependency installation, workspace links, package-manager hooks, custom loaders, semantic TypeScript project/type graphs and general bundler/build recipes remain incomplete. Relative imports and package mappings must resolve using the available private inputs and the qualified provider. A matching module-format receipt does not prove that all imports resolve or that a shipping artefact is equivalent.
 
-## Qualification status
+## Reproduce the qualification
+
+Use the qualified provider's locked Python environment and the matching Node tool:
+
+```sh
+make generation-node-project-otelc \
+  PYTHON=/absolute/path/to/otelc/.venv/bin/python \
+  OTELC_ROOT=/absolute/path/to/qualified/otelc \
+  REPORT_DIR=/private/tmp/new-node-context-qualification
+```
+
+This creates fresh fixtures and tests them through public run/replay commands, the generated `unittest` suite and an exported suite with its original application directory detached. It also reduces a same-return global-state difference from argument `7` to `0` and retains every trial and confirmation. The report directory must be new and outside both repositories.
+
+## Qualified scope
 
 Maintainer regressions cover actual loader formats, CommonJS free/receiver callers, exact scalar state and return values, source preservation, binding/intrinsic refusal, named context blockers and detached export. They use a limited compiler fixture for JS-compatible TypeScript unit cases.
 
-Actual-provider qualification of this increment is pending. These regressions do not extend the published provider/platform matrix. The acceptance claim remains **equivalence over these tests and observations**.
+The [22 October record](qualification/node-projects-2026-10-22.json) binds runtime `3d298d3`, verifier `75bbf85`, frozen provider `d6d03b7` and Node `24.21.0` on macOS ARM64. Its 245 unique application launches cover:
+
+- Eleven free-function contexts: `.cjs`, `.mjs`, default/module/commonjs `.js`, syntax-detected `.js`, `.cts`, `.mts` and default/module/commonjs `.ts`.
+- Plain JavaScript and TypeScript CommonJS receivers with independently expected state and self-aliases.
+- Complete initial/final/outcome graphs, exact scalar argument/result bits, descriptors, property order, stdout/stderr and original/private/caller context receipts in every repeat and lane.
+- Independently decoded raw OTLP span identity, application PID/service/scope, counters, histogram buckets/extrema and zero reported loss.
+- Four refusals before application launch: shadowed `require`, changed source, a rehashed forged format and an ambient parent package. Startup rebinding is separately refused after one plain launch.
+
+The existing JavaScript/TypeScript receiver corpus separately passes 186 application launches on the same frozen CLI. Five calibration launches are retained separately; copied shrink reports do not count as new launches. All 9,973 sealed evidence files and the provider's recorded source, products, dependency inputs and tools were rechecked.
+
+These are diagnostic caller results for the recorded provider/platform, with the observation and build limits above. The acceptance claim remains **equivalence over these tests and observations**.

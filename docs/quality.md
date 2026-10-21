@@ -4,6 +4,8 @@ CI caches only the pinned `cargo-llvm-cov` executable using an OS, architecture,
 
 ## Current scope
 
+The [Node source-context profile](node-source-context.md) has a separate 80% line coverage floor for `node_project.py`. Its [22 October qualification](qualification/node-projects-2026-10-22.json) completes 245 unique application launches across eleven module contexts, CommonJS receivers, all four retained routes, scalar reduction and refusal controls. An independent verifier checks complete fixed-fixture graphs, literal application channels, actual loader receipts and decoded raw OTLP. The same CLI also passes the existing 186-launch Node receiver corpus. These results leave dependency installation, general TypeScript/build integration and shipping qualification open.
+
 The explicit prepared Java recipe validator has its own 80% line coverage floor. Its regressions reject cross-profile substitutions, altered bootstrap parser bytes, foreign/duplicate JAR entries, missing tooling and changed frozen inputs.
 
 The optional [Java live metric profile](java-metric-controls.md) adds separate 80% line floors for `java_control.py`, `java_live.py` and `java_control_receipt.py`. Private-socket, malformed-data, process cleanup, checkpoint/state, independent counter and receipt regressions are contributor gates. Actual-provider qualification additionally needs same-PID four-state execution, direct exported data and complete independent application-state oracles.

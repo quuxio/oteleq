@@ -39,7 +39,7 @@ The [original-source Rust compiler corpus](docs/rust-build-bundles.md) qualifies
 
 The result is **equivalence over these tests and observations**. It is not a blanket proof that every function is identical.
 
-[Node caller context](docs/node-source-context.md) preserves actual CommonJS/ES-module formats across original sources, private snapshots and generated callers, including `.js`/`.ts` package interpretation. General Node dependency/build integration remains open.
+[Node caller context](docs/node-source-context.md) preserves actual CommonJS/ES-module formats across original sources, private snapshots and generated callers, including `.js`/`.ts` package interpretation. Its [245-launch qualification](docs/qualification/node-projects-2026-10-22.json) covers eleven module contexts, declared receivers, detached suites, replay, reduction and refusal controls; the existing receiver corpus separately passes 186 launches on that same CLI. General Node dependency/build integration remains open.
 
 Generated tests live in a new private directory outside the application repository. Selection, scalar domain fixtures, [declared return values](docs/expected-returns.md), seeded inputs and execution budgets use a [validated project policy](docs/automatic-generation.md#project-policy-and-concrete-fixtures). Users can retain or explicitly export them, using Python's standard `unittest` suite independently of the application's existing framework.
 
