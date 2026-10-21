@@ -1,0 +1,104 @@
+{
+  "qualification_schema_version": 1,
+  "date": "2026-10-21",
+  "platform": {
+    "os": "macOS",
+    "architecture": "ARM64",
+    "llvm": "22.1.8",
+    "python": "3.12.15"
+  },
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "runtime": {
+    "commit": "61b1a091fdf26824e8b652f66922bae6b7b76b86",
+    "cli_sha256": "880cb2a0cd450ea116855eb2e9e4cfe936c2ab9dff84e4847c0a12e6f79b7593",
+    "source_archive_sha256": "e4c2d169204c50563eef125f620ffbd0ab3a75222d1171f0afa00450211927d4",
+    "qualification_script_sha256": "547ebb4e09f4bbe3f401b37aa80365e5a0bbf55a4e170fe8e1bfa3a806ec3523",
+    "post_review_oracle_sha256": "086f26698d18fa6244e5c41cf410b7234f499194cd64caf58443b22e041ac3fd",
+    "application_code_unchanged_by_oracle_review": true
+  },
+  "provider": {
+    "source_commit": "58abcf523cfe941ae349d8f6e4c6bf56c1295243",
+    "source_tree": "d251c7a4bb7ba7bd9aea6ee95244d83609bdf216",
+    "manifest_sha256": "752b10f8860fbde958aad9119243eddac68174bccd9159b72a6f00de5f245f80",
+    "verified_files": 429,
+    "products": {
+      "target/debug/quux-otelc": {
+        "path": "target/debug/quux-otelc",
+        "sha256": "bfe2770634c187d4edfafa620a9287de4bcd07f180ec2f88cebe91812d63734d"
+      }
+    },
+    "status": "Frozen compatibility candidate only; replacement implementation, current main and release qualification remain open."
+  },
+  "results": {
+    "claim": "equivalence over these tests and observations",
+    "artefact_class": "diagnostic",
+    "runtime_cli_sha256": "880cb2a0cd450ea116855eb2e9e4cfe936c2ab9dff84e4847c0a12e6f79b7593",
+    "qualifier_sha256": "547ebb4e09f4bbe3f401b37aa80365e5a0bbf55a4e170fe8e1bfa3a806ec3523",
+    "cases": [
+      {
+        "name": "c-o0",
+        "language": "c",
+        "optimisation": "-O0",
+        "verdict": "equivalent_observed",
+        "actual_application_launches": 16
+      },
+      {
+        "name": "cpp-o2",
+        "language": "cpp",
+        "optimisation": "-O2",
+        "verdict": "equivalent_observed",
+        "actual_application_launches": 16
+      },
+      {
+        "name": "c-state",
+        "language": "c",
+        "optimisation": "-O2",
+        "verdict": "different_observed",
+        "actual_application_launches": 32
+      }
+    ],
+    "actual_application_launches": 64,
+    "refusal_controls": 4,
+    "generated_detached_replay_and_scalar_reduction": true,
+    "source_preserved": true,
+    "scope": "declared signed integer free functions in explicit same-language native targets; macOS ARM64 provider execution"
+  },
+  "retained_observations": {
+    "oracle_sha256": "086f26698d18fa6244e5c41cf410b7234f499194cd64caf58443b22e041ac3fd",
+    "complete_report_count": 17,
+    "checked_observation_records": 68,
+    "actual_application_launches": 64,
+    "copied_original_shrink_records": 4,
+    "explicit_expected_function_identity": true
+  },
+  "refusal_controls": [
+    "changed generated header",
+    "newly appearing existence-only header",
+    "changed retained native metadata",
+    "cleanup refuses edited context"
+  ],
+  "independent_oracles": [
+    "exact selected function identity",
+    "three typed and raw scalar roots before and after each call",
+    "32-bit signed little-endian integer ABI",
+    "expected return including unchanged return in mutation case",
+    "empty application stdout/stderr and complete successful termination",
+    "one exact selected function span, zero pending and loss in every instrumented attempt"
+  ],
+  "routes": [
+    "public run",
+    "generated unittest",
+    "fixed replay",
+    "detached exported unittest after original source removal",
+    "declared scalar shrinking and reduced unittest"
+  ],
+  "limits": [
+    "same-language explicit scalar free-function targets only",
+    "one frozen candidate on macOS ARM64/LLVM22",
+    "no general build-system/receiver/storage qualification",
+    "no invocation-scoped witness or same-process live-control qualification",
+    "no shipping artefact equivalence"
+  ],
+  "private_evidence_directory": "2026-10-21/native-project-routes-61b1a09-v2"
+}

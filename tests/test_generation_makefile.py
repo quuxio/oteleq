@@ -20,7 +20,8 @@ class QualificationRecipeTests(unittest.TestCase):
             for flag in ("--cli", "--comparator"):
                 if line.startswith("\t") and flag + " " in line:
                     targets[target] = flag
-        self.assertEqual(len(targets), 20)
+        self.assertEqual(len(targets), 21)
+        self.assertIn("generation-native-project-otelc", targets)
         self.assertIn("generation-http-otelc", targets)
         self.assertIn("generation-java-receiver-otelc", targets)
         self.assertIn("generation-go-receiver-otelc", targets)
@@ -56,6 +57,7 @@ class QualificationRecipeTests(unittest.TestCase):
     def test_help_names_the_http_qualification_target(self):
         result = subprocess.run(["make", "help"], cwd=ROOT, capture_output=True, text=True, check=True)
         self.assertIn("generation-http-otelc Qualify scripted HTTP", result.stdout)
+        self.assertIn("generation-native-project-otelc Qualify explicit C/C++ targets", result.stdout)
 
 
 if __name__ == "__main__":
