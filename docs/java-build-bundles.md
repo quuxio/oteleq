@@ -15,11 +15,13 @@ The plan freezes the Java and javac executable contents and the selected JDK mod
 
 ## Build profile
 
-The fixed profile uses UTF-8, `-proc:none`, `-implicit:class`, the private source root as its compilation classpath and a new separate class-output directory. The frontend itself runs with an empty isolated classpath, so application classes cannot replace its compiler APIs. Compilation does not initialise application classes.
+The standalone fixed profile uses UTF-8, `-proc:none`, `-implicit:class`, the private source root as its compilation classpath and a new separate class-output directory. The frontend itself runs with an empty isolated classpath, so application classes cannot replace its compiler APIs. Compilation does not initialise application classes.
 
 Each source's exact characters read by the compiler are hashed as UTF-8 and checked against the frozen source bytes, preserving CRLF and non-ASCII text. Every emitted class needs exactly one recorded source origin and a matching class-file hash. Missing, duplicate, changed or unrecorded outputs fail the build contract. Source, compiler inputs, class products and retained metadata are checked again after application execution.
 
-Annotation processors, arbitrary compiler flags, external dependency classpaths, module-path builds and custom classloaders are outside this profile. This does not provide general Java build-system integration. The JDK module image is covered by a content hash; native JDK/OS libraries are not comprehensively hashed. These are trusted local diagnostic builds, with no protection against malicious change-and-revert activity.
+Explicit [source/dependency context](java-project-context.md) adds a separately fixed compilation recipe with declared source roots and ordered private JAR/class/resource inputs. Compiler metadata schema 2 also records the URI and byte hash of every actual classpath class read. Source origins, generated driver identity and output checks remain required.
+
+Annotation processors, arbitrary compiler flags, module-path builds and custom classloaders remain outside these profiles. This does not provide general Java build-system integration. The JDK module image is covered by a content hash; native JDK/OS libraries are not comprehensively hashed. These are trusted local diagnostic builds, with no protection against malicious change-and-revert activity.
 
 ## Retained attempt records
 

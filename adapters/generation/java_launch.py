@@ -13,6 +13,7 @@ from urllib.parse import unquote
 
 import java_provider as provider
 import java_profiles
+import java_project
 import otelc_capture as capture
 
 MAX_RUNTIME_BYTES = 32 * 1024 * 1024
@@ -99,7 +100,8 @@ def target(entry: dict, application: dict, project: Path) -> tuple[str, str]:
 
 
 def expected_argv(root: Path, java: Path, classes: Path, main: str, runtime: Path,
-                  data: dict, owner: str, method: str, plain: bool, profile: str = java_profiles.STOCK) -> list[str]:
+                  data: dict, owner: str, method: str, plain: bool, profile: str = java_profiles.STOCK,
+                  *, context: dict | None = None) -> list[str]:
     """SDK metadata may verify this recipe; it cannot choose executables or flags."""
     args = [str(java), "-Xshare:off", "-Xlog:class+load=info:file=" + str(runtime / CLASS_LOG)]
     if not plain:
@@ -113,7 +115,8 @@ def expected_argv(root: Path, java: Path, classes: Path, main: str, runtime: Pat
                  "-Dotelc.lifetime.types=", "-Dotelc.lifetime.resources=", "-Dotelc.lifetime.max-live=4096",
                  "-Dotelc.lifetime.release=close"]
         args += ["-D" + key + "=" + value for key, value in sorted(agent_values(data, owner, method, profile).items())]
-    return args + ["-cp", str(classes), main]
+    paths = os.pathsep.join(map(str, java_project.runtime_classpath(classes, context)))
+    return args + ["-cp", paths, main]
 
 
 def plan_values(runtime: Path, data: dict, selection: dict) -> dict:
@@ -126,7 +129,7 @@ def plan_values(runtime: Path, data: dict, selection: dict) -> dict:
 
 
 def verify(launch: dict, *, root: Path, project: Path, folder: Path, tools: dict,
-           runtime: Path, entry: dict, data: dict, plain: bool) -> None:
+           runtime: Path, entry: dict, data: dict, plain: bool, context: dict | None = None) -> None:
     """Bind the full public response, argv and loaded inputs before and after Java."""
     application_path = folder / APPLICATION_FILE
     application = capture.strict_json(application_path.read_bytes())
@@ -139,14 +142,15 @@ def verify(launch: dict, *, root: Path, project: Path, folder: Path, tools: dict
                      and launch["language"] == "java" and launch["plain"] is plain
                      and launch["jvm_profile"] == "diagnostic-no-cds", "unsupported prepared launch identity")
     provider.require(launch["argv"] == expected_argv(root, java, classes, application["main_class"], runtime,
-                                                   data, owner, method, plain, profile), "SDK changed the fixed Java launch recipe")
-    provider.require(launch["main_class"] == application["main_class"] and launch["ordered_classpath"] == [str(classes)]
+                                                   data, owner, method, plain, profile, context=context), "SDK changed the fixed Java launch recipe")
+    paths = list(map(str, java_project.runtime_classpath(classes, context)))
+    provider.require(launch["main_class"] == application["main_class"] and launch["ordered_classpath"] == paths
                      and type(launch["java_version"]) is str and launch["java_version"], "prepared main/classpath/version differs")
     provider.require(launch["policy_sha256"] == provider.digest(data)
                      and launch["loaded_origins"] == str(runtime / CLASS_LOG), "prepared policy/origin identity differs")
     for key, filename in (("agent_diagnostics", "agent.log"), ("health_report", "health.json"), ("control_socket", CONTROL_SOCKET)):
         provider.require(launch[key] == (None if plain else str(runtime / filename)), "prepared runtime path differs: " + key)
-    verify_application(launch["application"], application, application_path, classes)
+    verify_application(launch["application"], application, application_path, classes, context=context)
     tooling = {java}
     if plain:
         provider.require(launch["selection_sha256"] is None, "plain launch has an instrumented selection")
@@ -165,18 +169,19 @@ def verify(launch: dict, *, root: Path, project: Path, folder: Path, tools: dict
     files(launch["tooling"], tooling)
 
 
-def verify_application(value: dict, application: dict, manifest: Path, classes: Path) -> None:
+def verify_application(value: dict, application: dict, manifest: Path, classes: Path, *, context: dict | None = None) -> None:
     """Require the actual complete compiler product inventory and source bindings."""
     provider.require(type(value) is dict and set(value) == {"manifest", "classpath", "main_class", "ordered_classpath", "sources", "bindings"}
                      and value["bindings"] == application["bindings"] and value["main_class"] == application["main_class"]
-                     and value["ordered_classpath"] == [str(classes)], "prepared compiler application binding differs")
+                     and value["ordered_classpath"] == list(map(str, java_project.runtime_classpath(classes, context))),
+                     "prepared compiler application binding differs")
     files([value["manifest"]], {manifest})
-    files(value["classpath"], {path for path in classes.rglob("*") if path.is_file()})
+    files(value["classpath"], java_project.classpath_files(classes, context))
     files(value["sources"], {Path(binding["source"]) for binding in application["bindings"].values()})
 
 
 def prepare(root: Path, project: Path, folder: Path, tools: dict, runtime: Path,
-            entry: dict, data: dict, plain: bool, env: dict, execute: Callable) -> list[str]:
+            entry: dict, data: dict, plain: bool, env: dict, execute: Callable, *, context: dict | None = None) -> list[str]:
     """Use the public prepare-only API, then accept only the independently fixed argv."""
     config = folder / "policy.toml"
     command = [sys.executable, "-m", "otelc", "--config", config, "java", "--manifest",
@@ -184,11 +189,11 @@ def prepare(root: Path, project: Path, folder: Path, tools: dict, runtime: Path,
     if plain:
         command.append("--plain")
     result = execute(command, root, provider.environment(root, tools, folder, env), folder / "sdk-prepare",
-                     max_output_bytes=provider.MAX_METADATA)
+                     max_output_bytes=16 * 1024 * 1024 if context is not None else provider.MAX_METADATA)
     provider.require(result.returncode == 0, "public SDK preparation failed; inspect sdk-prepare/stderr")
     launch = capture.strict_json(result.stdout)
     verify(launch, root=root, project=project, folder=folder, tools=tools, runtime=runtime,
-           entry=entry, data=data, plain=plain)
+           entry=entry, data=data, plain=plain, context=context)
     (folder / LAUNCH_FILE).write_text(json.dumps(launch, indent=2) + "\n")
     return launch["argv"]
 
@@ -231,17 +236,23 @@ def runtime(entry: dict, folder: Path, *, source_roots: tuple[Path, ...] = ()) -
                 archive(path, folder)
 
 
-def origins(runtime: Path, folder: Path, entry: dict) -> None:
+def origins(runtime: Path, folder: Path, entry: dict, *, context: dict | None = None) -> None:
     """Required application/driver classes must load from the retained class output."""
     path = runtime / CLASS_LOG
     provider.require(path.is_file() and path.stat().st_size <= MAX_RUNTIME_BYTES, "missing or oversized JVM origin log")
     application = capture.strict_json((folder / APPLICATION_FILE).read_bytes())
+    expected = {name: "file:" + str(folder / "scratch/classes") + "/" for name in application["bindings"]}
+    for dependency in context["entries"] if context else []:
+        source = "file:" + dependency["path"] + ("/" if dependency["kind"] == "directory" else "")
+        for name in dependency["classes"]:
+            provider.require(name not in expected, "duplicate classpath binary identity")
+            expected[name] = source
     loaded = {}
     for line in path.read_text().splitlines():
         match = re.search(r"\] ([^ ]+) source: (.+)$", line)
-        if match and match[1] in application["bindings"]:
+        if match and match[1] in expected:
             source = unquote(match[2])
-            provider.require(source == "file:" + str(folder / "scratch/classes") + "/", "application class loaded from another origin")
+            provider.require(source == expected[match[1]], "application class loaded from another origin")
             provider.require(match[1] not in loaded, "duplicate application classloader identity")
             loaded[match[1]] = match[2]
     owner = entry["otelc_function"].split("(", 1)[0].rsplit(".", 1)[0]

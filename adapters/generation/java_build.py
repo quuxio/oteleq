@@ -6,6 +6,8 @@ from pathlib import Path
 import shutil
 
 from otelc_capture import strict_json
+import java_classpath
+import java_project
 
 FRONTEND = Path(__file__).with_name("OteleqCompile.java")
 MAX_METADATA = 16 * 1024 * 1024
@@ -50,15 +52,17 @@ def contained(name: str, root: Path) -> Path:
 
 
 def bindings(metadata: dict, project: Path, classes: Path, original: dict,
-             generated: set[Path], provenance: str) -> dict:
+             generated: set[Path], provenance: str, *, context: dict | None = None) -> dict:
     """Every class must have one compiler source origin read from frozen bytes."""
-    require(type(metadata) is dict and set(metadata) == {"schema_version", "success", "java_version", "options", "source_reads_sha256", "outputs"}
-            and metadata.get("schema_version") == 1
+    fields = {"schema_version", "success", "java_version", "options", "source_reads_sha256", "outputs"}
+    if context is not None:
+        fields.add("class_reads_sha256")
+    require(type(metadata) is dict and set(metadata) == fields
+            and metadata.get("schema_version") == (2 if context is not None else 1)
             and type(metadata.get("schema_version")) is int and metadata.get("success") is True,
             "unsupported or unsuccessful compiler result")
     require(type(metadata["java_version"]) is str and metadata["java_version"]
-            and metadata["options"] == ["-encoding", "UTF-8", "-proc:none", "-implicit:class",
-                                       "-classpath", str(project), "-d", str(classes)],
+            and metadata["options"] == java_project.compiler_options(project, classes, context),
             "compiler identity or fixed options changed")
     reads = metadata.get("source_reads_sha256")
     outputs = metadata.get("outputs")
@@ -84,6 +88,10 @@ def bindings(metadata: dict, project: Path, classes: Path, original: dict,
         recorded.add(path)
     actual = {classes / name for name in files(classes)}
     require(recorded == actual, "unrecorded or missing class products")
+    if context is not None:
+        java_classpath.class_reads(metadata["class_reads_sha256"], context["entries"])
+        require(not any(set(result).intersection(entry["classes"]) for entry in context["entries"]),
+                "source products duplicate a declared dependency class")
     return result
 
 
@@ -116,7 +124,7 @@ def compiler_inputs(java: Path, frontend: Path | None = None) -> dict:
 
 
 def build(project: Path, sources: list[Path], main: str, java: Path,
-          classes: Path, folder: Path, environment: dict, execute: Callable) -> dict:
+          classes: Path, folder: Path, environment: dict, execute: Callable, *, context: dict | None = None) -> dict:
     """Compile private source, retain origins, and emit the public prepared manifest."""
     project = project.resolve(strict=True)
     folder = folder.resolve()
@@ -126,6 +134,11 @@ def build(project: Path, sources: list[Path], main: str, java: Path,
     require(not folder.is_relative_to(project), "build records must be outside the private source")
     original = files(project)
     sources = [contained(str(path.resolve()), project) for path in sources]
+    generated = set(sources[1:])
+    if context is not None:
+        java_project.verify_attempt(folder, context)
+        require(str(sources[0]) in context["source_units"], "selected target is outside declared source units")
+        sources = [contained(name, project) for name in context["source_units"]] + sources[1:]
     require(sources and len(set(sources)) == len(sources) and all(path.suffix == ".java" for path in sources),
             "explicit Java source units must be distinct")
     classes.mkdir(parents=True)
@@ -136,7 +149,12 @@ def build(project: Path, sources: list[Path], main: str, java: Path,
     frontend = tool / FRONTEND.name
     shutil.copyfile(FRONTEND, frontend)
     tool_inputs = compiler_inputs(java, frontend)
-    command = [java, "-cp", isolated, frontend, project, classes, *sources]
+    arguments = [project, classes, *sources]
+    if context is not None:
+        paths = [entry["path"] for entry in context["entries"]]
+        arguments = ["--context-v2", project, classes, str(len(context["source_roots"])),
+                     *context["source_roots"], str(len(paths)), *paths, *sources]
+    command = [java, "-cp", isolated, frontend, *arguments]
     result = execute(command, project, environment, folder / "build", max_output_bytes=MAX_METADATA)
     require(not result.returncode, "compilation failed; inspect build/stderr")
     metadata = strict_json(result.stdout)
@@ -147,14 +165,18 @@ def build(project: Path, sources: list[Path], main: str, java: Path,
                 "argv": list(map(str, command)), "compiler_metadata_sha256": digest(folder / COMPILER_METADATA_FILENAME)}
     (folder / COMPILER_IDENTITY_FILENAME).write_text(json.dumps(compiler, indent=2) + "\n")
     provenance = "oteleq.jdk-file-manager-v1:" + digest(folder / COMPILER_IDENTITY_FILENAME)
-    bound = bindings(metadata, project, classes, original, set(sources[1:]), provenance)
+    bound = bindings(metadata, project, classes, original, generated, provenance, context=context)
     require(main in bound, "generated main has no compiler binding")
-    application = {"schema_version": 1, "main_class": main, "classpath": [str(classes)], "bindings": bound}
+    application = {"schema_version": 1, "main_class": main,
+                   "classpath": list(map(str, java_project.runtime_classpath(classes, context))), "bindings": bound}
     (folder / PREPARED_APPLICATION_FILENAME).write_text(json.dumps(application, indent=2) + "\n")
     record = {"schema_version": 1, "source_sha256": original, "classes_sha256": files(classes),
               "main_class": main, "compiler_metadata_sha256": digest(folder / COMPILER_METADATA_FILENAME),
               "compiler_identity_sha256": digest(folder / COMPILER_IDENTITY_FILENAME),
               "prepared_application_sha256": digest(folder / PREPARED_APPLICATION_FILENAME)}
+    if context is not None:
+        java_project.verify_attempt(folder, context)
+        record["java_context_sha256"] = digest(folder / java_project.CONTEXT_FILE)
     (folder / "build-identities.json").write_text(json.dumps(record, indent=2) + "\n")
     return application
 
@@ -173,3 +195,7 @@ def verify(project: Path, classes: Path, folder: Path) -> None:
     compiler = strict_json((folder / COMPILER_IDENTITY_FILENAME).read_bytes())
     require(all(Path(name).is_file() and digest(Path(name)) == sha
                 for name, sha in compiler["inputs_sha256"].items()), "selected compiler changed")
+    if "java_context_sha256" in record:
+        path = folder / java_project.CONTEXT_FILE
+        require(digest(path) == record["java_context_sha256"], "retained Java context changed")
+        java_project.verify_attempt(folder, strict_json(path.read_bytes()))

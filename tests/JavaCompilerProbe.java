@@ -1,5 +1,6 @@
 // Regression-only probes for compiler bookkeeping; no application code is loaded.
 import java.io.IOException;
+import java.io.ByteArrayInputStream;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -59,6 +60,47 @@ class JavaCompilerProbe {
             require(manager.source(first) == first);
         }
     }
+    static void classProbes(Path output) throws Exception {
+        try (var standard = ToolProvider.getSystemJavaCompiler().getStandardFileManager(null, null, null);
+             var manager = new OteleqCompile.Manager(standard, true)) {
+            standard.setLocationFromPaths(StandardLocation.CLASS_PATH, List.of(output));
+            var unit = manager.getJavaFileForInput(StandardLocation.CLASS_PATH, "Source", JavaFileObject.Kind.CLASS);
+            require(unit instanceof OteleqCompile.ReadClass);
+            require(manager.input(StandardLocation.CLASS_PATH, unit) == unit);
+            require(manager.isSameFile(unit, unit) && manager.contains(StandardLocation.CLASS_PATH, unit));
+            require(manager.inferBinaryName(StandardLocation.CLASS_PATH, unit).equals("Source"));
+            try (var input = unit.openInputStream()) { require(input.readAllBytes().length > 0); }
+            require(manager.classReads.size() == 1);
+        }
+        var changing = new SimpleJavaFileObject(URI.create("memory:///Changed.class"), JavaFileObject.Kind.CLASS) {
+            int count;
+            @Override public java.io.InputStream openInputStream() {
+                return new ByteArrayInputStream(new byte[]{(byte) ++count});
+            }
+        };
+        var wrapped = new OteleqCompile.ReadClass(changing, new LinkedHashMap<>());
+        wrapped.openInputStream().close();
+        try { wrapped.openInputStream(); throw new AssertionError("changed class passed"); }
+        catch (IOException expected) { require(expected.getMessage().contains("changed")); }
+    }
+    static void contextCompile(Path project, Path output) throws Exception {
+        Path empty = Files.createDirectory(project.resolve("empty"));
+        Path classes = Files.createDirectory(output.resolve("context-products"));
+        Path source = project.resolve("ContextApp.java");
+        Files.writeString(source, "class ContextApp {static int selected(){Source.throwIfLoaded();return 7;}}\n");
+        OteleqCompile.main(new String[]{"--context-v2", project.toString(), classes.toString(), "1", empty.toString(),
+            "1", output.toString(), source.toString()});
+        var zero = new OteleqCompile.Arguments(new String[]{"--context-v2", project.toString(), classes.toString(),
+            "1", project.toString(), "0", source.toString()});
+        require(zero.options.contains(classes.toString()));
+        for (var args : List.of(new String[]{"--context-v2", "p", "c", "0"},
+                new String[]{"--context-v2", "p", "c", "257"},
+                new String[]{"--context-v2", "p", "c", "1", "root", "-1"},
+                new String[]{"--context-v2", "p", "c", "1", "root", "0"})) {
+            try { new OteleqCompile.Arguments(args); throw new AssertionError("invalid context arguments passed"); }
+            catch (IllegalArgumentException expected) { require(expected.getMessage() != null); }
+        }
+    }
     public static void main(String[] args) throws Exception {
         Path project = Path.of(args[0]), output = Path.of(args[1]);
         Files.createDirectories(project); Files.createDirectories(output);
@@ -69,5 +111,7 @@ class JavaCompilerProbe {
         try { OteleqCompile.main(new String[0]); throw new AssertionError("missing arguments passed"); }
         catch (IllegalArgumentException expected) { require(expected.getMessage().contains("required")); }
         OteleqCompile.main(new String[]{project.toString(), output.toString(), source.toString()});
+        classProbes(output);
+        contextCompile(project, output);
     }
 }

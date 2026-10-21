@@ -6,6 +6,14 @@ use syn::{spanned::Spanned, visit::Visit};
 
 const RESOURCES: &[(&str, &str)] = &[
     (
+        "java_project.py",
+        include_str!("../adapters/generation/java_project.py"),
+    ),
+    (
+        "java_classpath.py",
+        include_str!("../adapters/generation/java_classpath.py"),
+    ),
+    (
         "native_profile.py",
         include_str!("../adapters/generation/native_profile.py"),
     ),

@@ -1,0 +1,145 @@
+{
+  "qualification_schema_version": 1,
+  "date": "2026-10-21",
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "platform": {
+    "os": "macOS-27.0.1-arm64-arm-64bit",
+    "architecture": "arm64",
+    "jdk": "21.0.12.1"
+  },
+  "runtime": {
+    "commit": "e447c398fd366c1f1dd6f31ec96bd7a524909831",
+    "tree": "55b8aa108f934ef1c9b06593a3053965311b5db9",
+    "cli_sha256": "b47187771196904339d260e3b649e16ca41fc5b265a6a1ebc83fc2f2e57cd3b7",
+    "source_archive_sha256": "4d8899a920ac90fe3d0577c585e82cbadc005cef9cb11c3f7f5d6a61ebb3c12c"
+  },
+  "providers": {
+    "prepared": {
+      "commit": "2218774c63450d4f675da84a5ad60bb54e63bc24",
+      "source_files_preserved": 80,
+      "products_preserved": {
+        "adapters/java/target/java-extension-0.2.0-SNAPSHOT.jar": "fff68c5385da8cc9eaf981f140e90e448d38580ec6eec6320f65445bae3474b9",
+        "adapters/java/target/java-extension-0.2.0-SNAPSHOT-bootstrap-patch.jar": "56ba8c193b2999a188e67ad48c8678055dca8d9aac2f8bcea767f4c95ead31be",
+        "build/tools/opentelemetry-javaagent-2.32.0.jar": "f787eb6c7f3d18e69a431e108a15278d25ee37f83d68b678f621e063f3988f82"
+      },
+      "prior_retained_files_unchanged": 10380,
+      "prior_seal_sha256": "5c27728bac97874f7589b413002b24bf414fe7059631a16fd055769ef6b04550"
+    },
+    "legacy": {
+      "commit": "d6d03b72026cde8962b11ce3cc184ff3ebcb60d4",
+      "tree": "a577aa88d5d51f4e86bc0858bcd233be7b01c251",
+      "manifest_sha256": "2a8dbf239c6444c0fb536dff049993beade7eaed6578c9654c1e2d7233e9431f",
+      "source_files_preserved": 413,
+      "products_preserved": 586,
+      "dependency_records_preserved": 6361
+    }
+  },
+  "prepared_provider_archive_sha256": "2d571208341632dc56cb196fdad031eecf2060357ebc3f0c79de0da386685e54",
+  "results": {
+    "prepared": {
+      "claim": "equivalence over these tests and observations",
+      "artefact_class": "diagnostic",
+      "cli_sha256": "b47187771196904339d260e3b649e16ca41fc5b265a6a1ebc83fc2f2e57cd3b7",
+      "java_backend": "prepared",
+      "java_profile": "safe-methods-v1",
+      "cases": 4,
+      "matching_cases": 3,
+      "same_return_state_differences": 1,
+      "prelaunch_refusal_controls": 5,
+      "altered_evidence_controls": 5,
+      "source_preserved": true,
+      "dependency_preserved": true,
+      "detached_export": true,
+      "scalar_shrink": {
+        "original": [
+          7
+        ],
+        "reduced": [
+          0
+        ]
+      },
+      "actual_application_jvm_launches": 84,
+      "launches": {
+        "raw_attempt_folders": 88,
+        "unique_command_identities": 84
+      },
+      "retained_builds": 88,
+      "unique_builds": 84,
+      "retained_class_bindings": 456,
+      "prepared": {
+        "retained_attempts": 88,
+        "unique_processes": 84,
+        "retained_instrumented_receipts": 44,
+        "short_runtimes_removed": true
+      },
+      "scope": "Declared ordinary source roots and JAR/class/resource inputs; complete independent fixed-fixture values, compiler reads/products and loaded origins. No modules, MR-JAR, general build-system or shipping-artefact qualification."
+    },
+    "legacy": {
+      "claim": "equivalence over these tests and observations",
+      "artefact_class": "diagnostic",
+      "cli_sha256": "b47187771196904339d260e3b649e16ca41fc5b265a6a1ebc83fc2f2e57cd3b7",
+      "java_backend": "legacy",
+      "java_profile": null,
+      "cases": 4,
+      "matching_cases": 3,
+      "same_return_state_differences": 1,
+      "prelaunch_refusal_controls": 4,
+      "altered_evidence_controls": 5,
+      "source_preserved": true,
+      "dependency_preserved": true,
+      "detached_export": true,
+      "scalar_shrink": {
+        "original": [
+          7
+        ],
+        "reduced": [
+          0
+        ]
+      },
+      "actual_application_jvm_launches": 84,
+      "launches": {
+        "raw_attempt_folders": 88,
+        "unique_command_identities": 84
+      },
+      "retained_builds": 88,
+      "unique_builds": 84,
+      "retained_class_bindings": 456,
+      "scope": "Declared ordinary source roots and JAR/class/resource inputs; complete independent fixed-fixture values, compiler reads/products and loaded origins. No modules, MR-JAR, general build-system or shipping-artefact qualification."
+    }
+  },
+  "totals": {
+    "actual_application_jvm_launches": 168,
+    "retained_observations": 176,
+    "retained_class_bindings": 912,
+    "prelaunch_refusal_controls": 9,
+    "altered_evidence_controls": 10
+  },
+  "evidence": {
+    "retained_files": 7890,
+    "manifest_sha256": "a82c96c238d773b1e001b8639e9ceb731e165b04138c8021727a7ada53ec0e00"
+  },
+  "validation": {
+    "result": "passed",
+    "distinct_regressions": 685,
+    "python_capture": 140,
+    "python_generation": 454,
+    "rust": 70,
+    "node": 17,
+    "go": 4,
+    "rust_product_line_coverage": 97.32,
+    "java_compiler_frontend_line_coverage": 97.17,
+    "java_observer_line_coverage": 96.69,
+    "java_project_line_coverage": 99.41,
+    "java_classpath_line_coverage": 100,
+    "log_sha256": "381c043b3a8c94c44fc6ae8eae45b82ef5898e9858dfb90b0b8353e7076cef70"
+  },
+  "delivery_checks": "https://github.com/quuxio/oteleq/pull/53/checks",
+  "limits": [
+    "Recorded ordinary source roots and JAR/class/resource inputs on macOS ARM64/JDK21; no module-path, multi-release JAR, annotation-processing or general Maven/Gradle build qualification.",
+    "The fixture verifies complete declared own state, including a private receiver; sibling/dependency globals and arbitrary object storage remain outside this observation scope.",
+    "Literal private paths/resource URLs can vary across attempts; they are not normalised.",
+    "Loaded origins, compiler bindings and named trace trees do not establish invocation cookies, runtime transformed-byte identity or a different shipping artefact.",
+    "Other platforms and broader build, lifetime, asynchronous, mutable-argument and instrument-control combinations require their own qualification."
+  ]
+}

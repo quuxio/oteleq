@@ -20,12 +20,13 @@ class QualificationRecipeTests(unittest.TestCase):
             for flag in ("--cli", "--comparator"):
                 if line.startswith("\t") and flag + " " in line:
                     targets[target] = flag
-        self.assertEqual(len(targets), 24)
+        self.assertEqual(len(targets), 25)
         self.assertIn("generation-native-project-otelc", targets)
         self.assertIn("generation-http-otelc", targets)
         self.assertIn("generation-java-receiver-otelc", targets)
         self.assertIn("generation-java-sequence-otelc", targets)
         self.assertIn("generation-java-controls-otelc", targets)
+        self.assertIn("generation-java-project-otelc", targets)
         self.assertIn("generation-go-receiver-otelc", targets)
         self.assertIn("rust-semantic-otelc", targets)
         with tempfile.TemporaryDirectory() as temporary:
@@ -60,6 +61,7 @@ class QualificationRecipeTests(unittest.TestCase):
         result = subprocess.run(["make", "help"], cwd=ROOT, capture_output=True, text=True, check=True)
         self.assertIn("generation-http-otelc Qualify scripted HTTP", result.stdout)
         self.assertIn("generation-native-project-otelc Qualify explicit C/C++ targets", result.stdout)
+        self.assertIn("generation-java-project-otelc Qualify Java roots", result.stdout)
 
 
 if __name__ == "__main__":

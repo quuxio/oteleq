@@ -28,6 +28,7 @@ import java_live
 import java_control_receipt
 import java_provider
 import java_profiles
+import java_project
 import java_telemetry
 import node_receivers
 import native_profile
@@ -70,13 +71,15 @@ def snapshot_file_size(path: Path) -> int:
     return path.stat().st_size
 
 
-def manifest(root: Path, *, excluded: Collection[str] = (), max_file_bytes: int | None = None) -> dict[str, str]:
+def manifest(root: Path, *, excluded: Collection[str] = (), excluded_files: Collection[str] = (),
+             max_file_bytes: int | None = None) -> dict[str, str]:
     """Fingerprint all private contents; only original source walks exclude build trees."""
     result, total = {}, 0
     file_limit = MAX_FILE if max_file_bytes is None else max_file_bytes
     for directory, names, files in os.walk(root, followlinks=False):
         base = Path(directory)
         names[:] = sorted(n for n in names if n not in excluded)
+        files = [name for name in files if (base / name).relative_to(root).as_posix() not in excluded_files]
         for name in names + files:
             if (base / name).is_symlink():
                 raise ValueError("source symlink requires an explicit build recipe: " + str(base / name))
@@ -421,7 +424,7 @@ def configure_fixture(entry, discovered, fixture):
                 entry["reason"] = entry["reason"] or str(error)
 
 
-def inventory_tree(contents, root, snapshot, workspace, args, native_projects=None):
+def inventory_tree(contents, root, snapshot, workspace, args, native_projects=None, java_context=None):
     native_projects = native_projects or {}
     tools, artefacts, inventory, covered = native_profile.inventory(
         sys.modules[__name__], native_projects, root, snapshot, workspace, args)
@@ -444,6 +447,7 @@ def inventory_tree(contents, root, snapshot, workspace, args, native_projects=No
         discovered["entrypoints"] = [function for function in discovered["functions"] if is_entrypoint(function, language)]
         for function in discovered["functions"]:
             entry = inventory_entry(function, discovered, name, language, sha, snapshot, args)
+            java_project.bind_entry(entry, java_context)
             filesystem_effects.bind(entry, args.configuration)
             typescript_provider.bind(entry, root, workspace, tools.get(language, {}), execute, policy)
             java_provider.bind(entry, root, workspace, tools.get(language, {}), execute)
@@ -485,18 +489,25 @@ def plan(args):
     configuration = plan_configuration(args)
     temporary = capture.temporary_parent(source, root)
     parent = source_outside(args.workspace_parent or temporary, source, root)
-    contents = manifest(source, excluded=discovery.IGNORED)
-    if not contents and not native_profile.configured(configuration):
+    java_options = configuration["adapters"]["java"] if "java" in args.language else {}
+    java_project.protect_destination(parent, java_project.input_locations(source, java_options))
+    excluded_jars = java_project.snapshot_exclusions(source, java_options)
+    contents = manifest(source, excluded=discovery.IGNORED, excluded_files=excluded_jars)
+    if not contents and not native_profile.configured(configuration) and "source_roots" not in java_options:
         raise ValueError("empty source tree")
     workspace = Path(tempfile.mkdtemp(prefix="oteleq-run-", dir=parent))
     write(workspace / OWNED_MARKER, {"schema_version": VERSION, "id": uuid.uuid4().hex})
     contents, native_projects = native_profile.prepare_inputs(
-        sys.modules[__name__], source, root, workspace, configuration, contents)
+        sys.modules[__name__], source, root, workspace, configuration, contents, excluded_files=excluded_jars)
+    java_context = java_project.prepare(source, workspace, java_options, discovery.IGNORED)
+    contents = java_source_manifest(source, java_options, contents)
     snapshot = snapshot_source(source, workspace, contents)
     native_profile.directories(snapshot, native_projects)
-    tools, artefacts, inventory = inventory_tree(contents, root, snapshot, workspace, args, native_projects)
+    java_project.directories(snapshot, java_options)
+    tools, artefacts, inventory = inventory_tree(contents, root, snapshot, workspace, args, native_projects, java_context)
     validate_fixture_inventory(configuration, inventory, args.language, workspace)
-    if native_profile.source_manifest(sys.modules[__name__], source, native_projects) != contents or manifest(snapshot) != contents:
+    current = native_profile.source_manifest(sys.modules[__name__], source, native_projects, excluded_files=excluded_jars)
+    if java_source_manifest(source, java_options, current) != contents or manifest(snapshot) != contents:
         raise ValueError("source changed during discovery")
     data = {"schema_version": VERSION, "source": str(source), "otelc_root": str(root), "source_manifest": contents,
             "source_sha256": identity(contents), "tools": {lang: {k: str(v) for k, v in selected.items()} for lang, selected in tools.items()},
@@ -507,12 +518,29 @@ def plan(args):
             "generator_sha256": generator_identity(), "cli_sha256": capture.file_digest(Path(os.environ["OTELEQ_EXECUTABLE"]))}
     if native_projects:
         data.update(native_projects=native_projects, native_context_manifest=native_profile.context_manifest(sys.modules[__name__], workspace))
+    if java_context is not None:
+        data.update(java_context=java_context, java_context_manifest=java_project.context_manifest(workspace))
+        data["source_sha256"] = identity({"source": contents, "java_context": data["java_context_manifest"]})
+        java_project.verify(workspace, data)
+    if (workspace / java_provider.DIRECTORY).exists():
+        data["java_provider_manifest"] = manifest(workspace / java_provider.DIRECTORY)
     write(workspace / PLAN_FILE, data)
     marker = read(workspace / OWNED_MARKER)
     marker["plan_sha256"] = identity(data)
     write(workspace / OWNED_MARKER, marker)
     print(workspace, flush=True)
     return 0
+
+
+def java_source_manifest(source, options, contents):
+    """Explicit generated Java units still obey the ordinary source snapshot bounds."""
+    if "source_roots" not in options:
+        return contents
+    result = java_project.source_manifest(source, options, contents, discovery.IGNORED)
+    if (len(result) > 10000 or any((source / name).stat().st_size > MAX_FILE for name in result)
+            or sum((source / name).stat().st_size for name in result) > MAX_TREE):
+        raise ValueError("required Java units exceed the source snapshot budget")
+    return result
 
 
 def package_files(package, spec):
@@ -544,6 +572,7 @@ def generator_identity():
     names = ("generation.py", "policy.py", "return_expectations.py", "filesystem_effects.py", "http_effects.py", "domains.py", "shrinking.py", "sequences.py", "typescript_provider.py", "python_project.py", "go_project.py", "go_receivers.py", "go_graph.py", "go_observe.go", "node_receivers.py", "java_receivers.py", "java_build.py", "java_control.py", "java_profiles.py", "java_live.py", "java_control_receipt.py", "java_health.py", "java_launch.py", "java_provider.py", "java_telemetry.py", "OteleqCompile.java", "java_graph.py", "OteleqGraph.java", "cpp_models.py", "cpp_receivers.py", "cpp_worker.py", "cpp_graph.py", "cpp_observe.hpp", "native_names.py", "discovery.py", "harness.py", "observe.py", "node_observe.mjs", "node_sequence.mjs", "typed_capture.py", "discover.mjs", "discover.go", "Discover.java")
     files = {name: capture.file_digest(here / name) for name in names}
     files.update({name: capture.file_digest(here / name) for name in (
+        'java_project.py', 'java_classpath.py',
         'native_profile.py', 'native_project.py', 'native_dependencies.py', 'native_frontend.py',
         'native_discover.cpp', 'native_context.py', 'native_workers.py', 'native_workspace.py')})
     files["host-python"] = capture.file_digest(Path(sys.executable))
@@ -565,9 +594,15 @@ def load_workspace(path, generated=False):
     if (data["configuration_sha256"] != identity(data["configuration"])
             or project_policy.validate(data["configuration"]) != data["configuration"]):
         raise ValueError("configuration identity or schema changed; create a new plan")
-    if native_profile.source_manifest(sys.modules[__name__], Path(data["source"]), data.get('native_projects', {})) != data["source_manifest"] or manifest(workspace / "snapshot") != data["source_manifest"]:
+    context = data.get("java_context", {})
+    contents = native_profile.source_manifest(sys.modules[__name__], Path(data["source"]), data.get('native_projects', {}),
+                                              excluded_files=context.get("excluded_source_jars", []))
+    java_options = data["configuration"]["adapters"]["java"] if context else {}
+    if java_source_manifest(Path(data["source"]), java_options, contents) != data["source_manifest"] or manifest(workspace / "snapshot") != data["source_manifest"]:
         raise ValueError("application source or immutable snapshot changed")
     native_profile.verify(sys.modules[__name__], workspace, data)
+    java_project.verify(workspace, data, originals="original_source" not in data)
+    java_provider.verify_probes(sys.modules[__name__], workspace, data)
     if generated and manifest(workspace / "tests") != read(workspace / GENERATED_MANIFEST):
         raise ValueError("generated suite or corpus changed; create a new plan")
     return workspace, data
@@ -718,22 +753,14 @@ def driver_path(project, entry):
     return project / (relative or entry["path"])
 
 
-def build_command(root, project, entry, driver, config, tools, env, folder, scratch, lane, *, prepared_runtime=None):
+def build_command(root, project, entry, driver, config, tools, env, folder, scratch, lane, *, prepared_runtime=None, java_context=None):
     language = entry["language"]
     prefix = [root / "target/debug/quux-otelc", "--config", config, "--language", language]
     if language in ("c", "cpp"):
         return native_command(prefix, project, language, driver, tools, env, folder, scratch, lane)
     if language == "java":
-        classes = scratch / "classes"
-        main = (entry["package"] + "." if entry["package"] else "") + "OteleqDriver"
-        java_build.build(project, [project / entry["path"], driver], main, tools["java"],
-                         classes, folder, env, execute)
-        if java_provider.prepared(entry):
-            java_provider.require(prepared_runtime is not None, "missing owned runtime context")
-            return java_launch.prepare(root, project, folder, tools, prepared_runtime, entry,
-                                       tomllib.loads(config.read_text()), lane == "baseline", env, execute)
-        command = [tools["java"], "-Xshare:off", "-cp", classes, main] if lane == "baseline" else prefix + ["java", "-Xshare:off", "-cp", classes, main]
-        return command
+        return java_command(root, project, entry, driver, config, tools, env, folder, scratch, lane,
+                            prepared_runtime=prepared_runtime, context=java_context)
     # Use the proven build recipes, with bounded execution for every build and launch.
     old_execute = capture.execute
     capture.execute = lambda command, cwd, environment, timeout=180: execute(command, cwd, environment, folder / ("build-" + uuid.uuid4().hex), timeout)
@@ -751,6 +778,25 @@ def build_command(root, project, entry, driver, config, tools, env, folder, scra
     finally:
         capture.execute = old_execute
     return plain if lane == "baseline" else on
+
+
+def java_command(root, project, entry, driver, config, tools, env, folder, scratch, lane, *, prepared_runtime=None, context=None):
+    """Keep the fixed compiler and launch recipe together for both Java providers."""
+    classes = scratch / "classes"
+    main = (entry["package"] + "." if entry["package"] else "") + "OteleqDriver"
+    options = {"context": context} if context is not None else {}
+    java_build.build(project, [project / entry["path"], driver], main, tools["java"],
+                     classes, folder, env, execute, **options)
+    if java_provider.prepared(entry):
+        java_provider.require(prepared_runtime is not None, "missing owned runtime context")
+        return java_launch.prepare(root, project, folder, tools, prepared_runtime, entry,
+                                   tomllib.loads(config.read_text()), lane == "baseline", env, execute, **options)
+    paths = os.pathsep.join(map(str, java_project.runtime_classpath(classes, context)))
+    flags = ["-Xshare:off"]
+    if context is not None:
+        flags.append("-Xlog:class+load=info:file=" + str(folder / java_launch.CLASS_LOG))
+    prefix = [root / "target/debug/quux-otelc", "--config", config, "--language", "java", "java"]
+    return ([tools["java"]] if lane == "baseline" else prefix) + [*flags, "-cp", paths, main]
 
 
 def go_build_request(project, entry, driver):
@@ -863,6 +909,7 @@ def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, ht
         env["NODE_OPTIONS"] = "--expose-gc"
         write(folder / "collection-controls.json", {"NODE_OPTIONS": "--expose-gc", "sequence": case["sequence"]})
     immutable = manifest(project)
+    java_context = java_project.materialise(workspace, data, folder, project) if language == "java" else None
     receiver_options = {"max_requests": java_provider.MAX_TELEMETRY_REQUESTS} if runtime is not None else {}
     with capture.receiver(**receiver_options) as (endpoint, bodies, errors):
         config = folder / "policy.toml"
@@ -876,7 +923,7 @@ def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, ht
             command = native_profile.build(sys.modules[__name__], workspace, data, entry, case,
                                            project, prefix, env, folder, lane)
         else:
-            options = {"prepared_runtime": runtime} if runtime is not None else {}
+            options = attempt_build_options(runtime, java_context)
             command = build_command(root, project, entry, driver, config, tools, env, folder, scratch, lane, **options)
         launch = read(folder / java_launch.LAUNCH_FILE) if runtime is not None else None
         write(folder / "command.json", [str(p) for p in command])
@@ -899,7 +946,8 @@ def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, ht
     request_channels, request_complete = http_effects.finish(requests)
     effect_channels.update(request_channels)
     complete &= request_complete
-    verify_attempt_inputs(data, entry, project, folder, scratch, tools, immutable, runtime, launch, config, lane=lane)
+    options = {"java_context": java_context} if java_context is not None else {}
+    verify_attempt_inputs(data, entry, project, folder, scratch, tools, immutable, runtime, launch, config, lane=lane, **options)
     return qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, decoder,
                            extra_channels=effect_channels, capture_complete=complete, prepared_runtime=runtime)
 
@@ -914,7 +962,12 @@ def execution_options(entry, case, lane, folder, runtime, bodies, env):
     return options
 
 
-def verify_attempt_inputs(data, entry, project, folder, scratch, tools, immutable, runtime, launch, config, *, lane):
+def attempt_build_options(runtime, context):
+    """Pass only explicitly present Java runtime and compiler contexts to builders."""
+    return {key: value for key, value in (("prepared_runtime", runtime), ("java_context", context)) if value is not None}
+
+
+def verify_attempt_inputs(data, entry, project, folder, scratch, tools, immutable, runtime, launch, config, *, lane, java_context=None):
     """Recheck private sources, compiler products and the selected launch/provider."""
     root, language = Path(data["otelc_root"]), entry["language"]
     validate_private_sources(project, immutable, folder)
@@ -922,9 +975,14 @@ def verify_attempt_inputs(data, entry, project, folder, scratch, tools, immutabl
         java_build.verify(project, scratch / "classes", folder)
     if runtime is not None:
         java_provider.require(read(folder / java_launch.LAUNCH_FILE) == launch, "retained launch changed during execution")
+        options = {"context": java_context} if java_context is not None else {}
         java_launch.verify(launch, root=root, project=project, folder=folder, tools=tools, runtime=runtime,
-                           entry=entry, data=tomllib.loads(config.read_text()), plain=lane == "baseline")
-        java_launch.origins(runtime, folder, entry)
+                           entry=entry, data=tomllib.loads(config.read_text()), plain=lane == "baseline", **options)
+        java_launch.origins(runtime, folder, entry, **options)
+    if java_context is not None:
+        java_project.verify_attempt(folder, java_context)
+        if runtime is None:
+            java_launch.origins(folder, folder, entry, context=java_context)
     if 'native_context' in entry:
         native_profile.verify_build(sys.modules[__name__], folder)
     provider_stable(root, language, tools, data["artefacts"][language], entry)
@@ -1022,6 +1080,7 @@ def run(args):
         destination = Path(tempfile.mkdtemp(prefix="replay-", dir=parent))
     else:
         destination = source_outside(args.report_dir, Path(data["source"]), root, workspace)
+        java_project.protect_destination(destination, java_project.original_locations(data))
         destination.mkdir(mode=0o700, exist_ok=False)
     results = []
     cases = read(workspace / "tests/corpus.json")
@@ -1061,12 +1120,17 @@ def run(args):
 def export_tests(args):
     workspace, data = load_workspace(args.workspace, generated=True)
     destination = args.destination.resolve()
+    java_project.protect_destination(destination, java_project.original_locations(data))
     if destination.exists() or destination.is_relative_to(workspace) or workspace.is_relative_to(destination):
         raise ValueError("export destination must be new and independent of the workspace")
     if not args.apply:
         files = ["snapshot", "tests", PLAN_FILE, README_FILE]
         if data.get('native_projects'):
             files.append(native_profile.DIRECTORY)
+        if data.get('java_context'):
+            files.append(java_project.DIRECTORY)
+        if 'java_provider_manifest' in data:
+            files.append(java_provider.DIRECTORY)
         print(json.dumps({"destination": str(destination), "copy": files, "mode": "dry-run"}))
         return 0
     destination.mkdir(mode=0o700)
@@ -1074,6 +1138,10 @@ def export_tests(args):
         shutil.copytree(workspace / name, destination / name)
     if data.get('native_projects'):
         shutil.copytree(workspace / native_profile.DIRECTORY, destination / native_profile.DIRECTORY)
+    if data.get('java_context'):
+        shutil.copytree(workspace / java_project.DIRECTORY, destination / java_project.DIRECTORY)
+    if 'java_provider_manifest' in data:
+        shutil.copytree(workspace / java_provider.DIRECTORY, destination / java_provider.DIRECTORY)
     for name in (OWNED_MARKER, GENERATED_MANIFEST, README_FILE):
         shutil.copyfile(workspace / name, destination / name)
     data["original_source"] = data["source"]
@@ -1091,7 +1159,7 @@ def clean(args):
     workspace = args.workspace.resolve(strict=True)
     if args.workspace.is_symlink() or workspace.parent == workspace or read(workspace / OWNED_MARKER)["schema_version"] != VERSION:
         raise ValueError("refusing to remove an unowned workspace")
-    allowed = {OWNED_MARKER, PLAN_FILE, "snapshot", "tests", GENERATED_MANIFEST, README_FILE, "runs", "go-cache", native_profile.DIRECTORY}
+    allowed = {OWNED_MARKER, PLAN_FILE, "snapshot", "tests", GENERATED_MANIFEST, README_FILE, "runs", "go-cache", native_profile.DIRECTORY, java_project.DIRECTORY, java_provider.DIRECTORY}
     if any(p.name not in allowed for p in workspace.iterdir()):
         raise ValueError("workspace contains unowned files; retain and inspect it")
     marker = read(workspace / OWNED_MARKER)
@@ -1105,6 +1173,8 @@ def clean(args):
         raise ValueError('native context was edited or is unowned; retain and inspect it')
     if manifest(workspace / "snapshot") != data["source_manifest"]:
         raise ValueError("snapshot was edited; retain and inspect it")
+    java_project.verify(workspace, data, originals=False)
+    java_provider.verify_probes(sys.modules[__name__], workspace, data)
     if (workspace / "tests").exists() and not (workspace / GENERATED_MANIFEST).is_file():
         raise ValueError("generated suite is unsealed; retain and inspect it")
     if (workspace / GENERATED_MANIFEST).exists() and manifest(workspace / "tests") != read(workspace / GENERATED_MANIFEST):

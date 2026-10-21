@@ -59,6 +59,8 @@ Declared [ordered Java calls and Node calls/release](docs/ordered-sequences.md) 
 
 Opt-in [native project context](docs/native-project-context.md) preserves explicit C/C++ compilation-database targets, generated inputs, matched per-unit recipes and target-wide scalar state through generated suites, replay, export and scalar reduction. Its [64-launch qualification](docs/qualification/native-projects-2026-10-21.json) uses one frozen SDK candidate; compatibility with the replacement SDK, richer project-mode receivers and general build-system integration remain open.
 
+Declared [Java source roots and dependencies](docs/java-project-context.md) add complete target-unit compilation and ordered private JAR/class/resource inputs. Compiler reads, dependency bytes and loaded class origins remain checked through replay and detached export. The [168-launch qualification](docs/qualification/java-projects-2026-10-21.json) covers prepared and legacy providers, private receivers, resources and scalar reduction. Maven/Gradle execution, modules and multi-release JARs remain open.
+
 Start with [automatic generation](docs/automatic-generation.md), [fixed eight-language workloads](docs/eight-language-capture.md) or [workload comparison](docs/workload-comparison.md). See [usefulness and limits](docs/adoption.md), the [design](docs/design.md) and [roadmap](docs/roadmap.md).
 
 Observers refuse unsupported application formatters and exception accessors. Such capture failures remain incomplete evidence; see the [qualified codec limits](docs/automatic-generation.md#selection-and-inputs).

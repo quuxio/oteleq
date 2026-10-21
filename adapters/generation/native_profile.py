@@ -20,7 +20,7 @@ def configured(configuration: dict) -> bool:
 
 
 def prepare_inputs(workflow, source: Path, root: Path, workspace: Path,
-                   configuration: dict, contents: dict) -> tuple[dict, dict]:
+                   configuration: dict, contents: dict, *, excluded_files=()) -> tuple[dict, dict]:
     """Retain native discovery failures and bind added inputs before snapshotting."""
     try:
         profiles = prepare(workflow, source, root, workspace, configuration)
@@ -30,7 +30,7 @@ def prepare_inputs(workflow, source: Path, root: Path, workspace: Path,
         raise ValueError(str(error) + '; partial workspace: ' + str(workspace)) from error
     if not profiles:
         return contents, profiles
-    required = source_manifest(workflow, source, profiles)
+    required = source_manifest(workflow, source, profiles, excluded_files=excluded_files)
     if any(required.get(name) != digest for name, digest in contents.items()):
         raise ValueError('source changed during native build discovery')
     return required, profiles
@@ -103,9 +103,10 @@ def prepare(workflow, source: Path, root: Path, workspace: Path, configuration: 
     return profiles
 
 
-def source_manifest(workflow, source: Path, profiles: dict) -> dict:
+def source_manifest(workflow, source: Path, profiles: dict, *, excluded_files=()) -> dict:
     """Explicit compiler inputs supplement the normal source walk and its budgets."""
-    contents = workflow.manifest(source, excluded=discovery.IGNORED)
+    options = {"excluded_files": excluded_files} if excluded_files else {}
+    contents = workflow.manifest(source, excluded=discovery.IGNORED, **options)
     for profile in profiles.values():
         for name in profile['directories']:
             path = source / name
