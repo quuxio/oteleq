@@ -207,6 +207,27 @@ class JavaLaunchTests(unittest.TestCase):
             cleanup.assert_called_once()
             self.assertIsNotNone(cleanup.call_args.args[0].poll())
 
+    def test_post_execution_verification_uses_the_actual_lane(self):
+        config = self.folder / "policy.toml"
+        config.write_text(provider.policy(self.entry, "http://127.0.0.1:54321", "case"))
+        data = {"otelc_root": str(self.root), "artefacts": {"java": {"frozen": "identity"}}}
+        for lane in ("baseline", "instrumented_on"):
+            value = self.value()
+            # Producer metadata must not choose the host's expected execution lane.
+            value["plain"] = lane != "baseline"
+            with self.subTest(lane=lane), patch.object(generation, "read", return_value=value), \
+                 patch.object(generation, "validate_private_sources") as sources, \
+                 patch.object(generation.java_build, "verify") as compiler, \
+                 patch.object(launch, "verify") as verifier, patch.object(launch, "origins") as origins, \
+                 patch.object(generation, "provider_stable") as stable:
+                generation.verify_attempt_inputs(data, self.entry, self.project, self.folder, self.folder / "scratch",
+                                                 self.tools, {}, self.runtime, value, config, lane=lane)
+                self.assertEqual(verifier.call_args.kwargs["plain"], lane == "baseline")
+                sources.assert_called_once_with(self.project, {}, self.folder)
+                compiler.assert_called_once_with(self.project, self.classes, self.folder)
+                origins.assert_called_once_with(self.runtime, self.folder, self.entry)
+                stable.assert_called_once_with(self.root, "java", self.tools, data["artefacts"]["java"], self.entry)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -877,12 +877,12 @@ def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, ht
     request_channels, request_complete = http_effects.finish(requests)
     effect_channels.update(request_channels)
     complete &= request_complete
-    verify_attempt_inputs(data, entry, project, folder, scratch, tools, immutable, runtime, launch, config)
+    verify_attempt_inputs(data, entry, project, folder, scratch, tools, immutable, runtime, launch, config, lane=lane)
     return qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, decoder,
                            extra_channels=effect_channels, capture_complete=complete, prepared_runtime=runtime)
 
 
-def verify_attempt_inputs(data, entry, project, folder, scratch, tools, immutable, runtime, launch, config):
+def verify_attempt_inputs(data, entry, project, folder, scratch, tools, immutable, runtime, launch, config, *, lane):
     """Recheck private sources, compiler products and the selected launch/provider."""
     root, language = Path(data["otelc_root"]), entry["language"]
     validate_private_sources(project, immutable, folder)
