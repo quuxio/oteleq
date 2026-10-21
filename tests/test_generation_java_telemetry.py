@@ -13,6 +13,7 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(REPO / "adapters/generation"), str(REPO / "examples")]
 import java_telemetry as telemetry
 from test_generation_java_health import report
+from test_generation_java_control_receipt import flat_fixture as control_fixture, STATES
 
 
 def attribute(key: str, value: str):
@@ -84,6 +85,23 @@ class JavaTelemetryTests(unittest.TestCase):
             self.trace = traces(nodes);self.metric = metrics(len(nodes))
             with self.subTest(nodes=len(nodes)), self.assertRaisesRegex(ValueError, "declared calls"):
                 self.receipt()
+
+    def test_live_control_receipt_keeps_tracing_all_calls_and_only_collects_requested_calls(self):
+        record, _, bodies, _ = control_fixture()
+        self.entry["sequence_configuration"] = [{"action": "call", "metrics": state} for state in STATES]
+        nodes = []
+        for index in range(4):
+            node = span(bytes([index + 1]) * 8)
+            node.trace_id = bytes([index + 1]) * 16
+            node.start_time_unix_nano, node.end_time_unix_nano = 10 + index * 20, 20 + index * 20
+            nodes.append(node)
+        self.trace = traces(nodes)
+        body_rows = [(path, b"on" if index == 0 else b"restored" if index == 2 else b"trace")
+                     for index, (path, _) in enumerate(bodies)]
+        result = self.receipt(bodies=body_rows, metric_decoder=lambda raw: metrics(1 if raw == b"on" else 2), controls=record)
+        self.assertEqual(result, {"trace_batches": 1, "spans": 4, "metric_batches": 2, "metric_points": 4, "errors": 0})
+        with self.assertRaisesRegex(ValueError, "missing required live"):
+            self.receipt(bodies=body_rows)
 
     def test_incomplete_unknown_duplicate_or_wrongly_typed_attributes_refuse(self):
         for rows in ([attribute("name", "x"), attribute("name", "y")],

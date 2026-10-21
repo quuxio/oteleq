@@ -41,7 +41,7 @@ def validate(value: Any, expected_outcome: Callable) -> list[dict]:
 
 def call(step: dict, expected_outcome: Callable) -> dict:
     """Retain either the generated case inputs or an explicit finite scalar list."""
-    if set(step) - {"action", "arguments", "expected_baseline"}:
+    if set(step) - {"action", "arguments", "expected_baseline", "metrics"}:
         raise ValueError("unsupported sequence call fields")
     arguments = step.get("arguments", "case")
     if arguments != "case" and (not isinstance(arguments, list) or any(type(value) not in (bool, int, float, str)
@@ -50,6 +50,12 @@ def call(step: dict, expected_outcome: Callable) -> dict:
     result = {"action": "call", "arguments": copy.deepcopy(arguments)}
     if "expected_baseline" in step:
         result["expected_baseline"] = expected_outcome(step["expected_baseline"])
+    if "metrics" in step:
+        settings = step["metrics"]
+        if (type(settings) is not dict or set(settings) != {"collection", "emission"}
+                or any(type(value) is not bool for value in settings.values())):
+            raise ValueError("sequence metrics require collection and emission booleans")
+        result["metrics"] = settings.copy()
     return result
 
 
@@ -67,6 +73,8 @@ def configure(entry: dict, value: list[dict], coerce: Callable) -> None:
         raise ValueError("sequences require a declared Java/JavaScript/TypeScript receiver fixture")
     if entry["language"] == "java" and any(step["action"] != "call" for step in value):
         raise ValueError("Java receiver sequences currently support call actions only")
+    if any("metrics" in step for step in value):
+        configure_controls(entry, value)
     if (entry["language"] == "typescript" and any(step["action"] == "collect" for step in value)
             and entry.get("typescript_backend") not in ("source", "native")):
         raise ValueError("TypeScript collection requires an explicitly selected emitter")
@@ -76,11 +84,20 @@ def configure(entry: dict, value: list[dict], coerce: Callable) -> None:
     entry["sequence_configuration"] = copy.deepcopy(value)
 
 
+def configure_controls(entry: dict, value: list[dict]) -> None:
+    """The live profile needs a positive control before any off-state observation."""
+    if (entry["language"] != "java" or entry.get("java_backend") != "prepared"
+            or any(step["action"] != "call" or "metrics" not in step for step in value)):
+        raise ValueError("live metrics require prepared Java calls with an explicit state for every call")
+    if value[0]["metrics"] != {"collection": True, "emission": True}:
+        raise ValueError("live metrics require an initial collection-on/emission-on positive control")
+
+
 def concrete(entry: dict, arguments: list, coerce: Callable) -> list[dict]:
     """Freeze all call inputs and expectations into each retained corpus case."""
     result = []
     for index, step in enumerate(entry["sequence_configuration"]):
-        item = {**step, "id": "step-" + str(index)}
+        item = {**copy.deepcopy(step), "id": "step-" + str(index)}
         if step["action"] == "call":
             generated = step["arguments"] == "case"
             item["arguments"] = copy.deepcopy(arguments) if generated else coerce(entry, step["arguments"])
@@ -103,6 +120,11 @@ def collects(entry: dict) -> bool:
 def call_count(entry: dict) -> int:
     """The requested call denominator is fixed before any telemetry is received."""
     return sum(step["action"] == "call" for step in entry["sequence_configuration"]) if "sequence_configuration" in entry else 1
+
+
+def controls(entry: dict) -> bool:
+    """Live controls are an explicit part of each frozen call, never inferred."""
+    return any("metrics" in step for step in entry.get("sequence_configuration", []))
 
 
 def creator(entry: dict) -> str | None:

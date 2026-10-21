@@ -24,6 +24,8 @@ import harness
 import java_receivers
 import java_build
 import java_launch
+import java_live
+import java_control_receipt
 import java_provider
 import java_telemetry
 import node_receivers
@@ -144,12 +146,30 @@ def finish_process(process: subprocess.Popen) -> None:
         process.wait()
 
 
-def execute(command, cwd, env=None, folder=None, timeout=60, input_data=None, *, max_output_bytes=None, record_process=False):
+def monitor_process(process, out, err, maximum, deadline, interaction):
+    """Keep process budgets active while advancing optional private checkpoints."""
+    failure = None
+    while process.poll() is None:
+        if time.monotonic() > deadline:
+            failure = "process timeout"
+        if out.stat().st_size + err.stat().st_size > maximum:
+            failure = "process output limit exceeded"
+        if failure:
+            break
+        if interaction is not None:
+            interaction.poll(process, deadline)
+        time.sleep(0.01)
+    if interaction is not None and failure is None:
+        interaction.finish(process)
+    return failure
+
+
+def execute(command, cwd, env=None, folder=None, timeout=60, input_data=None, *, max_output_bytes=None, record_process=False, interaction=None):
     """Trusted local execution with wall time/output limits and process-group cleanup."""
     if folder is None:
         with tempfile.TemporaryDirectory(prefix="oteleq-discover-") as directory:
             return execute(command, cwd, env, Path(directory), timeout, input_data,
-                           max_output_bytes=max_output_bytes, record_process=record_process)
+                           max_output_bytes=max_output_bytes, record_process=record_process, interaction=interaction)
     maximum = MAX_OUTPUT if max_output_bytes is None else max_output_bytes
     folder.mkdir(parents=True, exist_ok=True)
     out, err = folder / "stdout", folder / "stderr"
@@ -162,14 +182,7 @@ def execute(command, cwd, env=None, folder=None, timeout=60, input_data=None, *,
         try:
             if record_process:
                 write(folder / "process.json", {"pid": process.pid, "argv": list(map(str, command))})
-            while process.poll() is None:
-                if time.monotonic() > deadline:
-                    failure = "process timeout"
-                if out.stat().st_size + err.stat().st_size > maximum:
-                    failure = "process output limit exceeded"
-                if failure:
-                    break
-                time.sleep(0.01)
+            failure = monitor_process(process, out, err, maximum, deadline, interaction)
         finally:
             # Descendants cannot keep running after the leader exits or interrupts the host.
             finish_process(process)
@@ -526,7 +539,7 @@ def decoder_files():
 
 def generator_identity():
     here = Path(__file__).parent
-    names = ("generation.py", "policy.py", "return_expectations.py", "filesystem_effects.py", "http_effects.py", "domains.py", "shrinking.py", "sequences.py", "typescript_provider.py", "python_project.py", "go_project.py", "go_receivers.py", "go_graph.py", "go_observe.go", "node_receivers.py", "java_receivers.py", "java_build.py", "java_health.py", "java_launch.py", "java_provider.py", "java_telemetry.py", "OteleqCompile.java", "java_graph.py", "OteleqGraph.java", "cpp_models.py", "cpp_receivers.py", "cpp_worker.py", "cpp_graph.py", "cpp_observe.hpp", "native_names.py", "discovery.py", "harness.py", "observe.py", "node_observe.mjs", "node_sequence.mjs", "typed_capture.py", "discover.mjs", "discover.go", "Discover.java")
+    names = ("generation.py", "policy.py", "return_expectations.py", "filesystem_effects.py", "http_effects.py", "domains.py", "shrinking.py", "sequences.py", "typescript_provider.py", "python_project.py", "go_project.py", "go_receivers.py", "go_graph.py", "go_observe.go", "node_receivers.py", "java_receivers.py", "java_build.py", "java_control.py", "java_live.py", "java_control_receipt.py", "java_health.py", "java_launch.py", "java_provider.py", "java_telemetry.py", "OteleqCompile.java", "java_graph.py", "OteleqGraph.java", "cpp_models.py", "cpp_receivers.py", "cpp_worker.py", "cpp_graph.py", "cpp_observe.hpp", "native_names.py", "discovery.py", "harness.py", "observe.py", "node_observe.mjs", "node_sequence.mjs", "typed_capture.py", "discover.mjs", "discover.go", "Discover.java")
     files = {name: capture.file_digest(here / name) for name in names}
     files.update({name: capture.file_digest(here / name) for name in (
         'native_profile.py', 'native_project.py', 'native_dependencies.py', 'native_frontend.py',
@@ -774,6 +787,14 @@ def validate_private_sources(project, immutable, folder):
               for name in ("plain", "instrumented") if (project / name).is_file()})
 
 
+def baseline_receipt(entry, folder, bodies):
+    """Plain execution must neither emit telemetry nor invent SDK replies."""
+    if bodies:
+        raise ValueError("baseline unexpectedly exported telemetry")
+    if sequences.controls(entry):
+        java_control_receipt.read(folder, entry, read(folder / "process.json")["pid"], bodies, plain=True)
+
+
 def qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, decoder, *, extra_channels=None,
                     capture_complete=True, prepared_runtime=None):
     if errors or result.returncode:
@@ -786,8 +807,7 @@ def qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, 
         raise ValueError("case observation exceeds comparator channel budget")
     witness = None
     if lane == "baseline":
-        if bodies:
-            raise ValueError("baseline unexpectedly exported telemetry")
+        baseline_receipt(entry, folder, bodies)
     elif prepared_runtime is not None:
         witness = java_telemetry.witness(prepared_runtime, folder, entry, bodies, service, decoder)
     else:
@@ -869,7 +889,7 @@ def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, ht
             env.update(bindings)
             write(folder / "http-controls.json", {"declarations": http_effects.selected(data["configuration"]), "environment": bindings})
         with http_effects.observe(http_fixtures, folder, data["configuration"]["limits"]["max_capture_bytes"]) as requests:
-            options = {"record_process": True} if runtime is not None else {}
+            options = execution_options(entry, case, lane, folder, runtime, bodies, env)
             result = execute(command, working_directory, env, folder, timeout=data["configuration"]["limits"]["case_timeout_ms"] / 1000,
                              **options)
     capture.retain_http(folder, bodies, errors)
@@ -880,6 +900,16 @@ def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, ht
     verify_attempt_inputs(data, entry, project, folder, scratch, tools, immutable, runtime, launch, config, lane=lane)
     return qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, decoder,
                            extra_channels=effect_channels, capture_complete=complete, prepared_runtime=runtime)
+
+
+def execution_options(entry, case, lane, folder, runtime, bodies, env):
+    """Add only explicitly requested process recording and live Java checkpoints."""
+    options = {"record_process": True} if runtime is not None else {}
+    if sequences.controls(entry):
+        interaction = java_live.Session(folder, runtime, case["sequence"], bodies, plain=lane == "baseline")
+        env.update(interaction.environment())
+        options["interaction"] = interaction
+    return options
 
 
 def verify_attempt_inputs(data, entry, project, folder, scratch, tools, immutable, runtime, launch, config, *, lane):
@@ -943,9 +973,11 @@ def compare_with_fixtures(workspace, data, entry, case, destination, decoder, ht
                   "tools": {name: sha for name, sha in data["artefacts"][entry["language"]].items() if name.startswith("tool:")}}
     scope = {"language": entry["language"], "artefact_class": "diagnostic", "source_sha256": data["source_sha256"],
              "baseline_artefact_sha256": identity(diagnostic), "instrumented_artefact_sha256": identity({**diagnostic, "adapter": data["artefacts"][entry["language"]]}),
-             "policy_sha256": identity({"otelc": policy(entry, "receiver"), "generation": data["configuration"]}), "observer": "oteleq configured scalar generator v1; independently one selected root, recursive span counts observed",
+             "policy_sha256": identity({"otelc": policy(entry, "receiver"), "generation": data["configuration"]}), "observer": f"oteleq configured scalar generator v1; {sequences.call_count(entry)} target call root(s) required; recursive span counts observed",
              "channels": ["stdout", "stderr", "state-and-outcome", *filesystem_effects.channels(data["configuration"]), *http_effects.channels(data["configuration"])],
-             "gaps": ["scalar corpus; business preconditions and branch exhaustiveness not established", "diagnostic access/entrypoint helpers; not shipping artefact evidence", "artefact digests aggregate diagnostic inputs and qualified tools/adapters; emitted runtime compiler/loader outputs are outside those digests", "no undeclared network, imported-module globals, instrumented-off or concurrent-schedule qualification", "exception traceback/stack and Java/C++ extra exception fields are unobserved", "compiler sysroots and OS libraries are outside content identity", "trusted local execution; no hostile-code sandbox"]}
+             "gaps": ["scalar corpus; business preconditions and branch exhaustiveness not established", "diagnostic access/entrypoint helpers; not shipping artefact evidence", "artefact digests aggregate diagnostic inputs and qualified tools/adapters; emitted runtime compiler/loader outputs are outside those digests", "no undeclared network, imported-module globals or concurrent-schedule qualification", "exception traceback/stack and Java/C++ extra exception fields are unobserved", "compiler sysroots and OS libraries are outside content identity", "trusted local execution; no hostile-code sandbox"]}
+    scope["gaps"].append("live metric controls cover selected synchronous Java call trees and bounded export windows; general SDK-instrument, other-language and exporter-fault qualification remains open"
+                         if sequences.controls(entry) else "live metric controls and exporter-fault scenarios are unobserved")
     scope["gaps"].append("filesystem boundary bytes/kinds/permissions only; timestamps, inode/link identity, transient activity and undeclared paths are unobserved"
                          if filesystem_effects.selected(data["configuration"]) else "filesystem effects are unobserved")
     scope["gaps"].append("HTTP fixture accepted request order/method/target/body, selected raw header lines and scripted response bytes only; other headers, peer/packet timing, other destinations, TLS and broader protocols are unobserved"
@@ -957,6 +989,8 @@ def compare_with_fixtures(workspace, data, entry, case, destination, decoder, ht
                   "expected_spans": sum(selected.values()), **typed_observed}
     typed_scope = {**scope, "channels": ["stdout", "stderr", *filesystem_effects.channels(data["configuration"]), *http_effects.channels(data["configuration"])],
                    "observer": "oteleq typed boundary codecs v1; captured globals/arguments and initial-state checks; name-only decoded invocation witness"}
+    if sequences.controls(entry):
+        typed_scope["observer"] += "; selected-function live metric collection/emission receipts validated"
     typed_scope["gaps"] = [*scope["gaps"], "graph identities are local to each boundary; cross-boundary replacement, weakref and finalizer effects are unobserved"]
     write(destination / TYPED_BUNDLE, {"typed_schema_version": 1, "scope": typed_scope, "cases": [typed_case]})
     if (destination / TYPED_BUNDLE).stat().st_size > 16 * 1024 * 1024:
