@@ -89,6 +89,8 @@ The default `JAVA_BACKEND=legacy` preserves the earlier qualification route. Bot
 
 ## Published qualification
 
+The explicit `safe-methods-v1` recipe has separate [164-JVM qualification](qualification/java-safe-profile-2026-10-21.json) at runtime `b4f2024` / SDK `e4aaafa`, whose tree matches producer main `9956bd9`. It covers generated/replayed/detached-exported/reduced live sequences, the corrected getter regression and ordinary prepared/legacy calls. All original `stock-methods-v1` evidence below keeps its own frozen provider identity and known getter limitation.
+
 The [21 October record](qualification/java-prepared-2026-10-21.json) qualifies runtime `fae3874` with frozen SDK `f3279fd` on macOS ARM64/JDK 21. The receiver corpus completes 151 actual JVM launches: six matching cases, two deliberate same-return state differences, generated suites, per-case replay, exported suites with the original source temporarily unavailable, scalar shrinking from seven to zero and seven refusal controls.
 
 All 155 retained compiler manifests, 467 class bindings and 155 runtime archives are checked independently. Four copied original shrink attempts remain retained evidence and do not inflate the 151 actual JVMs. Both 62-file SDK source copies and both Java products remain unchanged; all original short runtime directories are removed.

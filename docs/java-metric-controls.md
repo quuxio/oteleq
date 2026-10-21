@@ -88,3 +88,9 @@ The [21 October record](qualification/java-metric-controls-2026-10-21.json) qual
 Seven altered actual control/metric receipts and three incompatible schedule requests are refused; the latter launch no application. Changed-source replay is also refused before launch. Both 62-file frozen SDK source copies and the two prepared Java products remain unchanged. The 661-regression repository gate passes, with 97.32% Rust product line coverage and 97% to 100% coverage in the three new control modules. The rendered guide and actual six-case HTML report were inspected.
 
 The getter case remains a genuine difference on this frozen SDK: exception-cause formatting adds one private receiver-field mutation per call. Its exact failing graphs, raw telemetry and final health remain retained. Corrected providers require their own qualification; this record does not claim that the frozen defect is fixed.
+
+### Corrected SDK profile
+
+The [safe-profile record](qualification/java-safe-profile-2026-10-21.json) separately qualifies runtime `b4f2024` with immutable SDK `e4aaafa`, whose tree matches merged producer main `9956bd9`. All 164 actual JVM routes pass their independent expectations. The getter case now matches with no extra receiver-field mutation, while both artificial state differences remain detected. Four live states, recursive traces, collection counters, retained emission-off measurements and final health remain checked in each instrumented process. Seven altered actual receipts are refused.
+
+All 78 SDK source files, the extension and bootstrap parser patch remain unchanged. The 665-regression gate passes, with 97.32% Rust product line coverage and 100% coverage of the explicit recipe validator. The original provider's failing getter evidence remains preserved in its separate record. This does not qualify broader dependency/type-metadata contexts or subsequent SDK revisions.
