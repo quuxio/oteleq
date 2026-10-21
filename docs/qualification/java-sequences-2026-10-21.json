@@ -1,0 +1,155 @@
+{
+  "qualification_schema_version": 1,
+  "date": "2026-10-21",
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "platform": {
+    "os": "macOS-27.0.1-arm64-arm-64bit",
+    "architecture": "arm64",
+    "jdk": "21.0.12.1"
+  },
+  "runtime": {
+    "runtime": "dc8fa3db556e3e95ca58b08219af01e6a9db2abd",
+    "cli_sha256": "3af6e05956b91230c2fdb992858b3c1653037b00355152cddb9cb4cb9af3892a",
+    "source_archive_sha256": "0db3f251b0523ce2586d06865e772a2fac653b8be0b136804fb87e9f506bb35a",
+    "prepared_provider": "f3279fdff099e9f2406c122fc5c3b6ae4ba4f84f",
+    "legacy_provider": "d6d03b72026cde8962b11ce3cc184ff3ebcb60d4"
+  },
+  "verifier": {
+    "verifier_commit": "8d08d65e35de2aabc76ad7bd50965e05770b986f",
+    "source_archive_sha256": "60afa97f439c38194e6fcf6366936c2a01c0025dae46c79ce183bea803bf14be",
+    "new_jvm_launches": 0
+  },
+  "providers": {
+    "prepared": {
+      "commit": "f3279fdff099e9f2406c122fc5c3b6ae4ba4f84f",
+      "archive_sha256": "5347cf89b04adb0bd72b3aa7a31e249abafbfb967423fe38a3cda95dd2c63d70",
+      "source_files_preserved": {
+        "provider": 62,
+        "prepared-provider": 62
+      },
+      "source_identity_sha256": "7992b7bb5780fa09a19ef305a554f2a10efce43cc25b448c20fdae1931c674c3",
+      "products_preserved": {
+        "build/tools/opentelemetry-javaagent-2.32.0.jar": "f787eb6c7f3d18e69a431e108a15278d25ee37f83d68b678f621e063f3988f82",
+        "adapters/java/target/java-extension-0.2.0-SNAPSHOT.jar": "8b681aace5988474466a40fa02056b314ef5c1079adbc0945f0206c28f1b4405"
+      },
+      "build_provenance": {
+        "sdk_main": "f3279fdff099e9f2406c122fc5c3b6ae4ba4f84f",
+        "java_sources_and_pom_equal": true,
+        "built_from": "f9f73eac9eaca6148ea7c3db74373ca1012db16f",
+        "products": {
+          "build/tools/opentelemetry-javaagent-2.32.0.jar": "f787eb6c7f3d18e69a431e108a15278d25ee37f83d68b678f621e063f3988f82",
+          "adapters/java/target/java-extension-0.2.0-SNAPSHOT.jar": "8b681aace5988474466a40fa02056b314ef5c1079adbc0945f0206c28f1b4405"
+        }
+      }
+    },
+    "legacy": {
+      "commit": "d6d03b72026cde8962b11ce3cc184ff3ebcb60d4"
+    }
+  },
+  "results": {
+    "prepared": {
+      "claim": "equivalence over these tests and observations",
+      "artefact_class": "diagnostic",
+      "backend": "prepared",
+      "cli_sha256": "3af6e05956b91230c2fdb992858b3c1653037b00355152cddb9cb4cb9af3892a",
+      "cases": 5,
+      "matching_cases": 4,
+      "intermediate_difference_controls": 1,
+      "qualified_reports": 23,
+      "retained_observations": 124,
+      "actual_jvm_launches": 120,
+      "evidence_refusals": 5,
+      "prelaunch_source_refusals": 1,
+      "source_preserved": true,
+      "detached_export": true,
+      "builds": {
+        "retained_manifests": 124,
+        "unique_manifest_identities": 120,
+        "retained_class_bindings": 372
+      },
+      "launches": {
+        "raw_attempt_folders": 124,
+        "unique_command_identities": 120
+      },
+      "prepared": {
+        "retained_attempts": 124,
+        "unique_processes": 120,
+        "retained_instrumented_receipts": 62,
+        "short_runtimes_removed": true
+      },
+      "scope": "Two ordered calls on declared Java receivers; private factories, fields/statics, aliases/cycles, expected intermediate exceptions and recursive trees. No release, collection, invocation attribution or shipping artefact claim."
+    },
+    "legacy": {
+      "claim": "equivalence over these tests and observations",
+      "artefact_class": "diagnostic",
+      "backend": "legacy",
+      "cli_sha256": "3af6e05956b91230c2fdb992858b3c1653037b00355152cddb9cb4cb9af3892a",
+      "cases": 5,
+      "matching_cases": 4,
+      "intermediate_difference_controls": 1,
+      "qualified_reports": 23,
+      "retained_observations": 124,
+      "actual_jvm_launches": 120,
+      "evidence_refusals": 5,
+      "prelaunch_source_refusals": 1,
+      "source_preserved": true,
+      "detached_export": true,
+      "builds": {
+        "retained_manifests": 124,
+        "unique_manifest_identities": 120,
+        "retained_class_bindings": 372
+      },
+      "launches": {
+        "raw_attempt_folders": 124,
+        "unique_command_identities": 120
+      },
+      "prepared": null,
+      "scope": "Two ordered calls on declared Java receivers; private factories, fields/statics, aliases/cycles, expected intermediate exceptions and recursive trees. No release, collection, invocation attribution or shipping artefact claim."
+    }
+  },
+  "totals": {
+    "actual_jvm_launches": 240,
+    "retained_observations": 248,
+    "retained_manifests": 248,
+    "retained_class_bindings": 744
+  },
+  "evidence": {
+    "retained_files": 7537,
+    "manifest_sha256": "f69049a04e8531acf74ef3ce2c0dd9bed5703e8397172a2c1b5d936f7e57d163"
+  },
+  "validation": {
+    "runtime_gate": {
+      "commit": "dc8fa3db556e3e95ca58b08219af01e6a9db2abd",
+      "distinct_regressions": 633,
+      "result": "passed",
+      "rust_product_line_coverage": 97.32,
+      "log_sha256": "4f60b2bc232f20223762e2808112a864d9852a7ae8856ea30555216471941a04"
+    },
+    "final_sequence_regressions": {
+      "tests": 10,
+      "result": "passed",
+      "log_sha256": "743c50779656152c8399029ec32c4c39c1ba3cfd5b8a3fcbcf4dd389486a3248"
+    },
+    "before_after": "New private receiver sequence regression fails on prior main 7ff7fec and passes with the generator.",
+    "rendered_guide_and_report": "inspected",
+    "delivery_checks": "https://github.com/quuxio/oteleq/pull/50/checks",
+    "scope": "Exact runtime and verifier evidence. Final-head delivery gates have separate retained receipts."
+  },
+  "checks": [
+    "Both providers check five cases through run, per-case replay, generated suites and detached exported run/suites. Four match and the deliberate intermediate state difference is detected after final state and return are restored.",
+    "Complete independent typed before/outcome/after graphs cover private storage, static roots, fixed arguments, arrays, aliases, cycles and declared intermediate exceptions. Recursive calls have four selected spans in two independent roots.",
+    "Scalar shrinking reduces seven to zero while retaining construction, fixed calls and intermediate failure paths; reduced framework and replay preserve the difference.",
+    "Five altered evidence controls and one changed-source refusal per provider cannot pass. Java release/collection and invalid fixed inputs remain inventory blockers.",
+    "All 248 compiler manifests and 744 class bindings are rechecked. Prepared mode rechecks 124 runtime archives,120 unique PID/argv identities and62 retained instrumented receipts with real protobuf and health accounting.",
+    "All 124 frozen prepared SDK source files and both Java products are unchanged. Original short runtimes are removed.",
+    "The original route script completed execution and failed only its final launch audit: it subtracted four launches already counted once. Verifier8d08d65 fixes the accounting, adds direct receipt/refusal regression controls and rechecks all46 reports with no new JVMs. Four copied original shrink attempts per provider do not inflate actual launch counts."
+  ],
+  "limits": [
+    "Declared source-classpath Java receiver calls on the recorded macOS ARM64/JDK21/provider profiles only.",
+    "No Java release/collection, general async/resource schedules, mutable object arguments, other action targets or cross-boundary allocation identity.",
+    "Named-tree/source/PID witnessing does not provide invocation-scoped action attribution.",
+    "Filesystem/HTTP observations remain whole-worker boundaries; undeclared and transient internal effects can remain unobserved.",
+    "No general project/dependency builds, shipping artefact, performance-budget or cross-platform qualification."
+  ]
+}

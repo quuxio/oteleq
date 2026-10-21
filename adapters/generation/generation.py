@@ -678,7 +678,7 @@ def telemetry(bodies, report, entry, service, decoder):
 def sequence_telemetry(bodies, report, entry, service, decoder, names, roots, errors):
     """Validate independent call roots and collection metadata before comparison."""
     target, creator = entry["otelc_function"], sequences.creator(entry)
-    calls = sum(step["action"] == "call" for step in entry["sequence_configuration"])
+    calls = sequences.call_count(entry)
     spans = [span for path, body in bodies if path == capture.TRACE_PATH
              for span in capture.service_spans(decoder.FromString(body), service)]
     otelc_collection.sequence_functions(spans, target, calls, creator)

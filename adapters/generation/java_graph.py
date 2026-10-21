@@ -194,13 +194,8 @@ def root_types(entry: dict) -> dict[str, str]:
             **{"static:" + owner + "." + field["name"]: field["type"] for field in entry["java_class_roots"]}}
 
 
-def boundaries(raw: bytes, entry: dict) -> dict:
-    """Decode the closed Java receiver envelope into the shared typed contract."""
-    require(len(raw) <= 3 * 262144 + 1024, "capture budget exceeded")
-    capture = strict_json(raw)
-    require(type(capture) is dict and set(capture) == {"java_receiver_schema_version", "before", "outcome", "after"}
-            and type(capture["java_receiver_schema_version"]) is int and capture["java_receiver_schema_version"] == 1,
-            "invalid receiver envelope")
+def boundary(capture: dict, entry: dict) -> dict:
+    """Validate every source-bound graph in one call without application codecs."""
     outcome = capture["outcome"]
     require(type(outcome) is dict and set(outcome) == {"kind", "value"} and outcome["kind"] in ("return", "error"), "invalid outcome")
     schema, roots = Schema(entry), root_types(entry)
@@ -213,3 +208,35 @@ def boundaries(raw: bytes, entry: dict) -> dict:
         result["category"] = "exception"
     return {"before": schema.graph(capture["before"], roots), "outcome": result,
             "after": schema.graph(capture["after"], roots)}
+
+
+def boundaries(raw: bytes, entry: dict) -> dict:
+    """Version two requires the entire frozen ordered call schedule."""
+    require(len(raw) <= 3 * 262144 + 1024, "capture budget exceeded")
+    capture = strict_json(raw)
+    ordered = "sequence_configuration" in entry
+    fields = {"java_receiver_schema_version", "before", "outcome", "after"} | ({"steps"} if ordered else set())
+    require(type(capture) is dict and set(capture) == fields
+            and type(capture["java_receiver_schema_version"]) is int
+            and capture["java_receiver_schema_version"] == (2 if ordered else 1), "invalid receiver envelope")
+    result = boundary(capture, entry)
+    if ordered:
+        result["steps"] = steps(capture, entry)
+    return result
+
+
+def steps(capture: dict, entry: dict) -> list[dict]:
+    """Missing, reordered and contradictory intermediate boundaries are gaps."""
+    schedule = entry["sequence_configuration"]
+    observed = capture["steps"]
+    require(type(observed) is list and 1 <= len(observed) == len(schedule) <= 32, "incomplete receiver sequence")
+    result = []
+    for index, (step, declared) in enumerate(zip(observed, schedule)):
+        require(type(step) is dict and set(step) == {"id", "action", "before", "outcome", "after"}
+                and step["id"] == "step-" + str(index) and step["action"] == declared["action"] == "call",
+                "invalid receiver action")
+        result.append({"id": step["id"], "action": "call", "gaps": [], **boundary(step, entry)})
+    require(capture["before"] == observed[0]["before"]
+            and all(capture[name] == observed[-1][name] for name in ("outcome", "after")),
+            "receiver sequence contradicts its outer boundaries")
+    return result

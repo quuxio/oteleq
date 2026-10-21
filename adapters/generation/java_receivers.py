@@ -72,7 +72,28 @@ def bind(entry: dict, discovered: dict, declaration: dict, concrete: Callable) -
                  receiver_configuration=declaration, globals=[], reason="")
 
 
-def driver(entry: dict, arguments: list, literal: Callable) -> str:
+def execution(entry: dict, arguments: list, literal: Callable, sequence: list[dict] | None) -> str:
+    """One receiver is retained for all calls; arguments are frozen per action."""
+    def inputs(values: list) -> str:
+        return "new java.lang.Object[]{" + ",".join(literal(value, type_) for value, type_ in zip(values, entry["parameters"])) + "}"
+
+    if sequence is None:
+        return 'java.lang.String capture="{\\\"java_receiver_schema_version\\\":1,"+boundaries(call(receiver,' + inputs(arguments) + ',target))+"}";'
+    schedule = ",".join(inputs(step["arguments"]) for step in sequence)
+    return '''java.lang.Object[][] schedule=new java.lang.Object[][]{''' + schedule + '''};
+java.lang.String[] first=null,last=null;
+java.lang.StringBuilder steps=new java.lang.StringBuilder();
+for(int index=0;index<schedule.length;index++){
+ java.lang.String[] current=call(receiver,schedule[index],target);
+ if(first==null)first=current;
+ last=current;
+ if(index>0)steps.append(',');
+ steps.append("{\\\"id\\\":\\\"step-").append(index).append("\\\",\\\"action\\\":\\\"call\\\",").append(boundaries(current)).append('}');
+}
+java.lang.String capture="{\\\"java_receiver_schema_version\\\":2,\\\"before\\\":"+first[0]+",\\\"outcome\\\":"+last[1]+",\\\"after\\\":"+last[2]+",\\\"steps\\\":["+steps+"]}";'''
+
+
+def driver(entry: dict, arguments: list, literal: Callable, sequence: list[dict] | None = None) -> str:
     """Emit identical SDK-free reflection/access helpers for the two lanes."""
     models, fixture = entry["java_models"], entry["receiver_fixture"]
     owner = entry["receiver_class"]
@@ -107,6 +128,18 @@ java.util.ArrayList<java.lang.Class<?>> types=new java.util.ArrayList<>(java.uti
 if(outcome){names.add(failure==null?"result":"error");values.add(failure==null?result:failure);types.add(failure==null?@OUTPUT@.class:java.lang.Exception.class);}
 return observer.graph(names.toArray(new java.lang.String[0]),values.toArray(),types.toArray(new java.lang.Class<?>[0]));
 }
+static java.lang.String[] call(@OWNER@ receiver,java.lang.Object[] arguments,java.lang.reflect.Method target) throws java.lang.Exception {
+java.lang.String before=graph(receiver,arguments,null,null,false);
+java.lang.Object result=null;java.lang.Exception failure=null;
+try{result=target.invoke(receiver,arguments);}catch(java.lang.reflect.InvocationTargetException invocation){
+java.lang.Throwable cause=invocation.getCause();if(!(cause instanceof java.lang.Exception))throw new java.lang.AssertionError("target throwable requires another codec");failure=(java.lang.Exception)cause;}
+java.lang.String outcome=graph(receiver,arguments,result,failure,true);
+java.lang.String after=graph(receiver,arguments,null,null,false);
+return new java.lang.String[]{before,"{\"kind\":\""+(failure==null?"return":"error")+"\",\"value\":"+outcome+"}",after};
+}
+static java.lang.String boundaries(java.lang.String[] capture){
+return "\"before\":"+capture[0]+",\"outcome\":"+capture[1]+",\"after\":"+capture[2];
+}
 public static void main(java.lang.String[] ignored) throws java.lang.Exception {
 if(java.lang.System.getSecurityManager()!=null)throw new java.lang.AssertionError("custom security manager requires a fixture");
 java.lang.reflect.Method target=@OWNER@.class.getDeclaredMethod(@METHOD@@PARAMS@);
@@ -116,14 +149,7 @@ java.lang.Object constructed;
 try{@CONSTRUCT@}catch(java.lang.Throwable failure){throw new java.lang.AssertionError("receiver construction failed");}
 if(constructed==null || constructed.getClass()!=@OWNER@.class)throw new java.lang.AssertionError("receiver factory returned the wrong class");
 @OWNER@ receiver=(@OWNER@)constructed;
-java.lang.Object[] arguments=new java.lang.Object[]{@ARGUMENTS@};
-java.lang.String before=graph(receiver,arguments,null,null,false);
-java.lang.Object result=null;java.lang.Exception failure=null;
-try{result=target.invoke(receiver,arguments);}catch(java.lang.reflect.InvocationTargetException invocation){
-java.lang.Throwable cause=invocation.getCause();if(!(cause instanceof java.lang.Exception))throw new java.lang.AssertionError("target throwable requires another codec");failure=(java.lang.Exception)cause;}
-java.lang.String outcome=graph(receiver,arguments,result,failure,true);
-java.lang.String after=graph(receiver,arguments,null,null,false);
-java.lang.String capture="{\"java_receiver_schema_version\":1,\"before\":"+before+",\"outcome\":{\"kind\":\""+(failure==null?"return":"error")+"\",\"value\":"+outcome+"},\"after\":"+after+"}";
+@EXECUTION@
 java.nio.file.Files.writeString(java.nio.file.Path.of(java.lang.System.getenv("OTELEQ_OBSERVATION")),capture);
 }
 }
@@ -134,7 +160,7 @@ java.nio.file.Files.writeString(java.nio.file.Path.of(java.lang.System.getenv("O
                      "VALUES": ",".join(values), "ROOT_TYPES": ",".join(type_ + CLASS_LITERAL for type_ in types),
                      "OUTPUT": entry["output"], "METHOD": json.dumps(entry["name"].rsplit(".", 1)[-1]),
                      "PARAMS": ("," + params) if params else "", "CONSTRUCT": construct,
-                     "ARGUMENTS": ",".join(literal(value, type_) for value, type_ in zip(arguments, entry["parameters"]))}
+                     "EXECUTION": execution(entry, arguments, literal, sequence)}
     for name, value in substitutions.items():
         template = template.replace("@" + name + "@", value)
     package = "package " + entry["package"] + ";\n" if entry["package"] else ""
