@@ -23,6 +23,7 @@ class JavaCoverageTests(unittest.TestCase):
             path.write_text(report(8, 2))
             self.assertEqual(java_coverage.coverage(path), 80)
             for text in (report(7, 3), report(0, 0), report(-1, 2), report(100, 0, "Unrelated"), report(100, 0, "OteleqGraphOther"),
+                         report(100, 0).replace('</class>', '<counter type="LINE" covered="1" missed="0"/></class>'),
                          '<report/>', report(100, 0).replace('</package>', '<class name="OteleqGraph"><counter type="LINE" covered="1" missed="0"/></class></package>')):
                 path.write_text(text)
                 with self.subTest(text=text), self.assertRaises(ValueError):

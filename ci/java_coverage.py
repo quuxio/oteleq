@@ -58,9 +58,10 @@ def coverage(path: Path, name: str = "OteleqGraph", *, nested: bool = False) -> 
     classes = [node for node in root.findall("./package/class")
                if node.attrib["name"] == name or nested and node.attrib["name"].startswith(name + "$")]
     names = [node.attrib["name"] for node in classes]
-    counters = [node.find("./counter[@type='LINE']") for node in classes]
-    if names.count(name) != 1 or len(names) != len(set(names)) or any(counter is None for counter in counters):
+    groups = [node.findall("./counter[@type='LINE']") for node in classes]
+    if names.count(name) != 1 or len(names) != len(set(names)) or any(len(group) != 1 for group in groups):
         raise ValueError("Java product coverage is missing or ambiguous: " + name)
+    counters = [group[0] for group in groups]
     values = [int(counter.attrib[key]) for counter in counters for key in ("covered", "missed")]
     covered, missed = sum(values[::2]), sum(values[1::2])
     if min(values) < 0 or covered + missed == 0 or covered / (covered + missed) < 0.8:
