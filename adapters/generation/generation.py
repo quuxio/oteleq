@@ -21,6 +21,7 @@ import filesystem_effects
 import http_effects
 import harness
 import java_receivers
+import java_build
 import node_receivers
 import native_profile
 import otelc_capture as capture
@@ -213,6 +214,7 @@ def discover_file(name, language, root, snapshot, workspace, tools, artefacts, a
             selected = capture.selected_tools(root, language)
             if language == "java":
                 selected["javac"] = capture.tool_path(str(selected["java"].parent / "javac"))
+                selected["java-modules"] = java_build.module_image(selected["java"])
             qualified = capture.artefacts(root, language, selected, rust_backend=rust_backend)
             tools[language], artefacts[language] = selected, qualified
         def discover_execute(command, cwd, input_data=None, *, max_output_bytes=None):
@@ -513,7 +515,7 @@ def decoder_files():
 
 def generator_identity():
     here = Path(__file__).parent
-    names = ("generation.py", "policy.py", "return_expectations.py", "filesystem_effects.py", "http_effects.py", "domains.py", "shrinking.py", "sequences.py", "typescript_provider.py", "python_project.py", "go_project.py", "go_receivers.py", "go_graph.py", "go_observe.go", "node_receivers.py", "java_receivers.py", "java_graph.py", "OteleqGraph.java", "cpp_models.py", "cpp_receivers.py", "cpp_worker.py", "cpp_graph.py", "cpp_observe.hpp", "native_names.py", "discovery.py", "harness.py", "observe.py", "node_observe.mjs", "node_sequence.mjs", "typed_capture.py", "discover.mjs", "discover.go", "Discover.java")
+    names = ("generation.py", "policy.py", "return_expectations.py", "filesystem_effects.py", "http_effects.py", "domains.py", "shrinking.py", "sequences.py", "typescript_provider.py", "python_project.py", "go_project.py", "go_receivers.py", "go_graph.py", "go_observe.go", "node_receivers.py", "java_receivers.py", "java_build.py", "OteleqCompile.java", "java_graph.py", "OteleqGraph.java", "cpp_models.py", "cpp_receivers.py", "cpp_worker.py", "cpp_graph.py", "cpp_observe.hpp", "native_names.py", "discovery.py", "harness.py", "observe.py", "node_observe.mjs", "node_sequence.mjs", "typed_capture.py", "discover.mjs", "discover.go", "Discover.java")
     files = {name: capture.file_digest(here / name) for name in names}
     files.update({name: capture.file_digest(here / name) for name in (
         'native_profile.py', 'native_project.py', 'native_dependencies.py', 'native_frontend.py',
@@ -694,11 +696,9 @@ def build_command(root, project, entry, driver, config, tools, env, folder, scra
         return native_command(prefix, project, language, driver, tools, env, folder, scratch, lane)
     if language == "java":
         classes = scratch / "classes"
-        classes.mkdir()
-        build = execute([tools["javac"], "-d", classes, project / entry["path"], driver], project, env, folder / "build")
-        if build.returncode:
-            raise ValueError("generated Java build failed; inspect build/stderr")
         main = (entry["package"] + "." if entry["package"] else "") + "OteleqDriver"
+        java_build.build(project, [project / entry["path"], driver], main, tools["java"],
+                         classes, folder, env, execute)
         command = [tools["java"], "-Xshare:off", "-cp", classes, main] if lane == "baseline" else prefix + ["java", "-Xshare:off", "-cp", classes, main]
         return command
     # Use the proven build recipes, with bounded execution for every build and launch.
@@ -837,6 +837,8 @@ def attempt(workspace, data, entry, case, lane, folder, decoder, *, http_fixture
     effect_channels.update(request_channels)
     complete &= request_complete
     validate_private_sources(project, immutable, folder)
+    if language == "java":
+        java_build.verify(project, scratch / "classes", folder)
     if 'native_context' in entry:
         native_profile.verify_build(sys.modules[__name__], folder)
     capture.stable(root, language, tools, data["artefacts"][language], rust_backend=entry.get("rust_backend", "compiler"))

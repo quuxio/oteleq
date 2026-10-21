@@ -127,7 +127,7 @@ Repeats range from 2 to 32 per lane. `case_timeout_ms` bounds each application l
 | C/C++ | Clang AST JSON; opt-in matched compilation-database inventories | Standalone include driver or retained project unit/link recipes with private accessors and a neutral driver |
 | Rust | Pinned `syn` syntax AST | Private appended driver; actual rustc and otelc Rust adapter |
 | Python | Standard `ast` | Independent CPython caller and actual otelc monitoring adapter |
-| Java | JDK `JavacTask` Tree API | Private javac classes plus separate JVM caller and actual agent |
+| Java | JDK `JavacTask` Tree API | Private JDK compiler bindings, retained class products and a separate JVM caller/agent |
 | JavaScript/TypeScript | otelc's pinned TypeScript compiler AST | Private appended Node caller and actual loader; matched TypeScript baseline emission |
 | Go | Standard `go/parser` AST | Private appended same-file caller, retained Go build pair and compiler-free baseline/on replay |
 
@@ -138,6 +138,8 @@ Default inventories are syntactic; explicit native/Go contexts additionally use 
 The [integrated-provider corpus](qualification/integrated-provider-2026-10-20.json) separately checks consumer `2e3e056` against frozen otelc `d6d03b7`: 24 default cases across eight languages, 38 configured cases, retained framework/export replay and explicit mutation/binding/fixture controls, alongside standard fixed and Rust-only diagnostics. Fixed qualification now checks complete independently expected typed results and every concrete Node argument, rather than partial tokens or cross-lane equality alone. The recorded 533 launches do not qualify richer receiver/effect/shrinking corpora, optional profiles, shipping artefacts or another producer revision.
 
 Dependencies must already be available to the qualified local tools; generation does not install them into the application.
+
+Java uses a complete JDK 21 and a fixed UTF-8 profile with annotation processing disabled. [Retained Java compiler bindings](java-build-bundles.md) record actual source reads and class origins, including nested/anonymous and implicit source classes. The prepared manifest is a build foundation; general classpath/module builds and replacement-SDK runtime integration remain open.
 
 Python supports an explicit [regular source-package context](python-package-context.md) through `[adapters.python] import_roots`. Private source roots preserve relative imports, package initialisers and `src` layouts under their actual module names. Namespace packages and ambiguous/shadowed targets are blocked; installed-project metadata, dependency installation and imported-module observation remain outside this capability.
 

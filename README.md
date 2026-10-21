@@ -45,6 +45,8 @@ Generated tests live in a new private directory outside the application reposito
 
 **Provider compatibility:** these generated workflows require the qualified pre-rebuild otelc APIs, such as the frozen [`d6d03b7` provider](docs/qualification/integrated-provider-2026-10-20.json). The replacement SDK on otelc `main` has a different launch/configuration contract and currently implements its Java foundation. Integration with that SDK is in progress; its current checkout cannot replace the recorded providers in these commands. Prepare the matching tools from the provider revision being used.
 
+Generated Java builds retain [compiler-owned source/class bindings](docs/java-build-bundles.md), actual class products and the selected JDK module-image identity. They require a complete JDK 21 and use a fixed UTF-8 profile with annotation processing disabled. The prepared manifest supports ongoing SDK integration; general Java classpath/module builds remain open.
+
 Declared [ordered Node receiver calls/release](docs/ordered-sequences.md) retain intermediate state, with bounded JavaScript collection observations and [148-launch qualification](docs/qualification/ordered-sequences-2026-10-20.json). Missing collection stays inconclusive.
 
 Opt-in [native project context](docs/native-project-context.md) preserves explicit C/C++ compilation-database targets, generated inputs, matched per-unit recipes and target-wide scalar state through generated suites, replay, export and scalar reduction. Its [64-launch qualification](docs/qualification/native-projects-2026-10-21.json) uses one frozen SDK candidate; compatibility with the replacement SDK, richer project-mode receivers and general build-system integration remain open.

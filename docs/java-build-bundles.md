@@ -1,0 +1,46 @@
+# Retained Java compiler bindings
+
+Generated Java attempts compile their private application and caller through the selected JDK's public `JavaCompiler` API. A fixed file manager records each emitted binary class name, class-file path and originating source. Nested, anonymous and implicitly compiled source classes retain their actual compiler origin; class basenames and `SourceFile` attributes do not establish that binding.
+
+## Select the JDK
+
+Use a complete JDK 21, including `lib/modules`. On macOS, select its actual executable rather than the `/usr/bin/java` system launcher:
+
+```sh
+export OTELC_JAVA=/absolute/path/to/jdk/bin/java
+export OTELC_JAVAC=/absolute/path/to/jdk/bin/javac
+```
+
+The plan freezes the Java and javac executable contents and the selected JDK module image. The compiler frontend and observer are embedded in the oteleq executable. Changed tool, module-image, source or generated-suite identities require a new plan.
+
+## Build profile
+
+The fixed profile uses UTF-8, `-proc:none`, `-implicit:class`, the private source root as its compilation classpath and a new separate class-output directory. The frontend itself runs with an empty isolated classpath, so application classes cannot replace its compiler APIs. Compilation does not initialise application classes.
+
+Each source's exact characters read by the compiler are hashed as UTF-8 and checked against the frozen source bytes, preserving CRLF and non-ASCII text. Every emitted class needs exactly one recorded source origin and a matching class-file hash. Missing, duplicate, changed or unrecorded outputs fail the build contract. Source, compiler inputs, class products and retained metadata are checked again after application execution.
+
+Annotation processors, arbitrary compiler flags, external dependency classpaths, module-path builds and custom classloaders are outside this profile. This does not provide general Java build-system integration. The JDK module image is covered by a content hash; native JDK/OS libraries are not comprehensively hashed. These are trusted local diagnostic builds, with no protection against malicious change-and-revert activity.
+
+## Retained attempt records
+
+Each successful compilation retains the following outside the private application source:
+
+| Record | Contents |
+| --- | --- |
+| `build/stdout`, `build/stderr` | Raw compiler metadata and diagnostics |
+| `compiler-tool/OteleqCompile.java` | Exact frontend used for this compilation |
+| `java-compiler.json` | Compiler version, fixed options, source reads and class origins |
+| `java-compiler-identity.json` | Actual launch arguments and Java/module/frontend content hashes |
+| `scratch/classes/` | Actual compiled application, observer and caller classes |
+| `prepared-application.json` | Schema-1 main class, classpath and source/class bindings |
+| `build-identities.json` | Complete private source/product inventories and retained metadata hashes |
+
+The prepared manifest follows the replacement otelc SDK's published Java input format. Producing it does not make the generic generator compatible with that SDK's runtime, health or live controls. Generated paired execution continues to require the [qualified pre-rebuild provider](automatic-generation.md#build-and-run). Replacement-SDK runtime integration and invocation attribution remain open.
+
+## Validation
+
+`make check` includes real JDK regressions for nested/anonymous classes, implicit source discovery, exact UTF-8/CRLF reads, source preservation, application initialisation isolation and changed-input/product refusal controls. `java_build.py` has an independent 80% Python line floor. `make java-observer-check` separately measures the compiled observer and compiler frontend, each with an 80% line floor. Checksum-pinned JaCoCo is confined to those regression probes and is absent from actual otelc qualification.
+
+`make generation-java-receiver-otelc` rechecks compiler bindings and every retained class product alongside its complete independent state/result oracles, generated/exported suites, replay and scalar reduction. Its exact-revision qualification is separate from ordinary compiler regressions and does not qualify another SDK or platform.
+
+The file-manager hooks are documented in the [JDK 21 API](https://docs.oracle.com/en/java/javase/21/docs/api/java.compiler/javax/tools/ForwardingJavaFileManager.html). Both output methods are covered by the compiled probes; the newer method must not record an output a second time through the older override.

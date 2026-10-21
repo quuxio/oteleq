@@ -106,6 +106,14 @@ const RESOURCES: &[(&str, &str)] = &[
         include_str!("../adapters/generation/java_receivers.py"),
     ),
     (
+        "java_build.py",
+        include_str!("../adapters/generation/java_build.py"),
+    ),
+    (
+        "OteleqCompile.java",
+        include_str!("../adapters/generation/OteleqCompile.java"),
+    ),
+    (
         "java_graph.py",
         include_str!("../adapters/generation/java_graph.py"),
     ),

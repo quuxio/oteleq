@@ -33,6 +33,8 @@ oteleq-run-<id>/
 
 Builds use fresh per-attempt private project copies. Go retains both executables and their build/recipe/module evidence under each report attempt, separately from its reused workspace caches. Reports retain outputs, build logs, available native binary hashes, raw observations, runtime reports, OTLP captures and comparison bundles. The broader versioned graph protocol and per-language runner projects below are proposals; the current layout above is the implemented contract.
 
+Java also retains [compiler-owned source/class bindings](java-build-bundles.md), the exact frontend, JDK module-image identity, class products and a prepared-application manifest. Its fixed UTF-8 classpath profile disables annotation processing; arbitrary project/module builds remain unsupported.
+
 ## Retention and cleanup
 
 | User choice | Current result |

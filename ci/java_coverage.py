@@ -1,4 +1,4 @@
-"""Install pinned JaCoCo tools and enforce coverage of the real Java observer."""
+"""Enforce separate compiled Java observer and compiler frontend coverage."""
 import argparse
 import hashlib
 import io
@@ -52,20 +52,39 @@ def install(cache: Path) -> None:
         (cache / name).write_bytes(product)
 
 
-def coverage(path: Path) -> float:
-    """Require the actual observer class, rather than an aggregate Java score."""
+def coverage(path: Path, name: str = "OteleqGraph", *, nested: bool = False) -> float:
+    """Require one exact product class, optionally including its nested classes."""
     root = ET.parse(path).getroot()
-    counters = root.findall("./package/class[@name='OteleqGraph']/counter[@type='LINE']")
-    if len(counters) != 1:
-        raise ValueError("Java observer coverage is missing or ambiguous")
-    covered, missed = int(counters[0].attrib["covered"]), int(counters[0].attrib["missed"])
-    if min(covered, missed) < 0 or covered + missed == 0 or covered / (covered + missed) < 0.8:
-        raise ValueError("Java observer line coverage is below 80%")
+    classes = [node for node in root.findall("./package/class")
+               if node.attrib["name"] == name or nested and node.attrib["name"].startswith(name + "$")]
+    names = [node.attrib["name"] for node in classes]
+    counters = [node.find("./counter[@type='LINE']") for node in classes]
+    if names.count(name) != 1 or len(names) != len(set(names)) or any(counter is None for counter in counters):
+        raise ValueError("Java product coverage is missing or ambiguous: " + name)
+    values = [int(counter.attrib[key]) for counter in counters for key in ("covered", "missed")]
+    covered, missed = sum(values[::2]), sum(values[1::2])
+    if min(values) < 0 or covered + missed == 0 or covered / (covered + missed) < 0.8:
+        raise ValueError("Java product line coverage is below 80%: " + name)
     return 100 * covered / (covered + missed)
 
 
+def compiler_probe(cache: Path, repo: Path, folder: Path, classes: Path, execution: Path) -> None:
+    """Measure compiler bookkeeping separately from application/SDK execution."""
+    compiled = folder / "compiler-probe"
+    compiled.mkdir()
+    javac = os.environ.get("OTELC_JAVAC", "javac")
+    java = os.environ.get("OTELC_JAVA", "java")
+    subprocess.run([javac, "-g", "-d", str(compiled), str(repo / "adapters/generation/OteleqCompile.java"),
+                    str(repo / "tests/JavaCompilerProbe.java")], cwd=repo, check=True, timeout=30)
+    agent = f"-javaagent:{cache / 'jacocoagent.jar'}=destfile={execution},append=true,includes=OteleqCompile*"
+    subprocess.run([java, agent, "-cp", str(compiled), "JavaCompilerProbe",
+                    str(folder / "probe-source"), str(folder / "probe-products")], cwd=repo, check=True, timeout=30)
+    for source in compiled.glob("OteleqCompile*.class"):
+        (classes / source.name).write_bytes(source.read_bytes())
+
+
 def check(cache: Path, repo: Path) -> None:
-    """Collect only observer probes; production SDK qualification uses no JaCoCo."""
+    """Collect product probes; production SDK qualification uses no JaCoCo."""
     if not verified(cache):
         raise ValueError("run make setup: pinned Java coverage tools are unavailable")
     build = repo / "build"
@@ -82,10 +101,12 @@ def check(cache: Path, repo: Path) -> None:
                        "OTELEQ_JAVA_COVERAGE_EXEC": str(execution)}
         subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "tests", "-p", "test_generation_java_receivers.py", "-v"],
                        cwd=repo, env=environment, check=True, timeout=120)
+        compiler_probe(cache, repo, folder, classes, execution)
         subprocess.run([java, "-jar", str(cache / "jacococli.jar"), "report", str(execution),
                         "--classfiles", str(classes), "--sourcefiles", str(repo / "adapters/generation"), "--xml", str(report)],
                        cwd=repo, check=True, timeout=30)
     print(f"Java observer line coverage: {coverage(report):.2f}%")
+    print(f"Java compiler frontend line coverage: {coverage(report, 'OteleqCompile', nested=True):.2f}%")
 
 
 def main() -> None:
