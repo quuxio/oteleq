@@ -6,11 +6,12 @@ GETTER_EXPECTATION ?= different
 JAVA_PROFILE ?= stock-methods-v1
 MARKDOWNLINT ?= ./ci/markdownlint/node_modules/.bin/markdownlint
 
-.PHONY: generation-preconditions-otelc generation-domains-otelc generation-input-walks-otelc generation-retained-source-otelc generation-native-project-otelc generation-return-otelc generation-java-sequence-otelc generation-java-controls-otelc generation-java-project-otelc generation-java-archive-otelc generation-node-project-otelc
+.PHONY: generation-project-tests-otelc generation-preconditions-otelc generation-domains-otelc generation-input-walks-otelc generation-retained-source-otelc generation-native-project-otelc generation-return-otelc generation-java-sequence-otelc generation-java-controls-otelc generation-java-project-otelc generation-java-archive-otelc generation-node-project-otelc
 
 .PHONY: help setup lint examples docs-check observer-check generation-check effect-qualification-check node-observer-check node-sequence-check java-observer-check go-observer-check cpp-observer-check generation-cpp-receiver-otelc generation-go-receiver-otelc generation-java-receiver-otelc generation-otelc generation-policy-otelc generation-rust-otelc rust-semantic-otelc generation-native-otelc generation-shrink-otelc generation-python-project-otelc generation-receiver-otelc generation-node-receiver-otelc generation-go-build-otelc generation-go-project-otelc generation-sequence-otelc generation-typescript-sequence-otelc generation-filesystem-otelc generation-http-otelc resource-otelc capture-otelc report core-check coverage check
 
 help:
+	@printf '%s\n' 'generation-project-tests-otelc Qualify current-source suites, changed bodies and new functions across eight languages'
 	@printf '%s\n' 'generation-preconditions-otelc Qualify numeric relations, ordered calls and reduction across eight languages'
 	@printf '%s\n' 'generation-domains-otelc Qualify declared domains through eight-language retained suites'
 	@printf '%s\n' 'generation-input-walks-otelc Qualify strict input walks across eight languages (BEFORE_CLI)'
@@ -27,6 +28,11 @@ help:
 setup:
 	npm ci --ignore-scripts --prefix ci/markdownlint
 	$(PYTHON) ci/java_coverage.py setup
+
+generation-project-tests-otelc:
+	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
+	cargo build --locked
+	$(PYTHON) tests/qualify_project_tests.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" $(GENERATION_ARGS)
 
 generation-preconditions-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
