@@ -57,7 +57,7 @@ This creates fresh fixtures and tests them through public run/replay commands, t
 
 Maintainer regressions cover actual loader formats, CommonJS free/receiver callers, exact scalar state and return values, source preservation, binding/intrinsic refusal, named context blockers and detached export. They use a limited compiler fixture for JS-compatible TypeScript unit cases.
 
-The [22 October record](qualification/node-projects-2026-10-22.json) binds runtime `3d298d3`, verifier `75bbf85`, frozen provider `d6d03b7` and Node `24.21.0` on macOS ARM64. Its 245 unique application launches cover:
+The [22 October record](qualification/node-projects-2026-10-22.json) binds runtime/verifier `6e723ca`, frozen provider `d6d03b7` and Node `24.21.0` on macOS ARM64. Its 245 unique application launches cover:
 
 - Eleven free-function contexts: `.cjs`, `.mjs`, default/module/commonjs `.js`, syntax-detected `.js`, `.cts`, `.mts` and default/module/commonjs `.ts`.
 - Plain JavaScript and TypeScript CommonJS receivers with independently expected state and self-aliases.
@@ -65,6 +65,6 @@ The [22 October record](qualification/node-projects-2026-10-22.json) binds runti
 - Independently decoded raw OTLP span identity, application PID/service/scope, counters, histogram buckets/extrema and zero reported loss.
 - Four refusals before application launch: shadowed `require`, changed source, a rehashed forged format and an ambient parent package. Startup rebinding is separately refused after one plain launch.
 
-The existing JavaScript/TypeScript receiver corpus separately passes 186 application launches on the same frozen CLI. Five calibration launches are retained separately; copied shrink reports do not count as new launches. All 9,973 sealed evidence files and the provider's recorded source, products, dependency inputs and tools were rechecked.
+Every module-context fixture ends in a line comment without a final newline. Generated CommonJS callers insert an explicit newline and statement separator before their async wrapper. The existing JavaScript/TypeScript receiver corpus separately passes 186 application launches on the same frozen CLI. Copied shrink reports do not count as new launches. All 9,744 sealed evidence files and the provider's recorded source, products, dependency inputs and tools were rechecked.
 
 These are diagnostic caller results for the recorded provider/platform, with the observation and build limits above. The acceptance claim remains **equivalence over these tests and observations**.
