@@ -37,7 +37,7 @@ DEFAULTS = {
     "fixtures": [],
     "effects": {"filesystem": []},
     "adapters": {"rust": {"backend": "compiler"}, "python": {"import_roots": []},
-                 "go": {"module_roots": [], "build_tags": []}, "typescript": {"backend": "source"},
+                 "go": {"module_roots": [], "build_tags": [], "build_timeout_ms": 180000}, "typescript": {"backend": "source"},
                  "java": {"backend": "legacy"}},
 }
 

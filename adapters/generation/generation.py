@@ -388,6 +388,7 @@ def receiver_factory(entry, discovered, name):
 
 def configure_go_context(entry: dict, discovered: dict, configuration: dict) -> None:
     """Keep compiler package identity and recovery bindings in the frozen entry."""
+    entry["go_build_timeout_ms"] = configuration["adapters"]["go"]["build_timeout_ms"]
     entry["go_main_renames"] = discovered.get("main_renames", [])
     entry["go_shadowed_recovery"] = any(function["name"] in ("recover", "panic")
                                       for function in discovered["functions"])
@@ -824,6 +825,15 @@ def driver_path(project, entry):
     return project / (relative or entry["path"])
 
 
+def execute_capture_build(command, cwd, environment, folder, timeout):
+    """Retain each fixed build/tool vector and its declared wall-time budget."""
+    destination = folder / ("build-" + uuid.uuid4().hex)
+    destination.mkdir(mode=0o700)
+    write(destination / "build-command.json", {"schema_version": 1, "argv": list(map(str, command)),
+        "cwd": str(cwd), "timeout_ms": round(timeout * 1000)})
+    return execute(command, cwd, environment, destination, timeout=timeout)
+
+
 def build_command(root, project, entry, driver, config, tools, env, folder, scratch, lane, *, prepared_runtime=None, java_context=None):
     language = entry["language"]
     prefix = [root / "target/debug/quux-otelc", "--config", config, "--language", language]
@@ -838,8 +848,9 @@ def build_command(root, project, entry, driver, config, tools, env, folder, scra
                            max_output_bytes=max_output_bytes)
         node_project.verify_attempt(project, entry, root, tools[language], inspect_node, folder)
     # Use the proven build recipes, with bounded execution for every build and launch.
+    timeout = go_project.build_timeout(entry.get("go_build_timeout_ms", 180000)) / 1000 if language == "go" else 180
     old_execute = capture.execute
-    capture.execute = lambda command, cwd, environment, timeout=180: execute(command, cwd, environment, folder / ("build-" + uuid.uuid4().hex), timeout)
+    capture.execute = lambda command, cwd, environment, timeout=timeout: execute_capture_build(command, cwd, environment, folder, timeout)
     try:
         if language == "rust":
             command = capture.rust_command(root, project, driver, config, tools, env, folder, scratch, lane,

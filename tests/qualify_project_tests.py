@@ -64,6 +64,7 @@ def policy(path: Path, *, preflight: bool = False) -> None:
     text += '[functions]\ninclude=' + toml(includes) + '\n'
     for item in fixtures:
         text += '\n[[fixtures]]\n' + '\n'.join(key + '=' + toml(value) for key, value in item.items()) + '\n'
+    text += '\n[adapters.go]\nbuild_timeout_ms=600000\n'
     path.write_text(text)
 
 

@@ -26,6 +26,8 @@ Bundle JSON/metadata are limited to 4 MiB per file, executable/loaded input file
 
 ## Build settings and runtime controls
 
+Generated suites can set `[adapters.go] build_timeout_ms = 600000` to allow a declared wall-time budget for each compiler-metadata or SDK command during the retained Go build stage. The default remains 180000 ms; accepted integers range from 1 to 900000. Discovery keeps its existing separate tool limits. The resolved policy and each Go inventory entry retain the value. Build commands also retain `build-command.json` with the actual argument vector, working directory and budget. `limits.case_timeout_ms` continues to bound the separate application launch. A build timeout before that launch is incomplete build evidence, not an observed function result; process cleanup and all source, module, output and witness checks still apply.
+
 Source/function selectors, annotations and `traces.enabled` are build settings. Both replay policies must preserve them, including baseline replay. Trace-disabled compilation is a different build, not a runtime no-op exporter. Explicit target/compiler-setting changes also require rebuilding. Supported runtime resource/export/sampling settings can be changed for replay within the provider's contract.
 
 The SDK's module resolution must preserve existing dependency, language/toolchain and runtime-default identities. Incompatible older module graphs refuse before application execution. SDK dependency isolation remains open; an unchanged original `go.mod` alone cannot prove unchanged language semantics. Recipe hashes detect inconsistent evidence; these diagnostic bundles are not signed attestations against an actor replacing all artefacts and recomputing their metadata.
