@@ -105,10 +105,13 @@ def environment(root: Path, tools: dict, folder: Path, original: dict) -> dict:
 
 def verify_capabilities(value: object, requested: dict) -> None:
     """Keep candidate declarations separate from implemented language support."""
+    failure = "provider changed the complete requested policy or capability fields"
+    if not isinstance(value, dict):
+        raise ValueError("Java prepared provider: " + failure)
     fields = {"policy", "implemented", "remaining"}
     require(type(value) is dict and set(value) in (fields, fields | {"candidates"})
             and type(value["policy"]) is dict and digest(value["policy"]) == digest(requested),
-            "provider changed the complete requested policy or capability fields")
+            failure)
     implemented, remaining = value["implemented"], value["remaining"]
     require(type(implemented) is list and type(remaining) is list
             and all(type(name) is str for name in implemented + remaining)

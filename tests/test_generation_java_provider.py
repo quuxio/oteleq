@@ -26,6 +26,12 @@ def response(value: dict) -> dict:
 
 
 class JavaProviderTests(unittest.TestCase):
+    def test_non_object_public_responses_fail_before_field_access(self):
+        requested = response(entry())["policy"]
+        for value in (None, False, 0, "policy", [], ["policy"]):
+            with self.subTest(value=value), self.assertRaisesRegex(ValueError, "complete requested policy"):
+                provider.verify_capabilities(value, requested)
+
     def test_explicit_backend_and_complete_schema_three_policy(self):
         self.assertEqual(policy.validate({})["adapters"]["java"], {"backend": "legacy"})
         for backend in ("legacy", "prepared"):
