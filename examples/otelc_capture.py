@@ -6,6 +6,7 @@ import hashlib
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
 import os
+import stat
 import platform
 from pathlib import Path
 import re
@@ -136,9 +137,19 @@ def digest(data):
     return hashlib.sha256(data).hexdigest()
 
 
-def file_digest(path):
-    with path.open("rb") as stream:
-        return hashlib.file_digest(stream, "sha256").hexdigest()
+def file_digest(path: Path) -> str:
+    """Reject special inputs before reading, retaining permitted tool symlinks."""
+    nonblocking = getattr(os, "O_NONBLOCK", 0)
+    descriptor = os.open(path, os.O_RDONLY | nonblocking | getattr(os, "O_BINARY", 0))
+    try:
+        if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+            raise ValueError("hash input is not a regular file: " + str(path))
+        if nonblocking:
+            os.set_blocking(descriptor, True)
+        with os.fdopen(descriptor, "rb", closefd=False) as stream:
+            return hashlib.file_digest(stream, "sha256").hexdigest()
+    finally:
+        os.close(descriptor)
 
 
 def temporary_parent(*source_roots):

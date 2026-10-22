@@ -1,11 +1,10 @@
 """Retain compiler-owned class origins and bind prepared Java application inputs."""
 from collections.abc import Callable
-import hashlib
 import json
 from pathlib import Path
 import shutil
 
-from otelc_capture import strict_json, tree_paths
+from otelc_capture import file_digest, strict_json, tree_paths
 import java_classpath
 import java_project
 
@@ -23,12 +22,8 @@ def require(condition: bool, reason: str) -> None:
 
 
 def digest(path: Path) -> str:
-    """Hash stable, bounded project products without invoking application code."""
-    value = hashlib.sha256()
-    with path.open("rb") as stream:
-        for block in iter(lambda: stream.read(1024 * 1024), b""):
-            value.update(block)
-    return value.hexdigest()
+    """Hash regular project products without blocking on special inputs."""
+    return file_digest(path)
 
 
 def files(root: Path) -> dict[str, str]:

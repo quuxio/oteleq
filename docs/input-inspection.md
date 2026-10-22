@@ -6,6 +6,12 @@ The same checked directory walk covers ordinary application snapshots, owned ret
 
 Intentional exclusions remain in effect. A normal source walk still omits the documented build/cache directories; explicit Java generated-source roots are inspected when selected. SDK test directories outside the declared dependency identity are pruned before their contents are read. Symlink handling and file/byte budgets remain those of the selected caller or profile.
 
+## Regular hash inputs
+
+On qualified POSIX hosts, the shared content hasher opens input descriptors without waiting for a pipe writer, checks that the opened object is a regular file and only then reads its bytes. A named pipe cannot leave SDK/tool identity collection waiting for a writer. Permitted tool symlinks still resolve to regular files; callers which prohibit links keep their existing checks. Python task capture and Java build identities use the same hasher. Failed checks and reads close the owned descriptor.
+
+This check does not provide an atomic snapshot or a general timeout for slow regular-file storage. Directory inventories, file-size budgets and source-preservation checks retain their separate scope.
+
 ## Resolve a refusal
 
 Restore read and search access to the named input directory, or select a supported source/build context which excludes it explicitly. If a file tree changed during inspection, stop the writer and create a new plan. Workspaces and external reports remain available for inspection; cleanup also refuses private input trees it cannot verify. The tool does not change application or dependency permissions to obtain access.

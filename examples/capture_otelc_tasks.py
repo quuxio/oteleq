@@ -16,7 +16,7 @@ import threading
 
 from otelc_capture import (CaptureServer, loss_diagnostics, require_counters,
                            require_runtime_identity, retain_http, span_identity,
-                           strict_json, temporary_parent, tree_paths)
+                           strict_json, temporary_parent, tree_paths, file_digest)
 
 
 TASK_SOURCE = Path("examples/apps/python_tasks_app.py")
@@ -24,11 +24,6 @@ TASK_SOURCE = Path("examples/apps/python_tasks_app.py")
 
 def digest(data):
     return hashlib.sha256(data).hexdigest()
-
-
-def file_digest(path):
-    with path.open("rb") as stream:
-        return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
 def artefact_identities(root, interpreter):
