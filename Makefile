@@ -9,10 +9,12 @@ MARKDOWNLINT ?= ./ci/markdownlint/node_modules/.bin/markdownlint
 .PHONY: generation-project-tests-otelc generation-preconditions-otelc generation-domains-otelc generation-input-walks-otelc generation-retained-source-otelc generation-native-project-otelc generation-return-otelc generation-java-sequence-otelc generation-java-controls-otelc generation-java-project-otelc generation-java-archive-otelc generation-node-project-otelc
 .PHONY: node-source-context-check
 .PHONY: generation-node-source-collection-otelc generation-node-source-effects-otelc generation-node-source-channels-otelc
+.PHONY: generation-node-controls-otelc
 
 .PHONY: help setup lint examples docs-check observer-check generation-check effect-qualification-check node-observer-check node-sequence-check java-observer-check go-observer-check cpp-observer-check generation-cpp-receiver-otelc generation-go-receiver-otelc generation-java-receiver-otelc generation-otelc generation-policy-otelc generation-rust-otelc rust-semantic-otelc generation-native-otelc generation-shrink-otelc generation-python-project-otelc generation-receiver-otelc generation-node-receiver-otelc generation-go-build-otelc generation-go-project-otelc generation-sequence-otelc generation-typescript-sequence-otelc generation-filesystem-otelc generation-http-otelc resource-otelc capture-otelc report core-check coverage check
 
 help:
+	@printf '%s\n' 'generation-node-controls-otelc Qualify four same-process Node metric states and retained suites'
 	@printf '%s\n' 'generation-project-tests-otelc Qualify current-source suites, changed bodies and new functions across eight languages'
 	@printf '%s\n' 'generation-preconditions-otelc Qualify numeric relations, ordered calls and reduction across eight languages'
 	@printf '%s\n' 'generation-domains-otelc Qualify declared domains through eight-language retained suites'
@@ -94,7 +96,8 @@ node-observer-check:
 	$(NODE) --test --experimental-test-coverage --test-coverage-include='adapters/generation/node_observe.mjs' --test-coverage-lines=80 --test-coverage-functions=80 --test-coverage-branches=80 tests/node_observer.test.mjs
 
 node-sequence-check:
-	$(NODE) --expose-gc --test --experimental-test-coverage --test-coverage-include='adapters/generation/node_sequence.mjs' --test-coverage-lines=80 --test-coverage-functions=80 --test-coverage-branches=80 tests/node_sequence.test.mjs
+	$(NODE) --expose-gc --test --experimental-test-coverage --test-coverage-include='adapters/generation/node_sequence.mjs' --test-coverage-lines=80 --test-coverage-functions=80 --test-coverage-branches=80 tests/node_sequence.test.mjs tests/node_checkpoint.test.mjs
+	$(NODE) --test --experimental-test-coverage --test-coverage-include='adapters/generation/node_checkpoint.mjs' --test-coverage-lines=80 --test-coverage-functions=80 --test-coverage-branches=80 tests/node_checkpoint.test.mjs
 
 effect-qualification-check:
 	$(PYTHON) -m coverage run --data-file=.effect-qualification.coverage --include='*/effect_qualification.py' -m unittest discover -s tests -p 'test_generation_*qualification.py'
@@ -132,6 +135,9 @@ generation-check: node-observer-check node-sequence-check node-source-context-ch
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/node_inputs.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/node_execution.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/node_telemetry.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/node_control.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/node_control_receipt.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/node_live.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_health.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_provider.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_profiles.py' --fail-under=80
@@ -256,6 +262,11 @@ generation-node-source-channels-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
 	$(PYTHON) tests/qualify_node_source_channels.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" $(GENERATION_ARGS)
+
+generation-node-controls-otelc:
+	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
+	cargo build --locked
+	$(PYTHON) tests/qualify_node_controls.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
 
 generation-node-receiver-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"

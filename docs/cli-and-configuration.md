@@ -135,6 +135,8 @@ Mixed-result precedence is tool error, invalid plan, difference, incompleteness,
 
 ### Live Java metric controls
 
+The explicit source-v1 Node provider also accepts [live metric schedules](node-metric-controls.md), currently under qualification. Each call declares both flags, starts with a positive control and runs in one unchanged application/SDK pair. Release/collection actions cannot be combined with these states.
+
 A prepared Java receiver call can include `metrics = { collection = false, emission = true }`. Every call in that schedule must declare both booleans, and the first must enable both as a positive control. The host controls one unchanged JVM through private checkpoints, waits for an effective export-off barrier, and restores both settings before shutdown. [The control guide](java-metric-controls.md) defines direct trace/metric/health checks, budgets and limitations. The ordinary plain/on workflow is unchanged when controls are absent.
 
 ### Ordered receiver sequences

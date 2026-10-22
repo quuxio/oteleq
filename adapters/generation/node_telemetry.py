@@ -8,6 +8,7 @@ from pathlib import Path
 import node_source as provider
 import otelc_capture as capture
 import sequences
+import node_control_receipt
 
 FUNCTION_SCOPE = ("io.quux.otelc.functions", "0.2.0")
 LIFETIME_SCOPE = ("io.quux.otelc.lifetimes", "0.2.0")
@@ -201,8 +202,28 @@ def auxiliary_metric_scope(scope, entry: dict) -> None:
     provider.require(identity in permitted, "unknown or unrequested source metric scope")
     names = ({"otelc.lifetime.admitted", "otelc.lifetime.completed", "otelc.lifetime.incomplete", "otelc.lifetime.lost",
               "otelc.lifetime.duration", "otelc.lifetime.live"} if identity == LIFETIME_SCOPE
-             else {"otel.sdk.processor.span.queue.capacity", "otel.sdk.processor.span.queue.size"})
+             else {"otel.sdk.processor.span.processed", "otel.sdk.processor.span.queue.capacity", "otel.sdk.processor.span.queue.size"})
     provider.require(all(metric.name in names for metric in scope.metrics), "unknown SDK or lifetime metric")
+    if identity == ("@opentelemetry/sdk-trace", ""):
+        for metric in scope.metrics:
+            sdk_metric(metric)
+
+
+def sdk_metric(metric) -> None:
+    """Recognise the pinned SDK's own counters without hiding error-labelled drops."""
+    processed = metric.name == "otel.sdk.processor.span.processed"
+    provider.require(metric.WhichOneof("data") == "sum" and metric.unit == "{span}"
+                     and metric.sum.aggregation_temporality == 2 and metric.sum.is_monotonic is processed,
+                     "invalid SDK span metric kind or temporality")
+    for point in metric.sum.data_points:
+        kind = point.WhichOneof("value")
+        value = point.as_int if kind == "as_int" else point.as_double
+        provider.require(kind in ("as_int", "as_double") and math.isfinite(value) and value >= 0 and value == int(value)
+                         and point.flags == 0 and 0 < point.start_time_unix_nano <= point.time_unix_nano
+                         and attributes(point.attributes) == {
+                             "otel.component.type": ("string_value", "batching_span_processor"),
+                             "otel.component.name": ("string_value", "batching_span_processor/0")},
+                         "invalid, foreign or loss-labelled SDK span metric point")
 
 
 def function_metric_scope(scope, entry: dict, allowed: set[str], observed: dict) -> None:
@@ -256,7 +277,7 @@ def metric_group(group, entry: dict, service: str, launch: str, allowed: set[str
             auxiliary_metric_scope(scope, entry)
 
 
-def function_metrics(bodies, entry: dict, service: str, report: dict, spans: list, allowed: set[str]) -> None:
+def function_metrics(bodies, entry: dict, service: str, report: dict, spans: list, allowed: set[str], *, controls=None) -> None:
     """Cumulative call/unwind/histogram samples must reach the decoded call totals."""
     from opentelemetry.proto.collector.metrics.v1.metrics_service_pb2 import ExportMetricsServiceRequest
     totals, unwinds = Counter(), Counter()
@@ -264,17 +285,23 @@ def function_metrics(bodies, entry: dict, service: str, report: dict, spans: lis
         if span.name in allowed:
             totals[span.name] += 1
             unwinds[span.name] += int(span.status.code == 2)
-    observed = {}
-    for route, body in bodies:
+    observed, series = {}, {}
+    for index, (route, body) in enumerate(bodies):
         if route != "/v1/metrics":
             continue
         try:
             message = ExportMetricsServiceRequest.FromString(body)
         except Exception as error:
             raise ValueError("Node source provider: invalid metric protobuf") from error
+        points = {}
         for group in message.resource_metrics:
-            metric_group(group, entry, service, report["launch_id"], allowed, observed)
+            metric_group(group, entry, service, report["launch_id"], allowed, points)
+        series[index] = cumulative_counts(points)
+        for key, samples in points.items():
+            observed.setdefault(key, []).extend(samples)
     counts = cumulative_counts(observed)
+    if controls is not None:
+        totals, unwinds = node_control_receipt.qualify(controls, bodies, spans, series)
     for name, count in totals.items():
         provider.require(counts.get(("otelc.function.calls", name)) == count
                          and counts.get((DURATION, name)) == count
@@ -287,7 +314,8 @@ def witness(folder: Path, entry: dict, bodies: list, service: str, decoder) -> d
     report = capture.strict_json((folder / "node-runtime/node-status.json").read_bytes())
     losses, pending = health(report, entry)
     names, spans, graph = decode_traces(bodies, entry, service, report, decoder)
-    function_metrics(bodies, entry, service, report, spans, graph["allowed"])
+    controls = node_control_receipt.read(folder, entry, bodies, plain=False) if sequences.controls(entry) else None
+    function_metrics(bodies, entry, service, report, spans, graph["allowed"], controls=controls)
     if sequences.collects(entry):
         losses["lifetime.censored"] = collection_state(report)["censored"]
     raw = hashlib.sha256()

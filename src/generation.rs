@@ -61,6 +61,22 @@ const RESOURCES: &[(&str, &str)] = &[
         include_str!("../adapters/generation/node_telemetry.py"),
     ),
     (
+        "node_control.py",
+        include_str!("../adapters/generation/node_control.py"),
+    ),
+    (
+        "node_control_receipt.py",
+        include_str!("../adapters/generation/node_control_receipt.py"),
+    ),
+    (
+        "node_live.py",
+        include_str!("../adapters/generation/node_live.py"),
+    ),
+    (
+        "node_checkpoint.mjs",
+        include_str!("../adapters/generation/node_checkpoint.mjs"),
+    ),
+    (
         "java_project.py",
         include_str!("../adapters/generation/java_project.py"),
     ),

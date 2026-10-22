@@ -36,6 +36,8 @@ import node_project
 import node_source
 import node_launch
 import node_telemetry
+import node_live
+import node_control_receipt
 import owned_workspace
 import native_profile
 import otelc_capture as capture
@@ -670,7 +672,8 @@ def generator_identity():
     files.update({name: capture.file_digest(here / name) for name in (
         'java_project.py', 'java_classpath.py', 'java_archives.py', 'java_archive_context.py',
         'java_helper_binding.py', 'OteleqArchives.java',
-        'node_project.py', 'node_context.mjs', 'node_source_context.mjs', 'node_source_context.py', 'node_source.py', 'node_source_worker.py', 'node_launch.py', 'node_inputs.py', 'node_telemetry.py',
+        'node_project.py', 'node_context.mjs', 'node_source_context.mjs', 'node_source_context.py', 'node_source.py', 'node_source_worker.py', 'node_launch.py', 'node_inputs.py', 'node_execution.py', 'node_telemetry.py',
+        'node_live.py', 'node_control.py', 'node_control_receipt.py', 'node_checkpoint.mjs',
         'native_profile.py', 'native_project.py', 'native_dependencies.py', 'native_frontend.py',
         'native_discover.cpp', 'native_context.py', 'native_workers.py', 'native_workspace.py',
         'owned_workspace.py', 'preconditions.py', 'project_tests.py', 'project_runner.py')})
@@ -962,7 +965,10 @@ def baseline_receipt(entry, folder, bodies):
     if bodies:
         raise ValueError("baseline unexpectedly exported telemetry")
     if sequences.controls(entry):
-        java_control_receipt.read(folder, entry, read(folder / "process.json")["pid"], bodies, plain=True)
+        if node_source.enabled(entry):
+            node_control_receipt.read(folder, entry, bodies, plain=True)
+        else:
+            java_control_receipt.read(folder, entry, read(folder / "process.json")["pid"], bodies, plain=True)
 
 
 def qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, decoder, *, extra_channels=None,
@@ -1094,10 +1100,12 @@ def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, ht
 
 
 def execution_options(entry, case, lane, folder, runtime, bodies, env):
-    """Add only explicitly requested process recording and live Java checkpoints."""
+    """Add only explicitly requested process recording and live host checkpoints."""
     options = {"record_process": True} if runtime is not None or node_source.enabled(entry) else {}
     if sequences.controls(entry):
-        interaction = java_live.Session(folder, runtime, case["sequence"], bodies, plain=lane == "baseline")
+        interaction = (node_live.Session(folder, case["sequence"], bodies, language=entry["language"], plain=lane == "baseline")
+                       if node_source.enabled(entry)
+                       else java_live.Session(folder, runtime, case["sequence"], bodies, plain=lane == "baseline"))
         env.update(interaction.environment())
         options["interaction"] = interaction
     return options
@@ -1179,7 +1187,7 @@ def compare_with_fixtures(workspace, data, entry, case, destination, decoder, ht
              "policy_sha256": identity({"otelc": policy(entry, "receiver"), "generation": data["configuration"]}), "observer": f"oteleq configured scalar generator v1; {sequences.call_count(entry)} target call root(s) required; recursive span counts observed",
              "channels": ["stdout", "stderr", "state-and-outcome", *filesystem_effects.channels(data["configuration"]), *http_effects.channels(data["configuration"])],
              "gaps": ["scalar corpus; business preconditions and branch exhaustiveness not established", "diagnostic access/entrypoint helpers; not shipping artefact evidence", "artefact digests aggregate diagnostic inputs and qualified tools/adapters; emitted runtime compiler/loader outputs are outside those digests", "no undeclared network, imported-module globals or concurrent-schedule qualification", "exception traceback/stack and Java/C++ extra exception fields are unobserved", "compiler sysroots and OS libraries are outside content identity", "trusted local execution; no hostile-code sandbox"]}
-    scope["gaps"].append("live metric controls cover selected synchronous Java call trees and bounded export windows; general SDK-instrument, other-language and exporter-fault qualification remains open"
+    scope["gaps"].append("live metric controls cover selected serial Java/Node call trees and bounded export windows; general SDK-instrument, other-language and exporter-fault qualification remains open"
                          if sequences.controls(entry) else "live metric controls and exporter-fault scenarios are unobserved")
     if entry["language"] in ("javascript", "typescript"):
         scope["gaps"].append("state reachable only through CommonJS wrapper/module.exports caches or undeclared imported modules is unobserved")

@@ -1,6 +1,7 @@
 // Generated observer boilerplate is MIT licensed; see GENERATED-LICENSE.txt.
 import {setImmediate as nextTurn} from 'node:timers/promises';
 import {prepareReceiver,writeObservation} from './node_observe.mjs';
+import {checkpoint} from './node_checkpoint.mjs';
 const NativeWeakRef=globalThis.WeakRef;
 const dereference=NativeWeakRef.prototype.deref;
 const apply=Reflect.apply;
@@ -25,13 +26,16 @@ async function collection(weak,step) {
 /** Execute the exact frozen call/release schedule with independent state at each step. */
 export async function runSequence(record,call,roots,validBinding) {
   const selected=call.sequence;
+  const controls=selected.some(step=>step.metrics!==undefined);
   const receiver=prepareReceiver(record,call,roots,validBinding);
   if(selected.some(step=>step.action==='collect')&&typeof collect!=='function') throw new NativeError('collection requires the explicitly selected --expose-gc test mode');
   const steps=[];
   let weak,lastCall;
-  for(const step of selected) {
+  for(const [index,step] of selected.entries()) {
     if(step.action==='call') {
+      if(controls) await checkpoint('before-'+index); // NOSONAR: the host must acknowledge each declared state before the call.
       const observed=await receiver.observe(step.arguments); // NOSONAR: declared actions share one receiver and must execute in order.
+      if(controls) await checkpoint('after-'+index); // NOSONAR: the host must finish this call's receipt before the next action.
       lastCall=observed.outcome;
       steps.push({id:step.id,action:step.action,gaps:[],...observed});
       continue;
@@ -51,5 +55,6 @@ export async function runSequence(record,call,roots,validBinding) {
     const after=receiver.snapshot();
     steps.push({id:step.id,action:step.action,gaps,before,outcome,after,...(collectionObservation?{collection:collectionObservation}:{})});
   }
+  if(controls) await checkpoint('finish');
   writeObservation({before:steps[0].before,outcome:lastCall,after:steps.at(-1).after,steps});
 }

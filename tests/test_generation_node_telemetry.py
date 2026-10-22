@@ -94,6 +94,31 @@ class NodeTelemetryTests(unittest.TestCase):
             self.assertEqual(witness["pending"], 0)
             self.assertFalse(any(witness["losses"].values()))
 
+    def test_actual_sdk_processed_counter_is_auxiliary_and_loss_labels_are_refused(self):
+        message = metrics()
+        scope = message.resource_metrics[0].scope_metrics.add()
+        scope.scope.name = "@opentelemetry/sdk-trace"
+        metric = scope.metrics.add(name="otel.sdk.processor.span.processed", unit="{span}")
+        metric.sum.aggregation_temporality, metric.sum.is_monotonic = 2, True
+        point = metric.sum.data_points.add(as_double=1, start_time_unix_nano=1, time_unix_nano=2)
+        attributes(point.attributes, {"otel.component.type": "batching_span_processor",
+                                      "otel.component.name": "batching_span_processor/0"})
+        telemetry.function_metrics(self.bodies(metric=message), self.entry, "case", report(),
+                                   list(traces().resource_spans[0].scope_spans[0].spans), {"app.add"})
+        attributes(point.attributes, {"error.type": "queue_full"})
+        with self.assertRaisesRegex(ValueError, "loss-labelled"):
+            telemetry.auxiliary_metric_scope(scope, self.entry)
+        del point.attributes[-1]
+        for field, value in (("flags", 1), ("as_double", -1), ("as_double", 1.5), ("time_unix_nano", 0)):
+            previous = getattr(point, field)
+            setattr(point, field, value)
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                telemetry.auxiliary_metric_scope(scope, self.entry)
+            setattr(point, field, previous)
+        metric.unit = "wrong"
+        with self.assertRaises(ValueError):
+            telemetry.auxiliary_metric_scope(scope, self.entry)
+
     def test_missing_boolean_nonzero_and_unavailable_health_counters_refuse(self):
         for path, changed in [("schema_version", True), ("phase", "failed"), ("collection", False), ("emission", False),
                               ("effective_emission_off", True), ("active_functions", 1), ("export_started", 0),
@@ -152,7 +177,11 @@ class NodeTelemetryTests(unittest.TestCase):
         message = metrics()
         scope = message.resource_metrics[0].scope_metrics.add()
         scope.scope.name = "@opentelemetry/sdk-trace"
-        scope.metrics.add(name="otel.sdk.processor.span.queue.size").sum.data_points.add(as_double=1)
+        metric = scope.metrics.add(name="otel.sdk.processor.span.queue.size", unit="{span}")
+        metric.sum.aggregation_temporality = 2
+        point = metric.sum.data_points.add(as_double=1, start_time_unix_nano=1, time_unix_nano=2)
+        attributes(point.attributes, {"otel.component.type": "batching_span_processor",
+                                      "otel.component.name": "batching_span_processor/0"})
         bodies = self.bodies(metric=message)
         _, spans, graph = telemetry.decode_traces(bodies, self.entry, "case", report(), ExportTraceServiceRequest)
         telemetry.function_metrics(bodies, self.entry, "case", report(), spans, graph["allowed"])

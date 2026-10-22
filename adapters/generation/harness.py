@@ -771,5 +771,6 @@ def materialise(project, entry, args):
             (generated / "node_observe.mjs").write_text(JS_OBSERVER)
             if "sequence_configuration" in entry:
                 (generated / "node_sequence.mjs").write_bytes(Path(__file__).with_name("node_sequence.mjs").read_bytes())
+                (generated / "node_checkpoint.mjs").write_bytes(Path(__file__).with_name("node_checkpoint.mjs").read_bytes())
         driver.write_text(emit(entry, args, original))
     return driver
