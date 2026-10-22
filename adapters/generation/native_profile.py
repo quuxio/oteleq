@@ -25,17 +25,17 @@ def prepare_inputs(workflow, source: Path, root: Path, workspace: Path,
     """Retain native discovery failures and bind added inputs before snapshotting."""
     try:
         profiles = prepare(workflow, source, root, workspace, configuration)
+        if not profiles:
+            return contents, profiles
+        required = source_manifest(workflow, source, profiles, excluded_files=excluded_files,
+                                   excluded_roots=excluded_roots)
+        if any(required.get(name) != digest for name, digest in contents.items()):
+            raise ValueError('source changed during native build discovery')
+        return required, profiles
     except (ValueError, OSError) as error:
         workflow.write(workspace / 'discovery-failure.json', {'schema_version': workflow.VERSION,
                        'error': str(error), 'phase': 'native build context'})
         raise ValueError(str(error) + '; partial workspace: ' + str(workspace)) from error
-    if not profiles:
-        return contents, profiles
-    required = source_manifest(workflow, source, profiles, excluded_files=excluded_files,
-                               excluded_roots=excluded_roots)
-    if any(required.get(name) != digest for name, digest in contents.items()):
-        raise ValueError('source changed during native build discovery')
-    return required, profiles
 
 
 def context_manifest(workflow, workspace: Path) -> dict:

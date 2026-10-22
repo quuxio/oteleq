@@ -1,5 +1,6 @@
 """Bounded diagnostic capture for the eight ordinary otelc trace workloads."""
 from collections import Counter
+from collections.abc import Collection, Iterator
 from contextlib import contextmanager
 import hashlib
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -18,6 +19,24 @@ import tomllib
 
 import otelc_collection
 import otelc_resource
+
+
+def raise_walk_error(error: OSError) -> None:
+    """An inaccessible or vanished directory is incomplete input evidence."""
+    raise error
+
+
+def walk_tree(root: Path) -> Iterator[tuple[str, list[str], list[str]]]:
+    """Keep directory pruning available while refusing incomplete enumeration."""
+    return os.walk(root, followlinks=False, onerror=raise_walk_error)
+
+
+def tree_paths(root: Path, *, excluded: Collection[str] = ()) -> Iterator[Path]:
+    """Enumerate entries without following links or inspecting excluded trees."""
+    for directory, names, files in walk_tree(root):
+        names[:] = sorted(name for name in names if name not in excluded)
+        for name in sorted(names + files):
+            yield Path(directory) / name
 
 
 MAX_REQUEST_BYTES = 1024 * 1024
@@ -220,8 +239,7 @@ def artefacts(root, language, tools, *, rust_backend="compiler"):
     for tree, suffixes in trees:
         if not tree.is_dir():
             raise ValueError(f"required adapter directory is missing: {tree}")
-        paths += [p for p in sorted(tree.rglob("*")) if p.is_file() and p.suffix in suffixes
-                  and "tests" not in p.relative_to(tree).parts]
+        paths += [p for p in sorted(tree_paths(tree, excluded={"tests"})) if p.is_file() and p.suffix in suffixes]
     identities = {str(p.relative_to(root)): file_digest(p) for p in paths}
     identities.update({"tool:" + name: file_digest(path) for name, path in tools.items()})
     for name in ("otelc_capture.py", "otelc_rust_build.py", "otelc_collection.py", "otelc_resource.py", "capture_otelc_languages.py", "otelc-workloads.json", "otelc-worker-workloads.json", "otelc-typescript-native-workloads.json", "otelc-collection-workloads.json", "otelc-resource-workloads.json"):

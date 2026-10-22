@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 import shutil
 
-from otelc_capture import strict_json
+from otelc_capture import strict_json, tree_paths
 import java_classpath
 import java_project
 
@@ -34,7 +34,7 @@ def digest(path: Path) -> str:
 def files(root: Path) -> dict[str, str]:
     """Refuse links and preserve the complete private project input set."""
     result = {}
-    for path in sorted(root.rglob("*")):
+    for path in sorted(tree_paths(root)):
         require(not path.is_symlink(), "symlink in the private build: " + str(path))
         if path.is_file():
             result[path.relative_to(root).as_posix()] = digest(path)

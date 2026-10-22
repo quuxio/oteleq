@@ -80,7 +80,7 @@ def manifest(root: Path, *, excluded: Collection[str] = (), excluded_files: Coll
     """Fingerprint all private contents; only original source walks exclude build trees."""
     result, total = {}, 0
     file_limit = MAX_FILE if max_file_bytes is None else max_file_bytes
-    for directory, names, files in os.walk(root, followlinks=False):
+    for directory, names, files in capture.walk_tree(root):
         base = Path(directory)
         names[:] = sorted(n for n in names if n not in excluded
                           and (base / n).relative_to(root).as_posix() not in excluded_roots)
@@ -600,7 +600,7 @@ def package_files(package, spec):
     files = {}
     for directory in spec.submodule_search_locations or []:
         base = Path(directory)
-        for path in sorted(base.rglob("*")):
+        for path in sorted(capture.tree_paths(base)):
             if path.is_file() and path.suffix in (".py", ".so", ".pyd"):
                 files[package + ":" + path.relative_to(base).as_posix()] = capture.file_digest(path)
     return files
@@ -891,7 +891,7 @@ def validate_private_sources(project, immutable, folder):
     # Generated native binaries are build outputs, not source snapshot members.
     if any(not (project / name).is_file() or capture.file_digest(project / name) != digest for name, digest in immutable.items()):
         raise ValueError("private application/harness source changed")
-    for candidate in project.rglob("*"):
+    for candidate in capture.tree_paths(project):
         if candidate.is_symlink() or (candidate.suffix in discovery.LANGUAGES and candidate.relative_to(project).as_posix() not in immutable):
             raise ValueError("unexpected source or symlink appeared in the private project")
     if not (folder / BUILD_IDENTITIES).exists():

@@ -8,6 +8,7 @@ import shutil
 import java_classpath as classpath
 import java_archive_context as archive_context
 import owned_workspace
+from otelc_capture import tree_paths, walk_tree
 
 DIRECTORY = "java-context"
 CONTEXT_FILE = "java-build-context.json"
@@ -58,7 +59,7 @@ def source_files(source: Path, options: dict, ignored: set[str], *, excluded_roo
         owned_workspace.require_application_input(source, relative)
         root = source / relative
         require(root.is_dir() and root.resolve() == root and root.is_relative_to(source), "missing or linked source root")
-        for directory, directories, names in os.walk(root):
+        for directory, directories, names in walk_tree(root):
             parent = Path(directory)
             require(not any((parent / name).is_symlink() for name in directories + names), "symlink in source root")
             directories[:] = sorted(name for name in directories if name not in ignored
@@ -295,7 +296,7 @@ def compiler_options(project: Path, classes: Path, context: dict | None) -> list
 
 def classpath_files(classes: Path, context: dict | None) -> set[Path]:
     """Prepared evidence must include every resource byte, not only loaded classes."""
-    result = {path for path in classes.rglob("*") if path.is_file()}
+    result = {path for path in tree_paths(classes) if path.is_file()}
     for entry in context["entries"] if context else []:
         path = Path(entry["path"])
         result.update({path} if entry["kind"] == "jar" else {path / name for name in entry["files"]})

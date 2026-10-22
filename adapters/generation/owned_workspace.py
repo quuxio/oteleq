@@ -1,8 +1,8 @@
 """Validate retained tool output before separating it from application inputs."""
-import os
 from pathlib import Path
 
 import discovery
+from otelc_capture import walk_tree
 
 MARKER = ".oteleq-owned.json"
 
@@ -83,7 +83,7 @@ def exclusions(workflow, source: Path, source_roots=()) -> list[dict]:
     roots = dict.fromkeys([source, *(source / name for name in source_roots)])
     for root in roots:
         require_application_input(source, root.relative_to(source).as_posix())
-        for directory, names, files in os.walk(root, followlinks=False):
+        for directory, names, files in walk_tree(root):
             path = Path(directory)
             relative = path.relative_to(source).as_posix()
             if MARKER in names or MARKER in files:

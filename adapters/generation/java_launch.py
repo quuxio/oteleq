@@ -249,7 +249,7 @@ def prepare(root: Path, project: Path, folder: Path, tools: dict, runtime: Path,
 def archive(runtime: Path, folder: Path) -> None:
     """Retain regular runtime outputs and their original identities before cleanup."""
     provider.require(runtime.is_dir() and not runtime.is_symlink(), "SDK runtime was replaced")
-    paths = list(runtime.rglob("*"))
+    paths = list(capture.tree_paths(runtime))
     provider.require(len(paths) <= MAX_RUNTIME_FILES and all(not path.is_symlink() for path in paths),
                      "SDK runtime has links or too many outputs")
     records = {}

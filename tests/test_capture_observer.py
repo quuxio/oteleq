@@ -20,6 +20,33 @@ import otelc_capture as capture
 OBSERVER = runpy.run_path(str(Path(__file__).resolve().parents[1] / "examples/capture_otelc_tasks.py"))
 
 
+class StrictTreeTests(unittest.TestCase):
+    def test_missing_required_directory_preserves_its_read_error(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            missing = Path(temporary) / "missing"
+            paths = capture.tree_paths(missing)
+            with self.assertRaises(FileNotFoundError):
+                list(paths)
+
+    def test_excluded_directories_are_pruned_before_enumerating_their_contents(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            excluded = root / "tests"
+            excluded.mkdir()
+            (root / "module.py").write_text("# SDK module\n")
+            (excluded / "hidden.py").write_text("# outside the declared closure\n")
+            scandir = os.scandir
+
+            def enumerate_declared(path):
+                if Path(path) == excluded:
+                    self.fail("excluded directory was inspected")
+                return scandir(path)
+
+            with patch.object(capture.os, "scandir", side_effect=enumerate_declared):
+                paths = list(capture.tree_paths(root, excluded={"tests"}))
+            self.assertEqual(paths, [root / "module.py"])
+
+
 def runtime_report():
     return {"schema_version": 1, "language": "python", "export_finished": True,
             "losses": {name: 0 for name in ("function_capacity", "active_call_capacity", "incomplete", "invalid")},
