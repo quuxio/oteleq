@@ -20,7 +20,7 @@ The remaining sections describe the broader design. Full semantic/build-aware ad
 | Generate tests across a source tree | Inventory every discovered callable and generate runnable cases where types and fixtures permit; retain explicit reasons for every gap |
 | Leave original source unchanged | Read the target tree; put tests, tooling dependencies, generated helpers and build copies in a private external workspace |
 | Allow an independent test framework | Each adapter supplies its own runner and dependency environment without changing the target's test setup |
-| Allow users to keep the tests | Retain the workspace or explicitly export a frozen suite and source snapshot into a chosen directory |
+| Allow users to keep the tests | Retain/export a frozen suite and source snapshot, or explicitly promote a suite that replans the current checkout |
 | Compare global and instance mutations | Compare declared globals, receiver state and input-reachable object graphs before and after identical action sequences |
 | Account for telemetry | Identify telemetry through its dedicated transport/runtime identities; compare application observations independently |
 | Produce reviewable evidence | Retain corpus, fixtures, artefact hashes, instrumentation witness, normalisation rules, gaps and reproducible differences |

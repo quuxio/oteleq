@@ -274,7 +274,7 @@ func unused()*Unused{return nil}
         self.assertIn(";main();return state", rewritten)
 
     def test_policy_roots_tags_workspace_and_dependency_boundaries(self):
-        self.assertEqual(policy.load(None)["adapters"]["go"], {"module_roots": [], "build_tags": []})
+        self.assertEqual(policy.load(None)["adapters"]["go"], {"module_roots": [], "build_tags": [], "build_timeout_ms": 180000})
         invalid = [[], {"backend": "compile"}, {"module_roots": "src"}, {"module_roots": [1]},
                    *[{"module_roots": [name]} for name in ("", "/tmp", "../outside", "a/../b", "a//b", "a\\b", "a:b")],
                    {"module_roots": [".", "."]}, {"build_tags": ["integration"]},
@@ -282,6 +282,10 @@ func unused()*Unused{return nil}
         for value in invalid:
             with self.subTest(value=value), self.assertRaises(ValueError):
                 go_project.settings(value)
+        self.assertEqual(go_project.settings({"build_timeout_ms": 600000})["build_timeout_ms"], 600000)
+        for timeout in (None, False, 0, -1, 900001, 1.5, "600000"):
+            with self.subTest(timeout=timeout), self.assertRaisesRegex(ValueError, "build_timeout_ms"):
+                go_project.settings({"build_timeout_ms": timeout})
         source = self.source("counter/api.go", "package counter\n")
         self.assertEqual(go_project.module_root(self.snapshot, source, ["services/api"]), self.module)
         with self.assertRaisesRegex(ValueError, "not configured"):

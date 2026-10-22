@@ -2,9 +2,11 @@
 from pathlib import Path
 
 import discovery
+import project_tests
 from otelc_capture import walk_tree
 
 MARKER = ".oteleq-owned.json"
+OWNERSHIP_ERROR = "workspace is not an owned oteleq directory"
 
 
 def verify_layout(workflow, workspace: Path) -> None:
@@ -13,7 +15,7 @@ def verify_layout(workflow, workspace: Path) -> None:
                workflow.README_FILE, "runs", "go-cache", workflow.native_profile.DIRECTORY,
                workflow.java_project.DIRECTORY, workflow.java_provider.DIRECTORY}
     if workspace.is_symlink() or not workspace.is_dir():
-        raise ValueError("workspace is not an owned oteleq directory")
+        raise ValueError(OWNERSHIP_ERROR)
     if any(path.name not in allowed or path.is_symlink() for path in workspace.iterdir()):
         raise ValueError("workspace contains unowned files; retain and inspect it")
     for name in ("snapshot", "runs", "go-cache"):
@@ -45,12 +47,19 @@ def verify_suite(workflow, workspace: Path) -> None:
 
 def verify(workflow, workspace: Path) -> tuple[dict, dict]:
     """Inspect owned content without original sources, external tools or deletion."""
+    marker_path = workspace / MARKER
+    if workspace.is_symlink() or marker_path.is_symlink():
+        raise ValueError(OWNERSHIP_ERROR)
+    if workspace.is_dir() and marker_path.is_file():
+        candidate = workflow.read(marker_path)
+        if type(candidate) is dict and candidate.get("kind") == project_tests.KIND:
+            return project_tests.verify(workflow, workspace)
     verify_layout(workflow, workspace)
     marker = workflow.read(workspace / MARKER)
     if (type(marker) is not dict or type(marker.get("schema_version")) is not int
             or marker["schema_version"] != workflow.VERSION
             or (marker.get("id") is not None and type(marker["id"]) is not str)):
-        raise ValueError("workspace is not an owned oteleq directory")
+        raise ValueError(OWNERSHIP_ERROR)
     if not (workspace / workflow.PLAN_FILE).is_file():
         raise ValueError("workspace plan is unsealed; retain and inspect it")
     data = workflow.read(workspace / workflow.PLAN_FILE)
@@ -91,10 +100,16 @@ def exclusions(workflow, source: Path, source_roots=()) -> list[dict]:
                     marker, data = verify(workflow, path)
                 except (ValueError, OSError, KeyError, TypeError) as error:
                     raise ValueError(f"invalid retained oteleq workspace {relative}: {error}") from error
-                result[relative] = {"path": relative, "workspace_id": marker.get("id"),
-                                    "plan_sha256": workflow.identity(data),
-                                    "reason": "verified retained oteleq workspace"}
+                result[relative] = exclusion_record(workflow, relative, marker, data)
                 names[:] = []
             else:
                 names[:] = sorted(name for name in names if name not in discovery.IGNORED)
     return [result[name] for name in sorted(result)]
+
+
+def exclusion_record(workflow, relative: str, marker: dict, data: dict) -> dict:
+    """Describe either verified output kind without adding branches to the walk."""
+    reason = ("verified current-source oteleq suite" if marker.get("kind") == project_tests.KIND
+              else "verified retained oteleq workspace")
+    return {"path": relative, "workspace_id": marker.get("id"),
+            "plan_sha256": workflow.identity(data), "reason": reason}

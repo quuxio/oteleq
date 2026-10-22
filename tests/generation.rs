@@ -69,6 +69,15 @@ fn cli_embeds_generation_workers_and_exposes_subcommand_help() {
     for flag in ["--case", "--report-dir", "--trials"] {
         assert!(shrinking.contains(flag));
     }
+    let promotion = Command::new(exe)
+        .args(["promote", "--help"])
+        .output()
+        .unwrap();
+    assert!(promotion.status.success());
+    let promotion = String::from_utf8_lossy(&promotion.stdout);
+    for flag in ["--workspace", "--source", "--destination", "--apply"] {
+        assert!(promotion.contains(flag));
+    }
     let missing_value = Command::new(exe)
         .args(["plan", "--source"])
         .output()
@@ -103,4 +112,30 @@ fn cli_embeds_generation_workers_and_exposes_subcommand_help() {
         .unwrap();
     assert!(result.status.success());
     assert!(String::from_utf8_lossy(&result.stdout).contains("sample"));
+}
+
+#[test]
+fn planner_host_ignores_ambient_python_import_roots() {
+    let dir = tempfile::tempdir().unwrap();
+    let marker = dir.path().join("application-initializer.txt");
+    let marker_literal = serde_json::to_string(marker.to_str().unwrap()).unwrap();
+    fs::write(
+        dir.path().join("json.py"),
+        format!("open({marker_literal},'w').write('application initializer ran')\nraise RuntimeError('application imported by planner')\n"),
+    )
+    .unwrap();
+    let exe = env!("CARGO_BIN_EXE_quux-oteleq");
+    for variable in ["PYTHONPATH", "PYTHONHOME"] {
+        let help = Command::new(exe)
+            .args(["plan", "--help"])
+            .env(variable, dir.path())
+            .output()
+            .unwrap();
+        assert!(
+            help.status.success(),
+            "{}",
+            String::from_utf8_lossy(&help.stderr)
+        );
+        assert!(!marker.exists());
+    }
 }

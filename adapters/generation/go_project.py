@@ -9,10 +9,18 @@ OBSERVER_DIRECTORY = "oteleq_generated_observer"
 BRIDGE = "OteleqGeneratedRun"
 
 
+def build_timeout(value: int) -> int:
+    """Reject invalid retained budgets before starting any selected Go tool."""
+    if type(value) is not int or not 1 <= value <= 900000:
+        raise ValueError("Go build_timeout_ms must be an integer from 1 to 900000")
+    return value
+
+
 def settings(value: dict) -> dict:
-    """Freeze canonical module roots and an explicit, shared build tag selection."""
-    if not isinstance(value, dict) or set(value) - {"module_roots", "build_tags"}:
-        raise ValueError("adapters.go accepts module_roots and build_tags")
+    """Freeze module roots, shared build tags and the per-command build budget."""
+    if not isinstance(value, dict) or set(value) - {"module_roots", "build_tags", "build_timeout_ms"}:
+        raise ValueError("adapters.go accepts module_roots, build_tags and build_timeout_ms")
+    timeout = build_timeout(value.get("build_timeout_ms", 180000))
     roots, tags = value.get("module_roots", []), value.get("build_tags", [])
     if not isinstance(roots, list) or any(type(item) is not str for item in roots):
         raise ValueError("Go module_roots must be an array of relative paths")
@@ -26,7 +34,7 @@ def settings(value: dict) -> dict:
         raise ValueError("Go module roots and build tags must be valid and distinct")
     if tags and not roots:
         raise ValueError("Go build_tags require explicit module_roots")
-    return {"module_roots": roots.copy(), "build_tags": tags.copy()}
+    return {"module_roots": roots.copy(), "build_tags": tags.copy(), "build_timeout_ms": timeout}
 
 
 def environment(options: dict) -> dict[str, str]:

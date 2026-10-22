@@ -12,6 +12,61 @@ from qualify_go_project import check_build_context
 
 
 class GeneratedGoBuildTests(unittest.TestCase):
+    def test_build_budget_is_frozen_for_standalone_and_package_entries(self):
+        configuration = gen.project_policy.validate({"adapters": {"go": {"build_timeout_ms": 600000}}})
+        for context in (None, {"module_root": ".", "shadowed_recovery": False}):
+            with self.subTest(context=context):
+                entry = {"path": "app.go", "name": "selected"}
+                discovered = {"functions": []}
+                if context is not None:
+                    discovered["go_context"] = context
+                gen.configure_go_context(entry, discovered, configuration)
+                self.assertEqual(entry["go_build_timeout_ms"], 600000)
+
+    def test_failed_build_retains_command_budget_and_restores_capture_hook(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            original_execute = gen.capture.execute
+            def commands(*_):
+                gen.capture.execute(["/selected/go", "build"], folder, {})
+            with patch.object(gen.capture, "go_commands", side_effect=commands), \
+                    patch.object(gen, "execute", side_effect=ValueError("process timeout")):
+                with self.assertRaisesRegex(ValueError, "process timeout"):
+                    gen.build_command(folder, folder, {"language": "go", "go_build_timeout_ms": 600000},
+                        folder / "app.go", folder / "policy", {}, {}, folder, folder, "baseline")
+            self.assertIs(gen.capture.execute, original_execute)
+            receipt, = folder.glob("build-*/build-command.json")
+            self.assertEqual(gen.read(receipt)["timeout_ms"], 600000)
+
+    def test_invalid_retained_build_budget_never_starts_a_tool(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            for milliseconds in (True, 0, 900001, float("inf")):
+                entry = {"language": "go", "go_build_timeout_ms": milliseconds}
+                with self.subTest(milliseconds=milliseconds), patch.object(gen, "execute") as execute:
+                    with self.assertRaisesRegex(ValueError, "build_timeout_ms"):
+                        gen.build_command(folder, folder, entry, folder / "app.go", folder / "policy", {}, {},
+                                          folder, folder, "baseline")
+                    execute.assert_not_called()
+
+    def test_declared_build_budget_is_applied_and_recorded_without_changing_launch_budget(self):
+        for milliseconds in (180000, 600000):
+            with self.subTest(milliseconds=milliseconds), tempfile.TemporaryDirectory() as temporary:
+                folder = Path(temporary)
+                entry = {"language": "go", "go_build_timeout_ms": milliseconds}
+                def commands(*_):
+                    gen.capture.execute(["/selected/go", "build"], folder, {})
+                    gen.write(folder / "go-build-identities.json", {"application": "fixed"})
+                    return ["plain"], ["on"]
+                with patch.object(gen.capture, "go_commands", side_effect=commands), patch.object(gen, "execute") as execute:
+                    self.assertEqual(gen.build_command(folder, folder, entry, folder / "app.go", folder / "policy",
+                        {}, {}, folder, folder, "baseline"), ["plain"])
+                self.assertEqual(execute.call_args.kwargs["timeout"], milliseconds / 1000)
+                receipt, = folder.glob("build-*/build-command.json")
+                self.assertEqual(gen.read(receipt), {"schema_version": 1, "argv": ["/selected/go", "build"],
+                    "cwd": str(folder), "timeout_ms": milliseconds})
+                self.assertEqual(gen.project_policy.validate({})["limits"]["case_timeout_ms"], 60000)
+
     def test_copied_shrink_evidence_retains_original_module_build_provenance(self):
         with tempfile.TemporaryDirectory() as temporary:
             base=Path(temporary).resolve();folder=base/'copy/case/baseline-0'

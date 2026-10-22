@@ -4,7 +4,22 @@ use serde_json::{json, Value};
 use std::{env, fs, path::Path, process::Command};
 use syn::{spanned::Spanned, visit::Visit};
 
+const ADAPTER_BOOTSTRAP: &str = concat!(
+    "import runpy, sys; ",
+    "root = sys.argv.pop(1); script = sys.argv[1]; ",
+    "sys.path.insert(0, root); sys.argv = sys.argv[1:]; ",
+    "runpy.run_path(script, run_name='__main__')"
+);
+
 const RESOURCES: &[(&str, &str)] = &[
+    (
+        "project_tests.py",
+        include_str!("../adapters/generation/project_tests.py"),
+    ),
+    (
+        "project_runner.py",
+        include_str!("../adapters/generation/project_runner.py"),
+    ),
     (
         "node_project.py",
         include_str!("../adapters/generation/node_project.py"),
@@ -327,8 +342,12 @@ pub fn launch(args: &[String]) -> Result<i32, String> {
     let executable = env::current_exe().map_err(|e| format!("CLI identity: {e}"))?;
     let python = env::var("OTELEQ_PYTHON").unwrap_or_else(|_| "python3".into());
     let status = Command::new(python)
+        .args(["-I", "-B", "-c", ADAPTER_BOOTSTRAP])
+        .arg(directory.path())
         .arg(directory.path().join("generation.py"))
         .args(args)
+        .env_remove("PYTHONPATH")
+        .env_remove("PYTHONHOME")
         .env("OTELEQ_EXECUTABLE", executable)
         .env("PYTHONDONTWRITEBYTECODE", "1")
         .status()

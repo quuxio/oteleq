@@ -395,7 +395,10 @@ fn exclusion_summary(report: &RunReport) -> Result<String, String> {
                 .split('/')
                 .any(|part| matches!(part, "" | "." | ".."))
             || !sha(&entry.plan_sha256)
-            || entry.reason != "verified retained oteleq workspace"
+            || !matches!(
+                entry.reason.as_str(),
+                "verified retained oteleq workspace" | "verified current-source oteleq suite"
+            )
             || !paths.insert(&entry.path)
         {
             return Err("invalid retained workspace exclusion".into());

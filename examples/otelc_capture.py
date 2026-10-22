@@ -48,6 +48,32 @@ REQUEST_TIMEOUT = 2
 
 
 class Receiver(BaseHTTPRequestHandler):
+    def handle_one_request(self):
+        self.response_event = self.server.begin_response_event()
+        try:
+            super().handle_one_request()
+        finally:
+            if self.response_event is not None:
+                path = getattr(self, "path", None)
+                self.response_event["path"] = path if path in (TRACE_PATH, "/v1/metrics") else None
+                self.response_event["handler_finished_ns"] = time.monotonic_ns()
+
+    def send_response(self, code, message=None):
+        if self.response_event is not None:
+            self.response_event["status"] = code
+            self.response_event["response_started_ns"] = time.monotonic_ns()
+        super().send_response(code, message)
+
+    def end_headers(self):
+        try:
+            super().end_headers()
+        except OSError:
+            if self.response_event is not None:
+                self.response_event["headers_write_failed"] = True
+            raise
+        if self.response_event is not None:
+            self.response_event["headers_written_ns"] = time.monotonic_ns()
+
     def do_POST(self):
         self.server.requests += 1
         lengths = self.headers.get_all("Content-Length", [])
@@ -80,6 +106,9 @@ class Receiver(BaseHTTPRequestHandler):
             return
         self.server.bodies.append((self.path, bytes(body)))
         self.server.received_bytes += size
+        if self.response_event is not None:
+            self.response_event["body_index"] = len(self.server.bodies) - 1
+            self.response_event["body_received_ns"] = time.monotonic_ns()
         self.send_response(200)
         self.send_header("Content-Length", "0")
         self.end_headers()
@@ -100,7 +129,20 @@ class CaptureServer(HTTPServer):
         self.bodies = []
         self.errors = []
         self.requests = 0
+        self.response_events = []
+        self.unrecorded_response_events = 0
         super().__init__(("127.0.0.1", 0), Receiver)
+
+    def begin_response_event(self) -> dict | None:
+        """Bound transport records even for requests rejected before body capture."""
+        if len(self.response_events) >= self.max_requests:
+            self.unrecorded_response_events += 1
+            return None
+        event = {"path": None, "status": None, "body_index": None, "request_started_ns": time.monotonic_ns(),
+                 "body_received_ns": None, "response_started_ns": None, "headers_written_ns": None,
+                 "headers_write_failed": False, "handler_finished_ns": None}
+        self.response_events.append(event)
+        return event
 
     def get_request(self):
         connection, address = super().get_request()
@@ -835,7 +877,7 @@ def commands(root, workspace, language, source, policy, tools, environment, evid
 
 
 @contextmanager
-def receiver(*, max_requests=MAX_REQUESTS, max_bytes=MAX_CAPTURE_BYTES):
+def receiver(*, max_requests=MAX_REQUESTS, max_bytes=MAX_CAPTURE_BYTES, response_path: Path | None = None):
     """Expose exact received bytes and every transport failure to the observer."""
     server = CaptureServer(max_requests, max_bytes=max_bytes)
     worker = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True)
@@ -846,6 +888,12 @@ def receiver(*, max_requests=MAX_REQUESTS, max_bytes=MAX_CAPTURE_BYTES):
         server.shutdown()
         server.server_close()
         worker.join(timeout=3)
+        if response_path is not None:
+            record = {"schema_version": 1, "scope": "server response headers; client acknowledgement is not observed",
+                      "clock": "monotonic_ns", "events": server.response_events,
+                      "unrecorded_events": server.unrecorded_response_events}
+            with response_path.open("x", encoding="utf-8") as output:
+                output.write(json.dumps(record, indent=2) + "\n")
 
 
 def configure(policy, endpoint):

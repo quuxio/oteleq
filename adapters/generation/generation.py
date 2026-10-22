@@ -38,6 +38,7 @@ import native_profile
 import otelc_capture as capture
 import otelc_collection
 import policy as project_policy
+import project_tests
 import python_project
 import shrinking
 import sequences
@@ -54,7 +55,7 @@ GENERATED_MANIFEST = 'generated-manifest.json'
 TYPED_BUNDLE = 'typed-bundle.json'
 BUILD_IDENTITIES = 'build-identities.json'
 README_FILE = 'README.txt'
-COMMANDS = ("plan", "generate", "run", "replay", "clean", "export-tests", "shrink")
+COMMANDS = ("plan", "generate", "run", "replay", "clean", "export-tests", "shrink", "promote")
 
 
 def write(path, data):
@@ -387,6 +388,7 @@ def receiver_factory(entry, discovered, name):
 
 def configure_go_context(entry: dict, discovered: dict, configuration: dict) -> None:
     """Keep compiler package identity and recovery bindings in the frozen entry."""
+    entry["go_build_timeout_ms"] = configuration["adapters"]["go"]["build_timeout_ms"]
     entry["go_main_renames"] = discovered.get("main_renames", [])
     entry["go_shadowed_recovery"] = any(function["name"] in ("recover", "panic")
                                       for function in discovered["functions"])
@@ -641,7 +643,7 @@ def generator_identity():
         'node_project.py', 'node_context.mjs',
         'native_profile.py', 'native_project.py', 'native_dependencies.py', 'native_frontend.py',
         'native_discover.cpp', 'native_context.py', 'native_workers.py', 'native_workspace.py',
-        'owned_workspace.py')})
+        'owned_workspace.py', 'preconditions.py', 'project_tests.py', 'project_runner.py')})
     files["host-python"] = capture.file_digest(Path(sys.executable))
     files["observer:otelc_capture.py"] = capture.file_digest(Path(capture.__file__))
     files["host-version"] = sys.version
@@ -745,7 +747,7 @@ if __name__=="__main__":unittest.main()
             shutil.copyfile(workspace / "snapshot" / name, target)
         harness.materialise(preview, entry, case["arguments"])
     write(workspace / GENERATED_MANIFEST, manifest(destination))
-    (workspace / README_FILE).write_text("Generated scalar diagnostic suite. Boilerplate: MIT; application snapshot retains its original licence.\nRun: OTELEQ_PYTHON=/path/to/otelc/.venv/bin/python python3 tests/test_equivalence.py\nOr: quux-oteleq run --workspace . --report-dir /new/external/report\nEvery blocked selected callable fails the generated strict suite. No shipping-artefact or universal equivalence claim.\nKeep this whole workspace, or export-tests to a new destination.\n")
+    (workspace / README_FILE).write_text("Generated scalar diagnostic suite. Boilerplate: MIT; application snapshot retains its original licence.\nRun: OTELEQ_PYTHON=/path/to/otelc/.venv/bin/python python3 -I -B tests/test_equivalence.py\nOr: quux-oteleq run --workspace . --report-dir /new/external/report\nEvery blocked selected callable fails the generated strict suite. No shipping-artefact or universal equivalence claim.\nKeep this whole workspace, or export-tests to a new destination.\n")
     print(json.dumps({"workspace": str(workspace), "cases": len(cases), "ready_functions": sum(e["status"] == "ready" for e in data["inventory"]), "blocked_functions": sum(e["status"] == "blocked" for e in data["inventory"])}))
     return 0
 
@@ -823,6 +825,15 @@ def driver_path(project, entry):
     return project / (relative or entry["path"])
 
 
+def execute_capture_build(command, cwd, environment, folder, timeout):
+    """Retain each fixed build/tool vector and its declared wall-time budget."""
+    destination = folder / ("build-" + uuid.uuid4().hex)
+    destination.mkdir(mode=0o700)
+    write(destination / "build-command.json", {"schema_version": 1, "argv": list(map(str, command)),
+        "cwd": str(cwd), "timeout_ms": round(timeout * 1000)})
+    return execute(command, cwd, environment, destination, timeout=timeout)
+
+
 def build_command(root, project, entry, driver, config, tools, env, folder, scratch, lane, *, prepared_runtime=None, java_context=None):
     language = entry["language"]
     prefix = [root / "target/debug/quux-otelc", "--config", config, "--language", language]
@@ -837,8 +848,9 @@ def build_command(root, project, entry, driver, config, tools, env, folder, scra
                            max_output_bytes=max_output_bytes)
         node_project.verify_attempt(project, entry, root, tools[language], inspect_node, folder)
     # Use the proven build recipes, with bounded execution for every build and launch.
+    timeout = go_project.build_timeout(entry.get("go_build_timeout_ms", 180000)) / 1000 if language == "go" else 180
     old_execute = capture.execute
-    capture.execute = lambda command, cwd, environment, timeout=180: execute(command, cwd, environment, folder / ("build-" + uuid.uuid4().hex), timeout)
+    capture.execute = lambda command, cwd, environment, timeout=timeout: execute_capture_build(command, cwd, environment, folder, timeout)
     try:
         if language == "rust":
             command = capture.rust_command(root, project, driver, config, tools, env, folder, scratch, lane,
@@ -986,7 +998,7 @@ def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, ht
     immutable = manifest(project)
     java_context = java_project.materialise(workspace, data, folder, project) if language == "java" else None
     receiver_options = {"max_requests": java_provider.MAX_TELEMETRY_REQUESTS} if runtime is not None else {}
-    with capture.receiver(**receiver_options) as (endpoint, bodies, errors):
+    with capture.receiver(**receiver_options, response_path=folder / "http-responses.json") as (endpoint, bodies, errors):
         config = folder / "policy.toml"
         config.write_text(policy(entry, endpoint, service=service) if runtime is not None else policy(entry, endpoint))
         if language == "typescript":
@@ -1265,6 +1277,11 @@ def shrink(args):
     return shrinking.run(args, sys.modules[__name__])
 
 
+def promote(args):
+    """Create a reviewed suite which replans the current checkout on discovery."""
+    return project_tests.promote(args, sys.modules[__name__])
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, allow_abbrev=False)
     commands = parser.add_subparsers(dest="command", required=True)
@@ -1283,9 +1300,11 @@ def main(argv=None):
             sub.add_argument("--report-dir", type=Path, required=True)
         elif command == "replay":
             sub.add_argument("--case", required=True)
-        elif command == "export-tests":
+        elif command in ("export-tests", "promote"):
             sub.add_argument("--destination", type=Path, required=True)
             sub.add_argument("--apply", action="store_true")
+            if command == "promote":
+                sub.add_argument("--source", type=Path, required=True)
         elif command == "shrink":
             sub.add_argument("--case", required=True)
             sub.add_argument("--report-dir", type=Path, required=True)
@@ -1294,7 +1313,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
     try:
         return {"plan": plan, "generate": generate, "run": run, "replay": run, "clean": clean,
-                "export-tests": export_tests, "shrink": shrink}[args.command](args)
+                "export-tests": export_tests, "shrink": shrink, "promote": promote}[args.command](args)
     except (ValueError, OSError, KeyError, ImportError) as error:
         print("oteleq: " + str(error), file=sys.stderr)
         return 4

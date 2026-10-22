@@ -24,7 +24,7 @@ OTELEQ_WORKSPACE=/tmp/oteleq-run-actual-id
   --report-dir /absolute/path/to/new-report
 
 # The retained suite uses Python's standard unittest framework for every language.
-"$OTELEQ_PYTHON" "$OTELEQ_WORKSPACE/tests/test_equivalence.py"
+"$OTELEQ_PYTHON" -I -B "$OTELEQ_WORKSPACE/tests/test_equivalence.py"
 ```
 
 The report directory must be new and outside the application, otelc and workspace. Generation never edits the application, its dependencies, manifests or locks. Workspaces remain available until explicit cleanup; there is no automatic deletion after a successful run.
@@ -36,6 +36,8 @@ If an earlier exported suite lives inside the application, the planner [verifies
 The CLI embeds its adapter sources, so an installed binary does not depend on an oteleq source checkout. It still needs the selected Python environment, otelc build and language tools. Keep the same CLI and tool contents for replay; changing them requires a new plan. `cargo install --path . --locked` installs the CLI locally.
 
 The generated suite remembers the CLI path used during generation. If the same binary is moved, export `OTELEQ_CLI=/new/path/to/quux-oteleq` before running the suite; its content identity must still match the plan. `OTELEQ_PYTHON` selects the qualified adapter-host environment. See the [command/flag reference](cli-and-configuration.md#implemented-commands) and [actual workspace layout](test-generation.md#current-workspace).
+
+[Current-source promotion](current-source-tests.md) creates an optional reusable entrypoint from a generated workspace. Its file plan requires explicit `--apply`; each later discovery creates new private snapshots and per-case unittest tests for the current checkout, using the reviewed policy and pinned tool/provider contents. The [956-launch qualification](qualification/current-source-tests-2026-10-22.json) covers the supported eight-language profiles, changed bodies, checkout relocation, new functions and explicit refusal controls.
 
 Path flags accept both `--source PATH` and `--source=PATH` forms. Use full option names; abbreviated options are rejected. Input repository boundaries are checked before extracting embedded workers.
 
@@ -240,6 +242,8 @@ make generation-policy-otelc PYTHON=/absolute/path/to/otelc/.venv/bin/python \
 [`render-report`](reporting.md) creates private HTML/JUnit presentations from this retained JSON without executing the application. Incomplete or untested inventory entries remain errors, including in partial replay reports.
 
 `report.json` retains every case result, the complete selected/excluded/blocked inventory, source identity, observation scope and source-preservation result. Case directories retain the concrete corpus, generated source, build logs and hashes, launch vectors, raw application observations, runtime reports, OTLP protobuf/HTTP records, comparator bundle and JSON comparison. Partial results remain available if a later case fails.
+
+New generated attempts also retain `http-responses.json`: bounded server-side request/body receipt, response status, header-write completion or failure, and handler-finish events using a monotonic clock. Body indices refer to `http-capture.json`. Unknown request paths are omitted, and events beyond the request allowance have an explicit count. A completed server header write does not prove client acknowledgement, downstream receipt or zero exporter loss. Strict runtime health and decoded telemetry checks still apply. Older captures without this file have no recorded response lifecycle; missing evidence cannot be reconstructed from their retained bodies.
 
 Exit `0` requires nonzero completed cases and no selected blockers. `1` reports a reproducible difference; `2` reports argument errors or a blocked fixture/initial-state contract; `3` reports incomplete evidence or an unresolved inventory blocker; `4` reports a tool/build/protocol/identity failure. Mixed results give precedence to `4`, `2`, `3`, then `1`. The generated `unittest` suite turns every selected blocker into a failing test.
 

@@ -14,6 +14,7 @@ Updated 22 October 2026. `quux-oteleq` implements the commands below. The scalar
 | `replay` | `--workspace PATH --case ID` | None | One frozen case in a new `runs/replay-*` directory inside the workspace |
 | `shrink` | `--workspace PATH --case ID --report-dir PATH` | `--trials N` | Declared-domain scalar reduction, retained trial evidence and a sealed one-case replay workspace; see [shrinking](counterexample-shrinking.md) |
 | `export-tests` | `--workspace PATH --destination PATH` | `--apply` | Copy plan by default; with `--apply`, a new runnable frozen source/suite bundle |
+| `promote` | `--workspace PATH --source PATH --destination PATH` | `--apply` | Reviewable file plan; with `--apply`, a sealed suite which replans the current checkout and generates fresh per-case unittest tests |
 | `clean` | `--workspace PATH` | None | Removes an owned workspace after checking its snapshot/suite and top-level contents |
 | `render-report` | `REPORT.json --output-dir NEW_DIRECTORY` | None | Private standalone HTML and JUnit presentation of retained generated-run evidence |
 | `compare-workload` | `BUNDLE.json` positional path | None | Byte-channel comparison JSON on stdout |
@@ -21,7 +22,7 @@ Updated 22 October 2026. `quux-oteleq` implements the commands below. The scalar
 
 The generation commands and `render-report` accept `--help`. `quux-oteleq --help` lists both workflows and their exit contracts. Use full option names; abbreviations are rejected. Paths accept both `--source PATH` and `--source=PATH` forms. `--cases` accepts 1 through 1024 and defaults to the policy budget or 3 scalar cases per function. Larger budgets add seeded samples; finite domains can produce fewer distinct cases. Language IDs are `c`, `cpp`, `rust`, `python`, `java`, `javascript`, `typescript`, `go`; repeated language selectors form a subset, and exclusions match qualified function identities.
 
-Set `OTELEQ_PYTHON` to otelc's qualified Python 3.12+ environment with the OTLP protobuf decoder. The selected language tools and built otelc adapters must already exist. `plan` performs syntax discovery using those tools, without executing target functions. It does not establish arbitrary build graphs or valid business preconditions. `generate` creates the suite once; a changed source, corpus, CLI or tool identity requires a new plan. Dependencies are not installed into the application.
+Set `OTELEQ_PYTHON` to otelc's qualified Python 3.12+ environment with the OTLP protobuf decoder. The selected language tools and built otelc adapters must already exist. `plan` performs syntax discovery using those tools, without executing target functions. It does not establish arbitrary build graphs or valid business preconditions. `generate` creates the suite once; a changed source, corpus, CLI or tool identity requires a new plan. Dependencies are not installed into the application. The adapter host runs in isolated Python mode with its private embedded module root; ambient `PYTHONPATH` and `PYTHONHOME` do not select planner modules.
 
 Default generated execution uses the recorded pre-rebuild provider APIs and matching tools in the [qualification record](qualification/integrated-provider-2026-10-20.json). Java can explicitly use the replacement SDK's separately qualified [prepared provider](java-prepared-provider.md); other replacement-SDK adapters remain open. A fixture can also supply an independently [declared scalar return](expected-returns.md) with `expected_baseline.kind = "return_value"` and a typed `value` record.
 
@@ -49,11 +50,13 @@ Prepared Java additionally accepts `profile = "stock-methods-v1"` (default), `"s
 
 `[[fixtures]] receiver = { factory = "Counter", arguments = [10] }` declares an existing Python, Java, JavaScript or TypeScript source constructor or factory (a same-class static method for [Java](java-receivers.md)) for a selected instance method. Method `cases` exclude the implicit receiver. [Receiver fixtures](receiver-fixtures.md) retain construction inputs and source bindings, require typed receiver/class-data roots and reconstruct independently during generated tests, replay/export and scalar method-argument shrinking. [Go receivers](go-receivers.md) instead use a unique existing same-package scalar function returning the exact source struct pointer, with explicit module roots. Unsupported languages or callable/storage forms fail visibly.
 
+`[adapters.go] build_timeout_ms` declares the separate per-command Go prepare/build budget (default 180000; range 1 through 900000). It is frozen in plans and retained through promotion, replay and export. It does not change the application wall-time limit, fixed build flags or required evidence; see [retained Go builds](go-build-bundles.md#build-settings-and-runtime-controls).
+
 Go execution requires the [retained build/run provider API](go-build-bundles.md), with strict schema-1 bundle, selected compiler/source/SDK bindings, separate compiler bytes and fixed build-time trace selection. Both replay lanes use the same validated pair. `[adapters.go] module_roots = ["."]` opts into [ordinary module/package context](go-package-context.md); optional `build_tags = ["integration"]` is frozen for discovery and compilation. Empty roots retain standalone mode. Private compiler/module caches remain external to the target repository. Cgo/workspaces and general build recipes remain unsupported.
 
 ## Proposed extensions
 
-The broader design adds a `doctor` capability command, build recipes and object/receiver factories, richer promotion planning, stateful inputs and a versioned graph/worker protocol. `doctor`, `promote`, `--keep-workspace`, `--dry-run` and replay `--bundle` are proposal names, not available CLI options. Current retention uses `export-tests` and explicit `clean`.
+The broader design adds a `doctor` capability command, build recipes and object/receiver factories, richer promotion planning, stateful inputs and a versioned graph/worker protocol. `doctor`, `--keep-workspace`, `--dry-run` and replay `--bundle` are proposal names, not available CLI options. Current retention uses `export-tests`, [current-source promotion](current-source-tests.md) and explicit `clean`. Both export and promotion default to a reviewable plan and require `--apply` to copy.
 
 ## Implemented configuration
 

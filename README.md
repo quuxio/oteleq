@@ -100,7 +100,7 @@ OTELEQ_WORKSPACE=/tmp/oteleq-run-actual-id
 "$OTELEQ_CLI" generate --workspace "$OTELEQ_WORKSPACE"
 "$OTELEQ_CLI" run --workspace "$OTELEQ_WORKSPACE" \
   --report-dir /absolute/path/to/new-report
-"$OTELEQ_PYTHON" "$OTELEQ_WORKSPACE/tests/test_equivalence.py"
+"$OTELEQ_PYTHON" -I -B "$OTELEQ_WORKSPACE/tests/test_equivalence.py"
 ```
 
 Render a retained run as [standalone HTML and JUnit XML](docs/reporting.md):
@@ -152,6 +152,8 @@ Cleanup can remove an unchanged owned workspace after its original sources or to
 Export includes a frozen application snapshot and runnable suite. It refuses existing destinations and may be placed in the application only by that explicit choice. Generated boilerplate is MIT licensed; application code retains its licence. Retained suites test their frozen snapshot; create a new plan for changed application code. See [capabilities, limits and complete usage](docs/automatic-generation.md). Pass the executable [example policy](examples/equivalence.toml) with `plan --config PATH` for selection, scalar fixtures and budgets. Broader build/factory and generated graph-adapter integration remain on the [completion checklist](docs/completion.md).
 
 [Planning after an in-source export](docs/retained-source-selection.md) verifies and excludes retained oteleq bundles from application discovery and snapshots. Invalid or edited bundles stop planning; plans and reports disclose the exclusions.
+
+For future application changes, [promote a current-source suite](docs/current-source-tests.md). `promote --workspace "$OTELEQ_WORKSPACE" --source /absolute/path/to/application --destination /absolute/path/to/application/equivalence-tests` prints its file plan; add `--apply` to create it. Run `python3 -I -B` on its `test_equivalence.py` to generate and execute fresh per-case tests from the current checkout in external private workspaces. Tool/provider context and policy remain frozen, and selected gaps remain failures. The [exact-revision qualification](docs/qualification/current-source-tests-2026-10-22.json) checks the supported eight-language profiles through changed bodies, checkout relocation and newly added functions.
 
 [Input inspection](docs/input-inspection.md) refuses unreadable or vanished directories instead of silently omitting their contents from plans or byte identities. On qualified POSIX hosts, shared hashing also rejects named pipes without waiting for a writer.
 

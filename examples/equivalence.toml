@@ -35,6 +35,7 @@ backend = "legacy"
 [adapters.go]
 module_roots = []
 build_tags = []
+build_timeout_ms = 180000
 
 # Optional explicit domain cases replace automatic samples for matching functions.
 # Use the exact function identity from plan.json or a deliberate glob.
