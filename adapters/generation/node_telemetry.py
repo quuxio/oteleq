@@ -13,6 +13,8 @@ FUNCTION_SCOPE = ("io.quux.otelc.functions", "0.2.0")
 LIFETIME_SCOPE = ("io.quux.otelc.lifetimes", "0.2.0")
 BOUNDS = [1e-6, 1e-5, 1e-4, .001, .01, .1, 1.]
 RUNTIME_LOSSES = {"function_capacity", "active_call_capacity", "invalid", "async_origin", "incomplete"}
+DURATION = "otelc.function.duration"
+LIFETIME_SUFFIX = " lifetime"
 
 
 def attributes(rows) -> dict:
@@ -93,7 +95,7 @@ def span_record(span, identity: tuple, entry: dict, allowed: set[str], nodes: di
                          and values.get("otelc.language") == ("string_value", entry["language"]),
                          "unbound source function span")
     else:
-        provider.require(span.name == entry["node_class_label"] + " lifetime"
+        provider.require(span.name == entry["node_class_label"] + LIFETIME_SUFFIX
                          and values.get("type") == ("string_value", entry["node_class_label"])
                          and values.get("boundary") == ("string_value", "observed_gc"),
                          "unrequested lifetime boundary")
@@ -116,7 +118,7 @@ def trace_group(group, entry: dict, service: str, launch: str, allowed: set[str]
 
 def collection_receipt(spans: list, report: dict, entry: dict, creator: str | None) -> None:
     """A collected receiver needs its actual lifetime and optional creation link."""
-    lifetime = [span for span in spans if span.name == entry["node_class_label"] + " lifetime"]
+    lifetime = [span for span in spans if span.name == entry["node_class_label"] + LIFETIME_SUFFIX]
     provider.require(len(lifetime) == 1, "collection did not yield one complete lifetime")
     state = counters(report.get("lifetimes"), {"admitted", "gc_completed", "resource_completed", "current_live", "censored"}, "lifetime")
     provider.require(state == {"admitted": 1, "gc_completed": 1, "resource_completed": 0, "current_live": 0, "censored": 0},
@@ -130,7 +132,7 @@ def collection_receipt(spans: list, report: dict, entry: dict, creator: str | No
 def trace_counts(names: Counter, spans: list, report: dict, entry: dict, allowed: set[str]) -> None:
     """Compare declared selected roots and every decoded completion with SDK totals."""
     target_roots = sum(not span.parent_span_id and span.name == entry["otelc_function"] for span in spans)
-    extra = {entry["node_class_label"] + " lifetime"} if sequences.collects(entry) else set()
+    extra = {entry["node_class_label"] + LIFETIME_SUFFIX} if sequences.collects(entry) else set()
     provider.require(target_roots == sequences.call_count(entry) and set(names) == allowed | extra,
                      "selected source calls were not independently witnessed")
     provider.require(sum(names.values()) == report["span_accounting"]["received"], "decoded span count differs from final SDK receipt")
@@ -172,7 +174,7 @@ def metric_point(metric, point, entry: dict, allowed: set[str]) -> tuple[str, in
     provider.require(name in allowed and values == {"function": ("string_value", name), "language": ("string_value", entry["language"])}
                      and point.flags == 0 and 0 < point.start_time_unix_nano <= point.time_unix_nano,
                      "incomplete or unbound source metric point")
-    if metric.name == "otelc.function.duration":
+    if metric.name == DURATION:
         provider.require(list(point.explicit_bounds) == BOUNDS and len(point.bucket_counts) == len(BOUNDS) + 1
                          and sum(point.bucket_counts) == point.count and math.isfinite(point.sum) and point.sum >= 0,
                          "invalid source duration histogram")
@@ -194,18 +196,44 @@ def auxiliary_metric_scope(scope, entry: dict) -> None:
 
 
 def function_metric_scope(scope, entry: dict, allowed: set[str], observed: dict) -> None:
-    """Retain maxima across cumulative exports for each selected function metric."""
+    """Retain every cumulative sample; arrival order need not be timestamp order."""
     for metric in scope.metrics:
-        provider.require(metric.name in {"otelc.function.calls", "otelc.function.unwinds", "otelc.function.duration"},
+        provider.require(metric.name in {"otelc.function.calls", "otelc.function.unwinds", DURATION},
                          "unexpected source function metric")
-        histogram = metric.name == "otelc.function.duration"
+        histogram = metric.name == DURATION
         provider.require(metric.WhichOneof("data") == ("histogram" if histogram else "sum"), "source metric kind differs")
         data = metric.histogram if histogram else metric.sum
         provider.require(data.aggregation_temporality == 2, "source metrics must be cumulative")
         for point in data.data_points:
             name, count = metric_point(metric, point, entry, allowed)
             key = (metric.name, name)
-            observed[key] = max(observed.get(key, 0), count)
+            sample = (point.start_time_unix_nano, point.time_unix_nano, count,
+                      tuple(point.bucket_counts) if histogram else (), point.sum if histogram else 0)
+            observed.setdefault(key, []).append(sample)
+
+
+def cumulative_step(previous: tuple, sample: tuple) -> None:
+    """One later measurement cannot reset an established cumulative stream."""
+    provider.require(sample[0] == previous[0], "cumulative metric start time changed")
+    if sample[1] == previous[1]:
+        provider.require(sample == previous, "conflicting cumulative snapshots share a timestamp")
+        return
+    provider.require(sample[2] >= previous[2] and sample[4] >= previous[4]
+                     and all(current >= old for current, old in zip(sample[3], previous[3])),
+                     "cumulative metric count, bucket or sum regressed")
+
+
+def cumulative_counts(observed: dict) -> dict:
+    """Reject resets and conflicting snapshots before using final cumulative totals."""
+    result = {}
+    for key, samples in observed.items():
+        ordered = sorted(samples, key=lambda sample: sample[1])
+        previous = ordered[0]
+        for sample in ordered[1:]:
+            cumulative_step(previous, sample)
+            previous = sample
+        result[key] = previous[2]
+    return result
 
 
 def metric_group(group, entry: dict, service: str, launch: str, allowed: set[str], observed: dict) -> None:
@@ -236,10 +264,11 @@ def function_metrics(bodies, entry: dict, service: str, report: dict, spans: lis
             raise ValueError("Node source provider: invalid metric protobuf") from error
         for group in message.resource_metrics:
             metric_group(group, entry, service, report["launch_id"], allowed, observed)
+    counts = cumulative_counts(observed)
     for name, count in totals.items():
-        provider.require(observed.get(("otelc.function.calls", name)) == count
-                         and observed.get(("otelc.function.duration", name)) == count
-                         and observed.get(("otelc.function.unwinds", name), 0) == unwinds[name],
+        provider.require(counts.get(("otelc.function.calls", name)) == count
+                         and counts.get((DURATION, name)) == count
+                         and counts.get(("otelc.function.unwinds", name), 0) == unwinds[name],
                          "decoded source function metrics differ from actual traced calls")
 
 

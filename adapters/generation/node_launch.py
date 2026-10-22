@@ -19,6 +19,7 @@ ENVIRONMENT_KEYS = ("NODE_OPTIONS", "NODE_PATH", "NODE_PRESERVE_SYMLINKS", "NODE
                     "NODE_COMPILE_CACHE_READONLY", "UV_THREADPOOL_SIZE", "TZ", "LANG", "LC_ALL",
                     "LC_CTYPE", "TMPDIR", "TEMP", "TMP")
 REQUEST_FILE = "node-source-request.json"
+PROCESS_FILE = "process.json"
 
 
 def read(path: Path) -> dict:
@@ -130,7 +131,7 @@ def tooling(manifest: dict, root: Path, value: dict) -> None:
 
 def process_receipts(folder: Path, value: dict) -> dict:
     """Keep supervisor, application and SDK identities distinct and actually completed."""
-    supervisor = read(folder / "process.json")
+    supervisor = read(folder / PROCESS_FILE)
     application = read(folder / "node-source-application.json")
     provider.require(type(supervisor.get("pid")) is int and supervisor["pid"] > 1
                      and type(application.get("pid")) is int and application["pid"] > 1
@@ -182,13 +183,14 @@ def launch_manifest(manifest: dict, value: dict, original: dict, root: Path, ent
 
 def verify(root: Path, project: Path, entry: dict, tools: dict, folder: Path, lane: str) -> None:
     """Qualify real process/launch/input receipts after the supervisor has terminated."""
-    value = read(folder / REQUEST_FILE)
     expected = {"schema_version": 1, "provider": str(root), "project": str(project),
                 "entry": str(project / entry["path"]), "runtime": str(folder / "node-runtime"),
                 "policy": str(folder / "policy.toml"), "node": str(tools[entry["language"]]),
                 "language": entry["language"], "compiler": entry["node_compiler"], "plain": lane == "baseline",
                 "gc_fixture": sequences.collects(entry), "timeout_ms": entry["node_timeout_ms"]}
-    same(value, expected, "consumer supervisor request changed")
+    same(read(folder / REQUEST_FILE), expected, "consumer supervisor request changed")
+    # Checked receipts cannot select paths for subsequent evidence reads.
+    value = expected
     completion = process_receipts(folder, value)
     runtime = Path(value["runtime"])
     prefix = "node-plain" if value["plain"] else "node"
@@ -199,8 +201,9 @@ def verify(root: Path, project: Path, entry: dict, tools: dict, folder: Path, la
          "common source policy no longer matches the selected entry")
     original = expected_original(value, configuration, read(folder / "node-source-environment.json"))
     launch_manifest(manifest, value, original, root, entry)
-    same(read(folder / "process.json")["argv"], list(map(str, supervisor_command(tools, folder))), "actual supervisor command differs")
-    provider.require(manifest["launcher_pid"] == read(folder / "process.json")["pid"], "SDK launcher is not the actual supervisor")
+    process = read(folder / PROCESS_FILE)
+    same(process["argv"], list(map(str, supervisor_command(tools, folder))), "actual supervisor command differs")
+    provider.require(manifest["launcher_pid"] == process["pid"], "SDK launcher is not the actual supervisor")
     same(read(folder / "node-source-command.json"), worker.expected_argv(value), "actual application command differs")
     inputs = read(runtime / (prefix + "-inputs.json"))
     fields = {"schema_version", "launch_id", "phase", "action_delivery_verified", "loaded_inputs", "launch_manifest",

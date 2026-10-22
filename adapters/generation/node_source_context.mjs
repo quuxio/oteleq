@@ -40,7 +40,8 @@ function retainCompiler(evidence, directory) {
 
 /** Use the frozen SDK compiler behind the ordinary empty-module inspector. */
 export async function installCompiler(request, root, selected) {
-  if (!request || Object.keys(request).sort().join(',') !== 'backend,directory,root'
+  if (!request || Object.keys(request).length !== 3
+      || !['backend', 'directory', 'root'].every(key => Object.hasOwn(request, key))
       || !['native', 'api'].includes(request.backend)
       || typeof request.root !== 'string' || typeof request.directory !== 'string'
       || !path.isAbsolute(request.root) || !path.isAbsolute(request.directory)) {
@@ -72,7 +73,7 @@ export async function installCompiler(request, root, selected) {
     receipt() {
       if (!compiler) throw new Error('source compiler was not inspected');
       const original = JSON.stringify([...state.reads.values()]);
-      for (const filename of [...state.reads.keys()]) readConfiguration(filename, state);
+      for (const filename of state.reads.keys()) readConfiguration(filename, state);
       if (JSON.stringify([...state.reads.values()]) !== original) throw new Error('compiler configuration changed after inspection');
       return {profile: 'module-format-only-v1', compiler, configuration_reads: [...state.reads.values()]};
     }

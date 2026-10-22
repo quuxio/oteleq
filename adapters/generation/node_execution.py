@@ -52,6 +52,15 @@ def reentry(record: dict, requests: dict, emissions: dict, entries: dict,
     successors[earlier] = load
 
 
+def later_entry(load: int, entries: dict, successors: dict) -> int:
+    """Only a complete increasing same-URL chain can reach an observed body."""
+    later = load
+    while later in successors and later not in entries:
+        later = successors[later]
+    provider.require(later != load and later in entries, "module body entry is unverified")
+    return later
+
+
 def outcomes(requests: dict, emissions: dict, entries: dict, successors: dict, value: dict) -> list[dict]:
     """Unentered attempts need a complete retained chain to a later actual entry."""
     result = []
@@ -68,10 +77,7 @@ def outcomes(requests: dict, emissions: dict, entries: dict, successors: dict, v
         if load in entries:
             outcome.update(outcome="body_entered", resolved_format=entries[load]["format"])
         elif required:
-            later = load
-            while later in successors and later not in entries:
-                later = successors[later]
-            provider.require(later != load and later in entries, "module body entry is unverified")
+            later = later_entry(load, entries, successors)
             outcome.update(outcome="unentered_before_same_url_entry", reentered_by=successors[load],
                            later_entry_load_id=later)
         result.append(outcome)

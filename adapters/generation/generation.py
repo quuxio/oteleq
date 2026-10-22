@@ -256,6 +256,14 @@ def discovery_tools(root: Path, language: str, adapters: dict) -> tuple[dict, di
     return selected, qualified
 
 
+def node_context_options(source_node, language, adapters, workspace, name):
+    """Compiler-only evidence belongs to this selected private TypeScript source."""
+    if source_node and language == "typescript":
+        return {"source_backend": adapters["node"]["typescript_compiler"],
+                "evidence": workspace / node_source.DIRECTORY / "context" / identity(name)}
+    return {}
+
+
 def discover_file(name, language, root, snapshot, workspace, tools, artefacts, adapter_state=None):
     adapter_state = adapter_state or {}
     adapters = adapter_state.get("configuration", {})
@@ -280,9 +288,7 @@ def discover_file(name, language, root, snapshot, workspace, tools, artefacts, a
         discovered = discovery.discover(snapshot / name, language, root, tools[language], discover_execute, **discovery_options)
         if language in ("javascript", "typescript"):
             original = Path(adapter_state["source"]) if "source" in adapter_state else None
-            options = ({"source_backend": adapters["node"]["typescript_compiler"],
-                        "evidence": workspace / node_source.DIRECTORY / "context" / identity(name)}
-                       if source_node and language == "typescript" else {})
+            options = node_context_options(source_node, language, adapters, workspace, name)
             discovered.update(node_project.inventory_context(snapshot / name, snapshot, original, language,
                                                              root, tools[language][language], discover_execute, **options))
         return discovered
@@ -481,6 +487,14 @@ def configure_fixture(entry, discovered, fixture):
             entry["reason"] = entry["reason"] or str(error)
 
 
+def bind_runtime_providers(entry, root, workspace, tools):
+    """Bind only the selected Node profile alongside the existing Java provider."""
+    if not node_source.enabled(entry):
+        typescript_provider.bind(entry, root, workspace, tools, execute, policy)
+    node_source.bind(entry, root, workspace, tools, execute)
+    java_provider.bind(entry, root, workspace, tools, execute)
+
+
 def inventory_tree(contents, root, snapshot, workspace, args, native_projects=None, java_context=None, *, original_source=None):
     native_projects = native_projects or {}
     tools, artefacts, inventory, covered = native_profile.inventory(
@@ -508,10 +522,7 @@ def inventory_tree(contents, root, snapshot, workspace, args, native_projects=No
             entry = inventory_entry(function, discovered, name, language, sha, snapshot, args)
             java_project.bind_entry(entry, java_context)
             filesystem_effects.bind(entry, args.configuration)
-            if not node_source.enabled(entry):
-                typescript_provider.bind(entry, root, workspace, tools.get(language, {}), execute, policy)
-            node_source.bind(entry, root, workspace, tools.get(language, {}), execute)
-            java_provider.bind(entry, root, workspace, tools.get(language, {}), execute)
+            bind_runtime_providers(entry, root, workspace, tools.get(language, {}))
             inventory.append(entry)
     return tools, artefacts, inventory
 
@@ -1002,6 +1013,13 @@ def attempt(workspace, data, entry, case, lane, folder, decoder, *, http_fixture
         return attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, http_fixtures, runtime)
 
 
+def attempt_policy(entry, endpoint, service, runtime):
+    """Prepared providers consume the same original per-attempt service identity."""
+    if runtime is not None or node_source.enabled(entry):
+        return policy(entry, endpoint, service=service)
+    return policy(entry, endpoint)
+
+
 def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, http_fixtures, runtime):
     """Capture each lane with the same private source, effects and process budgets."""
     root, language = Path(data["otelc_root"]), entry["language"]
@@ -1030,7 +1048,7 @@ def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, ht
         receiver_options["allow_chunked"] = True
     with capture.receiver(**receiver_options, response_path=folder / "http-responses.json") as (endpoint, bodies, errors):
         config = folder / "policy.toml"
-        config.write_text(policy(entry, endpoint, service=service) if runtime is not None or node_source.enabled(entry) else policy(entry, endpoint))
+        config.write_text(attempt_policy(entry, endpoint, service, runtime))
         if language == "typescript" and not node_source.enabled(entry):
             env["OTELC_TYPESCRIPT_BACKEND"] = capture.typescript_backend(root, language, entry, config.read_bytes())
             write(folder / "typescript-controls.json", {"OTELC_TYPESCRIPT_BACKEND": env["OTELC_TYPESCRIPT_BACKEND"],
@@ -1239,35 +1257,31 @@ def run(args):
     return code
 
 
+def retained_provider_directories(data):
+    """Dry-run and applied exports retain exactly the same provider evidence."""
+    providers = ((data.get('native_projects'), native_profile.DIRECTORY),
+                 (data.get('java_context'), java_project.DIRECTORY),
+                 ('java_provider_manifest' in data, java_provider.DIRECTORY),
+                 ('node_provider_manifest' in data, node_source.DIRECTORY))
+    return [directory for present, directory in providers if present]
+
+
 def export_tests(args):
     workspace, data = load_workspace(args.workspace, generated=True)
     destination = args.destination.resolve()
     java_project.protect_destination(destination, java_project.original_locations(data))
     if destination.exists() or destination.is_relative_to(workspace) or workspace.is_relative_to(destination):
         raise ValueError("export destination must be new and independent of the workspace")
+    providers = retained_provider_directories(data)
     if not args.apply:
-        files = ["snapshot", "tests", PLAN_FILE, README_FILE]
-        if data.get('native_projects'):
-            files.append(native_profile.DIRECTORY)
-        if data.get('java_context'):
-            files.append(java_project.DIRECTORY)
-        if 'java_provider_manifest' in data:
-            files.append(java_provider.DIRECTORY)
-        if 'node_provider_manifest' in data:
-            files.append(node_source.DIRECTORY)
+        files = ["snapshot", "tests", PLAN_FILE, README_FILE, *providers]
         print(json.dumps({"destination": str(destination), "copy": files, "mode": "dry-run"}))
         return 0
     destination.mkdir(mode=0o700)
     for name in ("snapshot", "tests"):
         shutil.copytree(workspace / name, destination / name)
-    if data.get('native_projects'):
-        shutil.copytree(workspace / native_profile.DIRECTORY, destination / native_profile.DIRECTORY)
-    if data.get('java_context'):
-        shutil.copytree(workspace / java_project.DIRECTORY, destination / java_project.DIRECTORY)
-    if 'java_provider_manifest' in data:
-        shutil.copytree(workspace / java_provider.DIRECTORY, destination / java_provider.DIRECTORY)
-    if 'node_provider_manifest' in data:
-        shutil.copytree(workspace / node_source.DIRECTORY, destination / node_source.DIRECTORY)
+    for name in providers:
+        shutil.copytree(workspace / name, destination / name)
     for name in (OWNED_MARKER, GENERATED_MANIFEST, README_FILE):
         shutil.copyfile(workspace / name, destination / name)
     data["original_source"] = data["source"]

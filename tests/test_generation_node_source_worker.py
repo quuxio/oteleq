@@ -55,8 +55,8 @@ class NodeSourceWorkerTests(unittest.TestCase):
                         {**value, "entry": str(path)}, {**value, "project": str(folder)},
                         {**value, "provider": str(folder)}]
             for changed in variants:
+                path.write_text(json.dumps(changed))
                 with self.subTest(changed=changed), self.assertRaises(ValueError):
-                    path.write_text(json.dumps(changed))
                     worker.request(path)
             path.write_text(json.dumps(value))
             Path(value["runtime"]).symlink_to(folder / "absent")

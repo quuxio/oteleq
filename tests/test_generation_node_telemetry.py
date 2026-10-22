@@ -117,16 +117,16 @@ class NodeTelemetryTests(unittest.TestCase):
                                ("trace_id", b""), ("start_time_unix_nano", 0)]:
             message = traces()
             setattr(message.resource_spans[0].scope_spans[0].spans[0], field, changed)
-            with self.subTest(field=field), self.assertRaises(ValueError):
-                telemetry.decode_traces(self.bodies(trace=message), self.entry, "case", report(), ExportTraceServiceRequest)
+            with self.subTest(field=field):
+                self.assertRaises(ValueError, telemetry.decode_traces, self.bodies(trace=message),
+                                  self.entry, "case", report(), ExportTraceServiceRequest)
         message = traces()
         message.resource_spans[0].resource.attributes[0].value.string_value = "foreign"
-        with self.assertRaises(ValueError):
-            telemetry.decode_traces(self.bodies(trace=message), self.entry, "case", report(), ExportTraceServiceRequest)
-        with self.assertRaises(ValueError):
-            telemetry.decode_traces([], self.entry, "case", report(), ExportTraceServiceRequest)
-        with self.assertRaises(ValueError):
-            telemetry.decode_traces([("/v1/traces", b"\xff")], self.entry, "case", report(), ExportTraceServiceRequest)
+        self.assertRaises(ValueError, telemetry.decode_traces, self.bodies(trace=message),
+                          self.entry, "case", report(), ExportTraceServiceRequest)
+        self.assertRaises(ValueError, telemetry.decode_traces, [], self.entry, "case", report(), ExportTraceServiceRequest)
+        self.assertRaises(ValueError, telemetry.decode_traces, [("/v1/traces", b"\xff")],
+                          self.entry, "case", report(), ExportTraceServiceRequest)
 
     def test_function_calls_unwinds_histograms_and_cumulative_values_are_checked(self):
         for error in (False, True):
@@ -137,16 +137,16 @@ class NodeTelemetryTests(unittest.TestCase):
         for field, changed in [("as_int", 0), ("flags", 1), ("time_unix_nano", 0)]:
             message = metrics()
             setattr(message.resource_metrics[0].scope_metrics[0].metrics[0].sum.data_points[0], field, changed)
-            with self.subTest(field=field), self.assertRaises(ValueError):
-                telemetry.function_metrics(self.bodies(metric=message), self.entry, "case", report(), spans, graph["allowed"])
+            with self.subTest(field=field):
+                self.assertRaises(ValueError, telemetry.function_metrics, self.bodies(metric=message),
+                                  self.entry, "case", report(), spans, graph["allowed"])
         message = metrics()
         message.resource_metrics[0].scope_metrics[0].metrics[1].histogram.data_points[0].sum = float("nan")
-        with self.assertRaises(ValueError):
-            telemetry.function_metrics(self.bodies(metric=message), self.entry, "case", report(), spans, graph["allowed"])
-        with self.assertRaises(ValueError):
-            telemetry.function_metrics([], self.entry, "case", report(), spans, graph["allowed"])
-        with self.assertRaises(ValueError):
-            telemetry.function_metrics([("/v1/metrics", b"\xff")], self.entry, "case", report(), spans, graph["allowed"])
+        self.assertRaises(ValueError, telemetry.function_metrics, self.bodies(metric=message),
+                          self.entry, "case", report(), spans, graph["allowed"])
+        self.assertRaises(ValueError, telemetry.function_metrics, [], self.entry, "case", report(), spans, graph["allowed"])
+        self.assertRaises(ValueError, telemetry.function_metrics, [("/v1/metrics", b"\xff")],
+                          self.entry, "case", report(), spans, graph["allowed"])
 
     def test_sdk_queue_samples_are_separate_from_final_drain_and_unknown_metrics_refuse(self):
         message = metrics()
@@ -157,12 +157,56 @@ class NodeTelemetryTests(unittest.TestCase):
         _, spans, graph = telemetry.decode_traces(bodies, self.entry, "case", report(), ExportTraceServiceRequest)
         telemetry.function_metrics(bodies, self.entry, "case", report(), spans, graph["allowed"])
         scope.metrics[0].name = "unrequested"
-        with self.assertRaises(ValueError):
-            telemetry.function_metrics(self.bodies(metric=message), self.entry, "case", report(), spans, graph["allowed"])
+        self.assertRaises(ValueError, telemetry.function_metrics, self.bodies(metric=message),
+                          self.entry, "case", report(), spans, graph["allowed"])
         scope.scope.name, scope.scope.version = telemetry.LIFETIME_SCOPE
         scope.metrics[0].name = "otelc.lifetime.admitted"
-        with self.assertRaises(ValueError):
-            telemetry.function_metrics(self.bodies(metric=message), self.entry, "case", report(), spans, graph["allowed"])
+        self.assertRaises(ValueError, telemetry.function_metrics, self.bodies(metric=message),
+                          self.entry, "case", report(), spans, graph["allowed"])
+
+    def cumulative(self, count, timestamp, *, start=1):
+        message = metrics()
+        values = message.resource_metrics[0].scope_metrics[0].metrics
+        call = values[0].sum.data_points[0]
+        call.as_int, call.start_time_unix_nano, call.time_unix_nano = count, start, timestamp
+        duration = values[1].histogram.data_points[0]
+        duration.count, duration.sum = count, count * .0001
+        duration.start_time_unix_nano, duration.time_unix_nano = start, timestamp
+        duration.bucket_counts[:] = [0, 0, count, 0, 0, 0, 0, 0]
+        return message
+
+    def cumulative_witness(self, messages):
+        spans = [traces().resource_spans[0].scope_spans[0].spans[0]] * 2
+        bodies = [("/v1/metrics", message.SerializeToString()) for message in messages]
+        telemetry.function_metrics(bodies, self.entry, "case", report(), spans, {"app.add"})
+
+    def test_cumulative_points_preserve_order_and_allow_repeated_or_reordered_delivery(self):
+        first, last = self.cumulative(1, 100), self.cumulative(2, 200)
+        for messages in ([first, last], [last, first], [first, last, last]):
+            with self.subTest(messages=len(messages)):
+                self.cumulative_witness(messages)
+
+    def test_later_counter_histogram_bucket_and_start_resets_cannot_hide_behind_a_maximum(self):
+        for fault in ("counter", "histogram", "bucket", "sum", "start", "same-time"):
+            first, last = self.cumulative(1, 100), self.cumulative(2, 200)
+            values = last.resource_metrics[0].scope_metrics[0].metrics
+            if fault == "counter":
+                first.resource_metrics[0].scope_metrics[0].metrics[0].sum.data_points[0].as_int = 2
+                values[0].sum.data_points[0].as_int = 1
+            elif fault == "histogram":
+                first = self.cumulative(2, 100)
+                values[1].histogram.data_points[0].count = 1
+                values[1].histogram.data_points[0].bucket_counts[:] = [0, 0, 1, 0, 0, 0, 0, 0]
+            elif fault == "bucket":
+                values[1].histogram.data_points[0].bucket_counts[:] = [0, 0, 0, 2, 0, 0, 0, 0]
+            elif fault == "sum":
+                values[1].histogram.data_points[0].sum = 0
+            elif fault == "start":
+                values[0].sum.data_points[0].start_time_unix_nano = 2
+            else:
+                last = self.cumulative(2, 100)
+            with self.subTest(fault=fault), self.assertRaisesRegex(ValueError, "cumulative"):
+                self.cumulative_witness([first, last])
 
     def test_duplicate_and_unset_attributes_refuse(self):
         message = traces()
@@ -201,8 +245,8 @@ class NodeTelemetryTests(unittest.TestCase):
         self.assertEqual(names, {"app.Counter.add": 1, "app.make": 1, "app.Counter lifetime": 1})
         self.assertEqual(graph["allowed"], {"app.Counter.add", "app.make"})
         lifetime.links[0].span_id = b"x" * 8
-        with self.assertRaisesRegex(ValueError, "creation link"):
-            telemetry.decode_traces(self.bodies(trace=message), entry, "case", state, ExportTraceServiceRequest)
+        self.assertRaisesRegex(ValueError, "creation link", telemetry.decode_traces,
+                               self.bodies(trace=message), entry, "case", state, ExportTraceServiceRequest)
         state["lifetimes"]["gc_completed"] = 0
         with self.assertRaisesRegex(ValueError, "collection is missing"):
             telemetry.collection_receipt(spans, state, entry, "app.make")

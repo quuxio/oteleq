@@ -32,8 +32,14 @@ def validate(value: dict, source_digest: str, provider: Path, backend: str, dire
         require(type(argv) is list and len(argv) == 3 and argv[0] == str(executable)
                 and argv[1] == "--project" and type(argv[2]) is str,
                 "native inspection used a different compiler operation")
+    validate_files(compiler["files"], source_digest, backend, directory)
+    validate_reads(value["configuration_reads"])
+
+
+def validate_files(files: dict, source_digest: str, backend: str, directory: Path) -> None:
+    """Compiler artifacts retain their original content-addressed roles and bytes."""
+    require = node_source.require
     expected = {"input", "options", "output", "map"} | ({"preparation_map"} if backend == "native" else set())
-    files = compiler["files"]
     require(type(files) is dict and set(files) == expected, "incomplete compiler inspection artifacts")
     for record in files.values():
         require(type(record) is dict and set(record) in ({"file", "sha256", "size"}, {"file", "sha256", "size", "path"})
@@ -47,7 +53,11 @@ def validate(value: dict, source_digest: str, provider: Path, backend: str, dire
         require(path.is_file() and not path.is_symlink() and path.stat().st_size == record["size"]
                 and capture.file_digest(path) == record["sha256"], "compiler inspection artifact changed")
     require(files["input"]["sha256"] == source_digest, "inspected compiler input differs from original source")
-    reads = value["configuration_reads"]
+
+
+def validate_reads(reads: list) -> None:
+    """Configuration reads remain present or absent exactly as inspected."""
+    require = node_source.require
     require(type(reads) is list, "missing compiler configuration reads")
     names = []
     for record in reads:

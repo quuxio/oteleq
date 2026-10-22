@@ -124,8 +124,9 @@ class NodeSourceTests(unittest.TestCase):
         for key, value in (("node_compiler", "api"), ("node_backend", "legacy"), ("node_timeout_ms", 120000), ("node_timeout_ms", True)):
             with self.subTest(key=key, value=value), self.assertRaises(ValueError):
                 provider.verify_entry_settings({**data, "inventory": [{**selected, key: value}]})
+        empty = policy.validate({})
         with self.assertRaisesRegex(ValueError, "entry provider"):
-            provider.verify_entry_settings({"configuration": policy.validate({}), "inventory": [selected]})
+            provider.verify_entry_settings({"configuration": empty, "inventory": [selected]})
 
     def test_provider_and_compiler_choices_are_explicit(self) -> None:
         self.assertEqual(provider.settings({}), {"backend": "legacy"})
@@ -153,8 +154,9 @@ class NodeSourceTests(unittest.TestCase):
             self.assertEqual(requested["context"], {"tasks": False, "http": False})
             self.assertEqual(requested["functions"], {"include": [value["otelc_function"]], "exclude": []})
             self.assertEqual(requested["languages"], [language])
+        legacy = {**entry(), "node_backend": "legacy"}
         with self.assertRaises(ValueError):
-            provider.configuration({**entry(), "node_backend": "legacy"}, "endpoint", "service")
+            provider.configuration(legacy, "endpoint", "service")
 
     def test_candidate_response_is_preserved_without_promoting_other_languages(self) -> None:
         requested = provider.configuration(entry(), "endpoint", "service")
@@ -186,8 +188,9 @@ class NodeSourceTests(unittest.TestCase):
         for value in variants:
             with self.subTest(value=value), self.assertRaises(ValueError):
                 provider.verify_capabilities(value, requested, "typescript")
+        unsupported = response(requested)
         with self.assertRaises(ValueError):
-            provider.verify_capabilities(response(requested), requested, "go")
+            provider.verify_capabilities(unsupported, requested, "go")
 
     def test_closure_records_source_dependencies_products_and_file_links(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

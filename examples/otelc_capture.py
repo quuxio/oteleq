@@ -83,8 +83,8 @@ class Receiver(BaseHTTPRequestHandler):
         if self.response_event is not None:
             self.response_event["headers_written_ns"] = time.monotonic_ns()
 
-    def do_POST(self):
-        self.server.requests += 1
+    def request_size(self):
+        """Validate one fixed-length or explicitly permitted chunked request."""
         lengths = self.headers.get_all("Content-Length", [])
         transfers = self.headers.get_all("Transfer-Encoding", [])
         chunked = (self.server.allow_chunked and not lengths and len(transfers) == 1
@@ -93,12 +93,19 @@ class Receiver(BaseHTTPRequestHandler):
                               or transfers))
                 or self.headers.get("Content-Encoding", "identity") != "identity"
                 or self.path not in (TRACE_PATH, "/v1/metrics")):
-            self.send_error(400)
-            return
+            raise CaptureBodyError(400)
         size = 0 if chunked else int(lengths[0])
         if (size > MAX_REQUEST_BYTES or self.server.requests > self.server.max_requests
                 or size > self.server.max_bytes - self.server.received_bytes):
-            self.send_error(413)
+            raise CaptureBodyError(413)
+        return chunked, size
+
+    def do_POST(self):
+        self.server.requests += 1
+        try:
+            chunked, size = self.request_size()
+        except CaptureBodyError as error:
+            self.send_error(error.status)
             return
         deadline = time.monotonic() + REQUEST_TIMEOUT
         body = bytearray()
