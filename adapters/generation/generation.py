@@ -31,6 +31,7 @@ import java_profiles
 import java_project
 import java_telemetry
 import node_receivers
+import node_project
 import native_profile
 import otelc_capture as capture
 import otelc_collection
@@ -228,32 +229,44 @@ def snapshot_source(source, workspace, contents):
     return snapshot
 
 
+def discovery_tools(root: Path, language: str, adapters: dict) -> tuple[dict, dict]:
+    """Resolve the selected compiler/runtime tools and their provider identities."""
+    rust_backend = adapters.get("rust", {}).get("backend", "compiler")
+    selected = capture.selected_tools(root, language)
+    if language == "java":
+        selected["javac"] = capture.tool_path(str(selected["java"].parent / "javac"))
+        selected["java-modules"] = java_build.module_image(selected["java"])
+    qualified = (java_provider.artefacts(root, selected, adapters["java"].get("profile", java_profiles.STOCK))
+                 if language == "java" and adapters.get("java", {}).get("backend") == "prepared"
+                 else capture.artefacts(root, language, selected, rust_backend=rust_backend))
+    return selected, qualified
+
+
 def discover_file(name, language, root, snapshot, workspace, tools, artefacts, adapter_state=None):
     adapter_state = adapter_state or {}
     adapters = adapter_state.get("configuration", {})
-    rust_backend = adapters.get("rust", {}).get("backend", "compiler")
     try:
         if language not in tools:
-            selected = capture.selected_tools(root, language)
-            if language == "java":
-                selected["javac"] = capture.tool_path(str(selected["java"].parent / "javac"))
-                selected["java-modules"] = java_build.module_image(selected["java"])
-            qualified = (java_provider.artefacts(root, selected, adapters["java"].get("profile", java_profiles.STOCK))
-                         if language == "java" and adapters.get("java", {}).get("backend") == "prepared"
-                         else capture.artefacts(root, language, selected, rust_backend=rust_backend))
-            tools[language], artefacts[language] = selected, qualified
+            tools[language], artefacts[language] = discovery_tools(root, language, adapters)
         def discover_execute(command, cwd, input_data=None, *, max_output_bytes=None):
             environment = capture.environment(snapshot, tools[language], "oteleq-discovery", root)
             environment.update({"GOCACHE": str(workspace / "go-cache/build"), "GOMODCACHE": str(workspace / "go-cache/modules"), "GOTOOLCHAIN": "local",
                                 "OTELEQ_EXECUTABLE": os.environ["OTELEQ_EXECUTABLE"]})
             if language == "go" and adapters.get("go", {}).get("module_roots"):
                 environment.update(go_project.environment(adapters["go"]))
+            if language == "typescript":
+                environment["OTELC_TYPESCRIPT_BACKEND"] = adapters.get("typescript", {}).get("backend", "source")
             return execute(command, cwd, environment, input_data=input_data,
                            max_output_bytes=max_output_bytes)
         if language == "go" and adapters.get("go", {}).get("module_roots"):
             return go_project.discover(snapshot / name, snapshot, adapters["go"], tools[language]["go"],
                                        discover_execute, adapter_state.setdefault("go_cache", {}))
-        return discovery.discover(snapshot / name, language, root, tools[language], discover_execute)
+        discovered = discovery.discover(snapshot / name, language, root, tools[language], discover_execute)
+        if language in ("javascript", "typescript"):
+            original = Path(adapter_state["source"]) if "source" in adapter_state else None
+            discovered.update(node_project.inventory_context(snapshot / name, snapshot, original, language,
+                                                             root, tools[language][language], discover_execute))
+        return discovered
     except (ValueError, OSError, KeyError, SyntaxError, RecursionError) as error:
         return {"functions": [{"name": "<parse-or-tool-gap>", "line": 1, "parameters": [],
                                "output": "unknown", "reason": str(error), "inventory_gap": True}], "globals": []}
@@ -263,6 +276,7 @@ def qualify_entry(entry, snapshot, count):
     if entry["reason"]:
         return "blocked"
     try:
+        node_project.require_callable(entry)
         if entry.get("go_shadowed_recovery", False):
             raise ValueError("shadowed Go panic/recover requires an observation fixture")
         harness.corpus(entry, count)
@@ -327,7 +341,7 @@ def receiver_fixture(entry, discovered, declared):
                                      "arguments": arguments, "arguments_requested": declared["arguments"],
                                      "argument_types": factory["parameters"]}
         entry["receiver_configuration"] = declared
-        if (entry["language"] != "python" and Path(entry["path"]).suffix in (".cjs", ".cts")
+        if (entry["language"] != "python" and node_project.commonjs(entry)
                 and (any(item["name"] == "require" for item in discovered["functions"])
                      or any(item["name"] == "require" for item in discovered["globals"]))):
             raise ValueError("CommonJS bootstrap requires an unshadowed module require binding")
@@ -371,6 +385,28 @@ def configure_go_context(entry: dict, discovered: dict, configuration: dict) -> 
         entry["otelc_runtime_function"] = str(relative.with_suffix("")).replace("/", ".") + "." + entry["name"]
 
 
+def configure_entry_context(entry, discovered, configuration, snapshot, excluded):
+    """Apply explicit per-language provider settings and source-context bindings."""
+    language = entry["language"]
+    adapters = configuration["adapters"]
+    if language in ("javascript", "typescript"):
+        node_project.bind_entry(entry, discovered)
+    if language == "typescript":
+        entry["typescript_backend"] = adapters["typescript"]["backend"]
+    if language == "rust":
+        entry["rust_backend"] = adapters["rust"]["backend"]
+    if language == "java":
+        entry["java_backend"] = adapters.get("java", {}).get("backend", "legacy")
+        entry["java_profile"] = adapters.get("java", {}).get("profile", java_profiles.STOCK)
+    if language == "go":
+        configure_go_context(entry, discovered, configuration)
+    if language == "python" and not excluded and adapters["python"]["import_roots"]:
+        try:
+            entry["python_import"] = python_project.context(snapshot, entry["path"], adapters["python"]["import_roots"])
+        except ValueError as error:
+            entry["reason"] = entry["reason"] or str(error)
+
+
 def inventory_entry(function, discovered, name, language, source_hash, snapshot, args):
     entry = {**function, "path": name, "language": language, "globals": discovered["globals"],
              "parser": discovered.get("parser", "unavailable"), "package": discovered.get("package", ""),
@@ -388,20 +424,7 @@ def inventory_entry(function, discovered, name, language, source_hash, snapshot,
         # An unknown callable set cannot prove that the function filter excludes it.
         excluded = False
     entry["generation_seed"] = args.configuration["generation"]["seed"]
-    if language == "typescript":
-        entry["typescript_backend"] = args.configuration["adapters"]["typescript"]["backend"]
-    if language == "rust":
-        entry["rust_backend"] = args.configuration["adapters"]["rust"]["backend"]
-    if language == "java":
-        entry["java_backend"] = args.configuration["adapters"].get("java", {}).get("backend", "legacy")
-        entry["java_profile"] = args.configuration["adapters"].get("java", {}).get("profile", java_profiles.STOCK)
-    if language == "go":
-        configure_go_context(entry, discovered, args.configuration)
-    if language == "python" and not excluded and args.configuration["adapters"]["python"]["import_roots"]:
-        try:
-            entry["python_import"] = python_project.context(snapshot, name, args.configuration["adapters"]["python"]["import_roots"])
-        except ValueError as error:
-            entry["reason"] = entry["reason"] or str(error)
+    configure_entry_context(entry, discovered, args.configuration, snapshot, excluded)
     fixture = project_policy.matching_fixture(entry, args.configuration) if not excluded else None
     configure_fixture(entry, discovered, fixture)
     entry["status"] = "excluded" if excluded else qualify_entry(entry, snapshot, args.cases)
@@ -424,12 +447,14 @@ def configure_fixture(entry, discovered, fixture):
                 entry["reason"] = entry["reason"] or str(error)
 
 
-def inventory_tree(contents, root, snapshot, workspace, args, native_projects=None, java_context=None):
+def inventory_tree(contents, root, snapshot, workspace, args, native_projects=None, java_context=None, *, original_source=None):
     native_projects = native_projects or {}
     tools, artefacts, inventory, covered = native_profile.inventory(
         sys.modules[__name__], native_projects, root, snapshot, workspace, args)
     native_files = {name for _, name in covered}
     adapter_state = {"configuration": args.configuration["adapters"], "go_cache": {}}
+    if original_source is not None:
+        adapter_state["source"] = str(original_source)
     for name, sha in contents.items():
         language = discovery.LANGUAGES.get(Path(name).suffix)
         if (not language or language not in args.language
@@ -504,7 +529,8 @@ def plan(args):
     snapshot = snapshot_source(source, workspace, contents)
     native_profile.directories(snapshot, native_projects)
     java_project.directories(snapshot, java_options)
-    tools, artefacts, inventory = inventory_tree(contents, root, snapshot, workspace, args, native_projects, java_context)
+    tools, artefacts, inventory = inventory_tree(contents, root, snapshot, workspace, args, native_projects, java_context,
+                                                original_source=source)
     validate_fixture_inventory(configuration, inventory, args.language, workspace)
     current = native_profile.source_manifest(sys.modules[__name__], source, native_projects, excluded_files=excluded_jars)
     if java_source_manifest(source, java_options, current) != contents or manifest(snapshot) != contents:
@@ -572,7 +598,7 @@ def generator_identity():
     names = ("generation.py", "policy.py", "return_expectations.py", "filesystem_effects.py", "http_effects.py", "domains.py", "shrinking.py", "sequences.py", "typescript_provider.py", "python_project.py", "go_project.py", "go_receivers.py", "go_graph.py", "go_observe.go", "node_receivers.py", "java_receivers.py", "java_build.py", "java_control.py", "java_profiles.py", "java_live.py", "java_control_receipt.py", "java_health.py", "java_launch.py", "java_provider.py", "java_telemetry.py", "OteleqCompile.java", "java_graph.py", "OteleqGraph.java", "cpp_models.py", "cpp_receivers.py", "cpp_worker.py", "cpp_graph.py", "cpp_observe.hpp", "native_names.py", "discovery.py", "harness.py", "observe.py", "node_observe.mjs", "node_sequence.mjs", "typed_capture.py", "discover.mjs", "discover.go", "Discover.java")
     files = {name: capture.file_digest(here / name) for name in names}
     files.update({name: capture.file_digest(here / name) for name in (
-        'java_project.py', 'java_classpath.py',
+        'java_project.py', 'java_classpath.py', 'node_project.py', 'node_context.mjs',
         'native_profile.py', 'native_project.py', 'native_dependencies.py', 'native_frontend.py',
         'native_discover.cpp', 'native_context.py', 'native_workers.py', 'native_workspace.py')})
     files["host-python"] = capture.file_digest(Path(sys.executable))
@@ -761,6 +787,11 @@ def build_command(root, project, entry, driver, config, tools, env, folder, scra
     if language == "java":
         return java_command(root, project, entry, driver, config, tools, env, folder, scratch, lane,
                             prepared_runtime=prepared_runtime, context=java_context)
+    if language in ("javascript", "typescript") and "node_context" in entry:
+        def inspect_node(command, cwd, input_data=None, *, max_output_bytes=None):
+            return execute(command, cwd, env, folder / "node-context-probe", input_data=input_data,
+                           max_output_bytes=max_output_bytes)
+        node_project.verify_attempt(project, entry, root, tools[language], inspect_node, folder)
     # Use the proven build recipes, with bounded execution for every build and launch.
     old_execute = capture.execute
     capture.execute = lambda command, cwd, environment, timeout=180: execute(command, cwd, environment, folder / ("build-" + uuid.uuid4().hex), timeout)
@@ -1038,6 +1069,8 @@ def compare_with_fixtures(workspace, data, entry, case, destination, decoder, ht
              "gaps": ["scalar corpus; business preconditions and branch exhaustiveness not established", "diagnostic access/entrypoint helpers; not shipping artefact evidence", "artefact digests aggregate diagnostic inputs and qualified tools/adapters; emitted runtime compiler/loader outputs are outside those digests", "no undeclared network, imported-module globals or concurrent-schedule qualification", "exception traceback/stack and Java/C++ extra exception fields are unobserved", "compiler sysroots and OS libraries are outside content identity", "trusted local execution; no hostile-code sandbox"]}
     scope["gaps"].append("live metric controls cover selected synchronous Java call trees and bounded export windows; general SDK-instrument, other-language and exporter-fault qualification remains open"
                          if sequences.controls(entry) else "live metric controls and exporter-fault scenarios are unobserved")
+    if entry["language"] in ("javascript", "typescript"):
+        scope["gaps"].append("state reachable only through CommonJS wrapper/module.exports caches or undeclared imported modules is unobserved")
     scope["gaps"].append("filesystem boundary bytes/kinds/permissions only; timestamps, inode/link identity, transient activity and undeclared paths are unobserved"
                          if filesystem_effects.selected(data["configuration"]) else "filesystem effects are unobserved")
     scope["gaps"].append("HTTP fixture accepted request order/method/target/body, selected raw header lines and scripted response bytes only; other headers, peer/packet timing, other destinations, TLS and broader protocols are unobserved"

@@ -115,7 +115,12 @@ class TypeScriptProviderTests(unittest.TestCase):
         execute = Mock(return_value=subprocess.CompletedProcess([], 0, json.dumps(response).encode(), b""))
         with tempfile.TemporaryDirectory() as temporary:
             folder = Path(temporary); (folder / "sample.mts").write_text("function selected(value:number){return value;}")
-            with patch.object(generation.capture, "selected_tools", return_value={}), patch.object(generation.capture, "artefacts", return_value={}), patch.object(generation.discovery, "discover", return_value=copy.deepcopy(parsed)), patch.object(generation, "execute", execute), patch.object(provider.capture, "typescript_backend", return_value="native"):
+            with (patch.object(generation.capture, "selected_tools", return_value={"typescript": Path("/fixed/node")}),
+                  patch.object(generation.capture, "artefacts", return_value={}),
+                  patch.object(generation.discovery, "discover", return_value=copy.deepcopy(parsed)),
+                  patch.object(generation.node_project, "inventory_context", return_value={}),
+                  patch.object(generation, "execute", execute),
+                  patch.object(provider.capture, "typescript_backend", return_value="native")):
                 _, _, inventory = generation.inventory_tree({"sample.mts": "a" * 64}, folder, folder, folder, args)
         self.assertEqual(inventory[0]["status"], "ready", inventory[0])
         self.assertEqual(inventory[0]["typescript_backend"], "native")

@@ -6,6 +6,14 @@ use syn::{spanned::Spanned, visit::Visit};
 
 const RESOURCES: &[(&str, &str)] = &[
     (
+        "node_project.py",
+        include_str!("../adapters/generation/node_project.py"),
+    ),
+    (
+        "node_context.mjs",
+        include_str!("../adapters/generation/node_context.mjs"),
+    ),
+    (
         "java_project.py",
         include_str!("../adapters/generation/java_project.py"),
     ),

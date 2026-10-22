@@ -1,0 +1,386 @@
+{
+  "qualification_schema_version": 1,
+  "date": "2026-10-22",
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "platform": {
+    "os": "macOS-27.0.1-arm64-arm-64bit",
+    "architecture": "arm64",
+    "node": "v24.21.0"
+  },
+  "runtime": {
+    "commit": "6e723ca18007832bd939f72149a8e5f9ea1f9c34",
+    "tree": "5a43072ccb3328831fd3f2062f7e808c67e84fce",
+    "cli_sha256": "aa66adbe6b6542cebc5540859f1b150774e82616519d9a55eedc164f8ad6bff4",
+    "source_archive_sha256": "c3830ca53ea702b8c2bdc231dc43230527dd8c6e569be72bd0839adac7101172"
+  },
+  "verifier": {
+    "commit": "6e723ca18007832bd939f72149a8e5f9ea1f9c34",
+    "files": {
+      "node_project_oracle.py": "eb46ae89f15e99d67ada089ab67dd10b31fc26df9bd7846279d6603ef7cf37e8",
+      "qualify_node_project.py": "9f4dfb59a9e40a1f7754c2a54171aa66326d4b0c4fb28423d28416382d17102f",
+      "qualify_generation.py": "db6e53931e17d6122e504a89e2a931a2d3df5224f6f37deff1fe135a47781652",
+      "test_generation_node_project_qualification.py": "b4bb63c77a543e7205fcb43d5bea32c8e427270805ddeeadd5878e4c1a619220",
+      "test_generation_node_project.py": "81085d16a7805c637377de398cc362c546da4b9ca331f77988e01ab2718592f7"
+    }
+  },
+  "provider": {
+    "commit": "d6d03b72026cde8962b11ce3cc184ff3ebcb60d4",
+    "tree": "a577aa88d5d51f4e86bc0858bcd233be7b01c251",
+    "all_unchanged": true,
+    "source_files": 413,
+    "products": 586,
+    "dependency_records": 6361,
+    "resolved_link_targets": 11,
+    "tools": 8,
+    "manifest_sha256": "2a8dbf239c6444c0fb536dff049993beade7eaed6578c9654c1e2d7233e9431f"
+  },
+  "module_contexts": [
+    {
+      "language": "javascript",
+      "format": "commonjs",
+      "receiver": false,
+      "different": false,
+      "source_sha256": "64ac1defb72d9460a277538c09388f8080db114e9592dc3d351db5645a3b055d",
+      "package": null,
+      "routes": [
+        "run",
+        "replay",
+        "framework",
+        "detached-framework"
+      ],
+      "actual_application_launches": 16,
+      "name": "cjs"
+    },
+    {
+      "language": "javascript",
+      "format": "module",
+      "receiver": false,
+      "different": false,
+      "source_sha256": "64ac1defb72d9460a277538c09388f8080db114e9592dc3d351db5645a3b055d",
+      "package": null,
+      "routes": [
+        "run",
+        "replay",
+        "framework",
+        "detached-framework"
+      ],
+      "actual_application_launches": 16,
+      "name": "mjs"
+    },
+    {
+      "language": "javascript",
+      "format": "commonjs",
+      "receiver": false,
+      "different": false,
+      "source_sha256": "64ac1defb72d9460a277538c09388f8080db114e9592dc3d351db5645a3b055d",
+      "package": null,
+      "routes": [
+        "run",
+        "replay",
+        "framework",
+        "detached-framework"
+      ],
+      "actual_application_launches": 16,
+      "name": "js-default"
+    },
+    {
+      "language": "javascript",
+      "format": "module",
+      "receiver": false,
+      "different": false,
+      "source_sha256": "64ac1defb72d9460a277538c09388f8080db114e9592dc3d351db5645a3b055d",
+      "package": {
+        "path": "package.json",
+        "sha256": "48e847860dd4f0907ce91e346dbb00a4a12213163ad3d80a953c343eb9a11979"
+      },
+      "routes": [
+        "run",
+        "replay",
+        "framework",
+        "detached-framework"
+      ],
+      "actual_application_launches": 16,
+      "name": "js-module"
+    },
+    {
+      "language": "javascript",
+      "format": "commonjs",
+      "receiver": false,
+      "different": false,
+      "source_sha256": "64ac1defb72d9460a277538c09388f8080db114e9592dc3d351db5645a3b055d",
+      "package": {
+        "path": "package.json",
+        "sha256": "e78adbbbe5741f27e8d900be349911234c1ae45c20a3f2fa293e2c8e5abf3c31"
+      },
+      "routes": [
+        "run",
+        "replay",
+        "framework",
+        "detached-framework"
+      ],
+      "actual_application_launches": 16,
+      "name": "js-commonjs"
+    },
+    {
+      "language": "javascript",
+      "format": "module",
+      "receiver": false,
+      "different": false,
+      "source_sha256": "4ac4d1a1e25270fc21068ba7ac2b648cafdfd6cf9b4c3a4dd9c03bb8dd496d81",
+      "package": null,
+      "routes": [
+        "run",
+        "replay",
+        "framework",
+        "detached-framework"
+      ],
+      "actual_application_launches": 16,
+      "name": "js-detected"
+    },
+    {
+      "language": "typescript",
+      "format": "commonjs",
+      "receiver": false,
+      "different": false,
+      "source_sha256": "db17d342946708832f6bf0f72fc61a410cc56f6e8fe4575003884675d1fe2875",
+      "package": null,
+      "routes": [
+        "run",
+        "replay",
+        "framework",
+        "detached-framework"
+      ],
+      "actual_application_launches": 16,
+      "name": "cts"
+    },
+    {
+      "language": "typescript",
+      "format": "module",
+      "receiver": false,
+      "different": false,
+      "source_sha256": "db17d342946708832f6bf0f72fc61a410cc56f6e8fe4575003884675d1fe2875",
+      "package": null,
+      "routes": [
+        "run",
+        "replay",
+        "framework",
+        "detached-framework"
+      ],
+      "actual_application_launches": 16,
+      "name": "mts"
+    },
+    {
+      "language": "typescript",
+      "format": "commonjs",
+      "receiver": false,
+      "different": false,
+      "source_sha256": "db17d342946708832f6bf0f72fc61a410cc56f6e8fe4575003884675d1fe2875",
+      "package": null,
+      "routes": [
+        "run",
+        "replay",
+        "framework",
+        "detached-framework"
+      ],
+      "actual_application_launches": 16,
+      "name": "ts-default"
+    },
+    {
+      "language": "typescript",
+      "format": "module",
+      "receiver": false,
+      "different": false,
+      "source_sha256": "db17d342946708832f6bf0f72fc61a410cc56f6e8fe4575003884675d1fe2875",
+      "package": {
+        "path": "package.json",
+        "sha256": "48e847860dd4f0907ce91e346dbb00a4a12213163ad3d80a953c343eb9a11979"
+      },
+      "routes": [
+        "run",
+        "replay",
+        "framework",
+        "detached-framework"
+      ],
+      "actual_application_launches": 16,
+      "name": "ts-module"
+    },
+    {
+      "language": "typescript",
+      "format": "commonjs",
+      "receiver": false,
+      "different": false,
+      "source_sha256": "db17d342946708832f6bf0f72fc61a410cc56f6e8fe4575003884675d1fe2875",
+      "package": {
+        "path": "package.json",
+        "sha256": "e78adbbbe5741f27e8d900be349911234c1ae45c20a3f2fa293e2c8e5abf3c31"
+      },
+      "routes": [
+        "run",
+        "replay",
+        "framework",
+        "detached-framework"
+      ],
+      "actual_application_launches": 16,
+      "name": "ts-commonjs"
+    },
+    {
+      "language": "javascript",
+      "format": "commonjs",
+      "receiver": true,
+      "different": false,
+      "source_sha256": "a2874ae7c88ed55010ee9166f8650f9d405675aeba602e0cba46d69a05e65b81",
+      "package": {
+        "path": "package.json",
+        "sha256": "e78adbbbe5741f27e8d900be349911234c1ae45c20a3f2fa293e2c8e5abf3c31"
+      },
+      "routes": [
+        "run",
+        "replay",
+        "framework",
+        "detached-framework"
+      ],
+      "actual_application_launches": 16,
+      "name": "js-commonjs"
+    },
+    {
+      "language": "typescript",
+      "format": "commonjs",
+      "receiver": true,
+      "different": false,
+      "source_sha256": "5a2ea45a81b7810715c2706570959d9818ff6a14a06930e49b2a412cf4c1fa35",
+      "package": {
+        "path": "package.json",
+        "sha256": "e78adbbbe5741f27e8d900be349911234c1ae45c20a3f2fa293e2c8e5abf3c31"
+      },
+      "routes": [
+        "run",
+        "replay",
+        "framework",
+        "detached-framework"
+      ],
+      "actual_application_launches": 16,
+      "name": "ts-commonjs"
+    },
+    {
+      "language": "javascript",
+      "format": "commonjs",
+      "receiver": false,
+      "different": true,
+      "source_sha256": "7edc79cc0a09d3c34b96f42787a5654d6e464746a916dbbe7e80f0e8100c2bd6",
+      "package": {
+        "path": "package.json",
+        "sha256": "e78adbbbe5741f27e8d900be349911234c1ae45c20a3f2fa293e2c8e5abf3c31"
+      },
+      "routes": [
+        "run",
+        "replay",
+        "framework",
+        "detached-framework"
+      ],
+      "actual_application_launches": 36,
+      "name": "js-commonjs"
+    }
+  ],
+  "results": {
+    "module_context_cases": 14,
+    "matching_cases": 13,
+    "same_return_global_difference_cases": 1,
+    "module_context_application_launches": 245,
+    "prelaunch_refusals": 4,
+    "startup_binding_refusals": 1,
+    "controls": [
+      {
+        "control": "shadowed-require",
+        "exit_code": 3,
+        "actual_application_launches": 0
+      },
+      {
+        "control": "changed-source",
+        "exit_code": 4,
+        "actual_application_launches": 0
+      },
+      {
+        "control": "forged-format",
+        "exit_code": 4,
+        "actual_application_launches": 0
+      },
+      {
+        "control": "ambient-package",
+        "exit_code": 3,
+        "actual_application_launches": 0
+      },
+      {
+        "control": "rebound-callable",
+        "exit_code": 4,
+        "actual_application_launches": 1
+      }
+    ],
+    "reduced_arguments": [
+      0.0
+    ],
+    "original_arguments": [
+      7.0
+    ],
+    "existing_receiver_compatibility_application_launches": 186,
+    "total_unique_application_launches": 431,
+    "all_source_preserved": true,
+    "all_provider_inputs_preserved": true,
+    "source_boundary_control": "Every module-context fixture ends in a line comment without a final newline; appended CommonJS callers use an explicit newline and statement separator."
+  },
+  "evidence": {
+    "local_root": "/Users/sclarke/github/oteleq-qualification/2026-10-22/node-context-6e723ca",
+    "seal_file": "node-qualification-seal.json",
+    "sealed_files": 9744,
+    "seal_sha256": "705354a811ce68769b4dbef0e89e07732061334619eda82837b993edaf6ee96a",
+    "seal_rechecked": true,
+    "accounting": {
+      "raw_roots": {
+        "node-project-qualified": {
+          "retained_command_records": 249,
+          "unique_application_commands": 245
+        },
+        "receiver-compatibility-current": {
+          "retained_command_records": 194,
+          "unique_application_commands": 186
+        }
+      },
+      "unique_application_launches": 431,
+      "copied_shrink_records_are_not_new_launches": true
+    }
+  },
+  "validation": {
+    "oracle_unit_tests": 6,
+    "oracle_controls": [
+      "complete initial/final/outcome graphs",
+      "arguments and scalar result bits",
+      "array descriptors and property order",
+      "object aliases and extra nodes",
+      "original/private/caller module receipts",
+      "raw span identities and attributes",
+      "raw OTLP PID/service/scope",
+      "counter values and complete loss reasons",
+      "histogram bounds, bucket placement and extrema",
+      "source and package file preservation"
+    ],
+    "final_delivery_checks": "Delivery gates are separate from this frozen runtime record; see https://github.com/quuxio/oteleq/pull/54/checks.",
+    "focused_node_tests": {
+      "count": 32,
+      "exit_code": 0,
+      "log_sha256": "87f0b5e364cebb1181e8a75c10818b6bb5dc3d49c95614e50e864ee218b1284f"
+    },
+    "source_boundary_regression": {
+      "failures_before_fix": 5,
+      "failing_runtime": "3d298d37fa285c6ad6ea18499ad8ff0644e1e26a",
+      "corrected_runtime": "6e723ca18007832bd939f72149a8e5f9ea1f9c34"
+    }
+  },
+  "limits": [
+    "Only the recorded macOS ARM64/Node/provider combination is qualified.",
+    "Generated callers are diagnostic artefacts, with explicit helper deltas.",
+    "Node dependency installation, package-manager/workspace hooks and custom loaders remain open.",
+    "General semantic TypeScript builds, source maps and bundlers remain open.",
+    "CommonJS wrapper/module.exports caches, undeclared imported roots, hidden/private and inherited storage remain outside this observation scope.",
+    "This record does not qualify shipping artefacts or complete the project checklist."
+  ]
+}
