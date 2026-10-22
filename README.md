@@ -145,6 +145,8 @@ Cleanup can remove an unchanged owned workspace after its original sources or to
 
 Export includes a frozen application snapshot and runnable suite. It refuses existing destinations and may be placed in the application only by that explicit choice. Generated boilerplate is MIT licensed; application code retains its licence. Retained suites test their frozen snapshot; create a new plan for changed application code. See [capabilities, limits and complete usage](docs/automatic-generation.md). Pass the executable [example policy](examples/equivalence.toml) with `plan --config PATH` for selection, scalar fixtures and budgets. Broader build/factory and generated graph-adapter integration remain on the [completion checklist](docs/completion.md).
 
+[Planning after an in-source export](docs/retained-source-selection.md) verifies and excludes retained oteleq bundles from application discovery and snapshots. Invalid or edited bundles stop planning; plans and reports disclose the exclusions.
+
 ### Compare an existing workload bundle
 
 ```sh

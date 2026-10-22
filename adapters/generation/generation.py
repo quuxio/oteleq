@@ -33,6 +33,7 @@ import java_archive_context
 import java_telemetry
 import node_receivers
 import node_project
+import owned_workspace
 import native_profile
 import otelc_capture as capture
 import otelc_collection
@@ -47,7 +48,7 @@ VERSION = 1
 MAX_FILE = 8 * 1024 * 1024
 MAX_TREE = 256 * 1024 * 1024
 MAX_OUTPUT = 4 * 1024 * 1024
-OWNED_MARKER = '.oteleq-owned.json'
+OWNED_MARKER = owned_workspace.MARKER
 PLAN_FILE = 'plan.json'
 GENERATED_MANIFEST = 'generated-manifest.json'
 TYPED_BUNDLE = 'typed-bundle.json'
@@ -74,13 +75,15 @@ def snapshot_file_size(path: Path) -> int:
 
 
 def manifest(root: Path, *, excluded: Collection[str] = (), excluded_files: Collection[str] = (),
+             excluded_roots: Collection[str] = (),
              max_file_bytes: int | None = None) -> dict[str, str]:
     """Fingerprint all private contents; only original source walks exclude build trees."""
     result, total = {}, 0
     file_limit = MAX_FILE if max_file_bytes is None else max_file_bytes
     for directory, names, files in os.walk(root, followlinks=False):
         base = Path(directory)
-        names[:] = sorted(n for n in names if n not in excluded)
+        names[:] = sorted(n for n in names if n not in excluded
+                          and (base / n).relative_to(root).as_posix() not in excluded_roots)
         files = [name for name in files if (base / name).relative_to(root).as_posix() not in excluded_files]
         for name in names + files:
             if (base / name).is_symlink():
@@ -520,34 +523,43 @@ def plan(args):
     java_options = configuration["adapters"]["java"] if "java" in args.language else {}
     java_project.protect_destination(parent, java_project.input_locations(source, java_options))
     excluded_jars = java_project.snapshot_exclusions(source, java_options)
-    contents = manifest(source, excluded=discovery.IGNORED, excluded_files=excluded_jars)
+    excluded_owned = source_exclusions(source, configuration)
+    excluded_roots = [item["path"] for item in excluded_owned]
+    contents = manifest(source, excluded=discovery.IGNORED, excluded_files=excluded_jars,
+                        excluded_roots=excluded_roots)
     if not contents and not native_profile.configured(configuration) and "source_roots" not in java_options:
         raise ValueError("empty source tree")
     workspace = Path(tempfile.mkdtemp(prefix="oteleq-run-", dir=parent))
     write(workspace / OWNED_MARKER, {"schema_version": VERSION, "id": uuid.uuid4().hex})
     contents, native_projects = native_profile.prepare_inputs(
-        sys.modules[__name__], source, root, workspace, configuration, contents, excluded_files=excluded_jars)
+        sys.modules[__name__], source, root, workspace, configuration, contents,
+        excluded_files=excluded_jars, excluded_roots=excluded_roots)
     java_settings = {}
     if java_archive_context.enabled(java_options):
         selected, _ = discovery_tools(root, "java", configuration["adapters"])
         java_settings = {"java": selected["java"], "execute": execute,
                          "environment": capture.environment(workspace, selected, "oteleq-archive-plan", root)}
-    java_context = java_project.prepare(source, workspace, java_options, discovery.IGNORED, **java_settings)
-    contents = java_source_manifest(source, java_options, contents)
+    java_context = java_project.prepare(source, workspace, java_options, discovery.IGNORED,
+                                        excluded_roots=excluded_roots, **java_settings)
+    contents = java_source_manifest(source, java_options, contents, excluded_roots=excluded_roots)
     snapshot = snapshot_source(source, workspace, contents)
     native_profile.directories(snapshot, native_projects)
     java_project.directories(snapshot, java_options)
     tools, artefacts, inventory = inventory_tree(contents, root, snapshot, workspace, args, native_projects, java_context,
                                                 original_source=source)
     validate_fixture_inventory(configuration, inventory, args.language, workspace)
-    current = native_profile.source_manifest(sys.modules[__name__], source, native_projects, excluded_files=excluded_jars)
-    if java_source_manifest(source, java_options, current) != contents or manifest(snapshot) != contents:
+    current = native_profile.source_manifest(sys.modules[__name__], source, native_projects,
+                                            excluded_files=excluded_jars, excluded_roots=excluded_roots)
+    if (source_exclusions(source, configuration) != excluded_owned
+            or java_source_manifest(source, java_options, current, excluded_roots=excluded_roots) != contents
+            or manifest(snapshot) != contents):
         raise ValueError("source changed during discovery")
     data = {"schema_version": VERSION, "source": str(source), "otelc_root": str(root), "source_manifest": contents,
             "source_sha256": identity(contents), "tools": {lang: {k: str(v) for k, v in selected.items()} for lang, selected in tools.items()},
             "artefacts": artefacts, "inventory": inventory, "cases_per_function": args.cases,
             "configuration": configuration, "configuration_sha256": identity(configuration),
             "excluded_files": [name for name in contents if not project_policy.selected(name, configuration["sources"])],
+            "owned_source_exclusions": excluded_owned,
             "excluded_directories": sorted(discovery.IGNORED), "excluded_languages": sorted(set(discovery.LANGUAGES.values()) - set(args.language or discovery.LANGUAGES.values())),
             "generator_sha256": generator_identity(), "cli_sha256": capture.file_digest(Path(os.environ["OTELEQ_EXECUTABLE"]))}
     if native_projects:
@@ -566,11 +578,18 @@ def plan(args):
     return 0
 
 
-def java_source_manifest(source, options, contents):
+def source_exclusions(source: Path, configuration: dict) -> list[dict]:
+    """Use the same owned-output scope for normal and explicit Java source walks."""
+    java = configuration["adapters"]["java"] if "java" in configuration["languages"] else {}
+    return owned_workspace.exclusions(sys.modules[__name__], source, java.get("source_roots", []))
+
+
+def java_source_manifest(source, options, contents, *, excluded_roots=()):
     """Explicit generated Java units still obey the ordinary source snapshot bounds."""
     if "source_roots" not in options:
         return contents
-    result = java_project.source_manifest(source, options, contents, discovery.IGNORED)
+    result = java_project.source_manifest(source, options, contents, discovery.IGNORED,
+                                          excluded_roots=excluded_roots)
     if (len(result) > 10000 or any((source / name).stat().st_size > MAX_FILE for name in result)
             or sum((source / name).stat().st_size for name in result) > MAX_TREE):
         raise ValueError("required Java units exceed the source snapshot budget")
@@ -610,7 +629,8 @@ def generator_identity():
         'java_helper_binding.py', 'OteleqArchives.java',
         'node_project.py', 'node_context.mjs',
         'native_profile.py', 'native_project.py', 'native_dependencies.py', 'native_frontend.py',
-        'native_discover.cpp', 'native_context.py', 'native_workers.py', 'native_workspace.py')})
+        'native_discover.cpp', 'native_context.py', 'native_workers.py', 'native_workspace.py',
+        'owned_workspace.py')})
     files["host-python"] = capture.file_digest(Path(sys.executable))
     files["observer:otelc_capture.py"] = capture.file_digest(Path(capture.__file__))
     files["host-version"] = sys.version
@@ -631,10 +651,13 @@ def load_workspace(path, generated=False):
             or project_policy.validate(data["configuration"]) != data["configuration"]):
         raise ValueError("configuration identity or schema changed; create a new plan")
     context = data.get("java_context", {})
+    excluded_roots = [item["path"] for item in source_exclusions(Path(data["source"]), data["configuration"])]
     contents = native_profile.source_manifest(sys.modules[__name__], Path(data["source"]), data.get('native_projects', {}),
-                                              excluded_files=context.get("excluded_source_jars", []))
+                                              excluded_files=context.get("excluded_source_jars", []),
+                                              excluded_roots=excluded_roots)
     java_options = data["configuration"]["adapters"]["java"] if context else {}
-    if java_source_manifest(Path(data["source"]), java_options, contents) != data["source_manifest"] or manifest(workspace / "snapshot") != data["source_manifest"]:
+    if (java_source_manifest(Path(data["source"]), java_options, contents, excluded_roots=excluded_roots) != data["source_manifest"]
+            or manifest(workspace / "snapshot") != data["source_manifest"]):
         raise ValueError("application source or immutable snapshot changed")
     native_profile.verify(sys.modules[__name__], workspace, data)
     java_project.verify(workspace, data, originals="original_source" not in data)
@@ -1155,6 +1178,7 @@ def run(args):
               "source_preserved": True, "workspace": str(workspace), "artefact_class": "diagnostic"}
     report["configuration"] = data["configuration"]
     report["configuration_sha256"] = data["configuration_sha256"]
+    report["owned_source_exclusions"] = source_exclusions(Path(data["source"]), data["configuration"])
     write(destination / "report.json", report)
     print(json.dumps({"report": str(destination / "report.json"), "exit_code": code, "cases": len(results), "blocked": len(blocked)}), flush=True)
     return code
@@ -1188,6 +1212,8 @@ def export_tests(args):
     for name in (OWNED_MARKER, GENERATED_MANIFEST, README_FILE):
         shutil.copyfile(workspace / name, destination / name)
     data["original_source"] = data["source"]
+    data["original_owned_source_exclusions"] = data.get("owned_source_exclusions", [])
+    data["owned_source_exclusions"] = []
     data["source"] = str(destination / "snapshot")
     write(destination / PLAN_FILE, data)
     marker = read(destination / OWNED_MARKER)
@@ -1200,28 +1226,9 @@ def export_tests(args):
 def clean(args):
     # Cleanup does not require the original application/toolchain still to exist.
     workspace = args.workspace.resolve(strict=True)
-    if args.workspace.is_symlink() or workspace.parent == workspace or read(workspace / OWNED_MARKER)["schema_version"] != VERSION:
+    if args.workspace.is_symlink() or workspace.parent == workspace:
         raise ValueError("refusing to remove an unowned workspace")
-    allowed = {OWNED_MARKER, PLAN_FILE, "snapshot", "tests", GENERATED_MANIFEST, README_FILE, "runs", "go-cache", native_profile.DIRECTORY, java_project.DIRECTORY, java_provider.DIRECTORY}
-    if any(p.name not in allowed for p in workspace.iterdir()):
-        raise ValueError("workspace contains unowned files; retain and inspect it")
-    marker = read(workspace / OWNED_MARKER)
-    if not (workspace / PLAN_FILE).is_file():
-        raise ValueError("workspace plan is unsealed; retain and inspect it")
-    data = read(workspace / PLAN_FILE)
-    if marker.get("plan_sha256") != identity(data):
-        raise ValueError("plan identity changed; retain and inspect it")
-    if (workspace / native_profile.DIRECTORY).exists() and (not data.get('native_projects') or
-            native_profile.context_manifest(sys.modules[__name__], workspace) != data.get('native_context_manifest')):
-        raise ValueError('native context was edited or is unowned; retain and inspect it')
-    if manifest(workspace / "snapshot") != data["source_manifest"]:
-        raise ValueError("snapshot was edited; retain and inspect it")
-    java_project.verify_owned(workspace, data)
-    java_provider.verify_probes(sys.modules[__name__], workspace, data)
-    if (workspace / "tests").exists() and not (workspace / GENERATED_MANIFEST).is_file():
-        raise ValueError("generated suite is unsealed; retain and inspect it")
-    if (workspace / GENERATED_MANIFEST).exists() and manifest(workspace / "tests") != read(workspace / GENERATED_MANIFEST):
-        raise ValueError("generated suite was edited; retain and inspect it")
+    owned_workspace.verify(sys.modules[__name__], workspace)
     shutil.rmtree(workspace)
     return 0
 

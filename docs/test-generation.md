@@ -59,6 +59,8 @@ Java runtime-archive cleanup checks the sealed private context, dependency bytes
 
 Use `export-tests --workspace PATH --destination PATH` to inspect the copy plan, then add `--apply` to perform it. The destination must be new and independent of the workspace. Choosing a new subdirectory in the application's repository explicitly incorporates the copied bundle; it does not edit existing tests, dependencies, manifests or locks.
 
+Later plans [verify and exclude owned retained bundles](retained-source-selection.md), including their copied sources and access helpers. Unknown, edited or unsealed contents remain visible errors. The plan and execution report retain the exclusion scope; ordinary application changes still require a new plan.
+
 The exported plan points at its copied immutable application snapshot and retains the original source provenance. Retained tests therefore continue testing that snapshot. Create a new plan for changed application code. Replay still requires the same qualified oteleq CLI, otelc adapters, Python environment and language tools; changed content identities fail. It is portable evidence with external toolchain requirements, rather than a standalone test of future source edits.
 
 Generated boilerplate carries the MIT licence. Copied application source retains its licence; oteleq's maintained implementation is AGPL-3.0. See [repository quality](quality.md#implementation-quality). A richer promotion plan with fixture/dependency integration and baseline-only regression export remains proposed; `promote` is not implemented.

@@ -32,6 +32,16 @@ struct RunReport {
     artefact_class: String,
     configuration: Box<RawValue>,
     configuration_sha256: String,
+    #[serde(default)]
+    owned_source_exclusions: Vec<OwnedSourceExclusion>,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct OwnedSourceExclusion {
+    path: String,
+    workspace_id: Option<String>,
+    plan_sha256: String,
+    reason: String,
 }
 #[derive(Deserialize)]
 struct Callable {
@@ -367,6 +377,39 @@ fn language_name(language: &Language) -> &'static str {
 fn sha(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
+fn exclusion_summary(report: &RunReport) -> Result<String, String> {
+    if report.owned_source_exclusions.len() > 10000 {
+        return Err("too many retained workspace exclusions".into());
+    }
+    let mut paths = BTreeSet::new();
+    let mut summary = format!(
+        "Retained oteleq output excluded from application inputs: {}",
+        report.owned_source_exclusions.len()
+    );
+    for entry in &report.owned_source_exclusions {
+        if entry.path.is_empty()
+            || entry.path.len() > 4096
+            || entry.path.starts_with('/')
+            || entry
+                .path
+                .split('/')
+                .any(|part| matches!(part, "" | "." | ".."))
+            || !sha(&entry.plan_sha256)
+            || entry.reason != "verified retained oteleq workspace"
+            || !paths.insert(&entry.path)
+        {
+            return Err("invalid retained workspace exclusion".into());
+        }
+        summary.push_str(&format!(
+            "\n{}; workspace {}; plan {}; {}",
+            entry.path,
+            entry.workspace_id.as_deref().unwrap_or("unavailable"),
+            entry.plan_sha256,
+            entry.reason
+        ));
+    }
+    Ok(summary)
+}
 fn validate_inventory(report: &RunReport) -> Result<BTreeMap<&str, &Callable>, String> {
     if report.schema_version != 1
         || report.claim != CLAIM
@@ -542,6 +585,7 @@ pub fn render(bytes: &[u8]) -> Result<RenderedReport, String> {
     let report: RunReport = serde_json::from_slice(bytes)
         .map_err(|error| format!("decode generated report: {error}"))?;
     let rows = rows(&report)?;
+    let exclusions = exclusion_summary(&report)?;
     let count = |outcome| rows.iter().filter(|row| row.outcome == outcome).count();
     let (matched, failures, errors, skipped) = (
         count(Outcome::Match),
@@ -557,9 +601,9 @@ pub fn render(bytes: &[u8]) -> Result<RenderedReport, String> {
         0
     };
     let summary = format!("{} paired cases matched; {} observed differences; {} incomplete/error entries; {} excluded callables. Inventory: {} callables; retained cases: {}.", matched, failures, errors, skipped, report.inventory.len(), report.cases.len());
-    let identity = format!("Source: {}\nSource preserved: {}\nConfiguration: {}\nWorkspace recorded by producer: {}\nArtefact class: {}\nPolicy: {}", report.source_sha256, report.source_preserved, report.configuration_sha256, report.workspace, report.artefact_class, report.configuration.get());
+    let identity = format!("Source: {}\nSource preserved: {}\nConfiguration: {}\nWorkspace recorded by producer: {}\nArtefact class: {}\nPolicy: {}\n{}", report.source_sha256, report.source_preserved, report.configuration_sha256, report.workspace, report.artefact_class, report.configuration.get(), exclusions);
     let mut html = format!("<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width\"><meta http-equiv=\"Content-Security-Policy\" content=\"default-src &apos;none&apos;; style-src &apos;unsafe-inline&apos;\"><title>oteleq observations</title><style>body{{font:16px system-ui,sans-serif;max-width:1100px;margin:2rem auto;padding:0 1rem;color:#17212b;background:#fff}}table{{border-collapse:collapse;width:100%}}th,td{{padding:.6rem;text-align:left;border-bottom:1px solid #ccd4db;vertical-align:top}}pre{{white-space:pre-wrap;overflow-wrap:anywhere;background:#f0f3f6;padding:1rem}}td{{overflow-wrap:anywhere}}details{{margin:.4rem 0}}.incomplete,.different_observed{{font-weight:bold}}caption{{text-align:left;padding:1rem 0}}h1{{font-size:1.8rem}}</style></head><body><h1>oteleq observations</h1><p><strong>{CLAIM}</strong></p><p>{}</p><p>Diagnostic harness evidence applies to the recorded tests and dimensions. Rendering presents producer-supplied evidence; it does not rerun or authenticate capture. It provides no blanket proof for other inputs or shipping artefacts. Redaction is not applied: treat this page and XML as application data.</p><details><summary>Source, policy and execution identity</summary><pre>{}</pre></details><table><caption>All retained cases and inventory gaps</caption><thead><tr><th scope=\"col\">Callable / case</th><th scope=\"col\">Source</th><th scope=\"col\">Result and observations</th></tr></thead><tbody>", escaped(&summary), escaped(&identity));
-    let mut junit = format!("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<testsuites tests=\"{}\" failures=\"{failures}\" errors=\"{errors}\" skipped=\"{skipped}\"><testsuite name=\"oteleq.observed-equivalence\" tests=\"{}\" failures=\"{failures}\" errors=\"{errors}\" skipped=\"{skipped}\"><properties><property name=\"claim\" value=\"{CLAIM}\"/><property name=\"artefact_class\" value=\"diagnostic\"/><property name=\"source_sha256\" value=\"{}\"/><property name=\"configuration_sha256\" value=\"{}\"/><property name=\"summary\" value=\"{}\"/></properties>\n", rows.len(), rows.len(), escaped(&report.source_sha256), escaped(&report.configuration_sha256), escaped(&summary));
+    let mut junit = format!("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<testsuites tests=\"{}\" failures=\"{failures}\" errors=\"{errors}\" skipped=\"{skipped}\"><testsuite name=\"oteleq.observed-equivalence\" tests=\"{}\" failures=\"{failures}\" errors=\"{errors}\" skipped=\"{skipped}\"><properties><property name=\"claim\" value=\"{CLAIM}\"/><property name=\"artefact_class\" value=\"diagnostic\"/><property name=\"source_sha256\" value=\"{}\"/><property name=\"configuration_sha256\" value=\"{}\"/><property name=\"summary\" value=\"{}\"/><property name=\"owned_source_exclusions\" value=\"{}\"/></properties>\n", rows.len(), rows.len(), escaped(&report.source_sha256), escaped(&report.configuration_sha256), escaped(&summary), escaped(&exclusions));
     for row in rows {
         let (name, class, details) = (
             escaped(&row.name),

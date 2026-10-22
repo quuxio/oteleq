@@ -6,11 +6,12 @@ GETTER_EXPECTATION ?= different
 JAVA_PROFILE ?= stock-methods-v1
 MARKDOWNLINT ?= ./ci/markdownlint/node_modules/.bin/markdownlint
 
-.PHONY: generation-native-project-otelc generation-return-otelc generation-java-sequence-otelc generation-java-controls-otelc generation-java-project-otelc generation-java-archive-otelc generation-node-project-otelc
+.PHONY: generation-retained-source-otelc generation-native-project-otelc generation-return-otelc generation-java-sequence-otelc generation-java-controls-otelc generation-java-project-otelc generation-java-archive-otelc generation-node-project-otelc
 
 .PHONY: help setup lint examples docs-check observer-check generation-check effect-qualification-check node-observer-check node-sequence-check java-observer-check go-observer-check cpp-observer-check generation-cpp-receiver-otelc generation-go-receiver-otelc generation-java-receiver-otelc generation-otelc generation-policy-otelc generation-rust-otelc rust-semantic-otelc generation-native-otelc generation-shrink-otelc generation-python-project-otelc generation-receiver-otelc generation-node-receiver-otelc generation-go-build-otelc generation-go-project-otelc generation-sequence-otelc generation-typescript-sequence-otelc generation-filesystem-otelc generation-http-otelc resource-otelc capture-otelc report core-check coverage check
 
 help:
+	@printf '%s\n' 'generation-retained-source-otelc Qualify eight-language in-source retention, replanning and detached suites'
 	@printf '%s\n' 'generation-node-project-otelc Qualify Node module formats, detached suites and reduction'
 	@printf '%s\n' 'generation-java-project-otelc Qualify Java roots, JARs/resources, detached suites and reduction (JAVA_BACKEND, JAVA_PROFILE)'
 	@printf '%s\n' 'generation-java-archive-otelc Qualify the explicit JDK21 runtime archive project profile'
@@ -23,6 +24,11 @@ help:
 setup:
 	npm ci --ignore-scripts --prefix ci/markdownlint
 	$(PYTHON) ci/java_coverage.py setup
+
+generation-retained-source-otelc:
+	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
+	cargo build --locked
+	$(PYTHON) tests/qualify_retained_source.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
 
 generation-return-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
@@ -77,6 +83,7 @@ generation-check: node-observer-check node-sequence-check java-observer-check go
 	$(PYTHON) -m coverage run --data-file=.generation.coverage --source=adapters/generation,ci -m unittest discover -s tests -p 'test_generation*.py' -v
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/generation.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/owned_workspace.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/return_expectations.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_build.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_project.py' --fail-under=80

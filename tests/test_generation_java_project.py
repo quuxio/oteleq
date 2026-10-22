@@ -266,6 +266,7 @@ class JavaProjectTests(unittest.TestCase):
         probe.parent.mkdir(parents=True)
         probe.write_text("retained capability response")
         data["java_provider_manifest"] = generation.manifest(workspace / generation.java_provider.DIRECTORY)
+        data["schema_version"] = generation.VERSION
         data["source_manifest"] = generation.manifest(workspace / "snapshot")
         generation.write(workspace / generation.PLAN_FILE, data)
         generation.write(workspace / generation.OWNED_MARKER, {"schema_version": 1, "plan_sha256": generation.identity(data)})

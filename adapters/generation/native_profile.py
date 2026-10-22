@@ -9,6 +9,7 @@ import native_frontend
 import native_project
 import native_workers
 import native_workspace
+import owned_workspace
 
 DIRECTORY = 'native-context'
 
@@ -20,7 +21,7 @@ def configured(configuration: dict) -> bool:
 
 
 def prepare_inputs(workflow, source: Path, root: Path, workspace: Path,
-                   configuration: dict, contents: dict, *, excluded_files=()) -> tuple[dict, dict]:
+                   configuration: dict, contents: dict, *, excluded_files=(), excluded_roots=()) -> tuple[dict, dict]:
     """Retain native discovery failures and bind added inputs before snapshotting."""
     try:
         profiles = prepare(workflow, source, root, workspace, configuration)
@@ -30,7 +31,8 @@ def prepare_inputs(workflow, source: Path, root: Path, workspace: Path,
         raise ValueError(str(error) + '; partial workspace: ' + str(workspace)) from error
     if not profiles:
         return contents, profiles
-    required = source_manifest(workflow, source, profiles, excluded_files=excluded_files)
+    required = source_manifest(workflow, source, profiles, excluded_files=excluded_files,
+                               excluded_roots=excluded_roots)
     if any(required.get(name) != digest for name, digest in contents.items()):
         raise ValueError('source changed during native build discovery')
     return required, profiles
@@ -103,16 +105,20 @@ def prepare(workflow, source: Path, root: Path, workspace: Path, configuration: 
     return profiles
 
 
-def source_manifest(workflow, source: Path, profiles: dict, *, excluded_files=()) -> dict:
+def source_manifest(workflow, source: Path, profiles: dict, *, excluded_files=(), excluded_roots=()) -> dict:
     """Explicit compiler inputs supplement the normal source walk and its budgets."""
     options = {"excluded_files": excluded_files} if excluded_files else {}
+    if excluded_roots:
+        options["excluded_roots"] = excluded_roots
     contents = workflow.manifest(source, excluded=discovery.IGNORED, **options)
     for profile in profiles.values():
         for name in profile['directories']:
+            owned_workspace.require_application_input(source, name)
             path = source / name
             native_project.require(path.is_dir() and path.resolve() == path,
                                    'required directory changed or is a symlink: ' + name)
         for name, expected in profile['local_inputs'].items():
+            owned_workspace.require_application_input(source, name)
             path = source / name
             native_project.require(path.is_file() and path.resolve() == path and not path.is_symlink(),
                                    'required input changed or is a symlink: ' + name)

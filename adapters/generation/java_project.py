@@ -7,6 +7,7 @@ import shutil
 
 import java_classpath as classpath
 import java_archive_context as archive_context
+import owned_workspace
 
 DIRECTORY = "java-context"
 CONTEXT_FILE = "java-build-context.json"
@@ -50,16 +51,18 @@ def settings(value: dict) -> dict:
     return {"source_roots": roots, "classpath": paths}
 
 
-def source_files(source: Path, options: dict, ignored: set[str]) -> list[str]:
+def source_files(source: Path, options: dict, ignored: set[str], *, excluded_roots=()) -> list[str]:
     """Explicit roots include generated Java source without admitting build binaries."""
     result = set()
     for relative in options["source_roots"]:
+        owned_workspace.require_application_input(source, relative)
         root = source / relative
         require(root.is_dir() and root.resolve() == root and root.is_relative_to(source), "missing or linked source root")
         for directory, directories, names in os.walk(root):
             parent = Path(directory)
             require(not any((parent / name).is_symlink() for name in directories + names), "symlink in source root")
-            directories[:] = sorted(name for name in directories if name not in ignored)
+            directories[:] = sorted(name for name in directories if name not in ignored
+                                    and (parent / name).relative_to(source).as_posix() not in excluded_roots)
             for name in names:
                 if name.endswith(".java"):
                     path = parent / name
@@ -70,11 +73,11 @@ def source_files(source: Path, options: dict, ignored: set[str]) -> list[str]:
     return sorted(result)
 
 
-def source_manifest(source: Path, options: dict, contents: dict, ignored: set[str]) -> dict:
+def source_manifest(source: Path, options: dict, contents: dict, ignored: set[str], *, excluded_roots=()) -> dict:
     """Preserve ordinary snapshot exclusions while retaining explicit generated units."""
     result = dict(contents)
     if "source_roots" in options:
-        for name in source_files(source, options, ignored):
+        for name in source_files(source, options, ignored, excluded_roots=excluded_roots):
             result[name] = classpath.digest(source / name)
     return result
 
@@ -128,7 +131,8 @@ def protect_destination(destination: Path, locations: list[Path]) -> None:
 
 
 def prepare(source: Path, workspace: Path, options: dict, ignored: set[str], *,
-            java: Path | None = None, environment: dict | None = None, execute: Callable | None = None) -> dict | None:
+            java: Path | None = None, environment: dict | None = None, execute: Callable | None = None,
+            excluded_roots=()) -> dict | None:
     """Copy existing dependencies without running a build manager in the repository."""
     if "source_roots" not in options:
         return None
@@ -139,10 +143,12 @@ def prepare(source: Path, workspace: Path, options: dict, ignored: set[str], *,
     root = workspace / DIRECTORY
     root.mkdir(mode=0o700)
     (root / "classpath").mkdir()
-    units = source_files(source, options, ignored)
+    units = source_files(source, options, ignored, excluded_roots=excluded_roots)
     entries, names, locations, total = [], set(), set(), 0
     for index, declared in enumerate(options["classpath"]):
         requested = Path(os.path.abspath(source / declared))
+        if requested.is_relative_to(source):
+            owned_workspace.require_application_input(source, requested.relative_to(source).as_posix())
         origin = requested.resolve(strict=True)
         require(origin not in locations, "duplicate resolved classpath location")
         locations.add(origin)

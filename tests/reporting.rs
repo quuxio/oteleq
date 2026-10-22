@@ -12,6 +12,63 @@ fn fixture() -> Value {
 fn rendered(data: &Value) -> quux_oteleq::reporting::RenderedReport {
     render(&serde_json::to_vec(data).unwrap()).unwrap()
 }
+#[test]
+fn retained_workspace_exclusions_are_visible_without_counting_as_tests() {
+    let mut data = fixture();
+    data["owned_source_exclusions"] = json!([{
+        "path":"retained&suite", "workspace_id":"known", "plan_sha256":"f".repeat(64),
+        "reason":"verified retained oteleq workspace"
+    }]);
+    let output = rendered(&data);
+    assert_eq!(output.exit_code, 0);
+    assert!(output
+        .html
+        .contains("Retained oteleq output excluded from application inputs: 1"));
+    assert!(output
+        .html
+        .contains("retained&amp;suite; workspace known; plan"));
+    assert!(output.junit.contains("name=\"owned_source_exclusions\""));
+    assert!(output.junit.contains("retained&amp;suite"));
+    assert!(output
+        .junit
+        .contains("tests=\"1\" failures=\"0\" errors=\"0\" skipped=\"0\""));
+    data["owned_source_exclusions"][0]["workspace_id"] = Value::Null;
+    assert!(rendered(&data).html.contains("workspace unavailable"));
+}
+
+#[test]
+fn invalid_retained_workspace_exclusions_are_rejected() {
+    let record = json!({"path":"retained", "workspace_id":null, "plan_sha256":"f".repeat(64),
+                        "reason":"verified retained oteleq workspace"});
+    for path in [
+        "",
+        "/absolute",
+        "a//b",
+        "a/../b",
+        "a/./b",
+        &"a".repeat(4097),
+    ] {
+        let mut data = fixture();
+        data["owned_source_exclusions"] = json!([record.clone()]);
+        data["owned_source_exclusions"][0]["path"] = json!(path);
+        assert!(render(&serde_json::to_vec(&data).unwrap()).is_err());
+    }
+    for (key, value) in [
+        ("plan_sha256", "bad"),
+        ("reason", "marker alone"),
+        ("unknown", "field"),
+    ] {
+        let mut data = fixture();
+        data["owned_source_exclusions"] = json!([record.clone()]);
+        data["owned_source_exclusions"][0][key] = json!(value);
+        assert!(render(&serde_json::to_vec(&data).unwrap()).is_err());
+    }
+    for count in [2, 10001] {
+        let mut data = fixture();
+        data["owned_source_exclusions"] = json!(vec![record.clone(); count]);
+        assert!(render(&serde_json::to_vec(&data).unwrap()).is_err());
+    }
+}
 fn typed_fixture() -> Value {
     let mut data = fixture();
     let original = data["cases"][0]["comparison"].clone();
