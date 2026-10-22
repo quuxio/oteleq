@@ -207,6 +207,28 @@ def seeded(cli: Path, provider: Path, folder: Path) -> set[str]:
     return check_report(folder / "seeded-report/report.json", count=8, expected_arguments=expected)
 
 
+def finish(cli: Path, workspace: Path, folder: Path, attempts: set[str], count: int) -> dict:
+    """Seal inputs and present checked results without rerunning application cases."""
+    original = json.loads((workspace / "plan.json").read_text())
+    for name, expected in original["source_manifest"].items():
+        assert hashlib.sha256((folder / "application" / name).read_bytes()).hexdigest() == expected
+    command([cli, "export-tests", "--workspace", workspace, "--destination", folder / "final-identity-check"],
+            folder, "final-identity-check")
+    command([cli, "render-report", folder / "comparison/report.json", "--output-dir", folder / "presentation"],
+            folder, "render", expected=1)
+    result = {"claim": "equivalence over these tests and observations", "artefact_class": "diagnostic",
+              "cli_sha256": hashlib.sha256(cli.read_bytes()).hexdigest(),
+              "driver_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+              "oracle_sha256": hashlib.sha256(Path(__file__).with_name("domain_fixture_oracle.py").read_bytes()).hexdigest(),
+              "languages": list(LANGUAGES), "selected_functions": 30, "initial_cases": CASES,
+              "qualified_application_launches": len(attempts), "prelaunch_refusal_controls": count,
+              "complete_literal_graph_oracles": True, "source_preserved": True,
+              "actual_attempt_directories": sorted(attempts),
+              "limits": "Recorded legacy diagnostic profiles; strings supported in five languages. Probe intentionally observes telemetry. No shipping equivalence."}
+    (folder / "qualification.json").write_text(json.dumps(result, indent=2) + "\n")
+    return result
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--cli", type=Path, required=True)
@@ -227,22 +249,7 @@ def main() -> None:
     for more in (frozen_replay(cli, workspace, folder), reduce_case(cli, workspace, folder), seeded(cli, provider, folder)):
         assert attempts.isdisjoint(more)
         attempts |= more
-    original = json.loads((workspace / "plan.json").read_text())
-    for name, expected in original["source_manifest"].items():
-        assert hashlib.sha256((folder / "application" / name).read_bytes()).hexdigest() == expected
-    command([cli, "export-tests", "--workspace", workspace, "--destination", folder / "final-identity-check"],
-            folder, "final-identity-check")
-    command([cli, "render-report", folder / "comparison/report.json", "--output-dir", folder / "presentation"], folder, "render")
-    result = {"claim": "equivalence over these tests and observations", "artefact_class": "diagnostic",
-              "cli_sha256": hashlib.sha256(cli.read_bytes()).hexdigest(),
-              "driver_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-              "oracle_sha256": hashlib.sha256(Path(__file__).with_name("domain_fixture_oracle.py").read_bytes()).hexdigest(),
-              "languages": list(LANGUAGES), "selected_functions": 30, "initial_cases": CASES,
-              "qualified_application_launches": len(attempts), "prelaunch_refusal_controls": count,
-              "complete_literal_graph_oracles": True, "source_preserved": True,
-              "actual_attempt_directories": sorted(attempts),
-              "limits": "Recorded legacy diagnostic profiles; strings supported in five languages. Probe intentionally observes telemetry. No shipping equivalence."}
-    (folder / "qualification.json").write_text(json.dumps(result, indent=2) + "\n")
+    result = finish(cli, workspace, folder, attempts, count)
     print(json.dumps({key: value for key, value in result.items() if key != "actual_attempt_directories"}), flush=True)
 
 

@@ -1,10 +1,12 @@
 """Independent domain-fixture oracles reject equal but incorrect observations."""
 import copy
+import hashlib
 import json
 from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / "tests"), str(ROOT / "adapters/generation"), str(ROOT / "examples")]
@@ -130,6 +132,40 @@ class DomainQualificationTests(unittest.TestCase):
         self.assertEqual(instrumented["roots"]["result"]["value"], "1")
         self.assertEqual(oracle.graph("python", "probe", 0, returned=True, lane="instrumented_on")
                          ["roots"]["result"]["value"], "0")
+
+    def finish_inputs(self) -> tuple[Path, Path, Path]:
+        cli = self.root / "cli"
+        cli.write_bytes(b"frozen CLI identity")
+        workspace = self.root / "workspace"
+        workspace.mkdir()
+        folder = self.root / "results"
+        source = folder / "application/app.py"
+        source.parent.mkdir(parents=True)
+        source.write_bytes(b"def selected():return 7\n")
+        (workspace / "plan.json").write_text(json.dumps({
+            "source_manifest": {"app.py": hashlib.sha256(source.read_bytes()).hexdigest()}}))
+        return cli, workspace, folder
+
+    def test_final_presentation_accepts_deliberate_differences_without_relaunching_cases(self):
+        cli, workspace, folder = self.finish_inputs()
+        attempts = {"retained-attempt-0", "retained-attempt-1"}
+        with patch.object(qualify_domains, "command") as command:
+            result = qualify_domains.finish(cli, workspace, folder, attempts, 14)
+        self.assertEqual([call.args[0][1] for call in command.call_args_list], ["export-tests", "render-report"])
+        self.assertNotIn("--apply", command.call_args_list[0].args[0])
+        self.assertEqual(command.call_args_list[1].kwargs.get("expected", 0), 1)
+        self.assertEqual(result["actual_attempt_directories"], sorted(attempts))
+        self.assertEqual(result["qualified_application_launches"], 2)
+        self.assertEqual(json.loads((folder / "qualification.json").read_text()), result)
+
+    def test_finalisation_refuses_changed_application_sources_before_presentation(self):
+        cli, workspace, folder = self.finish_inputs()
+        (folder / "application/app.py").write_text("def selected():return 99\n")
+        with patch.object(qualify_domains, "command") as command:
+            with self.assertRaises(AssertionError):
+                qualify_domains.finish(cli, workspace, folder, {"retained-attempt"}, 14)
+        command.assert_not_called()
+        self.assertFalse((folder / "qualification.json").exists())
 
 
 if __name__ == "__main__":
