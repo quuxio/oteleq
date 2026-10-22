@@ -31,6 +31,8 @@ The report directory must be new and outside the application, otelc and workspac
 
 If an earlier exported suite lives inside the application, the planner [verifies and excludes that retained bundle](retained-source-selection.md) from application inputs. Its helpers and frozen snapshot do not become new targets. Edited or unsealed bundles stop planning; the plan and report list verified exclusions.
 
+[Incomplete directory inspection](input-inspection.md) is an error. Unreadable or vanished source/input directories cannot produce successful partial plans or preservation checks. Documented exclusions remain explicit; the tool does not change permissions to read inputs.
+
 The CLI embeds its adapter sources, so an installed binary does not depend on an oteleq source checkout. It still needs the selected Python environment, otelc build and language tools. Keep the same CLI and tool contents for replay; changing them requires a new plan. `cargo install --path . --locked` installs the CLI locally.
 
 The generated suite remembers the CLI path used during generation. If the same binary is moved, export `OTELEQ_CLI=/new/path/to/quux-oteleq` before running the suite; its content identity must still match the plan. `OTELEQ_PYTHON` selects the qualified adapter-host environment. See the [command/flag reference](cli-and-configuration.md#implemented-commands) and [actual workspace layout](test-generation.md#current-workspace).

@@ -50,7 +50,7 @@ def artefacts(root: Path, tools: dict, profile: str = java_profiles.STOCK) -> di
         paths.append(root / HELPER)
     for tree in (package, root / "adapters/java/src/main"):
         require(tree.is_dir() and not tree.is_symlink(), "missing SDK source tree: " + str(tree))
-        for path in sorted(tree.rglob("*")):
+        for path in sorted(capture.tree_paths(tree)):
             require(not path.is_symlink(), "symlink in SDK inputs: " + str(path))
             if path.is_file() and (tree != package or path.suffix == ".py"):
                 paths.append(path)

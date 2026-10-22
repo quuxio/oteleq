@@ -16,7 +16,7 @@ import threading
 
 from otelc_capture import (CaptureServer, loss_diagnostics, require_counters,
                            require_runtime_identity, retain_http, span_identity,
-                           strict_json, temporary_parent)
+                           strict_json, temporary_parent, tree_paths)
 
 
 TASK_SOURCE = Path("examples/apps/python_tasks_app.py")
@@ -33,7 +33,7 @@ def file_digest(path):
 
 def artefact_identities(root, interpreter):
     identities = {str(path.relative_to(root)): file_digest(path)
-                  for path in sorted((root / "adapters/python/quux_otelc_python").rglob("*.py"))}
+                  for path in sorted(tree_paths(root / "adapters/python/quux_otelc_python")) if path.suffix == ".py"}
     for relative in ("target/debug/quux-otelc", "adapters/python/requirements.txt"):
         identities[relative] = file_digest(root / relative)
     identities["python_executable"] = file_digest(interpreter)

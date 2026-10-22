@@ -1,10 +1,11 @@
 # oteleq documentation
 
-Updated 21 October 2026, `quux-oteleq compare-workload` runs the Rust comparator, with diagnostic capture integrations for all eight otelc languages. [Automatic scalar test generation](automatic-generation.md) inventories and executes supported functions in private workspaces, emitting shared typed boundary graphs. [Scalar shrinking](counterexample-shrinking.md) reduces qualified differences within explicit independent domains. Semantic/build-aware adapters and richer object/factory codecs remain incomplete.
+Updated 22 October 2026, `quux-oteleq compare-workload` runs the Rust comparator, with diagnostic capture integrations for all eight otelc languages. [Automatic scalar test generation](automatic-generation.md) inventories and executes supported functions in private workspaces, emitting shared typed boundary graphs. [Scalar shrinking](counterexample-shrinking.md) reduces qualified differences within explicit independent domains. Semantic/build-aware adapters and richer object/factory codecs remain incomplete.
 
 | Document | Use it to |
 | --- | --- |
 | [Automatic generation](automatic-generation.md) | Generate, run, replay and retain the implemented scalar suite |
+| [Complete input inspection](input-inspection.md) | Resolve unreadable source/dependency refusals and inspect qualification evidence |
 | [Go build bundles](go-build-bundles.md) | Retain matched executables, compiler evidence and detached replay |
 | [Java compiler bindings](java-build-bundles.md) | Inspect actual source origins, JDK/compiler identities and retained class products |
 | [Java runtime archives](java-runtime-archives.md) | Configure the explicit prepared profile and review selected-JDK member evidence |

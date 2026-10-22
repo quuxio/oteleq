@@ -6,6 +6,8 @@ import stat
 from urllib.parse import unquote, urlsplit
 import zipfile
 
+from otelc_capture import tree_paths, walk_tree
+
 MAX_FILES = 20000
 MAX_FILE_BYTES = 128 * 1024 * 1024
 MAX_TOTAL_BYTES = 512 * 1024 * 1024
@@ -39,7 +41,7 @@ def manifest(root: Path) -> dict[str, str]:
     """Retain every resource byte and refuse links or unbounded directory trees."""
     require(root.is_dir() and root.resolve() == root and not root.is_symlink(), "unsafe class directory")
     result, size, count = {}, 0, 0
-    for directory, names, files in os.walk(root):
+    for directory, names, files in walk_tree(root):
         count += len(names) + len(files)
         require(count <= MAX_FILES, "classpath directory exceeds its entry budget")
         names.sort()
@@ -150,7 +152,7 @@ def inspect(path: Path) -> dict:
             if name is not None:
                 require((path / entry).stat().st_size <= MAX_CLASS_BYTES, CLASS_BUDGET_ERROR)
                 classes[name] = {"entry": entry, "sha256": sha}
-        directories = sorted(item.relative_to(path).as_posix() for item in path.rglob("*") if item.is_dir())
+        directories = sorted(item.relative_to(path).as_posix() for item in tree_paths(path) if item.is_dir())
         return {"kind": "directory", "files": files, "classes": classes, "directories": directories}
     sha = digest(path)
     classes = jar_classes(path)

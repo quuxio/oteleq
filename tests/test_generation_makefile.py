@@ -20,7 +20,8 @@ class QualificationRecipeTests(unittest.TestCase):
             for flag in ("--cli", "--comparator"):
                 if line.startswith("\t") and flag + " " in line:
                     targets[target] = flag
-        self.assertEqual(len(targets), 28)
+        self.assertEqual(len(targets), 29)
+        self.assertIn("generation-input-walks-otelc", targets)
         self.assertIn("generation-retained-source-otelc", targets)
         self.assertIn("generation-node-project-otelc", targets)
         self.assertIn("generation-native-project-otelc", targets)
@@ -53,7 +54,7 @@ class QualificationRecipeTests(unittest.TestCase):
                     with self.subTest(target=name, directory=directory):
                         result = subprocess.run(["make", "--no-print-directory", "-s", name,
                             "OTELC_ROOT=" + str(base / "provider"), "REPORT_DIR=" + str(base / "evidence"),
-                            "UNSUPPORTED_OTELC_ROOT=" + str(base / "old-provider"), "PYTHON=" + str(python),
+                            "UNSUPPORTED_OTELC_ROOT=" + str(base / "old-provider"), "BEFORE_CLI=" + str(base / "old-cli"), "PYTHON=" + str(python),
                             "GENERATION_ARGS=", "CAPTURE_ARGS="], cwd=ROOT, env=environment,
                             capture_output=True, text=True, check=False)
                         self.assertEqual(result.returncode, 0, result.stderr)
