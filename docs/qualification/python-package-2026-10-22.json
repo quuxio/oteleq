@@ -1,0 +1,159 @@
+{
+  "qualification_schema_version": 1,
+  "date": "2026-10-22",
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "platform": {
+    "os": "macOS-27.0.1-arm64-arm-64bit",
+    "architecture": "arm64",
+    "python": "3.12.15"
+  },
+  "runtime": {
+    "commit": "7b9fb76de35f6946059ea2bea102651cb2bffb72",
+    "tree": "ee38108d1b932d6c033a326d94187eea50117796",
+    "cli_sha256": "faab00881669488f8c6312b6a162b67e908e26f29e3f64d6d5c5bea7eab8f51e",
+    "source_archive_sha256": "c9ffc44049560e51d2c5c3546dd14157a534e5d5309857ba27f8f8a7d741857e",
+    "private_verifier_sha256": "298b24da2faa89edd6e5bfb3044968a5a9eddf149499fe78f13c61d8c8eaed02"
+  },
+  "provider": {
+    "commit": "d6d03b72026cde8962b11ce3cc184ff3ebcb60d4",
+    "all_unchanged": true,
+    "manifest_sha256": "2a8dbf239c6444c0fb536dff049993beade7eaed6578c9654c1e2d7233e9431f",
+    "source_files": 413,
+    "products": 586,
+    "dependencies": 6361,
+    "resolved_link_targets": 11,
+    "tools": 8
+  },
+  "maintained_package_corpus": {
+    "claim": "equivalence over these tests and observations",
+    "artefact_class": "diagnostic",
+    "cli_sha256": "faab00881669488f8c6312b6a162b67e908e26f29e3f64d6d5c5bea7eab8f51e",
+    "projects": 2,
+    "cases": 4,
+    "actual_application_launches": 48,
+    "generated_unittest_runs": 4,
+    "generated_tests": 8,
+    "changed_local_dependency_controls_rejected": 2,
+    "source_preserved": true,
+    "receiver_import_context_controls_rejected": 6,
+    "receiver_refusal_application_launches": 0,
+    "receiver_refusal_generated_suite_runs": 12,
+    "scope": "Explicit regular Python source packages and src layout, module-local state and scalar calls; no namespace, installed project metadata, imported-root or shipping qualification."
+  },
+  "package_receiver_corpus": {
+    "cases": [
+      {
+        "kind": "regular",
+        "factory": "Counter",
+        "actual_application_launches": 16,
+        "source_preserved": true
+      },
+      {
+        "kind": "regular",
+        "factory": "make_counter",
+        "actual_application_launches": 16,
+        "source_preserved": true
+      },
+      {
+        "kind": "namespace",
+        "factory": "Counter",
+        "actual_application_launches": 0,
+        "source_preserved": true
+      },
+      {
+        "kind": "namespace",
+        "factory": "make_counter",
+        "actual_application_launches": 0,
+        "source_preserved": true
+      },
+      {
+        "kind": "ambiguous",
+        "factory": "Counter",
+        "actual_application_launches": 0,
+        "source_preserved": true
+      },
+      {
+        "kind": "ambiguous",
+        "factory": "make_counter",
+        "actual_application_launches": 0,
+        "source_preserved": true
+      },
+      {
+        "kind": "shadowed",
+        "factory": "Counter",
+        "actual_application_launches": 0,
+        "source_preserved": true
+      },
+      {
+        "kind": "shadowed",
+        "factory": "make_counter",
+        "actual_application_launches": 0,
+        "source_preserved": true
+      }
+    ],
+    "actual_application_launches": 32
+  },
+  "results": {
+    "unique_application_launches": 80,
+    "supported_package_function_cases": 4,
+    "supported_package_receiver_cases": 2,
+    "invalid_context_factory_combinations": 6,
+    "refused_contexts": [
+      "namespace",
+      "ambiguous roots",
+      "shadowed package"
+    ],
+    "factories": [
+      "Counter",
+      "make_counter"
+    ],
+    "source_preserved": true,
+    "provider_preserved": true
+  },
+  "verification": {
+    "failure_before_fix": "Six context/factory regression cases were incorrectly ready and lacked python_import; fixtures cleared their import-context error.",
+    "fixed_behaviour": "Retain the specific import-context error before receiver fixture binding.",
+    "independent_receiver_oracle": [
+      "actual pkg.api module/package identity",
+      "complete initial and final argument/receiver graphs",
+      "constructor input 10 and method input 7",
+      "exact integer return 17",
+      "empty application stdout/stderr",
+      "per-lane instrumentation witness and raw OTLP presence",
+      "detached export and replay"
+    ],
+    "maintained_refusal_routes": [
+      "run",
+      "generated unittest",
+      "detached exported unittest"
+    ],
+    "refusal_application_launches": 0,
+    "unit_regression_cases_before_fix": 6,
+    "explicitly_retained_scope": "The 48-launch maintained package target and the separately retained 32-launch receiver corpus have distinct records and verifier bytes."
+  },
+  "evidence": {
+    "local_root": "/Users/sclarke/github/oteleq-qualification/2026-10-22/python-import-context-7b9fb76",
+    "seal_file": "seal.json",
+    "files": 2294,
+    "seal_sha256": "f62d570926b6c69db1176440124759a0cc13853ee672c6a360c94cf78c075299",
+    "all_rechecked": true,
+    "unique_application_launches": 80,
+    "accounting": {
+      "unique_application_launches": 80,
+      "corpora": {
+        "qualification": 32,
+        "maintained-qualification": 48
+      }
+    },
+    "receiver_verifier_file": "qualify_context_fix.py",
+    "maintained_verifier_file": "source/tests/qualify_python_project.py",
+    "maintained_verifier_sha256": "2ecfd9382b21a457a81d49a82e3d425740420c166165d24f75c6a7c66ab420f5"
+  },
+  "limits": [
+    "No namespace-package implementation is added.",
+    "Installed-project metadata, editable installation and dependency installation remain open.",
+    "Imported-module globals, arbitrary receivers and general Python async/build integration remain open.",
+    "These are fixed diagnostic caller results, not shipping-artefact or universal-equivalence evidence."
+  ]
+}
