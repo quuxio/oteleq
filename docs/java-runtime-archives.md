@@ -2,7 +2,7 @@
 
 ## Current status
 
-The explicit prepared `archive-methods-v1` profile integrates the independent consumer resolver into generated project workflows. Its [304-JVM qualification](qualification/java-archives-2026-10-22.json) uses frozen consumer runtime `646857c` and SDK `c06eb43`, with complete independent state/outcome checks, compiler/runtime member identities, decoded telemetry and source preservation. It requires that matching runtime-archive contract and helper tool. The original `stock-methods-v1` and `safe-methods-v1` recipes retain their existing behaviour and refuse versioned layouts. Invocation-scoped attribution remains open.
+The explicit prepared `archive-methods-v1` profile integrates the independent consumer resolver into generated project workflows. Its [260-JVM qualification](qualification/java-archives-2026-10-22.json) uses frozen consumer runtime `9b60417` and SDK `c06eb43`, with complete independent state/outcome checks, compiler/runtime member identities, decoded telemetry and source preservation. It requires that matching runtime-archive contract and helper tool. The original `stock-methods-v1` and `safe-methods-v1` recipes retain their existing behaviour and refuse versioned layouts. Invocation-scoped attribution remains open.
 
 ## Select the profile
 
@@ -38,7 +38,7 @@ The new provider must bind its resolver helper-tool identity in both plain and i
 
 ## Checks and remaining work
 
-The corpus covers eleven archive variants through direct, fixed replay, generated and exported suites. A second detached run removes both original source and external dependency directories. It also covers same-return global mutation, scalar reduction from `[7]` to `[0]`, independently reproduced real helper relocation, 48 private receiver JVMs with four live metric states, ordinary private receiver compatibility and 13 input/evidence controls. All 112 frozen provider files and 25 owned workspaces are revalidated after execution. Copied original shrink evidence is retained separately and does not inflate the 304 actual JVMs.
+The corpus covers eleven archive variants through direct, fixed replay, generated and exported suites. The detached route removes both original source and external dependency directories. It also covers same-return global mutation, scalar reduction from `[7]` to `[0]`, independently reproduced real helper relocation, 48 private receiver JVMs with four live metric states, ordinary private receiver compatibility and 13 input/evidence controls. All 112 frozen provider files and 25 owned workspaces are revalidated after execution. Copied original shrink evidence is retained separately and does not inflate the 260 actual JVMs.
 
 `make check` runs the real JDK matrix and enforces separate 80% line-coverage floors for `java_archives.py` and the compiled `OteleqArchives` resolver. JaCoCo is confined to regression probes; application/provider qualification uses ordinary JVMs.
 

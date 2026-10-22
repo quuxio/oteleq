@@ -5,191 +5,232 @@
   "date": "2026-10-22",
   "platform": "macOS ARM64",
   "profile": "archive-methods-v1",
-  "consumer_runtime_commit": "646857c34697f62f62832f0ebd457eaf252b9117",
-  "qualifier_commit": "5c3026eb3673913cef1419977736f7d8b2d7d3ad",
-  "consumer_cli_sha256": "f04723fc5d0c654c66da56c25afb2d67d1b35fed7576340277a01baad37cdbfc",
-  "runtime_source_files_unchanged_in_qualifier_commit": 85,
+  "consumer_runtime_commit": "9b60417ed0e424036df0345cf0cfdecb9f310ed1",
+  "qualifier_commit": "9b60417ed0e424036df0345cf0cfdecb9f310ed1",
+  "consumer_cli_sha256": "3da19a92b27eda8cbc2b5e7e7e38129383d3a5123570f7a3a0cf30e1ba2ab7d4",
+  "consumer_source_archive_sha256": "764f2b15032e64b7ffc15ccf3662aa00fdef2952fe0852b36285acbeb4044a39",
   "provider_commit": "c06eb438012116a7b2ec9b635a2cb7434d8e713d",
-  "provider_files_verified_after_execution": 112,
   "provider_manifest_sha256": "11bd6467ae4077815f056d8286bc2ed1301c3c1e15d92afdf5839100df5c460a",
+  "provider_files_verified_after_execution": 112,
   "jdk": "OpenJDK Runtime Environment Homebrew 21.0.12.1",
-  "actual_application_jvm_launches": 304,
-  "unique_instrumented_application_jvms": 152,
+  "actual_application_jvm_launches": 260,
+  "unique_instrumented_application_jvms": 130,
   "variants": {
-    "active": {
-      "application_launches": 20,
-      "launches": {
-        "raw_attempt_folders": 20,
-        "unique_command_identities": 20
-      },
-      "prepared": {
-        "retained_attempts": 20,
-        "unique_processes": 20,
-        "retained_instrumented_receipts": 10,
-        "short_runtimes_removed": true
-      },
-      "retained_builds": 20,
-      "complete_literal_graphs_verified": true
-    },
     "ordinary": {
-      "application_launches": 20,
+      "application_launches": 16,
       "launches": {
-        "raw_attempt_folders": 20,
-        "unique_command_identities": 20
+        "raw_attempt_folders": 16,
+        "unique_command_identities": 16
       },
       "prepared": {
-        "retained_attempts": 20,
-        "unique_processes": 20,
-        "retained_instrumented_receipts": 10,
+        "retained_attempts": 16,
+        "unique_processes": 16,
+        "retained_instrumented_receipts": 8,
         "short_runtimes_removed": true
       },
-      "retained_builds": 20,
-      "complete_literal_graphs_verified": true
+      "retained_builds": 16,
+      "complete_literal_graphs_verified": true,
+      "prelaunch_refusals": 0,
+      "altered_evidence_controls": 0,
+      "original_source_and_dependencies_preserved": true
     },
     "inactive": {
-      "application_launches": 20,
+      "application_launches": 16,
       "launches": {
-        "raw_attempt_folders": 20,
-        "unique_command_identities": 20
+        "raw_attempt_folders": 16,
+        "unique_command_identities": 16
       },
       "prepared": {
-        "retained_attempts": 20,
-        "unique_processes": 20,
-        "retained_instrumented_receipts": 10,
+        "retained_attempts": 16,
+        "unique_processes": 16,
+        "retained_instrumented_receipts": 8,
         "short_runtimes_removed": true
       },
-      "retained_builds": 20,
-      "complete_literal_graphs_verified": true
+      "retained_builds": 16,
+      "complete_literal_graphs_verified": true,
+      "prelaunch_refusals": 0,
+      "altered_evidence_controls": 0,
+      "original_source_and_dependencies_preserved": true
     },
     "false": {
-      "application_launches": 20,
+      "application_launches": 16,
       "launches": {
-        "raw_attempt_folders": 20,
-        "unique_command_identities": 20
+        "raw_attempt_folders": 16,
+        "unique_command_identities": 16
       },
       "prepared": {
-        "retained_attempts": 20,
-        "unique_processes": 20,
-        "retained_instrumented_receipts": 10,
+        "retained_attempts": 16,
+        "unique_processes": 16,
+        "retained_instrumented_receipts": 8,
         "short_runtimes_removed": true
       },
-      "retained_builds": 20,
-      "complete_literal_graphs_verified": true
+      "retained_builds": 16,
+      "complete_literal_graphs_verified": true,
+      "prelaunch_refusals": 0,
+      "altered_evidence_controls": 0,
+      "original_source_and_dependencies_preserved": true
+    },
+    "active": {
+      "application_launches": 16,
+      "launches": {
+        "raw_attempt_folders": 16,
+        "unique_command_identities": 16
+      },
+      "prepared": {
+        "retained_attempts": 16,
+        "unique_processes": 16,
+        "retained_instrumented_receipts": 8,
+        "short_runtimes_removed": true
+      },
+      "retained_builds": 16,
+      "complete_literal_graphs_verified": true,
+      "prelaunch_refusals": 5,
+      "altered_evidence_controls": 4,
+      "original_source_and_dependencies_preserved": true
     },
     "intermediate": {
-      "application_launches": 20,
+      "application_launches": 16,
       "launches": {
-        "raw_attempt_folders": 20,
-        "unique_command_identities": 20
+        "raw_attempt_folders": 16,
+        "unique_command_identities": 16
       },
       "prepared": {
-        "retained_attempts": 20,
-        "unique_processes": 20,
-        "retained_instrumented_receipts": 10,
+        "retained_attempts": 16,
+        "unique_processes": 16,
+        "retained_instrumented_receipts": 8,
         "short_runtimes_removed": true
       },
-      "retained_builds": 20,
-      "complete_literal_graphs_verified": true
+      "retained_builds": 16,
+      "complete_literal_graphs_verified": true,
+      "prelaunch_refusals": 0,
+      "altered_evidence_controls": 0,
+      "original_source_and_dependencies_preserved": true
     },
     "future": {
-      "application_launches": 20,
+      "application_launches": 16,
       "launches": {
-        "raw_attempt_folders": 20,
-        "unique_command_identities": 20
+        "raw_attempt_folders": 16,
+        "unique_command_identities": 16
       },
       "prepared": {
-        "retained_attempts": 20,
-        "unique_processes": 20,
-        "retained_instrumented_receipts": 10,
+        "retained_attempts": 16,
+        "unique_processes": 16,
+        "retained_instrumented_receipts": 8,
         "short_runtimes_removed": true
       },
-      "retained_builds": 20,
-      "complete_literal_graphs_verified": true
+      "retained_builds": 16,
+      "complete_literal_graphs_verified": true,
+      "prelaunch_refusals": 0,
+      "altered_evidence_controls": 0,
+      "original_source_and_dependencies_preserved": true
     },
     "version-only": {
-      "application_launches": 20,
+      "application_launches": 16,
       "launches": {
-        "raw_attempt_folders": 20,
-        "unique_command_identities": 20
+        "raw_attempt_folders": 16,
+        "unique_command_identities": 16
       },
       "prepared": {
-        "retained_attempts": 20,
-        "unique_processes": 20,
-        "retained_instrumented_receipts": 10,
+        "retained_attempts": 16,
+        "unique_processes": 16,
+        "retained_instrumented_receipts": 8,
         "short_runtimes_removed": true
       },
-      "retained_builds": 20,
-      "complete_literal_graphs_verified": true
+      "retained_builds": 16,
+      "complete_literal_graphs_verified": true,
+      "prelaunch_refusals": 0,
+      "altered_evidence_controls": 0,
+      "original_source_and_dependencies_preserved": true
     },
     "folded": {
-      "application_launches": 20,
+      "application_launches": 16,
       "launches": {
-        "raw_attempt_folders": 20,
-        "unique_command_identities": 20
+        "raw_attempt_folders": 16,
+        "unique_command_identities": 16
       },
       "prepared": {
-        "retained_attempts": 20,
-        "unique_processes": 20,
-        "retained_instrumented_receipts": 10,
+        "retained_attempts": 16,
+        "unique_processes": 16,
+        "retained_instrumented_receipts": 8,
         "short_runtimes_removed": true
       },
-      "retained_builds": 20,
-      "complete_literal_graphs_verified": true
+      "retained_builds": 16,
+      "complete_literal_graphs_verified": true,
+      "prelaunch_refusals": 0,
+      "altered_evidence_controls": 0,
+      "original_source_and_dependencies_preserved": true
     },
     "identical": {
-      "application_launches": 20,
+      "application_launches": 16,
       "launches": {
-        "raw_attempt_folders": 20,
-        "unique_command_identities": 20
+        "raw_attempt_folders": 16,
+        "unique_command_identities": 16
       },
       "prepared": {
-        "retained_attempts": 20,
-        "unique_processes": 20,
-        "retained_instrumented_receipts": 10,
+        "retained_attempts": 16,
+        "unique_processes": 16,
+        "retained_instrumented_receipts": 8,
         "short_runtimes_removed": true
       },
-      "retained_builds": 20,
-      "complete_literal_graphs_verified": true
+      "retained_builds": 16,
+      "complete_literal_graphs_verified": true,
+      "prelaunch_refusals": 0,
+      "altered_evidence_controls": 4,
+      "original_source_and_dependencies_preserved": true
     },
     "collision": {
-      "application_launches": 20,
+      "application_launches": 16,
       "launches": {
-        "raw_attempt_folders": 20,
-        "unique_command_identities": 20
+        "raw_attempt_folders": 16,
+        "unique_command_identities": 16
       },
       "prepared": {
-        "retained_attempts": 20,
-        "unique_processes": 20,
-        "retained_instrumented_receipts": 10,
+        "retained_attempts": 16,
+        "unique_processes": 16,
+        "retained_instrumented_receipts": 8,
         "short_runtimes_removed": true
       },
-      "retained_builds": 20,
-      "complete_literal_graphs_verified": true
+      "retained_builds": 16,
+      "complete_literal_graphs_verified": true,
+      "prelaunch_refusals": 0,
+      "altered_evidence_controls": 0,
+      "original_source_and_dependencies_preserved": true
     },
     "mutation": {
-      "application_launches": 40,
+      "application_launches": 36,
       "launches": {
-        "raw_attempt_folders": 44,
-        "unique_command_identities": 40
+        "raw_attempt_folders": 40,
+        "unique_command_identities": 36
       },
       "prepared": {
-        "retained_attempts": 44,
-        "unique_processes": 40,
-        "retained_instrumented_receipts": 22,
+        "retained_attempts": 40,
+        "unique_processes": 36,
+        "retained_instrumented_receipts": 20,
         "short_runtimes_removed": true
       },
-      "retained_builds": 44,
-      "complete_literal_graphs_verified": true
+      "retained_builds": 40,
+      "complete_literal_graphs_verified": true,
+      "prelaunch_refusals": 0,
+      "altered_evidence_controls": 0,
+      "original_source_and_dependencies_preserved": true
     }
   },
   "ordinary_private_receiver_compatibility": {
     "application_launches": 16,
-    "source_preserved": true,
     "cases": 4,
-    "matching_cases": 3,
-    "same_return_state_differences": 1,
-    "complete_literal_graphs_verified": true,
-    "scope": "ordinary JAR/class/resource context and private receiver compatibility on the new prepared profile"
+    "matching": 3,
+    "same_return_state_difference": 1,
+    "launches": {
+      "raw_attempt_folders": 16,
+      "unique_command_identities": 16
+    },
+    "prepared": {
+      "retained_attempts": 16,
+      "unique_processes": 16,
+      "retained_instrumented_receipts": 8,
+      "short_runtimes_removed": true
+    },
+    "complete_literal_graphs_verified": true
   },
   "live_controls": {
     "application_launches": 48,
@@ -218,6 +259,12 @@
     "additional_actual_jvm_launches": 20
   },
   "owned_workspaces_revalidated": 25,
+  "runtime_and_cargo_inputs_verified_against_initial_archive": 87,
+  "independent_literal_reports_revalidated": {
+    "archives": 50,
+    "live_controls": 7,
+    "ordinary_compatibility": 1
+  },
   "routes": [
     "direct",
     "fixed replay",
@@ -247,24 +294,38 @@
     "rehashed compiler member read",
     "altered loaded origin"
   ],
-  "retained_evidence_sha256": {
-    "runtime.json": "05397d336024a1f3997c8b75078d1aae5a49490b7b199b7fe78cd3493effd139",
-    "qualification-driver-v1.json": "21f4226d8e62732b42047df5b3144d195800958624e58f2e9cb33f8f2892fcaf",
-    "qualification-driver-v2.json": "a37e8c049ff59d2abe4200ef863b68e9eff33ecd868f250d36986a6ae6a78c0d",
-    "ordinary-direct.json": "3c75854f1be4f0700c879a9b0ca3b42d6be4429ad7e31ba17808135b060df313",
-    "ordinary-retained-verification.json": "b09e5c0e4dcdd0d17ca09a6ac2b580cdd7990abc75fa3f4b3b5cc7ccc3cc6268",
-    "archive-corpus-v1/active-retained-verification.json": "f720fc3fa02b96dab1ff3026e29e2168e497c21b80b3714cb4e8f1caef5526ae",
-    "archive-corpus-v2/qualification.json": "e408010dc87b3440544fd34eb60d63322b16477049ad8175b646c3901c4357ce",
-    "strict-detached-v3/qualification.json": "c679fe8ee110c8cd76ad47da6231222b156bdf7eed86a40a14c058608a20ffda",
-    "additional-v3/qualification.json": "8ec2ff40f4c16c512d00886ee8895db87645b557204602a31637f368dc6e8d2a",
-    "active-strict-detached.json": "1fa4d7882b96fa93a84856e30842f199f94cdc347fbedf44394d875089010d3f",
-    "post-qualification-integrity.json": "5f902662eecdbacdc9da154bac5c819f7ff66c1386118fff40e78ffb4dd9304e",
-    "final-literal-report-verification.json": "4960f70db6683d31c9e51ca7974affa1c7b2ec0a84be41d437c0b26dd25afa9b"
+  "full_local_gate": {
+    "source_commit": "9b60417ed0e424036df0345cf0cfdecb9f310ed1",
+    "command": "make check",
+    "result": "passed",
+    "distinct_regressions": {
+      "python": 643,
+      "rust": 70,
+      "node": 17,
+      "go": 4,
+      "total": 734
+    },
+    "rust_product_line_coverage": 97.32
   },
-  "calibrations": [
-    "The initial active-case verifier used an unresolved JDK symlink for lib/modules. The corrected verifier checked the existing 16 JVM results; those processes were not restarted or counted twice.",
-    "Copied original shrink evidence remains retained and is excluded from actual JVM counts."
-  ],
+  "sonar": {
+    "pull_request": 57,
+    "source_commit": "9b60417ed0e424036df0345cf0cfdecb9f310ed1",
+    "quality_gate": "OK",
+    "unresolved_issues": 0,
+    "pending_hotspots": 0
+  },
+  "retained_evidence_sha256": {
+    "runtime.json": "9cd7015a0344ce11753ef4461f1645f6d93d488cf48201045177474247513a1c",
+    "qualification/qualification.json": "309bd7b499a8260e90cfbf4fe0a490864161b1360fb92313dd0885cfe6160a49",
+    "qualification.exit.json": "5ae74d1c65f4cc8c07bd28e9fe63a7eaeb617dc2e81499428e413b0a467b0a4b",
+    "ordinary-compatibility/qualification.json": "67f6e09476b4b56508993380de59a539e0fdd094b29237d4d9515d968530ac59",
+    "ordinary.exit.json": "33b556e5ac1a425a725728bb2a6bf5560a75923589910ccf32d54de1230e5e83",
+    "check.exit.json": "38306acc45a05337047bdb1432cda2e2afa5299b1d28aec977be00a86ac1cebb",
+    "post-qualification-integrity.json": "50e312be02fa6cdb5712ea65367fb1c1234ca8d7604d088c94b70d7e5539b80f",
+    "sonar-issues.json": "249168aa6371dac6ed9bda7fc4f85be9c8475ad9072f5752fe519d0376b18d2a",
+    "sonar-hotspots.json": "0f956519dacc137a163ceadaec87828f3a0bfb1560fc0879c95df89c627f23c7",
+    "sonar-qualitygate.json": "39b3817ab81505f0dead51643a6cfb43580adeb86c626026723a4f915dc76523"
+  },
   "scope": "Explicit fixed JDK21 source-classpath workers and declared private receiver compatibility. Default JarFile selection; original JAR, dependency and resource bytes preserved.",
   "gaps": [
     "No invocation-scoped witness or proof of the exact class member actually defined by an arbitrary classloader.",
@@ -272,10 +333,10 @@
     "Application changes to JDK selection properties and custom classloaders are outside this profile.",
     "The broader project completion checklist remains open."
   ],
-  "runtime_and_cargo_inputs_verified_against_initial_archive": 87,
-  "independent_literal_reports_revalidated": {
-    "archives": 61,
-    "live_controls": 7,
-    "ordinary_compatibility": 1
+  "previous_qualification": {
+    "consumer_runtime_commit": "646857c34697f62f62832f0ebd457eaf252b9117",
+    "actual_application_jvm_launches": 304,
+    "record_commit": "f9e154e28022df0421efe69b23baf4ab0470d0a7",
+    "note": "The refactored runtime is freshly qualified above. Its maintained export route removes both source and external dependencies in the first detached run; the earlier record also counted a separate detached recheck. Copied shrink evidence never inflates either actual launch total."
   }
 }
