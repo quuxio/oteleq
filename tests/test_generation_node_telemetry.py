@@ -251,6 +251,27 @@ class NodeTelemetryTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "collection is missing"):
             telemetry.collection_receipt(spans, state, entry, "app.make")
 
+    def test_actual_censored_lifetime_remains_incomplete_without_a_fabricated_gc_span(self):
+        entry = {**self.entry, "node_class_label": "app.Counter",
+                 "sequence_configuration": [{"action": "call"}, {"action": "release"}, {"action": "collect"}]}
+        state = report()
+        state["lifetimes"] = {"admitted": 1, "gc_completed": 0, "resource_completed": 0,
+                              "current_live": 1, "censored": 1}
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            (folder / "node-runtime").mkdir()
+            path = folder / "node-runtime/node-status.json"
+            path.write_text(json.dumps(state))
+            witness = telemetry.witness(folder, entry, self.bodies(), "case", ExportTraceServiceRequest)
+            self.assertEqual(witness["functions"], {"app.add": 1})
+            self.assertEqual(witness["spans"], 1)
+            self.assertEqual(witness["losses"]["lifetime.censored"], 1)
+            self.assertEqual(witness["pending"], 0)
+            state["lifetimes"].update(gc_completed=1, current_live=0, censored=0)
+            path.write_text(json.dumps(state))
+            with self.assertRaisesRegex(ValueError, "independently witnessed"):
+                telemetry.witness(folder, entry, self.bodies(), "case", ExportTraceServiceRequest)
+
 
 if __name__ == "__main__":
     unittest.main()

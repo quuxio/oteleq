@@ -116,13 +116,22 @@ def trace_group(group, entry: dict, service: str, launch: str, allowed: set[str]
             spans.append(span)
 
 
+def collection_state(report: dict) -> dict:
+    """One requested receiver is either observed collected or explicitly censored."""
+    state = counters(report.get("lifetimes"), {"admitted", "gc_completed", "resource_completed", "current_live", "censored"}, "lifetime")
+    observed = {"admitted": 1, "gc_completed": 1, "resource_completed": 0, "current_live": 0, "censored": 0}
+    censored = {"admitted": 1, "gc_completed": 0, "resource_completed": 0, "current_live": 1, "censored": 1}
+    provider.require(state in (observed, censored), "source collection is missing or incomplete")
+    return state
+
+
 def collection_receipt(spans: list, report: dict, entry: dict, creator: str | None) -> None:
     """A collected receiver needs its actual lifetime and optional creation link."""
     lifetime = [span for span in spans if span.name == entry["node_class_label"] + LIFETIME_SUFFIX]
-    provider.require(len(lifetime) == 1, "collection did not yield one complete lifetime")
-    state = counters(report.get("lifetimes"), {"admitted", "gc_completed", "resource_completed", "current_live", "censored"}, "lifetime")
-    provider.require(state == {"admitted": 1, "gc_completed": 1, "resource_completed": 0, "current_live": 0, "censored": 0},
-                     "source collection is missing or incomplete")
+    state = collection_state(report)
+    provider.require(len(lifetime) == state["gc_completed"], "collection did not yield its reported complete lifetime")
+    if state["censored"]:
+        return
     if creator:
         parent = next(span for span in spans if span.name == creator)
         provider.require(len(lifetime[0].links) == 1 and lifetime[0].links[0].trace_id == parent.trace_id
@@ -132,7 +141,8 @@ def collection_receipt(spans: list, report: dict, entry: dict, creator: str | No
 def trace_counts(names: Counter, spans: list, report: dict, entry: dict, allowed: set[str]) -> None:
     """Compare declared selected roots and every decoded completion with SDK totals."""
     target_roots = sum(not span.parent_span_id and span.name == entry["otelc_function"] for span in spans)
-    extra = {entry["node_class_label"] + LIFETIME_SUFFIX} if sequences.collects(entry) else set()
+    collected = sequences.collects(entry) and collection_state(report)["gc_completed"] == 1
+    extra = {entry["node_class_label"] + LIFETIME_SUFFIX} if collected else set()
     provider.require(target_roots == sequences.call_count(entry) and set(names) == allowed | extra,
                      "selected source calls were not independently witnessed")
     provider.require(sum(names.values()) == report["span_accounting"]["received"], "decoded span count differs from final SDK receipt")
@@ -278,6 +288,8 @@ def witness(folder: Path, entry: dict, bodies: list, service: str, decoder) -> d
     losses, pending = health(report, entry)
     names, spans, graph = decode_traces(bodies, entry, service, report, decoder)
     function_metrics(bodies, entry, service, report, spans, graph["allowed"])
+    if sequences.collects(entry):
+        losses["lifetime.censored"] = collection_state(report)["censored"]
     raw = hashlib.sha256()
     for route, body in bodies:
         if route == capture.TRACE_PATH:
