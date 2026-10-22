@@ -72,9 +72,11 @@ rustup toolchain install 1.98.1 --profile minimal \
 rustup run 1.98.1 cargo install cargo-llvm-cov --version 0.8.7 --locked
 make setup
 python3 -m venv .venv
-.venv/bin/python -m pip install --only-binary=:all: coverage==7.16.2
+.venv/bin/python -m pip install --only-binary=:all: -r ci/requirements.txt
 rustup run 1.98.1 make check PYTHON=.venv/bin/python
 ```
+
+The pinned validation environment includes the OTLP protobuf decoder used by the Node telemetry regressions.
 
 Use Python 3.12+ and Node 24/npm for these contributor tools. `make setup` installs locked Markdown tooling and TypeScript 6.0.3 for real compiler-API inventory regressions; it does not install dependencies into an application or provider. Rust 1.98.1 and matching LLVM tools are pinned in CI. A newer compiler may build the application, but its coverage instrumentation requires matching LLVM tools; do not assume Homebrew's current Rust is compatible with LLVM 22.
 
