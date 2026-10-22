@@ -147,7 +147,7 @@ Export includes a frozen application snapshot and runnable suite. It refuses exi
 
 [Planning after an in-source export](docs/retained-source-selection.md) verifies and excludes retained oteleq bundles from application discovery and snapshots. Invalid or edited bundles stop planning; plans and reports disclose the exclusions.
 
-[Input inspection](docs/input-inspection.md) refuses unreadable or vanished directories instead of silently omitting their contents from plans or byte identities.
+[Input inspection](docs/input-inspection.md) refuses unreadable or vanished directories instead of silently omitting their contents from plans or byte identities. On qualified POSIX hosts, shared hashing also rejects named pipes without waiting for a writer.
 
 ### Compare an existing workload bundle
 
