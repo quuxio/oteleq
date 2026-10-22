@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "date": "2026-10-22",
+  "runtime_revision": "f5515ac4090a5d4152dfd6ff625c6d8d9c741569",
+  "qualifier_revision": "2204d433af7828b64efacb7e16d63106f93cab8f",
+  "runtime_cli_sha256": "d014e1a3c723c53a756e6b1698d550269bb1f8514e0a7af1b762741227827d1d",
+  "runtime_source_archive_sha256": "47444c9e679b9b6c24336e2f8099434dc3e8df4851a6090a6b9497a5c17d0c29",
+  "qualifier_sha256": "291f84b0d72dcb77fe1365c73248570909eb9704dce2aa3fa7de35ab75791567",
+  "provider_revision": "d6d03b72026cde8962b11ce3cc184ff3ebcb60d4",
+  "host": "macOS-27.0.1-arm64-arm-64bit",
+  "languages": [
+    "c",
+    "cpp",
+    "rust",
+    "python",
+    "java",
+    "javascript",
+    "typescript",
+    "go"
+  ],
+  "actual_application_launches": 136,
+  "instrumented_launches": 68,
+  "routes": {
+    "direct": 32,
+    "generated_suite": 32,
+    "original_workspace_replay": 4,
+    "additional_retained_bundle_replay": 4,
+    "detached_direct": 32,
+    "detached_generated_suite": 32
+  },
+  "refusal_controls": 4,
+  "source_files_before_and_after_retention": 8,
+  "selected_ready_functions": 8,
+  "full_inventory_callables": 16,
+  "java_source_units": [
+    "java/App.java"
+  ],
+  "complete_literal_graph_oracles": true,
+  "source_preserved": true,
+  "detached_original_source_unavailable": true,
+  "resumed_after_rechecking_completed_routes": true,
+  "runtime_code_unchanged_between_runtime_and_qualifier_revisions": true,
+  "html_visual_review": true,
+  "junit_scope_and_denominators_verified": true,
+  "limits": [
+    "Frozen legacy provider on the recorded macOS ARM64 host; replacement SDK, other platforms and shipping artefacts are not qualified.",
+    "Scalar fixtures only in this corpus; native explicit-input and additional Java root refusal contracts have separate unit regressions.",
+    "Owned run/cache directories remain reserved tool output; a self-resealed bundle is not authenticated."
+  ],
+  "overall_project_complete": false,
+  "provider_input_recheck": {
+    "provider_commit": "d6d03b72026cde8962b11ce3cc184ff3ebcb60d4",
+    "manifest_sha256": "2a8dbf239c6444c0fb536dff049993beade7eaed6578c9654c1e2d7233e9431f",
+    "verified_records": 7360,
+    "counts": {
+      "source_sha256": 413,
+      "products_sha256": 586,
+      "dependencies": 6361
+    },
+    "symlinks_verified": 11,
+    "external_tools_verified": 8,
+    "result": "all recorded SDK inputs unchanged after qualification"
+  },
+  "validation": {
+    "revision": "2204d433af7828b64efacb7e16d63106f93cab8f",
+    "full_local_make_check": "passed",
+    "distinct_regressions": 752,
+    "python": 659,
+    "rust": 72,
+    "node": 17,
+    "go": 4,
+    "rust_product_line_coverage_percent": 97.37,
+    "owned_workspace_line_coverage_percent": 99,
+    "generator_line_coverage_percent": 92,
+    "java_project_line_coverage_percent": 99,
+    "native_profile_line_coverage_percent": 98,
+    "notes": "Java 9 and effect 77 checks are subsets of the Python total; coverage reruns do not add distinct tests."
+  }
+}
