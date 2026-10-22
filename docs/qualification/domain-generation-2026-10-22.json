@@ -1,0 +1,142 @@
+{
+  "schema_version": 1,
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "date": "2026-10-22",
+  "runtime_revision": "1a167574db396b8c94499538b8edd60db33fc11f",
+  "runtime_cli_sha256": "eb447e233a60648630fd29aa8e53bc9ce17a25b2888989db946de4ea23ca612f",
+  "runtime_source_archive_sha256": "f93cbbe8fef11d6fe3c3d4a26c5daacbed175ee4f90ee20d3edfe3a237589c82",
+  "qualification_execution_checker_revision": "a0fc8e7407256a69818a622da257b8096953f9c0",
+  "qualification_execution_driver_sha256": "e1168a4adb609e41e9d5bd0921aa8c9b0d9d69a8bb2a1c93694db9fe246b76bf",
+  "qualification_execution_oracle_sha256": "643714fef3241d05bbf3d8e27650b7b02702c4fa2104ac4c28cae390746b4f42",
+  "finalisation_revision": "dbf99088a77771d801f68b24cfb7ffa68200b8c1",
+  "finalisation_driver_sha256": "ff18035a5b2ce94c3d850f15958a3797ffeb0c8fe249f5ef5dbe638db1e312b3",
+  "finalisation_source_archive_sha256": "ef565c743514c04b08cbceaed520de33be5374154a29cb2ba9eb885d0671046c",
+  "application_implementation_unchanged_by_checker_corrections": true,
+  "provider_revision": "d6d03b72026cde8962b11ce3cc184ff3ebcb60d4",
+  "host": "macOS-27.0.1-arm64-arm-64bit",
+  "languages": [
+    "c",
+    "cpp",
+    "rust",
+    "python",
+    "java",
+    "javascript",
+    "typescript",
+    "go"
+  ],
+  "selected_functions": 30,
+  "initial_generated_cases": 82,
+  "main_route_matching_cases": 80,
+  "main_route_deliberate_difference_cases": 2,
+  "scalar_kinds": {
+    "integer": "all eight language profiles",
+    "boolean": "all eight language profiles",
+    "float": "five float32 and three float64 language profiles",
+    "string": "Python, Java, JavaScript, TypeScript and Go"
+  },
+  "actual_application_launches": 1384,
+  "instrumented_application_launches": 692,
+  "routes": {
+    "direct": 328,
+    "generated_suite": 328,
+    "detached_direct": 328,
+    "detached_generated_suite": 328,
+    "frozen_policy_replay": 4,
+    "shrink_original": 4,
+    "shrink_trials": 24,
+    "shrink_confirmation": 4,
+    "reduced_exported_suite": 4,
+    "seeded_inputs": 32
+  },
+  "prelaunch_refusal_controls": {
+    "total": 14,
+    "domain_arity": 8,
+    "no_representable_float32_value": 5,
+    "input_payload_budget": 1,
+    "actual_application_launches": 0,
+    "public_run_and_generated_suite_both_fail": true
+  },
+  "frozen_external_policy_edit_does_not_resample": true,
+  "shrink": {
+    "original_arguments": [
+      32
+    ],
+    "reduced_arguments": [
+      7
+    ],
+    "trials": 6,
+    "incomplete_trials": 0,
+    "status": "candidate_rule_minimal",
+    "copied_original_attempts_verified_but_not_counted": 4
+  },
+  "seeded_python_integer_requests": [
+    0,
+    -100,
+    100,
+    -18,
+    -62,
+    1,
+    66,
+    -88
+  ],
+  "complete_literal_graph_oracles": true,
+  "raw_stdout_stderr_checked": true,
+  "selected_function_witnesses_checked": true,
+  "source_preserved": true,
+  "provider_input_recheck": {
+    "provider_commit": "d6d03b72026cde8962b11ce3cc184ff3ebcb60d4",
+    "manifest_sha256": "2a8dbf239c6444c0fb536dff049993beade7eaed6578c9654c1e2d7233e9431f",
+    "verified_records": 7360,
+    "counts": {
+      "source_sha256": 413,
+      "products_sha256": 586,
+      "dependencies": 6361
+    },
+    "symlinks_verified": 11,
+    "external_tools_verified": 8,
+    "result": "all recorded SDK inputs unchanged after qualification"
+  },
+  "retained_review": {
+    "reports_verified": 177,
+    "distinct_actual_attempts_verified": 1384,
+    "typed_comparisons_recomputed": 346,
+    "first_route_junit": {
+      "tests": "82",
+      "failures": "2",
+      "errors": "0",
+      "skipped": "0"
+    },
+    "browser_review": "Summary, scope and expanded intentional result difference inspected in the in-app browser.",
+    "final_presentation_byte_identical_to_browser_review": true,
+    "finalisation_additional_application_launches": 0
+  },
+  "retained_evidence_files": 41379,
+  "retained_evidence_manifest_sha256": "35179547cd753d54a944918cb06d4d4c4aa37b1389278223308c62d9e52f1ff2",
+  "validation": {
+    "recorded_full_gate_revision": "a0fc8e7407256a69818a622da257b8096953f9c0",
+    "recorded_full_local_make_check": "passed",
+    "recorded_distinct_regressions": 815,
+    "python": 722,
+    "rust": 72,
+    "node": 17,
+    "go": 4,
+    "rust_product_line_coverage_percent": 97.37,
+    "domain_component_regressions": 24,
+    "corrected_oracle_and_finalisation_regressions": 9,
+    "checker_regressions_fail_before_corrections": true,
+    "final_delivery_checks": "Required on final PR62 head and merged main; recorded by GitHub checks and the separate delivery receipt."
+  },
+  "corrections": {
+    "java_float_oracle": "The standalone primitive codec declares java.float. A failing-before/passing-after regression preserves that label and rejects boxed substitution. Every retained result was rechecked.",
+    "final_render_exit": "The deliberate-difference report correctly exits 1. The corrected bounded finalisation only seals inputs and renders retained evidence after all routes and controls completed. No application corpus was repeated."
+  },
+  "limits": [
+    "Bounded independent scalar domains and sampled combinations; no inferred or relational business preconditions, object argument/factory generation or exhaustive branch coverage.",
+    "C/C++/Rust string input codecs remain unsupported.",
+    "Recorded legacy diagnostic profiles on macOS ARM64; replacement SDKs, other platforms and shipping artefacts remain separately unqualified.",
+    "The Python probe intentionally observes instrumentation presence; its differences qualify the process rather than an instrumentation defect.",
+    "Retained comparator recomputation checks supplied typed graphs, channels and decoded witness consistency; it does not independently authenticate raw telemetry provenance or supply invocation-scoped attribution."
+  ],
+  "overall_project_complete": false
+}

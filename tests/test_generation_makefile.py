@@ -20,7 +20,8 @@ class QualificationRecipeTests(unittest.TestCase):
             for flag in ("--cli", "--comparator"):
                 if line.startswith("\t") and flag + " " in line:
                     targets[target] = flag
-        self.assertEqual(len(targets), 29)
+        self.assertEqual(len(targets), 30)
+        self.assertIn("generation-domains-otelc", targets)
         self.assertIn("generation-input-walks-otelc", targets)
         self.assertIn("generation-retained-source-otelc", targets)
         self.assertIn("generation-node-project-otelc", targets)

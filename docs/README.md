@@ -5,6 +5,7 @@ Updated 22 October 2026, `quux-oteleq compare-workload` runs the Rust comparator
 | Document | Use it to |
 | --- | --- |
 | [Automatic generation](automatic-generation.md) | Generate, run, replay and retain the implemented scalar suite |
+| [Declared domains](domain-generation.md) | Generate and freeze case values from independent scalar domains |
 | [Complete input inspection](input-inspection.md) | Resolve unreadable source/dependency refusals and inspect qualification evidence |
 | [Go build bundles](go-build-bundles.md) | Retain matched executables, compiler evidence and detached replay |
 | [Java compiler bindings](java-build-bundles.md) | Inspect actual source origins, JDK/compiler identities and retained class products |

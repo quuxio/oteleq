@@ -23,7 +23,7 @@ import typescript_provider
 
 
 LANGUAGES = ("c", "cpp", "rust", "python", "java", "javascript", "typescript", "go")
-MAX_CASES = 1024
+MAX_CASES = domains.MAX_CASES
 MAX_CHANNEL_BYTES = 256 * 1024
 DEFAULTS = {
     "schema_version": 1,
@@ -83,17 +83,13 @@ def scalar_arguments(value: Any) -> bool:
                                           and (type(item) is not float or math.isfinite(item)) for item in value)
 
 
-def fixture(value: Any, index: int) -> dict[str, Any]:
-    """Validate source-scoped concrete argument lists without executing target code."""
-    label = f"fixtures[{index}]"
-    keys(value, {"function", "source", "language", "cases", "expected_baseline", "domains", "receiver", "sequence"}, label)
-    function, source = value.get("function"), value.get("source", "**")
-    if any(not isinstance(item, str) or not item.strip() for item in (function, source)):
-        raise ValueError(f"{label} requires a function pattern and source pattern")
-    language = value.get("language")
-    if language is not None and language not in LANGUAGES:
-        raise ValueError(f"{label} has an unsupported language")
-    cases = value.get("cases")
+def fixture_cases(value: dict, label: str) -> list[list[Any]] | None:
+    """A missing case list selects domain generation; explicit lists stay strict."""
+    if "cases" not in value:
+        if "domains" not in value:
+            raise ValueError(f"{label} requires concrete cases or declared scalar domains")
+        return None
+    cases = value["cases"]
     if not isinstance(cases, list) or not 1 <= len(cases) <= MAX_CASES:
         raise ValueError(f"{label}.cases must contain 1 to {MAX_CASES} argument lists")
     for arguments in cases:
@@ -102,10 +98,26 @@ def fixture(value: Any, index: int) -> dict[str, Any]:
     identities = [json.dumps(arguments, ensure_ascii=True, allow_nan=False) for arguments in cases]
     if len(identities) != len(set(identities)):
         raise ValueError(f"{label} contains duplicate concrete cases")
-    result = {"function": function, "source": source, "language": language, "cases": cases,
+    return cases
+
+
+def fixture(value: Any, index: int) -> dict[str, Any]:
+    """Validate concrete cases or independent domains without executing target code."""
+    label = f"fixtures[{index}]"
+    keys(value, {"function", "source", "language", "cases", "expected_baseline", "domains", "receiver", "sequence"}, label)
+    function, source = value.get("function"), value.get("source", "**")
+    if any(not isinstance(item, str) or not item.strip() for item in (function, source)):
+        raise ValueError(f"{label} requires a function pattern and source pattern")
+    language = value.get("language")
+    if language is not None and language not in LANGUAGES:
+        raise ValueError(f"{label} has an unsupported language")
+    cases = fixture_cases(value, label)
+    result = {"function": function, "source": source, "language": language,
               "expected_baseline": expected_baseline(value.get("expected_baseline", {"kind": "return"}))}
+    if cases is not None:
+        result["cases"] = cases
     if "domains" in value:
-        result["domains"] = fixture_domains(value["domains"], cases, label)
+        result["domains"] = fixture_domains(value["domains"], cases or [], label)
     if "receiver" in value:
         result["receiver"] = receiver(value["receiver"])
     if "sequence" in value:
@@ -126,7 +138,7 @@ def receiver(value: Any) -> dict[str, Any]:
 
 
 def fixture_domains(value: Any, cases: list[list[Any]], label: str) -> list[dict]:
-    """Validate domain declarations and every requested concrete fixture together."""
+    """Validate independent domains and any explicit concrete fixtures together."""
     if not isinstance(value, list):
         raise ValueError(label + ".domains must be an array")
     result = [domains.validate(item) for item in value]
@@ -231,7 +243,7 @@ def matching_fixture(entry: Mapping[str, Any], config: Mapping[str, Any]) -> dic
 def concrete_cases(entry: Mapping[str, Any], config: Mapping[str, Any]) -> list[list[Any]] | None:
     """Read reviewed concrete cases through the single fixture selection rule."""
     matched = matching_fixture(entry, config)
-    return matched["cases"] if matched else None
+    return matched.get("cases") if matched else None
 
 
 def fixture_matches(entry: Mapping[str, Any], item: Mapping[str, Any]) -> bool:
