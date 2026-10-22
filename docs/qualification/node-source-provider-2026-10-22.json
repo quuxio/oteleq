@@ -1,0 +1,535 @@
+{
+  "qualification_schema_version": 1,
+  "date": "2026-10-22",
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "scope_status": "qualified recorded source5/execution1 diagnostic profiles",
+  "platform": {
+    "os": "macOS",
+    "architecture": "arm64",
+    "node_versions": [
+      "24.21.0",
+      "26.11.0"
+    ],
+    "python": "3.14.8"
+  },
+  "runtime": {
+    "repository": "quuxio/oteleq",
+    "commit": "3e9614e97543f66fcea15421a0553ce335ee8c76",
+    "source_archive_sha256": "f82c485755777c7a9c803374e3b3abcc500509e9ef0eb93cd27d37c96f09ff21",
+    "cli_sha256": "eb8e74a66b752f22fc6ca50dcb4c6190ee56e10ba864c7bbe4cb8970063c7446",
+    "source_inputs_unchanged_through_verifier": "fbd27fb8eb8bada953bb58f73c5001c0a0d1d5df"
+  },
+  "verifier": {
+    "commit": "fbd27fb8eb8bada953bb58f73c5001c0a0d1d5df",
+    "source_archive_sha256": "383dae17e620fd5be6971e9758646b9aa66d51627e8e3d8096235cec7ba5f0b4",
+    "files": {
+      "node_project_oracle.py": "399e14d14e91a9a011f2d8ffe319852f13b5919dbc1a7306a03ca7a1c883be81",
+      "node_source_oracle.py": "bef73d78c30f1940e0006a0265450112c6afbac4da26edf71ac93c5fce69cde9",
+      "node_collection_oracle.py": "6ad22cf3dd137814006694d1d1f43eab364960f5e1d38215ab8507ba6baa7b03",
+      "node_receiver_oracle.py": "cd68312d71374e03c63ed6be5cc0307a6f48bb59e5ffc1fb1102a10cd6c5ae1e",
+      "qualify_node_project.py": "ed5290c20aca5dabab7be1a53fcabacbce2f40841b8f27681fc3ed9612d85fbd",
+      "qualify_node_receivers.py": "822c1f3785b33b3109ccefce611ec8c7e5c3e2a5002bcde5d010cb98ec9d8d71",
+      "qualify_node_source_collection.py": "0e9c9d20b9d3d570f3e54ffde95aef6c7ef8fba6ef361b4b4627b6e7d4773a23",
+      "qualify_node_source_effects.py": "731774c2fd1c543a88c85a94b630838835a1c6581f374a0b58a7690898309207",
+      "qualify_node_source_channels.py": "6234158f056f12ea424b76cc1eb16987e36ef8b05170e4500922e00cf0d72c3c"
+    },
+    "final_audit_sha256": "c853b56f5bb5616c8c8d372d0ad31a81cd232f627a360567e3eecf908ba324fe",
+    "final_audit_receipt_sha256": "9a2ca50abec5f3e5a9e01c62ec2b10e7ff9c9fa0e857585d99764d8a82f57571"
+  },
+  "provider": {
+    "repository": "quuxio/otelc",
+    "commit": "0f05020bae4553d500cd2e523429dfc006ef478d",
+    "source_archive_sha256": "ba808e34ec0074d1ae3a9a190e2004cf7276d62709b76c1037252da125d5a418",
+    "index_sha256": "c490a60d92dfe01c8ef7b5c00bc75bd81d8f4b06abe77332a29c33fc22a5f2cd",
+    "all_unchanged": true,
+    "entries": 8284,
+    "source_files": 206,
+    "read_only_directories": 939,
+    "links": 12,
+    "external_tools": {
+      "/opt/homebrew/Cellar/node@24/24.21.0_2/bin/node": "798d7f9c0d38051608d11ba87a12fbb01e92bfa457cd77ec612b5bad2a73a05e",
+      "/opt/homebrew/Cellar/node/26.11.0_1/bin/node": "849e5785bd5b3ac68516f105d617c4a7ddcc3de1d7a89ba696d5dab271ab0164",
+      "/opt/homebrew/Cellar/python@3.14/3.14.8_1/Frameworks/Python.framework/Versions/3.14/bin/python3.14": "1860df605473e659fb393abbec47ef75a187b07777c0acf4322b9a1a1f057a08"
+    },
+    "protocols": {
+      "schema_version": 1,
+      "kind": "otelc.node.protocols",
+      "source": 5,
+      "execution": 1,
+      "request": 1,
+      "preload": 1,
+      "sdk": 1
+    },
+    "hosted_checks": [
+      {
+        "name": "SonarCloud Code Analysis",
+        "head_sha": "0f05020bae4553d500cd2e523429dfc006ef478d",
+        "status": "completed",
+        "conclusion": "success",
+        "details_url": "https://sonarcloud.io/dashboard?id=quuxio_otelc&pullRequest=157",
+        "completed_at": "2026-10-22T21:17:24Z"
+      },
+      {
+        "name": "SonarQube",
+        "head_sha": "0f05020bae4553d500cd2e523429dfc006ef478d",
+        "status": "completed",
+        "conclusion": "success",
+        "details_url": "https://github.com/quuxio/otelc/actions/runs/39850405710/job/120087317417",
+        "completed_at": "2026-10-22T21:17:33Z"
+      },
+      {
+        "name": "Documentation and tooling",
+        "head_sha": "0f05020bae4553d500cd2e523429dfc006ef478d",
+        "status": "completed",
+        "conclusion": "success",
+        "details_url": "https://github.com/quuxio/otelc/actions/runs/39850405710/job/120075162712",
+        "completed_at": "2026-10-22T20:50:52Z"
+      },
+      {
+        "name": "Native macOS ARM64 and 80% coverage",
+        "head_sha": "0f05020bae4553d500cd2e523429dfc006ef478d",
+        "status": "completed",
+        "conclusion": "success",
+        "details_url": "https://github.com/quuxio/otelc/actions/runs/39850405710/job/120075162620",
+        "completed_at": "2026-10-22T21:02:45Z"
+      }
+    ],
+    "preservation_receipt_sha256": "2f455acc51f6e4cc2a09e03634bd90e7abd0c526c95a80825bcc210a77e0fcbe",
+    "resolved_link_targets_audited": true,
+    "link_target_audit_sha256": "1b3a3ede5bfe623b85a2e8d2829b82e515710793c10e6dd3afe55a5d6dc1f27d"
+  },
+  "actual_application_launches": 1800,
+  "raw_application_receipts": 1832,
+  "reports_checked": 454,
+  "comparisons_recomputed": 456,
+  "all_recomputed_results_match": true,
+  "categories": {
+    "module_context": {
+      "actual_applications": 980,
+      "corpora": [
+        {
+          "corpus": "module-3e-node24-native",
+          "actual_applications": 245,
+          "raw_application_receipts": 249,
+          "reports_checked": 66,
+          "comparisons_recomputed": 62,
+          "tool_fixture_refusal_case_records": 2
+        },
+        {
+          "corpus": "module-3e-node24-api",
+          "actual_applications": 245,
+          "raw_application_receipts": 249,
+          "reports_checked": 66,
+          "comparisons_recomputed": 62,
+          "tool_fixture_refusal_case_records": 2
+        },
+        {
+          "corpus": "module-3e-node26-native",
+          "actual_applications": 245,
+          "raw_application_receipts": 249,
+          "reports_checked": 66,
+          "comparisons_recomputed": 62,
+          "tool_fixture_refusal_case_records": 2
+        },
+        {
+          "corpus": "module-3e-node26-api",
+          "actual_applications": 245,
+          "raw_application_receipts": 249,
+          "reports_checked": 66,
+          "comparisons_recomputed": 62,
+          "tool_fixture_refusal_case_records": 2
+        }
+      ]
+    },
+    "receivers": {
+      "actual_applications": 372,
+      "corpora": [
+        {
+          "corpus": "receivers-3e-node24-api",
+          "actual_applications": 186,
+          "raw_application_receipts": 194,
+          "reports_checked": 42,
+          "comparisons_recomputed": 48,
+          "tool_fixture_refusal_case_records": 2
+        },
+        {
+          "corpus": "receivers-3e-node26-native",
+          "actual_applications": 186,
+          "raw_application_receipts": 194,
+          "reports_checked": 42,
+          "comparisons_recomputed": 48,
+          "tool_fixture_refusal_case_records": 2
+        }
+      ]
+    },
+    "collection": {
+      "actual_applications": 128,
+      "corpora": [
+        {
+          "corpus": "collection-828ecb4-node24",
+          "actual_applications": 64,
+          "raw_application_receipts": 64,
+          "reports_checked": 16,
+          "comparisons_recomputed": 16,
+          "tool_fixture_refusal_case_records": 0
+        },
+        {
+          "corpus": "collection-828ecb4-node26",
+          "actual_applications": 64,
+          "raw_application_receipts": 64,
+          "reports_checked": 16,
+          "comparisons_recomputed": 16,
+          "tool_fixture_refusal_case_records": 0
+        }
+      ]
+    },
+    "effects_and_promotion": {
+      "actual_applications": 256,
+      "corpora": [
+        {
+          "corpus": "effects-v2-node24-js",
+          "actual_applications": 64,
+          "raw_application_receipts": 64,
+          "reports_checked": 15,
+          "comparisons_recomputed": 16,
+          "tool_fixture_refusal_case_records": 0
+        },
+        {
+          "corpus": "effects-v2-node26-ts-api",
+          "actual_applications": 64,
+          "raw_application_receipts": 64,
+          "reports_checked": 15,
+          "comparisons_recomputed": 16,
+          "tool_fixture_refusal_case_records": 0
+        },
+        {
+          "corpus": "effects-e33-node24-ts-native",
+          "actual_applications": 64,
+          "raw_application_receipts": 64,
+          "reports_checked": 15,
+          "comparisons_recomputed": 16,
+          "tool_fixture_refusal_case_records": 0
+        },
+        {
+          "corpus": "effects-e33-node26-js",
+          "actual_applications": 64,
+          "raw_application_receipts": 64,
+          "reports_checked": 15,
+          "comparisons_recomputed": 16,
+          "tool_fixture_refusal_case_records": 0
+        }
+      ]
+    },
+    "binary_application_channels": {
+      "actual_applications": 64,
+      "corpora": [
+        {
+          "corpus": "channels-fbd-node24-js",
+          "actual_applications": 32,
+          "raw_application_receipts": 32,
+          "reports_checked": 7,
+          "comparisons_recomputed": 8,
+          "tool_fixture_refusal_case_records": 0
+        },
+        {
+          "corpus": "channels-fbd-node26-ts-api",
+          "actual_applications": 32,
+          "raw_application_receipts": 32,
+          "reports_checked": 7,
+          "comparisons_recomputed": 8,
+          "tool_fixture_refusal_case_records": 0
+        }
+      ]
+    }
+  },
+  "module_profiles": [
+    {
+      "name": "module-3e-node24-native",
+      "node": "v24.21.0",
+      "provider": {
+        "backend": "source-v1",
+        "typescript_compiler": "native"
+      },
+      "contexts": [
+        "cjs",
+        "mjs",
+        "js-default",
+        "js-module",
+        "js-commonjs",
+        "js-detected",
+        "cts",
+        "mts",
+        "ts-default",
+        "ts-module",
+        "ts-commonjs",
+        "js-commonjs",
+        "ts-commonjs",
+        "js-commonjs"
+      ],
+      "actual_applications": 245,
+      "controls": [
+        {
+          "control": "shadowed-require",
+          "exit_code": 3,
+          "actual_application_launches": 0
+        },
+        {
+          "control": "changed-source",
+          "exit_code": 4,
+          "actual_application_launches": 0
+        },
+        {
+          "control": "forged-format",
+          "exit_code": 4,
+          "actual_application_launches": 0
+        },
+        {
+          "control": "ambient-package",
+          "exit_code": 3,
+          "actual_application_launches": 0
+        },
+        {
+          "control": "rebound-callable",
+          "exit_code": 4,
+          "actual_application_launches": 1
+        }
+      ]
+    },
+    {
+      "name": "module-3e-node24-api",
+      "node": "v24.21.0",
+      "provider": {
+        "backend": "source-v1",
+        "typescript_compiler": "api"
+      },
+      "contexts": [
+        "cjs",
+        "mjs",
+        "js-default",
+        "js-module",
+        "js-commonjs",
+        "js-detected",
+        "cts",
+        "mts",
+        "ts-default",
+        "ts-module",
+        "ts-commonjs",
+        "js-commonjs",
+        "ts-commonjs",
+        "js-commonjs"
+      ],
+      "actual_applications": 245,
+      "controls": [
+        {
+          "control": "shadowed-require",
+          "exit_code": 3,
+          "actual_application_launches": 0
+        },
+        {
+          "control": "changed-source",
+          "exit_code": 4,
+          "actual_application_launches": 0
+        },
+        {
+          "control": "forged-format",
+          "exit_code": 4,
+          "actual_application_launches": 0
+        },
+        {
+          "control": "ambient-package",
+          "exit_code": 3,
+          "actual_application_launches": 0
+        },
+        {
+          "control": "rebound-callable",
+          "exit_code": 4,
+          "actual_application_launches": 1
+        }
+      ]
+    },
+    {
+      "name": "module-3e-node26-native",
+      "node": "v26.11.0",
+      "provider": {
+        "backend": "source-v1",
+        "typescript_compiler": "native"
+      },
+      "contexts": [
+        "cjs",
+        "mjs",
+        "js-default",
+        "js-module",
+        "js-commonjs",
+        "js-detected",
+        "cts",
+        "mts",
+        "ts-default",
+        "ts-module",
+        "ts-commonjs",
+        "js-commonjs",
+        "ts-commonjs",
+        "js-commonjs"
+      ],
+      "actual_applications": 245,
+      "controls": [
+        {
+          "control": "shadowed-require",
+          "exit_code": 3,
+          "actual_application_launches": 0
+        },
+        {
+          "control": "changed-source",
+          "exit_code": 4,
+          "actual_application_launches": 0
+        },
+        {
+          "control": "forged-format",
+          "exit_code": 4,
+          "actual_application_launches": 0
+        },
+        {
+          "control": "ambient-package",
+          "exit_code": 3,
+          "actual_application_launches": 0
+        },
+        {
+          "control": "rebound-callable",
+          "exit_code": 4,
+          "actual_application_launches": 1
+        }
+      ]
+    },
+    {
+      "name": "module-3e-node26-api",
+      "node": "v26.11.0",
+      "provider": {
+        "backend": "source-v1",
+        "typescript_compiler": "api"
+      },
+      "contexts": [
+        "cjs",
+        "mjs",
+        "js-default",
+        "js-module",
+        "js-commonjs",
+        "js-detected",
+        "cts",
+        "mts",
+        "ts-default",
+        "ts-module",
+        "ts-commonjs",
+        "js-commonjs",
+        "ts-commonjs",
+        "js-commonjs"
+      ],
+      "actual_applications": 245,
+      "controls": [
+        {
+          "control": "shadowed-require",
+          "exit_code": 3,
+          "actual_application_launches": 0
+        },
+        {
+          "control": "changed-source",
+          "exit_code": 4,
+          "actual_application_launches": 0
+        },
+        {
+          "control": "forged-format",
+          "exit_code": 4,
+          "actual_application_launches": 0
+        },
+        {
+          "control": "ambient-package",
+          "exit_code": 3,
+          "actual_application_launches": 0
+        },
+        {
+          "control": "rebound-callable",
+          "exit_code": 4,
+          "actual_application_launches": 1
+        }
+      ]
+    }
+  ],
+  "routes": [
+    "direct",
+    "generated unittest",
+    "frozen replay",
+    "detached exported unittest",
+    "scalar shrinking",
+    "current-source promotion",
+    "changed source",
+    "new function discovery",
+    "moved checkout"
+  ],
+  "checks": [
+    "complete independently expected scalar/receiver graphs and descriptor/alias order",
+    "actual application/SDK process and closed drain receipts",
+    "independently decoded OTLP and cumulative history",
+    "source5 raw emission and execution1 body-entry/reentry evidence",
+    "bounded collection and actual GC creation link; retained receiver stays inconclusive",
+    "seeded filesystem bytes and scripted HTTP request/offered-response bytes",
+    "literal nonempty NUL/non-UTF8 stdout/stderr and stdout-only differences",
+    "strict fixture/source/protocol/format refusals and source preservation"
+  ],
+  "collection": {
+    "profiles_per_node": [
+      "JavaScript/native",
+      "TypeScript/native",
+      "TypeScript/API",
+      "retained JavaScript receiver"
+    ],
+    "censored_control": "inconclusive through every route; clearing observer gaps cannot qualify its missing lifetime witness"
+  },
+  "local_validation": {
+    "full_gate_commit": "e33fafe507743279d7563eab4403753fe2b2fabc",
+    "full_gate_distinct_regressions": 981,
+    "capture_python": 165,
+    "generation_python": 717,
+    "rust": 74,
+    "node": 21,
+    "go_observer": 4,
+    "rust_product_line_coverage_percent": 97.38,
+    "later_workflow_regressions": 3,
+    "later_binary_channel_unit_regressions": 3,
+    "fresh_hash_locked_environment_node_tests": 116,
+    "hash_mismatch_control": "pip refuses a wheel with a deliberately incorrect local hash"
+  },
+  "presentation": {
+    "browser_reviewed": [
+      "matching collection",
+      "censored collection",
+      "stdout-only difference"
+    ],
+    "collection_screenshots": {
+      "collection-report-match.png": "962e64ed3196fd2fc3baa7724ab446dd54bb5a9a6ff3d94110a651708572b58d",
+      "collection-report-censored.png": "e1f42bb231b89f9b45bb4eae7f93fd62ab389f6e08b86f50fadab05f4a24e20f"
+    },
+    "binary_channel_screenshot_sha256": "0b84c28ece2c58bd03f95d1da7c84db717ac7c2ef8569a3cbc2de3d9567be17b",
+    "censored_junit_errors": 1,
+    "binary_output_junit_failures": 1
+  },
+  "separate_prior_experiments": [
+    "source4 development and failed contexts",
+    "9113317 precursor matrices",
+    "742ae0d matrices/receiver corpora before the censoring correction",
+    "initial collection/censored-oracle development",
+    "effects replay checker opaque-ID failures"
+  ],
+  "limits": [
+    "Diagnostic access/entrypoint helpers; no shipping-artefact claim.",
+    "Fixed source formats and declared supported own storage; arbitrary object arguments, inherited/private/native storage and dependency/build integration remain incomplete.",
+    "Module-body entry is not invocation-scoped action attribution or module completion.",
+    "Live Node metric collection/emission control schedules remain unimplemented in the consumer.",
+    "Package-manager workspaces, custom/transitive loaders and semantic TypeScript project builds are not qualified.",
+    "No GC timing or leak inference; missing requested collection is incomplete evidence.",
+    "Observer/root/exception and graph-boundary limits remain as documented.",
+    "Downstream receipt and OTLP partial-rejection absence are not inferred from SDK accounting.",
+    "External tool hashes do not cover OS libraries or establish container/hostile-code isolation.",
+    "Other SDK revisions, platforms, runtime/compiler combinations and application inputs need their own qualification."
+  ],
+  "distinct_case_execution_sets": 448,
+  "copied_comparison_records": 8
+}

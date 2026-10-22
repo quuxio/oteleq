@@ -14,7 +14,7 @@ quux-oteleq plan --source /absolute/path/to/application \
 
 The normal [generation, run, replay and export commands](automatic-generation.md#build-and-run) then apply. No module-format override is needed. Select the TypeScript emitter through the existing `[adapters.typescript] backend` setting.
 
-## Rebuilt SDK profile in qualification
+## Rebuilt SDK source profile
 
 The explicit `source-v1` Node profile uses the rebuilt SDK's public schema-3 policy and source-launch APIs. Select it in the project policy:
 
@@ -40,7 +40,7 @@ An admitted receiver still alive at the end of a bounded collection attempt has 
 
 The `node-source-provider` directory seals planning/compiler evidence and travels with exported and reduced suites. Changed evidence prevents replay and cleanup. Current-source promotion retains the provider settings and makes fresh context receipts for each new snapshot.
 
-This profile remains in qualification. Initial source4 development evidence covers scalar public CLI runs on Node 24 and 26, both TypeScript compilers, retained Node 24 suites, receiver diagnostics, collection and reduction. Broader context checks found unresolved or retried format evidence in default JavaScript/TypeScript contexts. Those failed runs remain separate; they are not adapter admission. The first delivered profile requires corrected source5/execution1 evidence and a new immutable SDK handoff. Complete runtime/context/control qualification, final review and protected CI delivery remain pending. Live Node metric controls and invocation-scoped action attribution remain unimplemented.
+The [source5/execution1 qualification](qualification/node-source-provider-2026-10-22.json) records 1,800 actual application launches against immutable SDK `0f05020`, using Node 24 and 26 and both TypeScript compilers. It covers the specific module, receiver, collection, channel and effect profiles listed below. Live Node metric controls, invocation-scoped action attribution, general dependency/build integration and shipping-artefact qualification remain open.
 
 Include every `package.json` and `tsconfig.json` required by this source context within the selected tree. Selecting only a `src` subdirectory can omit a parent package which changes `.js` or `.ts` interpretation. An ambient package outside the selected root is a visible blocker. The private workspace must also have no undeclared parent package.
 
@@ -90,6 +90,24 @@ To qualify the explicit rebuilt SDK profile, add `GENERATION_ARGS='--node-backen
 `make generation-node-source-channels-otelc` separately checks nonempty stdout and stderr, including NUL and non-UTF8 bytes. Its same-return/state control changes only stdout in the instrumented lane. Both literal channels, complete state/results and direct SDK receipts are checked through ordinary execution, replay, generated tests and detached export. The default is JavaScript; select TypeScript and its compiler with `GENERATION_ARGS='--language typescript --typescript-compiler api'`.
 
 ## Qualified scope
+
+### Rebuilt SDK source5/execution1
+
+The [22 October source-provider record](qualification/node-source-provider-2026-10-22.json) binds runtime `3e9614e`, verifier `fbd27fb` and frozen SDK `0f05020` on macOS ARM64. Rust and embedded worker source inputs remain unchanged between the runtime and verifier commits. The retained diagnostic executable has its own content hash; this record applies to that executable and its recorded input/tool identities.
+
+| Corpus | Recorded profiles | Actual applications |
+| --- | --- | --- |
+| Module contexts | Node 24/26, each with native/API TypeScript; eleven formats, two receivers and a same-return state difference | 980 |
+| Complete receivers | Node 24/API and Node 26/native, JavaScript and TypeScript; matching methods, an expected error and instance/static differences | 372 |
+| Calls, release and bounded collection | Both Node runtimes, JavaScript and both TypeScript compilers, plus a strongly retained receiver | 128 |
+| Filesystem/HTTP effects and promotion | Node 24 JavaScript/native TypeScript; Node 26 JavaScript/API TypeScript; changed bodies, new functions and checkout relocation | 256 |
+| Binary stdout/stderr | Node 24 JavaScript and Node 26/API TypeScript; NUL/non-UTF8 bytes and a stdout-only difference | 64 |
+
+All 456 retained comparison records were recomputed across 454 reports. They represent 448 distinct case-execution sets and eight copied shrink-original comparisons. The 1,832 raw application receipts include 32 copied shrink records; deduplication confirms 1,800 actual launches. The corpus includes expected refusal, difference and incomplete results. A censored lifetime remains inconclusive through all retained routes, including when its observer gaps are deliberately cleared.
+
+After the application runs, all 8,284 frozen SDK/dependency/product records, twelve links, 939 read-only directories and three external tool hashes remained unchanged. The 206 SDK source files separately match the recorded Git archive. Complete graph/value/effect oracles, actual app/SDK identities, direct decoded OTLP and final health checks support the individual results. Browser-reviewed HTML and JUnit retain the expected difference/error classifications. This is **equivalence over these tests and observations**.
+
+### Legacy provider
 
 Maintainer regressions cover actual loader formats, CommonJS free/receiver callers, exact scalar state and return values, source preservation, binding/intrinsic refusal, named context blockers and detached export. They use a limited compiler fixture for JS-compatible TypeScript unit cases.
 
