@@ -205,6 +205,19 @@ def sample_draws(domain: dict, count: int, rng: random.Random) -> Iterator:
             yield "".join(rng.choice(domain["alphabet"]) for _ in range(length))
 
 
+def floating_fallback(domain: dict, width: int) -> Iterator[float]:
+    """Enumerate the representable interval monotonically without stepping past it."""
+    value, high = domain["minimum"], domain["maximum"]
+    while value <= high:
+        yield value
+        if value == high:
+            break
+        following = float_step(value, high, width)
+        if following <= value:
+            break
+        value = following
+
+
 def sample_fallback(domain: dict, width: int) -> Iterator:
     """Fill small finite pools lazily instead of relying on random collisions."""
     kind = domain["kind"]
@@ -217,15 +230,7 @@ def sample_fallback(domain: dict, width: int) -> Iterator:
             for characters in itertools.product(domain["alphabet"], repeat=length):
                 yield "".join(characters)
     else:
-        value, high = domain["minimum"], domain["maximum"]
-        while value <= high:
-            yield value
-            if value == high:
-                break
-            following = float_step(value, high, width)
-            if following <= value:
-                break
-            value = following
+        yield from floating_fallback(domain, width)
 
 
 def floating_sample(value: Any, width: int) -> float:
@@ -236,17 +241,12 @@ def floating_sample(value: Any, width: int) -> float:
         raise ValueError("declared domain exceeds the floating representation") from error
 
 
-def sampling_budget(count: int, width: int) -> None:
-    """Keep pure sampling entry points within the same bounded profile."""
-    if (type(count) is not int or not 1 <= count <= MAX_CASES
-            or type(width) is not int or width not in (32, 64)):
-        raise ValueError("invalid declared-domain sample budget or floating width")
-
-
 def samples(domain: dict, count: int, rng: random.Random, *, width: int = 64) -> list:
     """Materialise bounded independent scalar values, retaining exact distinctions."""
     domain = validate(domain)
-    sampling_budget(count, width)
+    if (type(count) is not int or not 1 <= count <= MAX_CASES
+            or type(width) is not int or width not in (32, 64)):
+        raise ValueError("invalid declared-domain sample budget or floating width")
     target = sample_count(domain, count)
     values = {}
     candidates = itertools.chain(sample_edges(domain), sample_draws(domain, target, rng),

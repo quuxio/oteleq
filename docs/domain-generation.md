@@ -43,6 +43,21 @@ An explicit `cases` list continues to override automatic sampling, even when `do
 
 [Scalar shrinking](counterexample-shrinking.md) consumes the same declared domains. Derived replay suites retain explicit reduced inputs and the original experiment's provenance. Automatic generation does not infer relational preconditions, create object factories, enable unsupported argument codecs or add action-sequence shrinking. Supply reviewed concrete cases when parameters have additional relationships.
 
+## Maintainer qualification
+
+With the qualified provider, matching language tools and its locked Python environment:
+
+```sh
+make generation-domains-otelc \
+  PYTHON=/absolute/path/to/otelc/.venv/bin/python \
+  OTELC_ROOT=/absolute/path/to/qualified/provider \
+  REPORT_DIR=/absolute/path/to/new-domain-evidence
+```
+
+The maintained corpus declares 30 functions and 82 generated cases: integer, boolean and floating inputs in every language, strings in the five supported profiles, and a Python diagnostic which deliberately observes instrumentation. That diagnostic must produce two stable differences. Full direct/generated and detached/exported routes, frozen-policy replay, scalar reduction, seeded samples and prelaunch refusal controls are checked independently.
+
+`tests/qualify_domains.py --resume` can recheck completed initial routes before later controls have started. Incomplete routes and changed inputs remain errors; the qualifier does not silently discard partial evidence or repeat later controls. The caller must confirm any previous process is terminal before resuming.
+
 ## Qualification status
 
 Component regressions cover all eight language IDs, deterministic/frozen values, scalar kinds, finite pools, float32 boundaries, signed zeros, type/range refusals and input budgets. Actual-provider qualification of this new generation path is still pending. It remains **equivalence over these tests and observations**.

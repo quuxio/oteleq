@@ -1,0 +1,117 @@
+"""Independent domain-fixture oracles reject equal but incorrect observations."""
+import copy
+import json
+from pathlib import Path
+import sys
+import tempfile
+import unittest
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path[:0] = [str(ROOT / "tests"), str(ROOT / "adapters/generation"), str(ROOT / "examples")]
+import domain_fixture_oracle as oracle
+import policy
+import qualify_domains
+
+
+class DomainQualificationTests(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+
+    def report(self):
+        entry = {"id": "case", "language": "python", "name": "domain_integer", "otelc_function": "app.domain_integer"}
+        parent = self.root / "case-0"
+        parent.mkdir()
+        bundle = {"contract": {"expected_baseline": {"kind": "return"}}}
+        for lane in ("baseline", "instrumented_on"):
+            attempts = []
+            for index in range(2):
+                folder = parent / (lane + "-" + str(index))
+                folder.mkdir()
+                observed = {"fixture": {"status": "ready"}, "gaps": [],
+                    "before": oracle.graph("python", "integer", 7),
+                    "after": oracle.graph("python", "integer", 7),
+                    "outcome": {"kind": "return", "graph": oracle.graph("python", "integer", 7, returned=True)}}
+                witness = ({"functions": {"app.domain_integer": 1}, "spans": 1, "pending": 0,
+                            "losses": {"export": 0}} if lane == "instrumented_on" else None)
+                attempts.append({"observation": observed, "execution": {"capture_complete": True,
+                    "termination": {"kind": "exit", "code": 0}, "channels": {"stdout": [], "stderr": []},
+                    "witness": witness}})
+                (folder / "typed-observation.json").write_text(json.dumps(observed))
+                (folder / "stdout").write_bytes(b"")
+                (folder / "stderr").write_bytes(b"")
+            bundle[lane] = attempts
+        (parent / "typed-bundle.json").write_text(json.dumps({"cases": [bundle]}))
+        report = {"source_preserved": True, "blocked": [], "inventory": [entry], "exit_code": 0,
+                  "cases": [{"case": "case-0", "function": "app.domain_integer", "arguments": [7], "exit_code": 0}]}
+        path = self.root / "report.json"
+        path.write_text(json.dumps(report))
+        return path, parent, bundle
+
+    def test_sources_and_policy_cover_every_declared_profile_without_literal_cases(self):
+        fixtures = []
+        for language in oracle.LANGUAGES:
+            name, text = oracle.source(language)
+            self.assertTrue(name and text)
+            self.assertTrue(all("domain_" + kind in text for kind in oracle.kinds(language)))
+            fixtures.extend((language, kind, [oracle.DOMAINS[kind]]) for kind in oracle.kinds(language))
+        path = self.root / "policy.toml"
+        qualify_domains.write_policy(path, fixtures)
+        frozen = policy.load(path)
+        self.assertEqual(len(frozen["fixtures"]), 30)
+        self.assertTrue(all("cases" not in row for row in frozen["fixtures"]))
+        self.assertEqual(sum(len(oracle.arguments(language, kind))
+            for language in oracle.LANGUAGES for kind in oracle.kinds(language)), 82)
+
+    def test_known_scalar_labels_bits_and_string_units_are_literal(self):
+        self.assertEqual(oracle.typed("c", "boolean", True),
+                         {"kind": "boolean", "type": "c._Bool", "value": True})
+        self.assertEqual(oracle.typed("java", "float", 0.1),
+                         {"kind": "float", "type": "java.lang.Float", "bits": "3dcccccd"})
+        self.assertEqual(oracle.typed("go", "string", "\u03bb"),
+                         {"kind": "string", "type": "go.string", "encoding": "raw_bytes", "value": "cebb"})
+        self.assertEqual(oracle.typed("python", "string", "\u03bb")["value"], "000003bb")
+        self.assertEqual(oracle.typed("javascript", "string", "\u03bb")["value"], "03bb")
+
+    def test_complete_oracle_accepts_every_repeat_and_no_more(self):
+        path, _, _ = self.report()
+        self.assertEqual(len(oracle.check_report(path, count=1)), 4)
+        with self.assertRaises(AssertionError):
+            oracle.check_report(path, count=2)
+
+    def test_equal_but_wrong_results_are_rejected_in_both_lanes(self):
+        path, parent, bundle = self.report()
+        for lane in ("baseline", "instrumented_on"):
+            for index, attempt in enumerate(bundle[lane]):
+                observed = attempt["observation"]
+                observed["outcome"]["graph"]["roots"]["result"]["value"] = "999"
+                (parent / (lane + "-" + str(index)) / "typed-observation.json").write_text(json.dumps(observed))
+        (parent / "typed-bundle.json").write_text(json.dumps({"cases": [bundle]}))
+        with self.assertRaises(AssertionError):
+            oracle.check_report(path, count=1)
+
+    def test_missing_witness_and_raw_output_changes_cannot_pass(self):
+        path, parent, bundle = self.report()
+        altered = copy.deepcopy(bundle)
+        altered["instrumented_on"][0]["execution"]["witness"]["spans"] = 0
+        (parent / "typed-bundle.json").write_text(json.dumps({"cases": [altered]}))
+        with self.assertRaises(AssertionError):
+            oracle.check_report(path, count=1)
+        (parent / "typed-bundle.json").write_text(json.dumps({"cases": [bundle]}))
+        (parent / "baseline-0/stdout").write_bytes(b"unexpected application output")
+        with self.assertRaises(AssertionError):
+            oracle.check_report(path, count=1)
+
+    def test_probe_is_an_explicit_stable_difference_not_an_invalid_baseline(self):
+        baseline = oracle.graph("python", "probe", 32, returned=True, lane="baseline")
+        instrumented = oracle.graph("python", "probe", 32, returned=True, lane="instrumented_on")
+        self.assertEqual(baseline["roots"]["result"]["value"], "0")
+        self.assertEqual(instrumented["roots"]["result"]["value"], "1")
+        self.assertEqual(oracle.graph("python", "probe", 0, returned=True, lane="instrumented_on")
+                         ["roots"]["result"]["value"], "0")
+
+
+if __name__ == "__main__":
+    unittest.main()
+
