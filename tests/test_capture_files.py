@@ -72,12 +72,9 @@ class FileDigestTests(unittest.TestCase):
         for target in (fifo, linked):
             for reader in self.readers():
                 with self.subTest(reader=reader.__module__, target=target.name):
-                    try:
-                        result = subprocess.run([sys.executable, "-c", code, str(ROOT / "examples"),
-                            str(ROOT / "adapters/generation"), reader.__module__, reader.__name__, str(target)],
-                            capture_output=True, text=True, timeout=3, check=False)
-                    except subprocess.TimeoutExpired:
-                        self.fail("hash reader blocked on a FIFO before it could reject the input")
+                    result = subprocess.run([sys.executable, "-c", code, str(ROOT / "examples"),
+                        str(ROOT / "adapters/generation"), reader.__module__, reader.__name__, str(target)],
+                        capture_output=True, text=True, timeout=3, check=False)
                     self.assertEqual(result.returncode, 0, result.stderr)
 
     @unittest.skipUnless(hasattr(os, "pipe"), "requires descriptor pipes")
