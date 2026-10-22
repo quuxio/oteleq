@@ -76,6 +76,8 @@ Instance own data properties preserve values, order, descriptor flags, aliases/c
 
 Run `make generation-node-receiver-otelc OTELC_ROOT=/absolute/path/to/otelc REPORT_DIR=/private/tmp/new-node-receiver-qualification` for the separate maintained actual-provider corpus. It checks both language IDs, matching/expected-error cases, same-return instance/static mutation controls, generated/exported suites, scalar shrinking and missing/wrong-class/root refusals. Unit parser and observer checks do not establish actual otelc qualification.
 
+Every recorded lane/repeat also checks the complete raw graph against an independent fixed-fixture oracle, including arguments, shared-array contents, descriptors, field order, aliases and the expected exception payload. Graph-local reference numbers may differ. Use `GENERATION_ARGS='--node-backend source-v1 --typescript-compiler native'` for the explicitly selected rebuilt SDK profile; `api` selects its other TypeScript compiler. Each profile requires its own new report directory and qualified provider.
+
 ## Observation and replay
 
 The observer reads ordinary stored state through builtin metadata. It does not call application getters, `repr`, custom serialisers or dynamic method lookup. Unsupported descriptors/storage and incomplete requested roots prevent qualification. Mutations to declared class data and receiver state can produce differences even when the method returns the same value in both lanes.

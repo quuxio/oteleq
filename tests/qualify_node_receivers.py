@@ -7,6 +7,7 @@ from pathlib import Path
 import struct
 import sys
 
+import node_receiver_oracle
 from qualify_generation import command
 
 
@@ -98,8 +99,10 @@ def check_report(path,count):
         assert 'receiver' in bundle['contract']['required_roots']
         for lane in ('baseline','instrumented_on'):
             assert len(bundle[lane])==2
-            for attempt in bundle[lane]:
+            for index, attempt in enumerate(bundle[lane]):
                 launches+=1
+                raw = path.parent / case['case'] / (lane + '-' + str(index)) / 'observation'
+                node_receiver_oracle.check(json.loads(raw.read_bytes()), method, case['arguments'][0], lane == 'instrumented_on')
                 observed=attempt['observation'];assert not observed['gaps']
                 assert receiver_value(observed['before'])==10
                 assert number(static_value(observed['before'],'total'))==0
