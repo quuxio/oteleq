@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "date": "2026-10-22",
+  "runtime_revision": "8a767ef770433ad03753246afe804193fee1a728",
+  "qualified_build_revision": "be6de0e1466ce70938a3096ee613cda82c7d3f36",
+  "runtime_cli_sha256": "a63be5b6fd060b93c31c96773f2fb8bf20ae504a2f43b0f95e888a1efc9da8e6",
+  "qualified_source_archive_sha256": "522d541634a5e17bc18dc474c9dd9aa61c2831e9a7bad7fa1b983b3230868924",
+  "runtime_source_archive_sha256": "cda2d62bad36910878d10a41e757ede2d0bf44934bdd6432aa68ffda03b59191",
+  "rebuilt_cli_byte_identical": true,
+  "rebase_changed_only_documentation": [
+    "docs/README.md",
+    "docs/input-inspection.md",
+    "docs/qualification/input-inspection-2026-10-22.json",
+    "docs/quality.md"
+  ],
+  "qualifier_sha256": "291f84b0d72dcb77fe1365c73248570909eb9704dce2aa3fa7de35ab75791567",
+  "special_input_qualifier_sha256": "b85182f38277e16458091aa15d1a6dbc6c72393cd2d5adb2d2d5c8dc11358a1b",
+  "provider_revision": "d6d03b72026cde8962b11ce3cc184ff3ebcb60d4",
+  "host": "macOS-27.0.1-arm64-arm-64bit",
+  "languages": [
+    "c",
+    "cpp",
+    "rust",
+    "python",
+    "java",
+    "javascript",
+    "typescript",
+    "go"
+  ],
+  "actual_application_launches": 140,
+  "instrumented_application_launches": 70,
+  "routes": {
+    "direct": 32,
+    "generated_suite": 32,
+    "original_workspace_replay": 4,
+    "additional_retained_bundle_replay": 4,
+    "detached_direct": 32,
+    "detached_generated_suite": 32,
+    "rebuilt_cli_replay": 4
+  },
+  "retained_bundle_refusal_controls": 4,
+  "synthetic_sdk_special_input_controls": {
+    "scope": "synthetic SDK identity failure only; no SDK or application execution",
+    "controls": [
+      {
+        "input_kind": "fifo",
+        "planning_completed_seconds": 0.5501813750015572,
+        "selected_blockers": 1,
+        "strict_run_exit": 3,
+        "actual_application_launches": 0
+      },
+      {
+        "input_kind": "symlink-to-fifo",
+        "planning_completed_seconds": 0.18208141699869884,
+        "selected_blockers": 1,
+        "strict_run_exit": 3,
+        "actual_application_launches": 0
+      }
+    ],
+    "actual_application_launches": 0,
+    "source_preserved": true
+  },
+  "earlier_unqualified_python_host_refused_before_execution": true,
+  "component_regressions": {
+    "failing_before_fix": true,
+    "qualified_python_3_12_tests": 9,
+    "installed_python_3_14_8_tests": 9,
+    "named_pipe_and_symlink_controls": true,
+    "descriptor_cleanup_and_blocking_regular_reads": true
+  },
+  "complete_literal_graph_oracles": true,
+  "source_preserved": true,
+  "provider_input_recheck": {
+    "provider_commit": "d6d03b72026cde8962b11ce3cc184ff3ebcb60d4",
+    "manifest_sha256": "2a8dbf239c6444c0fb536dff049993beade7eaed6578c9654c1e2d7233e9431f",
+    "verified_records": 7360,
+    "counts": {
+      "source_sha256": 413,
+      "products_sha256": 586,
+      "dependencies": 6361
+    },
+    "symlinks_verified": 11,
+    "external_tools_verified": 8,
+    "result": "all recorded SDK inputs unchanged after qualification"
+  },
+  "retained_review": {
+    "reports_verified": 21,
+    "distinct_attempts_verified": 140,
+    "complete_graphs_raw_channels_witnesses_verified": true,
+    "junit_inventory_entries": 16,
+    "junit_completed_cases": 8,
+    "junit_explicit_exclusions": 8,
+    "junit_failures": 0,
+    "junit_errors": 0,
+    "html_scope_present": true,
+    "visual_review": "unchanged renderer; no new visual qualification claimed"
+  },
+  "retained_evidence_files": 4311,
+  "retained_evidence_manifest_sha256": "42db7710b7b69606f798491c978c2779a562153d1f9cd7f4fa394600cb5baba7",
+  "validation": {
+    "revision": "be6de0e1466ce70938a3096ee613cda82c7d3f36",
+    "full_local_make_check": "passed",
+    "distinct_regressions": 784,
+    "python": 691,
+    "rust": 72,
+    "node": 17,
+    "go": 4,
+    "rust_product_line_coverage_percent": 97.37,
+    "host_python_hash_regressions": {
+      "version": "3.14.8",
+      "tests": 9,
+      "result": "passed"
+    },
+    "notes": "Java/effect subsets and coverage reruns are not counted twice."
+  },
+  "limits": [
+    "Recorded macOS POSIX host and frozen legacy provider; other platforms, replacement SDKs and shipping artefacts remain unqualified.",
+    "Special-input CLI controls use a synthetic SDK identity tree and execute neither that SDK nor an application.",
+    "Regular-file hashing has no general slow-storage deadline or atomic snapshot guarantee; callers retain their own link, size and preservation contracts."
+  ],
+  "overall_project_complete": false
+}

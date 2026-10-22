@@ -12,6 +12,8 @@ On qualified POSIX hosts, the shared content hasher opens input descriptors with
 
 This check does not provide an atomic snapshot or a general timeout for slow regular-file storage. Directory inventories, file-size budgets and source-preservation checks retain their separate scope.
 
+The [regular-input qualification](qualification/regular-inputs-2026-10-22.json) records 140 actual launches over the eight-language retained-suite corpus and one rebuilt-CLI replay. The rebuilt `8a767ef` CLI is byte-identical to the qualified `be6de0e` binary; the source delta contains only documentation. Two synthetic SDK controls record explicit blockers for a pipe and a symlink to a pipe, with no application execution. Nine component regressions pass under the qualified Python 3.12 environment and installed Python 3.14.8. The full runtime gate passes 784 distinct regressions, with 97.37% Rust product line coverage. These results qualify the recorded POSIX profile.
+
 ## Resolve a refusal
 
 Restore read and search access to the named input directory, or select a supported source/build context which excludes it explicitly. If a file tree changed during inspection, stop the writer and create a new plan. Workspaces and external reports remain available for inspection; cleanup also refuses private input trees it cannot verify. The tool does not change application or dependency permissions to obtain access.
