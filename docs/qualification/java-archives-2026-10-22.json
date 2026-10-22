@@ -1,0 +1,281 @@
+{
+  "schema_version": 1,
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "date": "2026-10-22",
+  "platform": "macOS ARM64",
+  "profile": "archive-methods-v1",
+  "consumer_runtime_commit": "646857c34697f62f62832f0ebd457eaf252b9117",
+  "qualifier_commit": "5c3026eb3673913cef1419977736f7d8b2d7d3ad",
+  "consumer_cli_sha256": "f04723fc5d0c654c66da56c25afb2d67d1b35fed7576340277a01baad37cdbfc",
+  "runtime_source_files_unchanged_in_qualifier_commit": 85,
+  "provider_commit": "c06eb438012116a7b2ec9b635a2cb7434d8e713d",
+  "provider_files_verified_after_execution": 112,
+  "provider_manifest_sha256": "11bd6467ae4077815f056d8286bc2ed1301c3c1e15d92afdf5839100df5c460a",
+  "jdk": "OpenJDK Runtime Environment Homebrew 21.0.12.1",
+  "actual_application_jvm_launches": 304,
+  "unique_instrumented_application_jvms": 152,
+  "variants": {
+    "active": {
+      "application_launches": 20,
+      "launches": {
+        "raw_attempt_folders": 20,
+        "unique_command_identities": 20
+      },
+      "prepared": {
+        "retained_attempts": 20,
+        "unique_processes": 20,
+        "retained_instrumented_receipts": 10,
+        "short_runtimes_removed": true
+      },
+      "retained_builds": 20,
+      "complete_literal_graphs_verified": true
+    },
+    "ordinary": {
+      "application_launches": 20,
+      "launches": {
+        "raw_attempt_folders": 20,
+        "unique_command_identities": 20
+      },
+      "prepared": {
+        "retained_attempts": 20,
+        "unique_processes": 20,
+        "retained_instrumented_receipts": 10,
+        "short_runtimes_removed": true
+      },
+      "retained_builds": 20,
+      "complete_literal_graphs_verified": true
+    },
+    "inactive": {
+      "application_launches": 20,
+      "launches": {
+        "raw_attempt_folders": 20,
+        "unique_command_identities": 20
+      },
+      "prepared": {
+        "retained_attempts": 20,
+        "unique_processes": 20,
+        "retained_instrumented_receipts": 10,
+        "short_runtimes_removed": true
+      },
+      "retained_builds": 20,
+      "complete_literal_graphs_verified": true
+    },
+    "false": {
+      "application_launches": 20,
+      "launches": {
+        "raw_attempt_folders": 20,
+        "unique_command_identities": 20
+      },
+      "prepared": {
+        "retained_attempts": 20,
+        "unique_processes": 20,
+        "retained_instrumented_receipts": 10,
+        "short_runtimes_removed": true
+      },
+      "retained_builds": 20,
+      "complete_literal_graphs_verified": true
+    },
+    "intermediate": {
+      "application_launches": 20,
+      "launches": {
+        "raw_attempt_folders": 20,
+        "unique_command_identities": 20
+      },
+      "prepared": {
+        "retained_attempts": 20,
+        "unique_processes": 20,
+        "retained_instrumented_receipts": 10,
+        "short_runtimes_removed": true
+      },
+      "retained_builds": 20,
+      "complete_literal_graphs_verified": true
+    },
+    "future": {
+      "application_launches": 20,
+      "launches": {
+        "raw_attempt_folders": 20,
+        "unique_command_identities": 20
+      },
+      "prepared": {
+        "retained_attempts": 20,
+        "unique_processes": 20,
+        "retained_instrumented_receipts": 10,
+        "short_runtimes_removed": true
+      },
+      "retained_builds": 20,
+      "complete_literal_graphs_verified": true
+    },
+    "version-only": {
+      "application_launches": 20,
+      "launches": {
+        "raw_attempt_folders": 20,
+        "unique_command_identities": 20
+      },
+      "prepared": {
+        "retained_attempts": 20,
+        "unique_processes": 20,
+        "retained_instrumented_receipts": 10,
+        "short_runtimes_removed": true
+      },
+      "retained_builds": 20,
+      "complete_literal_graphs_verified": true
+    },
+    "folded": {
+      "application_launches": 20,
+      "launches": {
+        "raw_attempt_folders": 20,
+        "unique_command_identities": 20
+      },
+      "prepared": {
+        "retained_attempts": 20,
+        "unique_processes": 20,
+        "retained_instrumented_receipts": 10,
+        "short_runtimes_removed": true
+      },
+      "retained_builds": 20,
+      "complete_literal_graphs_verified": true
+    },
+    "identical": {
+      "application_launches": 20,
+      "launches": {
+        "raw_attempt_folders": 20,
+        "unique_command_identities": 20
+      },
+      "prepared": {
+        "retained_attempts": 20,
+        "unique_processes": 20,
+        "retained_instrumented_receipts": 10,
+        "short_runtimes_removed": true
+      },
+      "retained_builds": 20,
+      "complete_literal_graphs_verified": true
+    },
+    "collision": {
+      "application_launches": 20,
+      "launches": {
+        "raw_attempt_folders": 20,
+        "unique_command_identities": 20
+      },
+      "prepared": {
+        "retained_attempts": 20,
+        "unique_processes": 20,
+        "retained_instrumented_receipts": 10,
+        "short_runtimes_removed": true
+      },
+      "retained_builds": 20,
+      "complete_literal_graphs_verified": true
+    },
+    "mutation": {
+      "application_launches": 40,
+      "launches": {
+        "raw_attempt_folders": 44,
+        "unique_command_identities": 40
+      },
+      "prepared": {
+        "retained_attempts": 44,
+        "unique_processes": 40,
+        "retained_instrumented_receipts": 22,
+        "short_runtimes_removed": true
+      },
+      "retained_builds": 44,
+      "complete_literal_graphs_verified": true
+    }
+  },
+  "ordinary_private_receiver_compatibility": {
+    "application_launches": 16,
+    "source_preserved": true,
+    "cases": 4,
+    "matching_cases": 3,
+    "same_return_state_differences": 1,
+    "complete_literal_graphs_verified": true,
+    "scope": "ordinary JAR/class/resource context and private receiver compatibility on the new prepared profile"
+  },
+  "live_controls": {
+    "application_launches": 48,
+    "states_per_jvm": 4,
+    "launches": {
+      "raw_attempt_folders": 48,
+      "unique_command_identities": 48
+    },
+    "prepared": {
+      "retained_attempts": 48,
+      "unique_processes": 48,
+      "retained_instrumented_receipts": 24,
+      "short_runtimes_removed": true
+    },
+    "complete_literal_graphs_verified": true
+  },
+  "prelaunch_refusal_controls": 5,
+  "altered_evidence_controls": 8,
+  "scalar_shrink": {
+    "original": [
+      7
+    ],
+    "reduced": [
+      0
+    ],
+    "additional_actual_jvm_launches": 20
+  },
+  "owned_workspaces_revalidated": 25,
+  "routes": [
+    "direct",
+    "fixed replay",
+    "generated unittest",
+    "exported unittest with both original source and external dependencies unavailable",
+    "reduced generated suite and fixed replay"
+  ],
+  "observations": [
+    "complete independent before, after and outcome graphs in every repeat/lane",
+    "compile-time constant, runtime method and resource values as separate roots",
+    "exact stdout/stderr and expected errors",
+    "literal compiler source/class reads and emitted bindings",
+    "full raw JAR and resource directory bytes",
+    "selected-JDK runtime entry names and digests, including equal-byte members",
+    "actual PID/argv, loaded archive origins and original runtime cleanup",
+    "decoded OTLP function/resource metrics and spans with final loss/export accounting",
+    "four same-PID metric collection/emission states, retained restoration and independent tracing"
+  ],
+  "controls": [
+    "changed original source",
+    "changed original archive",
+    "changed original external resource",
+    "changed private archive",
+    "changed frozen resolver output",
+    "altered runtime member with unchanged class digest in identical-byte fixture",
+    "altered JDK feature",
+    "rehashed compiler member read",
+    "altered loaded origin"
+  ],
+  "retained_evidence_sha256": {
+    "runtime.json": "05397d336024a1f3997c8b75078d1aae5a49490b7b199b7fe78cd3493effd139",
+    "qualification-driver-v1.json": "21f4226d8e62732b42047df5b3144d195800958624e58f2e9cb33f8f2892fcaf",
+    "qualification-driver-v2.json": "a37e8c049ff59d2abe4200ef863b68e9eff33ecd868f250d36986a6ae6a78c0d",
+    "ordinary-direct.json": "3c75854f1be4f0700c879a9b0ca3b42d6be4429ad7e31ba17808135b060df313",
+    "ordinary-retained-verification.json": "b09e5c0e4dcdd0d17ca09a6ac2b580cdd7990abc75fa3f4b3b5cc7ccc3cc6268",
+    "archive-corpus-v1/active-retained-verification.json": "f720fc3fa02b96dab1ff3026e29e2168e497c21b80b3714cb4e8f1caef5526ae",
+    "archive-corpus-v2/qualification.json": "e408010dc87b3440544fd34eb60d63322b16477049ad8175b646c3901c4357ce",
+    "strict-detached-v3/qualification.json": "c679fe8ee110c8cd76ad47da6231222b156bdf7eed86a40a14c058608a20ffda",
+    "additional-v3/qualification.json": "8ec2ff40f4c16c512d00886ee8895db87645b557204602a31637f368dc6e8d2a",
+    "active-strict-detached.json": "1fa4d7882b96fa93a84856e30842f199f94cdc347fbedf44394d875089010d3f",
+    "post-qualification-integrity.json": "5f902662eecdbacdc9da154bac5c819f7ff66c1386118fff40e78ffb4dd9304e",
+    "final-literal-report-verification.json": "4960f70db6683d31c9e51ca7974affa1c7b2ec0a84be41d437c0b26dd25afa9b"
+  },
+  "calibrations": [
+    "The initial active-case verifier used an unresolved JDK symlink for lib/modules. The corrected verifier checked the existing 16 JVM results; those processes were not restarted or counted twice.",
+    "Copied original shrink evidence remains retained and is excluded from actual JVM counts."
+  ],
+  "scope": "Explicit fixed JDK21 source-classpath workers and declared private receiver compatibility. Default JarFile selection; original JAR, dependency and resource bytes preserved.",
+  "gaps": [
+    "No invocation-scoped witness or proof of the exact class member actually defined by an arbitrary classloader.",
+    "No shipping artefact, Maven/Gradle/module build or arbitrary JVM/compiler recipe qualification.",
+    "Application changes to JDK selection properties and custom classloaders are outside this profile.",
+    "The broader project completion checklist remains open."
+  ],
+  "runtime_and_cargo_inputs_verified_against_initial_archive": 87,
+  "independent_literal_reports_revalidated": {
+    "archives": 61,
+    "live_controls": 7,
+    "ordinary_compatibility": 1
+  }
+}

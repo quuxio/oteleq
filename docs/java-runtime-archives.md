@@ -2,7 +2,7 @@
 
 ## Current status
 
-The explicit prepared `archive-methods-v1` profile integrates the independent consumer resolver into generated project workflows. It requires the matching SDK runtime-archive contract and helper tool; exact-provider qualification is in progress. The original `stock-methods-v1` and `safe-methods-v1` recipes retain their existing behaviour and refuse versioned layouts. Invocation-scoped attribution remains open.
+The explicit prepared `archive-methods-v1` profile integrates the independent consumer resolver into generated project workflows. Its [304-JVM qualification](qualification/java-archives-2026-10-22.json) uses frozen consumer runtime `646857c` and SDK `c06eb43`, with complete independent state/outcome checks, compiler/runtime member identities, decoded telemetry and source preservation. It requires that matching runtime-archive contract and helper tool. The original `stock-methods-v1` and `safe-methods-v1` recipes retain their existing behaviour and refuse versioned layouts. Invocation-scoped attribution remains open.
 
 ## Select the profile
 
@@ -37,6 +37,8 @@ The agreed new prepared profile keeps the 16 launch fields. Every JAR-containing
 The new provider must bind its resolver helper-tool identity in both plain and instrumented launches containing a JAR. Instrumented schema-2 launches also bind the actual javap executable from the same selected full JDK. Consumer verification compares the producer's complete claim with an independent selected-JDK result. Missing/extra archives, fields, classes, changed bytes, incorrect JDK features and different entry identities cannot pass. The consumer receipt retains its exact JDK/resolver input set, fixed command and original probe result; removing a tool hash or changing that local evidence cannot weaken verification. Duplicate definitions, implicit manifest Class-Path/index expansion, unsafe/duplicate ZIP entries and changed resolver inputs are refused. Ambient Java option variables and explicit multi-release selection property overrides are outside this profile.
 
 ## Checks and remaining work
+
+The corpus covers eleven archive variants through direct, fixed replay, generated and exported suites. A second detached run removes both original source and external dependency directories. It also covers same-return global mutation, scalar reduction from `[7]` to `[0]`, independently reproduced real helper relocation, 48 private receiver JVMs with four live metric states, ordinary private receiver compatibility and 13 input/evidence controls. All 112 frozen provider files and 25 owned workspaces are revalidated after execution. Copied original shrink evidence is retained separately and does not inflate the 304 actual JVMs.
 
 `make check` runs the real JDK matrix and enforces separate 80% line-coverage floors for `java_archives.py` and the compiled `OteleqArchives` resolver. JaCoCo is confined to regression probes; application/provider qualification uses ordinary JVMs.
 
