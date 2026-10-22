@@ -60,4 +60,10 @@ The maintained corpus declares 30 functions and 82 generated cases: integer, boo
 
 ## Qualification status
 
-Component regressions cover all eight language IDs, deterministic/frozen values, scalar kinds, finite pools, float32 boundaries, signed zeros, type/range refusals and input budgets. Actual-provider qualification of this new generation path is still pending. It remains **equivalence over these tests and observations**.
+The [22 October exact-revision qualification](qualification/domain-generation-2026-10-22.json) completes 1,384 distinct application launches on frozen runtime `1a16757` and legacy provider `d6d03b7`. Each full direct/generated/detached route contains 80 matching cases and two deliberate Python telemetry-sensitive differences. Fourteen domain-arity, float32-representation and payload-budget refusals fail both public execution and the generated suite before application launch.
+
+Frozen replay ignores an edited external policy. Scalar reduction preserves the deliberate difference while reducing 32 to 7, with six complete trials and an exported reduced suite. The separate seeded Python route uses eight independently fixed inputs. Retained review checks 177 reports, recomputes all 346 typed comparisons and excludes four copied original attempts from the launch count. Source bytes and all 7,360 recorded provider inputs remain unchanged. Final HTML/JUnit are byte-identical to the browser-reviewed presentation.
+
+The first checker expected a boxed Java float label instead of the standalone primitive codec's `java.float`; its regression fails before correction and rejects boxed substitution afterwards. The executing qualifier also expected exit 0 from a deliberate-difference render, whose correct exit is 1. Corrected finalisation rechecked the source seal and rendered retained data without repeating application launches. The record distinguishes runtime, execution-checker and finalisation identities.
+
+Component regressions additionally cover deterministic/frozen values, finite pools, signed zeros, type/range refusals and input budgets. This qualifies the recorded diagnostic profiles on macOS ARM64. Broader argument/factory contracts, replacement SDKs, other platforms and shipping artefacts remain separate. The result is **equivalence over these tests and observations**.
