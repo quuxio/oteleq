@@ -14,6 +14,8 @@ from urllib.parse import unquote
 import java_provider as provider
 import java_profiles
 import java_project
+import java_archive_context
+import java_helper_binding
 import otelc_capture as capture
 
 MAX_RUNTIME_BYTES = 32 * 1024 * 1024
@@ -68,9 +70,13 @@ def agent_values(data: dict, owner: str, method: str, profile: str = java_profil
             "otel.instrumentation.otelc-lifetimes.enabled": "true",
             "otel.instrumentation.opentelemetry-api.enabled": "true",
             "otel.instrumentation.methods.include": owner + "[" + method + "]"}
-    if java_profiles.name(profile) == java_profiles.SAFE:
+    if java_profiles.corrected(profile):
         values["otel.instrumentation.methods.enabled"] = "false"
         values["otel.instrumentation.otelc-methods.enabled"] = "true"
+    if profile == java_profiles.ARCHIVES:
+        values.update({name: "false" for name in ("otel.instrumentation.executors.enabled",
+                       "otel.instrumentation.java-http-client.enabled", "otel.instrumentation.java-http-server.enabled",
+                       "otel.instrumentation.otelc-http-headers.enabled")})
     return values
 
 
@@ -101,15 +107,15 @@ def target(entry: dict, application: dict, project: Path) -> tuple[str, str]:
 
 def expected_argv(root: Path, java: Path, classes: Path, main: str, runtime: Path,
                   data: dict, owner: str, method: str, plain: bool, profile: str = java_profiles.STOCK,
-                  *, context: dict | None = None) -> list[str]:
+                  *, context: dict | None = None, extension: Path | None = None) -> list[str]:
     """SDK metadata may verify this recipe; it cannot choose executables or flags."""
     args = [str(java), "-Xshare:off", "-Xlog:class+load=info:file=" + str(runtime / CLASS_LOG)]
     if not plain:
         args[1:1] = ["-Dotel.javaagent.logging=simple",
                      "-Dio.opentelemetry.javaagent.slf4j.simpleLogger.logFile=" + str(runtime / "agent.log")]
-        if java_profiles.name(profile) == java_profiles.SAFE:
+        if java_profiles.corrected(profile):
             args += ["-Xbootclasspath/a:" + str(root / java_profiles.PATCH)]
-        args += ["-javaagent:" + str(root / provider.AGENT), "-Dotel.javaagent.extensions=" + str(root / provider.EXTENSION),
+        args += ["-javaagent:" + str(root / provider.AGENT), "-Dotel.javaagent.extensions=" + str(extension or root / provider.EXTENSION),
                  "-Dotel.javaagent.configuration-file=" + str(runtime / AGENT_CONFIG),
                  "-Dotelc.plan=" + str(runtime / PLAN_CONFIG), "-Dotelc.traces.enabled=true",
                  "-Dotelc.lifetime.types=", "-Dotelc.lifetime.resources=", "-Dotelc.lifetime.max-live=4096",
@@ -137,12 +143,19 @@ def verify(launch: dict, *, root: Path, project: Path, folder: Path, tools: dict
     java = tools["java"].resolve(strict=True)
     owner, method = target(entry, application, project)
     profile = java_profiles.name(entry.get("java_profile", java_profiles.STOCK))
+    paths = java_project.runtime_classpath(classes, context)
+    modern = profile == java_profiles.ARCHIVES
+    has_archives = modern and any(path.suffix.lower() == ".jar" for path in paths)
+    provider.require(not modern or java_archive_context.configured(context), "missing runtime archive project context")
+    extension, extra = root / provider.EXTENSION, set()
+    if modern and not plain:
+        extension, extra = java_helper_binding.verify(root, paths, context, folder, runtime)
     provider.require(type(launch) is dict and set(launch) == LAUNCH_FIELDS
-                     and type(launch["schema_version"]) is int and launch["schema_version"] == 1
+                     and type(launch["schema_version"]) is int and launch["schema_version"] == (2 if has_archives else 1)
                      and launch["language"] == "java" and launch["plain"] is plain
                      and launch["jvm_profile"] == "diagnostic-no-cds", "unsupported prepared launch identity")
     provider.require(launch["argv"] == expected_argv(root, java, classes, application["main_class"], runtime,
-                                                   data, owner, method, plain, profile, context=context), "SDK changed the fixed Java launch recipe")
+                                                   data, owner, method, plain, profile, context=context, extension=extension), "SDK changed the fixed Java launch recipe")
     paths = list(map(str, java_project.runtime_classpath(classes, context)))
     provider.require(launch["main_class"] == application["main_class"] and launch["ordered_classpath"] == paths
                      and type(launch["java_version"]) is str and launch["java_version"], "prepared main/classpath/version differs")
@@ -150,8 +163,18 @@ def verify(launch: dict, *, root: Path, project: Path, folder: Path, tools: dict
                      and launch["loaded_origins"] == str(runtime / CLASS_LOG), "prepared policy/origin identity differs")
     for key, filename in (("agent_diagnostics", "agent.log"), ("health_report", "health.json"), ("control_socket", CONTROL_SOCKET)):
         provider.require(launch[key] == (None if plain else str(runtime / filename)), "prepared runtime path differs: " + key)
-    verify_application(launch["application"], application, application_path, classes, context=context)
+    verify_application(launch["application"], application, application_path, classes, context=context,
+                       archive_profile=has_archives)
+    if modern:
+        # The fresh independent probe also verifies empty/directory-only resolutions.
+        claim = (launch["application"]["archive_resolution"] if has_archives else
+                 java_archive_context.expected_resolution(java_project.runtime_classpath(classes, context), context))
+        java_archive_context.verify_attempt(claim, java_project.runtime_classpath(classes, context), context, java, folder)
     tooling = {java}
+    if has_archives:
+        tooling.add(root / provider.HELPER)
+        if not plain:
+            tooling.add(tools["javap"].resolve(strict=True))
     if plain:
         provider.require(launch["selection_sha256"] is None, "plain launch has an instrumented selection")
     else:
@@ -164,14 +187,20 @@ def verify(launch: dict, *, root: Path, project: Path, folder: Path, tools: dict
                          "SDK changed agent configuration or live controls")
         tooling |= {root / provider.AGENT, root / provider.EXTENSION,
                     runtime / AGENT_CONFIG, runtime / PLAN_CONFIG, runtime / "selection.json"}
-        if profile == java_profiles.SAFE:
+        if java_profiles.corrected(profile):
             tooling.add(root / java_profiles.PATCH)
+        if extra:
+            tooling |= extra | {root / provider.HELPER}
     files(launch["tooling"], tooling)
 
 
-def verify_application(value: dict, application: dict, manifest: Path, classes: Path, *, context: dict | None = None) -> None:
+def verify_application(value: dict, application: dict, manifest: Path, classes: Path, *, context: dict | None = None,
+                       archive_profile: bool = False) -> None:
     """Require the actual complete compiler product inventory and source bindings."""
-    provider.require(type(value) is dict and set(value) == {"manifest", "classpath", "main_class", "ordered_classpath", "sources", "bindings"}
+    fields = {"manifest", "classpath", "main_class", "ordered_classpath", "sources", "bindings"}
+    if archive_profile:
+        fields.add("archive_resolution")
+    provider.require(type(value) is dict and set(value) == fields
                      and value["bindings"] == application["bindings"] and value["main_class"] == application["main_class"]
                      and value["ordered_classpath"] == list(map(str, java_project.runtime_classpath(classes, context))),
                      "prepared compiler application binding differs")
@@ -188,6 +217,12 @@ def prepare(root: Path, project: Path, folder: Path, tools: dict, runtime: Path,
                folder / APPLICATION_FILE, "--runtime", runtime, "--prepare-only", "--diagnostic-profile"]
     if plain:
         command.append("--plain")
+    if entry.get("java_profile") == java_profiles.ARCHIVES:
+        paths = java_project.runtime_classpath(folder / "scratch/classes", context)
+        java = tools["java"].resolve(strict=True)
+        java_archive_context.prepare_attempt(paths, context, java, folder, env, execute)
+        if not plain:
+            java_helper_binding.prepare(root, paths, context, java, folder, env, execute)
     result = execute(command, root, provider.environment(root, tools, folder, env), folder / "sdk-prepare",
                      max_output_bytes=16 * 1024 * 1024 if context is not None else provider.MAX_METADATA)
     provider.require(result.returncode == 0, "public SDK preparation failed; inspect sdk-prepare/stderr")
