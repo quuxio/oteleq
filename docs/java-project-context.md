@@ -47,6 +47,8 @@ Private file paths and resource URL strings are compared literally. They can var
 
 Named Java modules, module-path builds, multi-release JARs, arbitrary compiler/JVM flags, annotation processing, Maven/Gradle build execution and custom classloader qualification remain open. SDK/runtime compatibility requires actual-provider qualification; passing compiler regressions alone is insufficient.
 
+The independent [runtime archive resolver](java-runtime-archives.md) records actual selected-JDK member identities and keeps literal compiler reads separate. Its component regressions do not enable versioned JARs in generated workflows; the public producer/consumer integration still requires exact-provider qualification.
+
 `make check` covers real JDK compilation, actual JAR/directory class reads, generated source roots, resource loading, loaded origins, large internal JARs, detached context, source/dependency mutation controls and guarded cleanup. `java_project.py` and `java_classpath.py` each have an 80% line-coverage floor. Prepared-provider capability probes are sealed, exported and checked before cleanup, including when the original application is unavailable.
 
 ## Reproduce actual-provider qualification

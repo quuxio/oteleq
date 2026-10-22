@@ -7,6 +7,7 @@ Updated 21 October 2026, `quux-oteleq compare-workload` runs the Rust comparator
 | [Automatic generation](automatic-generation.md) | Generate, run, replay and retain the implemented scalar suite |
 | [Go build bundles](go-build-bundles.md) | Retain matched executables, compiler evidence and detached replay |
 | [Java compiler bindings](java-build-bundles.md) | Inspect actual source origins, JDK/compiler identities and retained class products |
+| [Java runtime archives](java-runtime-archives.md) | Review selected-JDK member evidence and the pending generated-workflow integration |
 | [Prepared Java SDK provider](java-prepared-provider.md) | Select the replacement Java SDK and verify launch, PID, origins and health/OTLP receipt |
 | [Filesystem effects](filesystem-effects.md) | Seed independent directories and compare declared bytes, kinds and permissions |
 | [HTTP fixtures](http-fixtures.md) | Script a local service and compare bounded requests and offered responses |

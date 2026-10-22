@@ -84,6 +84,21 @@ def compiler_probe(cache: Path, repo: Path, folder: Path, classes: Path, executi
         (classes / source.name).write_bytes(source.read_bytes())
 
 
+def archive_probe(cache: Path, repo: Path, folder: Path, classes: Path, execution: Path) -> None:
+    """Measure offline archive resolution without instrumenting any application."""
+    compiled = folder / "archive-probe"
+    compiled.mkdir()
+    javac = os.environ.get("OTELC_JAVAC", "javac")
+    java = os.environ.get("OTELC_JAVA", "java")
+    subprocess.run([javac, "-g", "-d", str(compiled), str(repo / "adapters/generation/OteleqArchives.java"),
+                    str(repo / "tests/JavaArchiveProbe.java")], cwd=repo, check=True, timeout=30)
+    agent = f"-javaagent:{cache / 'jacocoagent.jar'}=destfile={execution},append=true,includes=OteleqArchives"
+    subprocess.run([java, agent, "-cp", str(compiled), "JavaArchiveProbe", str(folder / "archive-inputs")],
+                   cwd=repo, check=True, timeout=30)
+    source = compiled / "OteleqArchives.class"
+    (classes / source.name).write_bytes(source.read_bytes())
+
+
 def check(cache: Path, repo: Path) -> None:
     """Collect product probes; production SDK qualification uses no JaCoCo."""
     if not verified(cache):
@@ -103,11 +118,13 @@ def check(cache: Path, repo: Path) -> None:
         subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "tests", "-p", "test_generation_java_receivers.py", "-v"],
                        cwd=repo, env=environment, check=True, timeout=120)
         compiler_probe(cache, repo, folder, classes, execution)
+        archive_probe(cache, repo, folder, classes, execution)
         subprocess.run([java, "-jar", str(cache / "jacococli.jar"), "report", str(execution),
                         "--classfiles", str(classes), "--sourcefiles", str(repo / "adapters/generation"), "--xml", str(report)],
                        cwd=repo, check=True, timeout=30)
     print(f"Java observer line coverage: {coverage(report):.2f}%")
     print(f"Java compiler frontend line coverage: {coverage(report, 'OteleqCompile', nested=True):.2f}%")
+    print(f"Java runtime archive resolver line coverage: {coverage(report, 'OteleqArchives'):.2f}%")
 
 
 def main() -> None:
