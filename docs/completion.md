@@ -8,7 +8,7 @@ Java now has an explicit [prepared SDK provider](java-prepared-provider.md) for 
 
 Instrumentation and its generated bootstraps/extensions/probes must require no application or dependency coding changes. Users supply common configuration and build/launch setup. Live metric controls require one unchanged application process and build: collection and emission change independently and together, with actual collection suppression distinguished from exporter/network suppression and tracing verified unaffected.
 
-Java [runtime archive integration](java-runtime-archives.md) now has an independent selected-JDK resolver, raw compiler-member validation and exact-byte metadata views with real JVM regressions. Generated multi-release JAR support remains blocked until the new prepared launch contract and actual-provider qualification are complete.
+Java [runtime archive integration](java-runtime-archives.md) now has an explicit generated project profile, an independent selected-JDK resolver, separate compiler/runtime catalogues, exact launch tooling and independently reproduced helper relocation. Actual-provider qualification is in progress; component regressions alone do not complete this build-integration requirement.
 
 | Requirement | Current evidence and remaining work |
 | --- | --- |

@@ -122,7 +122,7 @@ def framework(workspace: Path, folder: Path, label: str, expected_cases: int = 4
     return sum(oracle.check_report(Path(row["report"]), 1)[0] for row in reports)
 
 
-def verify_receipt(attempt: Path, launch: dict, pid: int, trace_decoder, metric_decoder) -> None:
+def verify_receipt(attempt: Path, launch: dict, pid: int, trace_decoder, metric_decoder, *, functions=oracle.FUNCTIONS) -> None:
     """Bind actual direct health to every decoded batch, span and metric point."""
     health = oracle.document(attempt / "sdk-runtime/health.json")
     captured = oracle.document(attempt / "http-capture.json")
@@ -134,7 +134,7 @@ def verify_receipt(attempt: Path, launch: dict, pid: int, trace_decoder, metric_
     assert launch["policy_sha256"] == hashlib.sha256(json.dumps(policy, sort_keys=True).encode()).hexdigest()
     service = policy["resource"]["service_name"]
     observed = oracle.document(attempt / "typed-observation.json")
-    assert observed["function_id"] in oracle.FUNCTIONS
+    assert observed["function_id"] in functions
     owner, method = observed["function_id"].split("(", 1)[0].rsplit(".", 1)
     spans, points, batches = [], 0, {"/v1/traces": 0, "/v1/metrics": 0}
     recorded = {CALLS: [], DURATION: []}

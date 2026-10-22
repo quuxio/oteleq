@@ -229,7 +229,7 @@ def check_compiler_tooling(folder: Path, identity: dict, original: Path) -> None
     assert sha(folder / "compiler-tool/OteleqCompile.java") == sha(expected_frontend)
 
 
-def check_origins(folder: Path, function: str) -> None:
+def check_origins(folder: Path, function: str, *, main_class: str = "app.OteleqDriver") -> None:
     launch = folder / "prepared-launch.json"
     log = folder / "sdk-runtime/class-load.log" if launch.exists() else folder / "class-load.log"
     identity = document(folder / "java-compiler-identity.json")
@@ -250,4 +250,4 @@ def check_origins(folder: Path, function: str) -> None:
             observed[match[1]] = match[2]
     assert document(folder / "verified-origins.json") == observed
     owner = function.split("(", 1)[0].rsplit(".", 1)[0]
-    assert {owner, "app.OteleqDriver", "dep.Library", "other.More"}.issubset(observed)
+    assert {owner, main_class, "dep.Library", "other.More"}.issubset(observed)

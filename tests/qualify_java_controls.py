@@ -36,12 +36,15 @@ SOURCE = r'''class Counter {
 '''
 
 
-def prepare(cli: Path, provider: Path, folder: Path, profile: str) -> Path:
+def prepare(cli: Path, provider: Path, folder: Path, profile: str, *, source_text: str = SOURCE,
+            classpath: list[str] | None = None) -> Path:
     """All states execute in one JVM per lane, using only existing source methods."""
     folder.mkdir();source = folder / "application";source.mkdir()
-    (source / "Counter.java").write_text(SOURCE)
+    (source / "Counter.java").write_text(source_text)
     text = 'schema_version=1\nlanguages=["java"]\n[adapters.java]\nbackend="prepared"\n'
     text += 'profile=' + json.dumps(profile) + '\n'
+    if classpath is not None:
+        text += 'source_roots=["."]\nclasspath=' + json.dumps(classpath) + '\n'
     text += '[functions]\ninclude=' + json.dumps(list(FUNCTIONS)) + '\n[limits]\ncase_timeout_ms=20000\n'
     for function, method in FUNCTIONS.items():
         text += '\n[[fixtures]]\nfunction=' + json.dumps(function) + '\ncases=[[7]]\n'

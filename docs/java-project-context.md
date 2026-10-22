@@ -23,7 +23,7 @@ Run the ordinary [planning and generation commands](automatic-generation.md#buil
 
 Source roots are literal paths relative to `--source`; they cannot leave that repository. Explicit roots can retain generated Java source under otherwise excluded directories such as `target`. Empty declared roots are preserved. All units in the declared roots are compiled together, including helpers that are excluded as test targets. A selected callable outside those roots is a visible blocker.
 
-Classpath entries are existing JARs or class/resource directories. Relative entries resolve against `--source`; absolute entries can refer to an existing dependency cache. Order is preserved. Duplicate resolved locations or class definitions are refused. Wildcards, path-list separators, implicit JAR `Class-Path` attributes, JAR indexes and multi-release layouts are refused. JARs retain their complete original bytes; they are never flattened or repacked.
+Classpath entries are existing JARs or class/resource directories. Relative entries resolve against `--source`; absolute entries can refer to an existing dependency cache. Order is preserved. Duplicate resolved locations or class definitions are refused. Wildcards, path-list separators, implicit JAR `Class-Path` attributes and JAR indexes are refused. The original profiles also refuse multi-release layouts; the explicit [runtime archive profile](java-runtime-archives.md) accepts them through selected-JDK resolution. JARs retain their complete original bytes; they are never flattened or repacked for application execution.
 
 The workspace owns `java-context/`, containing the frozen dependency copies and `context.json`. Each attempt receives separate copies under `java-classpath/`. Resource files and empty dependency directories are retained. Changes to original dependencies, frozen context, private copies or metadata invalidate the relevant checks. An exported suite carries its context and can run without the original application or dependency locations. It still requires the frozen CLI, SDK and language tools.
 
@@ -45,9 +45,9 @@ The claim remains **equivalence over these tests and observations**. Compiling a
 
 Private file paths and resource URL strings are compared literally. They can vary across independent attempts and make the result inconclusive; the runner does not normalise them.
 
-Named Java modules, module-path builds, multi-release JARs, arbitrary compiler/JVM flags, annotation processing, Maven/Gradle build execution and custom classloader qualification remain open. SDK/runtime compatibility requires actual-provider qualification; passing compiler regressions alone is insufficient.
+Named Java modules, module-path builds, arbitrary compiler/JVM flags, annotation processing, Maven/Gradle build execution and custom classloader qualification remain open. SDK/runtime compatibility requires actual-provider qualification; passing compiler regressions alone is insufficient.
 
-The independent [runtime archive resolver](java-runtime-archives.md) records actual selected-JDK member identities and keeps literal compiler reads separate. Its component regressions do not enable versioned JARs in generated workflows; the public producer/consumer integration still requires exact-provider qualification.
+The explicit prepared [runtime archive profile](java-runtime-archives.md) records actual selected-JDK member identities and keeps literal compiler reads separate. It binds the public producer/consumer launch contract, helper relocation and fresh per-attempt probes. Exact-provider qualification is in progress.
 
 `make check` covers real JDK compilation, actual JAR/directory class reads, generated source roots, resource loading, loaded origins, large internal JARs, detached context, source/dependency mutation controls and guarded cleanup. `java_project.py` and `java_classpath.py` each have an 80% line-coverage floor. Prepared-provider capability probes are sealed, exported and checked before cleanup, including when the original application is unavailable.
 

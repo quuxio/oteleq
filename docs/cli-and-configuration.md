@@ -41,7 +41,7 @@ The default compiler also validates the separate [original-source schema3 build 
 
 `[adapters.java] backend = "legacy"` (default) retains the pre-rebuild adapter. `"prepared"` explicitly selects the [prepared Java SDK provider](java-prepared-provider.md), requiring its prebuilt official agent/extension, complete schema-3 capability response, fixed launch recipe and direct health/OTLP receipt. There is no automatic fallback between provider contracts.
 
-Prepared Java additionally accepts `profile = "stock-methods-v1"` (default) or explicit `"safe-methods-v1"`. The safe recipe requires the corrected exception advice and pinned bootstrap parser patch. Both fixed recipes retain strict argv, properties, tooling, scope and input checks. Profiles on a legacy backend are rejected.
+Prepared Java additionally accepts `profile = "stock-methods-v1"` (default), `"safe-methods-v1"` or `"archive-methods-v1"`. The safe recipe requires the corrected exception advice and pinned bootstrap parser patch. The [runtime archive recipe](java-runtime-archives.md) additionally requires the matching helper tool and selected-JDK archive contract; it defaults to source roots `["."]` and an empty classpath. All three fixed recipes retain strict argv, properties, tooling, scope and input checks. Profiles on a legacy backend are rejected.
 
 `[adapters.java] source_roots = ["src/main/java"]` and `classpath = ["lib/library.jar", "target/classes"]` opt into [declared source/dependency context](java-project-context.md). Roots resolve inside the selected source repository; classpath entries can also be absolute. Existing generated units and dependency bytes are frozen without running a build manager. Omitted settings preserve the standalone recipe.
 

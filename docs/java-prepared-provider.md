@@ -34,6 +34,8 @@ Prepared Java defaults to `profile = "stock-methods-v1"`, the original frozen `f
 
 The safe recipe disables the stock method advice, enables the SDK's exception-safe method advice and adds its pinned bootstrap parser patch. The method scope remains `io.opentelemetry.methods` / `2.32.0-alpha`, with the original owner/function attributes. The runner independently fixes complete argv and properties for each profile. It never selects a profile from provider filenames or accepts additional flags from metadata. Unknown profiles, profiles on a legacy backend and cross-profile launch recipes are refused.
 
+The separate `archive-methods-v1` profile keeps the corrected advice and pinned bootstrap patch, adds selected-JDK runtime archive catalogues and independently verified helper relocation, and explicitly disables task/HTTP instrumentation. It requires the newer helper-tool product and launch contract. See [configuration and qualification](java-runtime-archives.md); the older profiles' evidence does not qualify this one.
+
 The safe profile also requires `adapters/java/target/java-extension-0.2.0-SNAPSHOT-bootstrap-patch.jar` and its declared licence/notice sources. The bounded JAR must contain only the pinned shaded `W3CTraceContextEncoding.class` and those two notices, with no duplicate or foreign entries. Its complete bytes and sources become frozen plan inputs and are rechecked before replay. Build it through the matching SDK's `make java-build` before planning. Actual-provider qualification is separate from metadata acceptance.
 
 The provider must contain:

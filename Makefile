@@ -6,13 +6,14 @@ GETTER_EXPECTATION ?= different
 JAVA_PROFILE ?= stock-methods-v1
 MARKDOWNLINT ?= ./ci/markdownlint/node_modules/.bin/markdownlint
 
-.PHONY: generation-native-project-otelc generation-return-otelc generation-java-sequence-otelc generation-java-controls-otelc generation-java-project-otelc generation-node-project-otelc
+.PHONY: generation-native-project-otelc generation-return-otelc generation-java-sequence-otelc generation-java-controls-otelc generation-java-project-otelc generation-java-archive-otelc generation-node-project-otelc
 
 .PHONY: help setup lint examples docs-check observer-check generation-check effect-qualification-check node-observer-check node-sequence-check java-observer-check go-observer-check cpp-observer-check generation-cpp-receiver-otelc generation-go-receiver-otelc generation-java-receiver-otelc generation-otelc generation-policy-otelc generation-rust-otelc rust-semantic-otelc generation-native-otelc generation-shrink-otelc generation-python-project-otelc generation-receiver-otelc generation-node-receiver-otelc generation-go-build-otelc generation-go-project-otelc generation-sequence-otelc generation-typescript-sequence-otelc generation-filesystem-otelc generation-http-otelc resource-otelc capture-otelc report core-check coverage check
 
 help:
 	@printf '%s\n' 'generation-node-project-otelc Qualify Node module formats, detached suites and reduction'
 	@printf '%s\n' 'generation-java-project-otelc Qualify Java roots, JARs/resources, detached suites and reduction (JAVA_BACKEND, JAVA_PROFILE)'
+	@printf '%s\n' 'generation-java-archive-otelc Qualify the explicit JDK21 runtime archive project profile'
 	@printf '%s\n' 'generation-java-controls-otelc Qualify same-PID Java metric states (JAVA_PROFILE, GETTER_EXPECTATION, optional LEGACY_OTELC_ROOT)'
 	@printf '%s\n' 'generation-java-sequence-otelc Qualify Java call sequences and recursive telemetry (JAVA_BACKEND)'
 	@printf '%s\n' 'generation-return-otelc Qualify declared return values and equal-wrong controls in all eight languages'
@@ -32,6 +33,11 @@ generation-java-project-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
 	$(PYTHON) tests/qualify_java_project.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" --java-backend "$(JAVA_BACKEND)" $(if $(filter prepared,$(JAVA_BACKEND)),--java-profile "$(JAVA_PROFILE)",)
+
+generation-java-archive-otelc:
+	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
+	cargo build --locked
+	$(PYTHON) tests/qualify_java_archives.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
 
 generation-native-project-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
@@ -76,6 +82,8 @@ generation-check: node-observer-check node-sequence-check java-observer-check go
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_project.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_classpath.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_archives.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_archive_context.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_helper_binding.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/node_project.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_health.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_provider.py' --fail-under=80
