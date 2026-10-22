@@ -72,11 +72,11 @@ rustup toolchain install 1.98.1 --profile minimal \
 rustup run 1.98.1 cargo install cargo-llvm-cov --version 0.8.7 --locked
 make setup
 python3 -m venv .venv
-.venv/bin/python -m pip install --only-binary=:all: -r ci/requirements.txt
+.venv/bin/python -m pip install --require-hashes --only-binary=:all: -r ci/requirements.txt
 rustup run 1.98.1 make check PYTHON=.venv/bin/python
 ```
 
-The pinned validation environment includes the OTLP protobuf decoder used by the Node telemetry regressions.
+The pinned validation environment includes the OTLP protobuf decoder used by the Node telemetry regressions. Each dependency has an exact version and permitted wheel hashes; pip requires those hashes in contributor setup and CI.
 
 `make examples` also parses every GitHub workflow with the locked YAML parser installed by `make setup`. Its regression checks the quoting required for pip's `--only-binary=:all:` argument.
 

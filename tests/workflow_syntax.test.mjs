@@ -20,3 +20,12 @@ test('pip binary-only arguments require quoting in a YAML command scalar', () =>
   assert.throws(() => yaml.load(`run: ${command}\n`));
   assert.equal(yaml.load(`run: '${command}'\n`).run, command);
 });
+
+test('Python validation installs enforce wheel and dependency hashes', () => {
+  const workflow = yaml.load(readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8'));
+  const install = workflow.jobs.design.steps.find(step => step.name === 'Install pinned Python validation tools');
+  assert.ok(install);
+  assert.match(install.run, /--require-hashes\b/);
+  assert.match(install.run, /--only-binary=:all:/);
+  assert.match(install.run, /-r ci\/requirements\.txt/);
+});
