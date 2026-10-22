@@ -10,6 +10,10 @@ import otelc_capture as capture
 PACKAGES = ("io.quux.otelc.methods.", "io.quux.otelc.lifecycle.",
             "io.quux.otelc.witness.probe.", "io.quux.otelc.http.")
 PROOF = "helper-proof"
+EXTENSION_FILE = "helpers-extension.jar"
+MAPPING_FILE = "helpers.properties"
+DESCRIPTOR_FILE = "helpers.json"
+RUNTIME_FILES = (EXTENSION_FILE, MAPPING_FILE, DESCRIPTOR_FILE)
 
 
 def packages(root: Path, paths: list[Path], context: dict) -> dict:
@@ -47,13 +51,13 @@ def prepare(root: Path, paths: list[Path], context: dict, java: Path, folder: Pa
     record = {"packages": mapping, "template_sha256": capture.file_digest(root / provider.EXTENSION),
               "tool_sha256": capture.file_digest(root / provider.HELPER)}
     if mapping:
-        plan = proof / "helpers.properties"
+        plan = proof / MAPPING_FILE
         plan.write_text(properties(mapping))
         result = execute([java, "-cp", root / provider.HELPER, "io.quux.otelc.tools.HelperRelocator",
-                          root / provider.EXTENSION, proof / "helpers-extension.jar", plan],
+                          root / provider.EXTENSION, proof / EXTENSION_FILE, plan],
                          proof, environment, proof / "build")
         provider.require(result.returncode == 0, "independent helper relocation failed")
-        record["generated_sha256"] = capture.file_digest(proof / "helpers-extension.jar")
+        record["generated_sha256"] = capture.file_digest(proof / EXTENSION_FILE)
     (proof / "binding.json").write_text(json.dumps(record, indent=2) + "\n")
 
 
@@ -66,18 +70,18 @@ def verify(root: Path, paths: list[Path], context: dict, folder: Path, runtime: 
                 "tool_sha256": capture.file_digest(root / provider.HELPER)}
     if not mapping:
         provider.require(record == expected and not any((runtime / name).exists() for name in
-                         ("helpers-extension.jar", "helpers.properties", "helpers.json")),
+                         RUNTIME_FILES),
                          "unexpected helper relocation")
         return root / provider.EXTENSION, set()
-    generated = proof / "helpers-extension.jar"
+    generated = proof / EXTENSION_FILE
     expected["generated_sha256"] = capture.file_digest(generated)
-    provider.require(record == expected and (proof / "helpers.properties").read_text() == properties(mapping),
+    provider.require(record == expected and (proof / MAPPING_FILE).read_text() == properties(mapping),
                      "independent helper proof changed")
-    extension = runtime / "helpers-extension.jar"
+    extension = runtime / EXTENSION_FILE
     provider.require(capture.file_digest(extension) == expected["generated_sha256"]
-                     and (runtime / "helpers.properties").read_text() == properties(mapping),
+                     and (runtime / MAPPING_FILE).read_text() == properties(mapping),
                      "private helper bytes or mapping differ")
     descriptor = {"schema_version": 1, "kind": "otelc.java-helper-map", **expected}
-    provider.require(capture.strict_json((runtime / "helpers.json").read_bytes()) == descriptor,
+    provider.require(capture.strict_json((runtime / DESCRIPTOR_FILE).read_bytes()) == descriptor,
                      "private helper descriptor differs")
-    return extension, {runtime / name for name in ("helpers-extension.jar", "helpers.properties", "helpers.json")}
+    return extension, {runtime / name for name in RUNTIME_FILES}

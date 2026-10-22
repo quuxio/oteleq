@@ -25,6 +25,7 @@ CLASS_LOG = "class-load.log"
 AGENT_CONFIG = "agent.properties"
 PLAN_CONFIG = "plan.properties"
 APPLICATION_FILE = "prepared-application.json"
+CLASSES = "scratch/classes"
 CONTROL_SOCKET = "control.sock"
 IDENTITY_FIELDS = {"path", "sha256", "size", "inode", "device", "mtime_ns"}
 LAUNCH_FIELDS = {"schema_version", "language", "plain", "jvm_profile", "agent_diagnostics", "health_report",
@@ -74,9 +75,9 @@ def agent_values(data: dict, owner: str, method: str, profile: str = java_profil
         values["otel.instrumentation.methods.enabled"] = "false"
         values["otel.instrumentation.otelc-methods.enabled"] = "true"
     if profile == java_profiles.ARCHIVES:
-        values.update({name: "false" for name in ("otel.instrumentation.executors.enabled",
+        values.update(dict.fromkeys(("otel.instrumentation.executors.enabled",
                        "otel.instrumentation.java-http-client.enabled", "otel.instrumentation.java-http-server.enabled",
-                       "otel.instrumentation.otelc-http-headers.enabled")})
+                       "otel.instrumentation.otelc-http-headers.enabled"), "false"))
     return values
 
 
@@ -139,7 +140,7 @@ def verify(launch: dict, *, root: Path, project: Path, folder: Path, tools: dict
     """Bind the full public response, argv and loaded inputs before and after Java."""
     application_path = folder / APPLICATION_FILE
     application = capture.strict_json(application_path.read_bytes())
-    classes = folder / "scratch/classes"
+    classes = folder / CLASSES
     java = tools["java"].resolve(strict=True)
     owner, method = target(entry, application, project)
     profile = java_profiles.name(entry.get("java_profile", java_profiles.STOCK))
@@ -150,19 +151,9 @@ def verify(launch: dict, *, root: Path, project: Path, folder: Path, tools: dict
     extension, extra = root / provider.EXTENSION, set()
     if modern and not plain:
         extension, extra = java_helper_binding.verify(root, paths, context, folder, runtime)
-    provider.require(type(launch) is dict and set(launch) == LAUNCH_FIELDS
-                     and type(launch["schema_version"]) is int and launch["schema_version"] == (2 if has_archives else 1)
-                     and launch["language"] == "java" and launch["plain"] is plain
-                     and launch["jvm_profile"] == "diagnostic-no-cds", "unsupported prepared launch identity")
+    verify_identity(launch, application, paths, runtime, data, plain, has_archives)
     provider.require(launch["argv"] == expected_argv(root, java, classes, application["main_class"], runtime,
                                                    data, owner, method, plain, profile, context=context, extension=extension), "SDK changed the fixed Java launch recipe")
-    paths = list(map(str, java_project.runtime_classpath(classes, context)))
-    provider.require(launch["main_class"] == application["main_class"] and launch["ordered_classpath"] == paths
-                     and type(launch["java_version"]) is str and launch["java_version"], "prepared main/classpath/version differs")
-    provider.require(launch["policy_sha256"] == provider.digest(data)
-                     and launch["loaded_origins"] == str(runtime / CLASS_LOG), "prepared policy/origin identity differs")
-    for key, filename in (("agent_diagnostics", "agent.log"), ("health_report", "health.json"), ("control_socket", CONTROL_SOCKET)):
-        provider.require(launch[key] == (None if plain else str(runtime / filename)), "prepared runtime path differs: " + key)
     verify_application(launch["application"], application, application_path, classes, context=context,
                        archive_profile=has_archives)
     if modern:
@@ -178,20 +169,42 @@ def verify(launch: dict, *, root: Path, project: Path, folder: Path, tools: dict
     if plain:
         provider.require(launch["selection_sha256"] is None, "plain launch has an instrumented selection")
     else:
-        selection = {"methods": {owner: [method]}, "types": [], "resources": []}
-        provider.require(launch["selection_sha256"] == provider.digest(selection)
-                         and capture.strict_json((runtime / "selection.json").read_bytes()) == selection,
-                         "SDK changed resolved method selection")
-        provider.require((runtime / AGENT_CONFIG).read_text() == properties(agent_values(data, owner, method, profile))
-                         and (runtime / PLAN_CONFIG).read_text() == properties(plan_values(runtime, data, selection)),
-                         "SDK changed agent configuration or live controls")
-        tooling |= {root / provider.AGENT, root / provider.EXTENSION,
-                    runtime / AGENT_CONFIG, runtime / PLAN_CONFIG, runtime / "selection.json"}
-        if java_profiles.corrected(profile):
-            tooling.add(root / java_profiles.PATCH)
+        tooling |= instrumented_tooling(launch, root, runtime, data, owner, method, profile)
         if extra:
             tooling |= extra | {root / provider.HELPER}
     files(launch["tooling"], tooling)
+
+
+def verify_identity(launch: dict, application: dict, paths: list[Path], runtime: Path,
+                    data: dict, plain: bool, has_archives: bool) -> None:
+    """The launch header and host-owned runtime locations form one closed contract."""
+    provider.require(type(launch) is dict and set(launch) == LAUNCH_FIELDS
+                     and type(launch["schema_version"]) is int and launch["schema_version"] == (2 if has_archives else 1)
+                     and launch["language"] == "java" and launch["plain"] is plain
+                     and launch["jvm_profile"] == "diagnostic-no-cds", "unsupported prepared launch identity")
+    provider.require(launch["main_class"] == application["main_class"] and launch["ordered_classpath"] == list(map(str, paths))
+                     and type(launch["java_version"]) is str and launch["java_version"], "prepared main/classpath/version differs")
+    provider.require(launch["policy_sha256"] == provider.digest(data)
+                     and launch["loaded_origins"] == str(runtime / CLASS_LOG), "prepared policy/origin identity differs")
+    for key, filename in (("agent_diagnostics", "agent.log"), ("health_report", "health.json"), ("control_socket", CONTROL_SOCKET)):
+        provider.require(launch[key] == (None if plain else str(runtime / filename)), "prepared runtime path differs: " + key)
+
+
+def instrumented_tooling(launch: dict, root: Path, runtime: Path, data: dict,
+                         owner: str, method: str, profile: str) -> set[Path]:
+    """Verify selected advice/configuration and return its exact fixed input set."""
+    selection = {"methods": {owner: [method]}, "types": [], "resources": []}
+    provider.require(launch["selection_sha256"] == provider.digest(selection)
+                     and capture.strict_json((runtime / "selection.json").read_bytes()) == selection,
+                     "SDK changed resolved method selection")
+    provider.require((runtime / AGENT_CONFIG).read_text() == properties(agent_values(data, owner, method, profile))
+                     and (runtime / PLAN_CONFIG).read_text() == properties(plan_values(runtime, data, selection)),
+                     "SDK changed agent configuration or live controls")
+    tooling = {root / provider.AGENT, root / provider.EXTENSION,
+               runtime / AGENT_CONFIG, runtime / PLAN_CONFIG, runtime / "selection.json"}
+    if java_profiles.corrected(profile):
+        tooling.add(root / java_profiles.PATCH)
+    return tooling
 
 
 def verify_application(value: dict, application: dict, manifest: Path, classes: Path, *, context: dict | None = None,
@@ -218,7 +231,7 @@ def prepare(root: Path, project: Path, folder: Path, tools: dict, runtime: Path,
     if plain:
         command.append("--plain")
     if entry.get("java_profile") == java_profiles.ARCHIVES:
-        paths = java_project.runtime_classpath(folder / "scratch/classes", context)
+        paths = java_project.runtime_classpath(folder / CLASSES, context)
         java = tools["java"].resolve(strict=True)
         java_archive_context.prepare_attempt(paths, context, java, folder, env, execute)
         if not plain:
@@ -276,7 +289,7 @@ def origins(runtime: Path, folder: Path, entry: dict, *, context: dict | None = 
     path = runtime / CLASS_LOG
     provider.require(path.is_file() and path.stat().st_size <= MAX_RUNTIME_BYTES, "missing or oversized JVM origin log")
     application = capture.strict_json((folder / APPLICATION_FILE).read_bytes())
-    expected = {name: "file:" + str(folder / "scratch/classes") + "/" for name in application["bindings"]}
+    expected = {name: "file:" + str(folder / CLASSES) + "/" for name in application["bindings"]}
     for dependency in context["entries"] if context else []:
         source = "file:" + dependency["path"] + ("/" if dependency["kind"] == "directory" else "")
         for name in dependency["classes"]:

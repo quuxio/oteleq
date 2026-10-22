@@ -153,12 +153,7 @@ def prepare(source: Path, workspace: Path, options: dict, ignored: set[str], *,
         names.update(record["classes"])
         owned = "classpath/" + str(index).zfill(4) + (".jar" if record["kind"] == "jar" else "")
         target = root / owned
-        if record["kind"] == "jar":
-            shutil.copy2(origin, target)
-        else:
-            shutil.copytree(origin, target)
-        inspect = archive_context.inspect if active else classpath.inspect
-        require(inspect(origin) == record and inspect(target) == record, "dependency changed while freezing")
+        freeze_dependency(origin, target, record, active)
         entries.append({"requested": str(requested), "source": str(origin), "owned": owned, **record})
     context = {"schema_version": 1, "profile": PROFILE, "source_roots": options["source_roots"],
                "excluded_source_jars": snapshot_exclusions(source, options),
@@ -171,6 +166,16 @@ def prepare(source: Path, workspace: Path, options: dict, ignored: set[str], *,
     require(len(raw.encode()) <= 16 * 1024 * 1024, "context metadata exceeds its byte budget")
     (root / "context.json").write_text(raw)
     return context
+
+
+def freeze_dependency(origin: Path, target: Path, record: dict, active: bool) -> None:
+    """Recheck both complete byte catalogues after making the private copy."""
+    if record["kind"] == "jar":
+        shutil.copy2(origin, target)
+    else:
+        shutil.copytree(origin, target)
+    inspect = archive_context.inspect if active else classpath.inspect
+    require(inspect(origin) == record and inspect(target) == record, "dependency changed while freezing")
 
 
 def verify(workspace: Path, data: dict, *, originals: bool = True) -> None:

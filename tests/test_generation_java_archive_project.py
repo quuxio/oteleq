@@ -167,8 +167,9 @@ class JavaArchiveProjectTests(unittest.TestCase):
         folder, project, classes, context, _ = self.build()
         context["entries"][0]["classes"]["dep.Flags"] = {
             "entry": "dep/Flags.class", "sha256": hashlib.sha256(self.variants[8]).hexdigest()}
+        paths = java_project.runtime_classpath(classes, context)
         with self.assertRaisesRegex(ValueError, "differs from the frozen catalogue"):
-            archive_context.prepare_attempt(java_project.runtime_classpath(classes, context), context, JAVA,
+            archive_context.prepare_attempt(paths, context, JAVA,
                                             folder, self.environment, generation.execute)
 
     def test_originals_private_records_duplicates_and_missing_execution_context_refuse(self):
