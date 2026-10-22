@@ -46,4 +46,6 @@ The corpus covers eleven archive variants through direct, fixed replay, generate
 
 Shipping artefacts, custom classloaders, application changes to JDK selection properties and general Maven/Gradle/module integration remain outside this profile.
 
+`clean` verifies the owned snapshot, dependency catalogue and retained probe bytes without reading original input paths or requiring the selected JDK. Execution and detached replay retain the selected-JDK checks. Edited archive evidence prevents cleanup and remains available for inspection.
+
 The result remains **equivalence over these tests and observations**.

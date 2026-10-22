@@ -1216,7 +1216,7 @@ def clean(args):
         raise ValueError('native context was edited or is unowned; retain and inspect it')
     if manifest(workspace / "snapshot") != data["source_manifest"]:
         raise ValueError("snapshot was edited; retain and inspect it")
-    java_project.verify(workspace, data, originals=False)
+    java_project.verify_owned(workspace, data)
     java_provider.verify_probes(sys.modules[__name__], workspace, data)
     if (workspace / "tests").exists() and not (workspace / GENERATED_MANIFEST).is_file():
         raise ValueError("generated suite is unsealed; retain and inspect it")

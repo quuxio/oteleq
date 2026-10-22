@@ -8,7 +8,10 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
+from uuid import uuid4
 import zipfile
 
 REPO = Path(__file__).resolve().parents[1]
@@ -197,6 +200,40 @@ class JavaArchiveProjectTests(unittest.TestCase):
         resolution = archive_context.expected_resolution([empty], context)
         self.assertEqual(resolution["archives"], [])
         self.assertEqual(context["schema_version"], 2)
+
+    def seal_cleanup_workspace(self, workspace: Path, data: dict) -> None:
+        """Retain the same ownership/content seals used by a completed plan."""
+        data["schema_version"] = generation.VERSION
+        data["source_manifest"] = generation.manifest(workspace / "snapshot")
+        generation.write(workspace / generation.PLAN_FILE, data)
+        generation.write(workspace / generation.OWNED_MARKER, {
+            "schema_version": generation.VERSION, "id": uuid4().hex,
+            "plan_sha256": generation.identity(data)})
+
+    def test_cleanup_requires_no_original_source_or_selected_jdk_but_replay_still_does(self):
+        workspace, data = self.workspace()
+        self.seal_cleanup_workspace(workspace, data)
+        cleanup = SimpleNamespace(workspace=workspace)
+        shutil.rmtree(self.source)
+        with patch.object(archive_context, "verify_jdk", side_effect=FileNotFoundError("selected JDK removed")) as jdk:
+            with self.assertRaises(FileNotFoundError):
+                java_project.verify(workspace, data, originals=False)
+            jdk.reset_mock()
+            self.assertEqual(generation.clean(cleanup), 0)
+            jdk.assert_not_called()
+        self.assertFalse(workspace.exists())
+
+    def test_cleanup_without_a_jdk_still_refuses_edited_owned_archive_evidence(self):
+        workspace, data = self.workspace()
+        self.seal_cleanup_workspace(workspace, data)
+        cleanup = SimpleNamespace(workspace=workspace)
+        probe = workspace / "java-context/archive-probe/probe/stdout"
+        probe.write_bytes(probe.read_bytes() + b"changed")
+        with patch.object(archive_context, "verify_jdk", side_effect=FileNotFoundError("selected JDK removed")) as jdk:
+            with self.assertRaisesRegex(ValueError, "frozen Java context changed"):
+                generation.clean(cleanup)
+            jdk.assert_not_called()
+        self.assertTrue(workspace.exists())
 
     def test_new_launch_contract_requires_schema2_complete_claim_and_exact_tooling(self):
         folder, project, classes, context, application = self.build()
