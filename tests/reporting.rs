@@ -37,6 +37,22 @@ fn retained_workspace_exclusions_are_visible_without_counting_as_tests() {
 }
 
 #[test]
+fn current_source_suite_exclusions_are_visible_without_counting_as_tests() {
+    let mut data = fixture();
+    data["owned_source_exclusions"] = json!([{
+        "path":"equivalence-tests", "workspace_id":"known", "plan_sha256":"f".repeat(64),
+        "reason":"verified current-source oteleq suite"
+    }]);
+    let output = rendered(&data);
+    assert_eq!(output.exit_code, 0);
+    assert!(output.html.contains("verified current-source oteleq suite"));
+    assert!(output.junit.contains("equivalence-tests"));
+    assert!(output
+        .junit
+        .contains("tests=\"1\" failures=\"0\" errors=\"0\" skipped=\"0\""));
+}
+
+#[test]
 fn invalid_retained_workspace_exclusions_are_rejected() {
     let record = json!({"path":"retained", "workspace_id":null, "plan_sha256":"f".repeat(64),
                         "reason":"verified retained oteleq workspace"});
