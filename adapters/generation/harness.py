@@ -18,6 +18,7 @@ import node_receivers
 import node_project
 import java_receivers
 import python_project
+import preconditions
 import sequences
 
 NATIVE_INTEGERS = {
@@ -232,6 +233,8 @@ def domain_cases(entry: dict, count: int, seed: int = 20261008) -> list[list]:
     declared = entry["input_domains"]
     if len(declared) != len(entry["parameters"]):
         raise ValueError("declared domain argument count differs from the callable")
+    conditions = entry.get("input_preconditions", [])
+    preconditions.bind(conditions, len(entry["parameters"]))
     rng, pools, size = random.Random(entry.get("generation_seed", seed)), [], 0
     for index, domain in enumerate(declared):
         pool = domain_pool(entry, index, domain, count, rng)
@@ -241,11 +244,20 @@ def domain_cases(entry: dict, count: int, seed: int = 20261008) -> list[list]:
         pools.append(pool)
     if not pools:
         return [[]]
+    return combine_domain_cases(entry, pools, count, conditions)
+
+
+def combine_domain_cases(entry: dict, pools: list[list], count: int, conditions: list[dict]) -> list[list]:
+    """Combine frozen pools with bounded precondition filtering and payload checks."""
     diagonal = ([pool[index % len(pool)] for pool in pools] for index in range(count))
     values, size = {}, 0
-    for candidate in itertools.chain(diagonal, itertools.product(*pools)):
+    for examined, candidate in enumerate(itertools.chain(diagonal, itertools.product(*pools)), 1):
+        if conditions and examined > preconditions.MAX_CANDIDATES:
+            raise ValueError("numeric precondition search exceeded its candidate budget")
         requested = list(candidate)
         actual = concrete_arguments(entry, requested)
+        if not preconditions.accepts(requested, conditions) or not preconditions.accepts(actual, conditions):
+            continue
         token = domains.key(actual)
         if token in values:
             continue
@@ -255,20 +267,31 @@ def domain_cases(entry: dict, count: int, seed: int = 20261008) -> list[list]:
         values[token] = requested
         if len(values) == count:
             break
+    if not values:
+        raise ValueError("no generated inputs satisfy the declared numeric preconditions")
     return list(values.values())
+
+
+def configured_corpus(entry: dict, count: int, seed: int) -> list[list]:
+    """Check every requested and materialised fixture before retaining inputs."""
+    requested = entry["input_cases"] if "input_cases" in entry else domain_cases(entry, count, seed)
+    concrete = [concrete_arguments(entry, arguments) for arguments in requested]
+    for arguments in (*requested, *concrete):
+        preconditions.require(arguments, entry.get("input_preconditions", []))
+    if "input_domains" in entry:
+        for arguments in concrete:
+            domains.arguments(arguments, entry["input_domains"])
+    if len({json.dumps(arguments) for arguments in concrete}) != len(concrete):
+        raise ValueError("configured cases collapse to duplicate target representations")
+    return concrete
 
 
 def corpus(entry, count, seed=20261008):
     """Use frozen fixture requests before any deterministic scalar sampling."""
     if "input_cases" in entry or "input_domains" in entry:
-        requested = entry["input_cases"] if "input_cases" in entry else domain_cases(entry, count, seed)
-        concrete = [concrete_arguments(entry, arguments) for arguments in requested]
-        if "input_domains" in entry:
-            for arguments in concrete:
-                domains.arguments(arguments, entry["input_domains"])
-        if len({json.dumps(arguments) for arguments in concrete}) != len(concrete):
-            raise ValueError("configured cases collapse to duplicate target representations")
-        return concrete
+        return configured_corpus(entry, count, seed)
+    if "input_preconditions" in entry:
+        raise ValueError("numeric preconditions require concrete cases or declared domains")
     rng = random.Random(entry.get("generation_seed", seed))
     pools = [expanded_pool(t, entry["language"], count, rng) for t in entry["parameters"]]
     if any(pool is None for pool in pools):

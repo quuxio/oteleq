@@ -218,6 +218,10 @@ const RESOURCES: &[(&str, &str)] = &[
         include_str!("../adapters/generation/domains.py"),
     ),
     (
+        "preconditions.py",
+        include_str!("../adapters/generation/preconditions.py"),
+    ),
+    (
         "shrinking.py",
         include_str!("../adapters/generation/shrinking.py"),
     ),

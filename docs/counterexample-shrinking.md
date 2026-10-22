@@ -29,7 +29,7 @@ The domain array follows parameter order. Each original concrete case and its ac
 
 All fields are explicit; unknown fields and unsupported domain kinds are rejected. Integer/boolean/string parameter types remain strict. The `float` domain accepts finite numeric requests; the language adapter controls their actual representation. Bounds apply after coercion too: a decimal endpoint may exclude its rounded float32 representation. Supported strings follow the adapter's existing codec. A domain cannot enable a blocked argument type, receiver or build context.
 
-These constraints express independent parameter domains. Relationships between arguments, application predicates, factories, objects, buffers and action sequences require further contracts. Do not declare an interval or alphabet as valid when those additional conditions are necessary. Baseline failures and incomplete fixtures remain visible trials.
+These domains constrain each parameter independently. Optional [numeric argument preconditions](numeric-preconditions.md) retain explicit ordering/equality rules between finite numeric arguments while shrinking. Application predicates, arithmetic expressions, factories, objects, buffers and action sequences require further contracts. Do not declare an interval or alphabet as valid when additional conditions are necessary. Baseline failures and incomplete fixtures remain visible trials.
 
 ## Run the shrinker
 

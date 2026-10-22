@@ -41,7 +41,7 @@ The resolved policy retains the declared domains without adding a user-supplied 
 
 An explicit `cases` list continues to override automatic sampling, even when `domains` is present. Its cases must satisfy the domains before and after conversion. Reordering or removing explicit cases is not part of automatic generation.
 
-[Scalar shrinking](counterexample-shrinking.md) consumes the same declared domains. Derived replay suites retain explicit reduced inputs and the original experiment's provenance. Automatic generation does not infer relational preconditions, create object factories, enable unsupported argument codecs or add action-sequence shrinking. Supply reviewed concrete cases when parameters have additional relationships.
+[Scalar shrinking](counterexample-shrinking.md) consumes the same declared domains. Derived replay suites retain explicit reduced inputs and the original experiment's provenance. Explicit [numeric argument preconditions](numeric-preconditions.md) can filter generated combinations and reduction candidates. Automatic generation does not infer application predicates, create object factories, enable unsupported argument codecs or add action-sequence shrinking. Supply reviewed concrete cases when additional relationships cannot be expressed by the numeric rules.
 
 ## Maintainer qualification
 

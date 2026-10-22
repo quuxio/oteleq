@@ -4,6 +4,8 @@ import copy
 import math
 from typing import Any
 
+import preconditions
+
 MAX_STEPS = 32
 
 
@@ -80,7 +82,7 @@ def configure(entry: dict, value: list[dict], coerce: Callable) -> None:
         raise ValueError("TypeScript collection requires an explicitly selected emitter")
     for step in value:
         if step["action"] == "call" and step["arguments"] != "case":
-            coerce(entry, step["arguments"])
+            require_arguments(entry, step["arguments"], coerce(entry, step["arguments"]))
     entry["sequence_configuration"] = copy.deepcopy(value)
 
 
@@ -101,9 +103,17 @@ def concrete(entry: dict, arguments: list, coerce: Callable) -> list[dict]:
         if step["action"] == "call":
             generated = step["arguments"] == "case"
             item["arguments"] = copy.deepcopy(arguments) if generated else coerce(entry, step["arguments"])
+            require_arguments(entry, arguments if generated else step["arguments"], item["arguments"])
             item["expected_baseline"] = copy.deepcopy(step.get("expected_baseline", entry["expected_baseline"] if generated else {"kind": "return"}))
         result.append(item)
     return result
+
+
+def require_arguments(entry: dict, requested: list, actual: list) -> None:
+    """Apply method preconditions to every fixed or generated call in a schedule."""
+    conditions = entry.get("input_preconditions", [])
+    preconditions.require(requested, conditions)
+    preconditions.require(actual, conditions)
 
 
 def contracts(case: dict, roots: list[str]) -> list[dict]:

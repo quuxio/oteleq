@@ -57,7 +57,7 @@ The broader design adds a `doctor` capability command, build recipes and object/
 
 ## Implemented configuration
 
-The [example policy](../examples/equivalence.toml) is consumed by `plan --config`. It configures `schema_version = 1`, enabled `languages`, `sources`/`functions` include/exclude selectors, `generation.seed`/`cases_per_function`, finite scalar `[[fixtures]]`, and `limits.case_timeout_ms`/`baseline_repeats`/`instrumented_repeats`/`max_capture_bytes`. Unknown or unsupported keys fail validation. CLI language/case flags override the policy, and CLI exclusions are added. The resolved policy is frozen with the corpus and carried into replay/export. See the [complete policy contract](automatic-generation.md#project-policy-and-concrete-fixtures).
+The [example policy](../examples/equivalence.toml) is consumed by `plan --config`. It configures `schema_version = 1`, enabled `languages`, `sources`/`functions` include/exclude selectors, `generation.seed`/`cases_per_function`, finite scalar `[[fixtures]]`, and `limits.case_timeout_ms`/`baseline_repeats`/`instrumented_repeats`/`max_capture_bytes`. Fixtures can declare bounded [numeric argument preconditions](numeric-preconditions.md) with concrete cases or scalar domains. Unknown or unsupported keys fail validation. CLI language/case flags override the policy, and CLI exclusions are added. The resolved policy is frozen with the corpus and carried into replay/export. See the [complete policy contract](automatic-generation.md#project-policy-and-concrete-fixtures).
 
 ## Proposed build and observation configuration
 

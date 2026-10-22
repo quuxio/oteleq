@@ -10,6 +10,7 @@ import uuid
 
 import domains
 import harness
+import preconditions
 
 
 def shape(value: dict | None) -> dict | None:
@@ -78,6 +79,8 @@ def candidates(entry: dict, current: list):
             try:
                 concrete = harness.concrete_arguments(entry, requested)
                 domains.arguments(concrete, declared)
+                preconditions.require(requested, entry.get("input_preconditions", []))
+                preconditions.require(concrete, entry.get("input_preconditions", []))
             except ValueError:
                 continue
             if domains.rank(concrete[index], domain) < domains.rank(value, domain):
@@ -126,6 +129,8 @@ def derived_data(workflow, original: dict, entry: dict, case: dict) -> dict:
                             "expected_baseline": entry["expected_baseline"]}]
     if "receiver_configuration" in entry:
         config["fixtures"][0]["receiver"] = copy.deepcopy(entry["receiver_configuration"])
+    if "input_preconditions" in entry:
+        config["fixtures"][0]["preconditions"] = copy.deepcopy(entry["input_preconditions"])
     if "sequence_configuration" in entry:
         config["fixtures"][0]["sequence"] = copy.deepcopy(entry["sequence_configuration"])
     data["configuration_sha256"] = workflow.identity(config)
@@ -257,7 +262,7 @@ def run(args: argparse.Namespace, workflow) -> int:
               "original_arguments": case["arguments"], "reduced_arguments": best, "failure_signature": wanted,
               "parent_workspace": str(original_workspace), "workspace": str(workspace),
               "confirmation": str(destination / "confirmation/report.json"), "source_preserved": True,
-              "scope": "declared independent scalar domains and deterministic candidate rules; no global minimum, relational preconditions, objects or action sequences"}
+              "scope": "declared scalar domains, numeric argument preconditions and deterministic candidate rules; no global minimum, inferred predicates, objects or action sequences"}
     workflow.write(destination / "shrink.json", report)
     print(workflow.json.dumps({"report": str(destination / "shrink.json"), "workspace": str(workspace),
                                "exit_code": 1, "trials": len(trials), "status": status}), flush=True)
