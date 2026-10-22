@@ -125,10 +125,10 @@ class PreparationFailure(unittest.TestCase):
     """An invalid plan must never become successful empty discovery."""
 
     def __init__(self, message: str):
-        super().__init__()
+        super().__init__("test_preparation")
         self.message = message
 
-    def runTest(self):
+    def test_preparation(self):
         self.fail(self.message)
 
 
