@@ -1,0 +1,147 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-22",
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "runtime_revision": "1f47c4609e822b630097732249b05e9eaf478caa",
+  "runtime_cli_sha256": "e4cca7223aea5211c4f1c29cd8c83ad7a65b6a0b748bb73f5dd16340416bd73a",
+  "runtime_source_archive_sha256": "51025f32e9c2021d2178e681cbf878ff777b31091c7f2dd6244561218f667bf1",
+  "qualification_checker_revision": "1f47c4609e822b630097732249b05e9eaf478caa",
+  "qualification_driver_sha256": "9ba76d329ddd39b83d55a7ba060a07a95543dbacc025366dd4426c202e129ac7",
+  "qualification_oracle_sha256": "c194f75f8a29171424e1f5ccc955c71832687523c51e921bae181009735223b5",
+  "application_implementation_unchanged_since_qualified_runtime": true,
+  "integrated_cli_byte_identical_to_qualified_runtime": true,
+  "provider_revision": "d6d03b72026cde8962b11ce3cc184ff3ebcb60d4",
+  "host": "macOS-27.0.1-arm64-arm-64bit",
+  "languages": [
+    "c",
+    "cpp",
+    "rust",
+    "python",
+    "java",
+    "javascript",
+    "typescript",
+    "go"
+  ],
+  "main_qualification_launches": 936,
+  "preliminary_preflight_launches": 20,
+  "actual_application_launches": 956,
+  "instrumented_application_launches": 478,
+  "routes": {
+    "preliminary_preflight": 20,
+    "main_preflight": 20,
+    "initial": 212,
+    "changed_bodies": 212,
+    "relocated_checkout_added_functions": 244,
+    "external_suite_deliberate_difference": 248
+  },
+  "route_functions_and_cases": {
+    "added": [
+      28,
+      61
+    ],
+    "changed": [
+      20,
+      53
+    ],
+    "different": [
+      29,
+      62
+    ],
+    "initial": [
+      20,
+      53
+    ]
+  },
+  "final_route": {
+    "selected_functions": 29,
+    "cases": 62,
+    "matches": 61,
+    "deliberate_differences": 1,
+    "incomplete": 0,
+    "excluded_callables": 4
+  },
+  "prelaunch_refusals": {
+    "total": 10,
+    "actual_application_launches": 0,
+    "controls": [
+      "missing-source",
+      "missing-file",
+      "extra-file",
+      "changed-file",
+      "linked-file",
+      "changed-cli",
+      "changed-generator",
+      "changed-provider",
+      "empty-source",
+      "resealed-foreign"
+    ]
+  },
+  "complete_literal_graph_oracles": true,
+  "raw_stdout_stderr_checked": true,
+  "selected_function_witnesses_checked": true,
+  "source_preserved_per_run": true,
+  "transport_scope": "bounded server response-header lifecycle records; client acknowledgement is not observed",
+  "go_build_budgets": {
+    "go_attempts": 104,
+    "build_commands": 208,
+    "per_build_timeout_ms": 600000,
+    "unchanged_application_timeout_ms": 60000,
+    "default_build_timeout_ms": 180000
+  },
+  "provider_input_recheck": {
+    "status": "verified",
+    "source_commit": "d6d03b72026cde8962b11ce3cc184ff3ebcb60d4",
+    "records": 7360,
+    "symlinks": 11,
+    "tools": 8,
+    "manifest_sha256": "2a8dbf239c6444c0fb536dff049993beade7eaed6578c9654c1e2d7233e9431f"
+  },
+  "retained_review": {
+    "distinct_launches_verified": 956,
+    "reports_verified": 239,
+    "typed_comparisons_recomputed": 239,
+    "junit": {
+      "tests": "66",
+      "failures": "1",
+      "errors": "0",
+      "skipped": "4"
+    },
+    "browser_review": "Actual in-app browser summary/scope and expanded intentional Python result difference inspected; zero-argument fixture and typed0/1 difference confirmed in accessibility content. Visible table and detail layout inspected.",
+    "final_presentation_byte_identical_to_browser_review": true
+  },
+  "retained_evidence_records": 30430,
+  "retained_evidence_manifest_sha256": "cf375129f4fd704f08564f33a26d1c418ee7e5ffb18dcbb30c53461d7853fb96",
+  "rebuildable_evidence_exclusions": [
+    "go-cache"
+  ],
+  "validation": {
+    "head": "1f47c4609e822b630097732249b05e9eaf478caa",
+    "exit_code": 0,
+    "python_distinct": 789,
+    "python_subset_runs": [
+      9,
+      100
+    ],
+    "rust_distinct": 74,
+    "node_distinct": 17,
+    "go_distinct": 4,
+    "distinct_regressions": 884,
+    "rust_product_line_coverage_percent": 97.38,
+    "actual_qualification_separate": true,
+    "log_sha256": "cb9af5204973463e4bad594d020401f471c75924d7f6633979a0cb14a3b02471",
+    "final_delivery_checks": "Required on final PR64 head and merged main; recorded separately in GitHub and delivery receipts."
+  },
+  "earlier_incomplete_experiments": [
+    "03b9658 retained an opaque Python exporter failure; this later result does not establish its cause.",
+    "f0b7f3e retained a 180-second Go SDK build timeout before application launch. The new experiment declares 600 seconds per build; the default 180 seconds and application timeout are unchanged. No silent retry or causal resolution is claimed."
+  ],
+  "limits": [
+    "Recorded legacy diagnostic profiles on macOS ARM64; other providers/platforms and shipping artefacts need separate qualification.",
+    "Bounded declared scalar and supported Java/Node sequence fixtures, not general semantic/build/dependency or arbitrary object/async support.",
+    "The deliberately added Python probe observes instrumentation presence; its stable 0/1 return difference checks failure reporting, not an instrumentation defect.",
+    "Typed recomputation and decoded telemetry consistency do not authenticate raw telemetry provenance or supply action-scoped attribution.",
+    "Native property frameworks, broader fixture/dependency integration and baseline-only regression promotion remain open."
+  ],
+  "overall_project_complete": false
+}
