@@ -14,6 +14,7 @@ Updated 22 October 2026. `quux-oteleq` implements the commands below. The scalar
 | `replay` | `--workspace PATH --case ID` | None | One frozen case in a new `runs/replay-*` directory inside the workspace |
 | `shrink` | `--workspace PATH --case ID --report-dir PATH` | `--trials N` | Declared-domain scalar reduction, retained trial evidence and a sealed one-case replay workspace; see [shrinking](counterexample-shrinking.md) |
 | `export-tests` | `--workspace PATH --destination PATH` | `--apply` | Copy plan by default; with `--apply`, a new runnable frozen source/suite bundle |
+| `promote` | `--workspace PATH --source PATH --destination PATH` | `--apply` | Reviewable file plan; with `--apply`, a sealed suite which replans the current checkout and generates fresh per-case unittest tests |
 | `clean` | `--workspace PATH` | None | Removes an owned workspace after checking its snapshot/suite and top-level contents |
 | `render-report` | `REPORT.json --output-dir NEW_DIRECTORY` | None | Private standalone HTML and JUnit presentation of retained generated-run evidence |
 | `compare-workload` | `BUNDLE.json` positional path | None | Byte-channel comparison JSON on stdout |
@@ -53,7 +54,7 @@ Go execution requires the [retained build/run provider API](go-build-bundles.md)
 
 ## Proposed extensions
 
-The broader design adds a `doctor` capability command, build recipes and object/receiver factories, richer promotion planning, stateful inputs and a versioned graph/worker protocol. `doctor`, `promote`, `--keep-workspace`, `--dry-run` and replay `--bundle` are proposal names, not available CLI options. Current retention uses `export-tests` and explicit `clean`.
+The broader design adds a `doctor` capability command, build recipes and object/receiver factories, richer promotion planning, stateful inputs and a versioned graph/worker protocol. `doctor`, `--keep-workspace`, `--dry-run` and replay `--bundle` are proposal names, not available CLI options. Current retention uses `export-tests`, [current-source promotion](current-source-tests.md) and explicit `clean`. Both export and promotion default to a reviewable plan and require `--apply` to copy.
 
 ## Implemented configuration
 

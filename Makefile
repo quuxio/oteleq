@@ -145,6 +145,8 @@ generation-check: node-observer-check node-sequence-check java-observer-check go
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/policy.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/domains.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/preconditions.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/project_tests.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/project_runner.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/shrinking.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/sequences.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/typescript_provider.py' --fail-under=80

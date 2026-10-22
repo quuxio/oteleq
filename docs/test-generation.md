@@ -53,6 +53,8 @@ Node attempts also retain [original/private/caller module context](node-source-c
 | `replay` or generated suite | A new retained case run under `runs/` |
 | `export-tests` | Prints the copy plan without copying |
 | `export-tests --apply` | Copies the frozen snapshot, suite, corpus, instructions and sealed plan into a new destination |
+| `promote` | Prints the current-source suite's file plan without copying |
+| `promote --apply` | Creates a sealed independent entrypoint which generates fresh current-source cases on each discovery |
 | `clean` | Explicitly removes the owned workspace after preservation checks |
 
 There is no automatic successful-run deletion or `--keep-workspace` flag. Keep reports or export the suite before `clean`. Private snapshot and generated-suite checks include every directory and file, including cache/build names that were excluded from the original source snapshot. Added files or symlinks in those private trees invalidate replay and refuse cleanup; they are not silently discarded as caches. If another runner imports the generated test module, set `PYTHONDONTWRITEBYTECODE=1` to avoid adding a Python cache to the frozen suite.
@@ -69,7 +71,9 @@ Later plans [verify and exclude owned retained bundles](retained-source-selectio
 
 The exported plan points at its copied immutable application snapshot and retains the original source provenance. Retained tests therefore continue testing that snapshot. Create a new plan for changed application code. Replay still requires the same qualified oteleq CLI, otelc adapters, Python environment and language tools; changed content identities fail. It is portable evidence with external toolchain requirements, rather than a standalone test of future source edits.
 
-Generated boilerplate carries the MIT licence. Copied application source retains its licence; oteleq's maintained implementation is AGPL-3.0. See [repository quality](quality.md#implementation-quality). A richer promotion plan with fixture/dependency integration and baseline-only regression export remains proposed; `promote` is not implemented.
+Use [current-source promotion](current-source-tests.md) to keep a reusable suite for future source changes. `promote --workspace PATH --source PATH --destination PATH` prints its six-file plan; add `--apply` to create it. Each discovery makes a fresh private snapshot and per-case unittest suite with the frozen policy and tool/provider context. An in-repository suite locates its source relative to itself; an external suite requires `OTELEQ_SOURCE`. Verified bundles are excluded from later inventory, and changed/unowned content remains an error.
+
+Generated boilerplate carries the MIT licence. Copied application source retains its licence; oteleq's maintained implementation is AGPL-3.0. See [repository quality](quality.md#implementation-quality). Richer fixture/dependency integration, native property frameworks and baseline-only regression promotion remain proposed.
 
 ## Broader generation design
 

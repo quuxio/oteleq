@@ -31,6 +31,7 @@ fn run(args: &[String]) -> Result<i32, String> {
             "clean",
             "export-tests",
             "shrink",
+            "promote",
         ]
         .contains(&arg.as_str())
     }) {
@@ -51,7 +52,7 @@ fn run(args: &[String]) -> Result<i32, String> {
         );
     }
     if args == ["--help"] {
-        println!("quux-oteleq compare-workload BUNDLE.json\nquux-oteleq compare-observations TYPED_BUNDLE.json\nquux-oteleq render-report REPORT.json --output-dir NEW_DIRECTORY\nquux-oteleq plan|generate|run|replay|clean|export-tests|shrink --help\nGenerate external paired unit harnesses for all eight otelc languages. Set OTELEQ_PYTHON to a Python 3.12+ environment with opentelemetry-proto for execution.\nComparator exits: 0 equivalent, 1 different, 2 invalid/source changed, 3 incomplete, 4 IO/codec error.\nGeneration exits: 0 complete, 1 different, 2 argument error, 3 incomplete/blocked, 4 tool/build/identity error.");
+        println!("quux-oteleq compare-workload BUNDLE.json\nquux-oteleq compare-observations TYPED_BUNDLE.json\nquux-oteleq render-report REPORT.json --output-dir NEW_DIRECTORY\nquux-oteleq plan|generate|run|replay|clean|export-tests|shrink|promote --help\nGenerate external paired unit harnesses for all eight otelc languages. Set OTELEQ_PYTHON to a Python 3.12+ environment with opentelemetry-proto for execution.\nComparator exits: 0 equivalent, 1 different, 2 invalid/source changed, 3 incomplete, 4 IO/codec error.\nGeneration exits: 0 complete, 1 different, 2 argument error, 3 incomplete/blocked, 4 tool/build/identity error.");
         return Ok(0);
     }
     if args.len() != 2 || !["compare-workload", "compare-observations"].contains(&args[0].as_str())

@@ -2,6 +2,7 @@
 from pathlib import Path
 
 import discovery
+import project_tests
 from otelc_capture import walk_tree
 
 MARKER = ".oteleq-owned.json"
@@ -45,6 +46,13 @@ def verify_suite(workflow, workspace: Path) -> None:
 
 def verify(workflow, workspace: Path) -> tuple[dict, dict]:
     """Inspect owned content without original sources, external tools or deletion."""
+    marker_path = workspace / MARKER
+    if workspace.is_symlink() or marker_path.is_symlink():
+        raise ValueError("workspace is not an owned oteleq directory")
+    if workspace.is_dir() and marker_path.is_file():
+        candidate = workflow.read(marker_path)
+        if type(candidate) is dict and candidate.get("kind") == project_tests.KIND:
+            return project_tests.verify(workflow, workspace)
     verify_layout(workflow, workspace)
     marker = workflow.read(workspace / MARKER)
     if (type(marker) is not dict or type(marker.get("schema_version")) is not int
@@ -93,7 +101,8 @@ def exclusions(workflow, source: Path, source_roots=()) -> list[dict]:
                     raise ValueError(f"invalid retained oteleq workspace {relative}: {error}") from error
                 result[relative] = {"path": relative, "workspace_id": marker.get("id"),
                                     "plan_sha256": workflow.identity(data),
-                                    "reason": "verified retained oteleq workspace"}
+                                    "reason": ("verified current-source oteleq suite" if marker.get("kind") == project_tests.KIND
+                                               else "verified retained oteleq workspace")}
                 names[:] = []
             else:
                 names[:] = sorted(name for name in names if name not in discovery.IGNORED)

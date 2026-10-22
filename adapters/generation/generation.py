@@ -38,6 +38,7 @@ import native_profile
 import otelc_capture as capture
 import otelc_collection
 import policy as project_policy
+import project_tests
 import python_project
 import shrinking
 import sequences
@@ -54,7 +55,7 @@ GENERATED_MANIFEST = 'generated-manifest.json'
 TYPED_BUNDLE = 'typed-bundle.json'
 BUILD_IDENTITIES = 'build-identities.json'
 README_FILE = 'README.txt'
-COMMANDS = ("plan", "generate", "run", "replay", "clean", "export-tests", "shrink")
+COMMANDS = ("plan", "generate", "run", "replay", "clean", "export-tests", "shrink", "promote")
 
 
 def write(path, data):
@@ -641,7 +642,7 @@ def generator_identity():
         'node_project.py', 'node_context.mjs',
         'native_profile.py', 'native_project.py', 'native_dependencies.py', 'native_frontend.py',
         'native_discover.cpp', 'native_context.py', 'native_workers.py', 'native_workspace.py',
-        'owned_workspace.py')})
+        'owned_workspace.py', 'preconditions.py', 'project_tests.py', 'project_runner.py')})
     files["host-python"] = capture.file_digest(Path(sys.executable))
     files["observer:otelc_capture.py"] = capture.file_digest(Path(capture.__file__))
     files["host-version"] = sys.version
@@ -1265,6 +1266,11 @@ def shrink(args):
     return shrinking.run(args, sys.modules[__name__])
 
 
+def promote(args):
+    """Create a reviewed suite which replans the current checkout on discovery."""
+    return project_tests.promote(args, sys.modules[__name__])
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, allow_abbrev=False)
     commands = parser.add_subparsers(dest="command", required=True)
@@ -1283,9 +1289,11 @@ def main(argv=None):
             sub.add_argument("--report-dir", type=Path, required=True)
         elif command == "replay":
             sub.add_argument("--case", required=True)
-        elif command == "export-tests":
+        elif command in ("export-tests", "promote"):
             sub.add_argument("--destination", type=Path, required=True)
             sub.add_argument("--apply", action="store_true")
+            if command == "promote":
+                sub.add_argument("--source", type=Path, required=True)
         elif command == "shrink":
             sub.add_argument("--case", required=True)
             sub.add_argument("--report-dir", type=Path, required=True)
@@ -1294,7 +1302,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
     try:
         return {"plan": plan, "generate": generate, "run": run, "replay": run, "clean": clean,
-                "export-tests": export_tests, "shrink": shrink}[args.command](args)
+                "export-tests": export_tests, "shrink": shrink, "promote": promote}[args.command](args)
     except (ValueError, OSError, KeyError, ImportError) as error:
         print("oteleq: " + str(error), file=sys.stderr)
         return 4

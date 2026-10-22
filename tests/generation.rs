@@ -69,6 +69,15 @@ fn cli_embeds_generation_workers_and_exposes_subcommand_help() {
     for flag in ["--case", "--report-dir", "--trials"] {
         assert!(shrinking.contains(flag));
     }
+    let promotion = Command::new(exe)
+        .args(["promote", "--help"])
+        .output()
+        .unwrap();
+    assert!(promotion.status.success());
+    let promotion = String::from_utf8_lossy(&promotion.stdout);
+    for flag in ["--workspace", "--source", "--destination", "--apply"] {
+        assert!(promotion.contains(flag));
+    }
     let missing_value = Command::new(exe)
         .args(["plan", "--source"])
         .output()
