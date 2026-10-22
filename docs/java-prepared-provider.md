@@ -28,6 +28,8 @@ Use the ordinary `plan`, `generate`, `run`, `replay`, `shrink` and `export-tests
 
 `backend = "legacy"` remains the default. Selecting `prepared` never silently falls back to that launcher. The replacement SDK currently provides Java; this setting does not make its other language placeholders executable adapters.
 
+The public plan probe accepts the original exact `policy`/`implemented`/`remaining` response and the newer exact response with an additional `candidates` list. Candidates must be distinct members of `remaining`, which still partitions all eight language IDs with `implemented`. A candidate declaration does not establish implemented support. The complete requested policy must still match, Java must be implemented, and unknown fields or malformed/overlapping declarations are refused. The resolved response is retained in the plan; this metadata acceptance is separate from qualifying a new SDK runtime.
+
 ### Select the fixed launch profile
 
 Prepared Java defaults to `profile = "stock-methods-v1"`, the original frozen `f3279fd` recipe. For the corrected SDK, explicitly add `profile = "safe-methods-v1"` under `[adapters.java]`, alongside `backend = "prepared"`.

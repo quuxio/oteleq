@@ -66,6 +66,33 @@ class JavaProviderTests(unittest.TestCase):
         self.assertEqual(value["java_provider"]["resolved"], response(value))
         self.assertEqual(tomllib.loads(value["java_provider"]["request"]), response(value)["policy"])
 
+    def test_candidate_languages_are_retained_without_becoming_implemented_capabilities(self):
+        for candidates in ([], ["javascript", "typescript"]):
+            value = entry()
+            data = {**response(value), "candidates": candidates}
+            with self.subTest(candidates=candidates):
+                self.bind(value, data)
+                self.assertEqual(value["status"], "ready", value["reason"])
+                self.assertEqual(value["java_provider"]["resolved"], data)
+                self.assertEqual(value["java_provider"]["resolved"]["implemented"], ["java"])
+
+    def test_malformed_or_implemented_candidate_claims_remain_blocked(self):
+        for candidates in (None, True, "javascript", [True], ["unknown"], ["java"],
+                           ["javascript", "javascript"]):
+            value = entry()
+            with self.subTest(candidates=candidates):
+                self.bind(value, {**response(value), "candidates": candidates})
+                self.assertEqual(value["status"], "blocked")
+                self.assertNotIn("resolved", value["java_provider"])
+
+    def test_java_candidate_does_not_replace_required_implemented_java(self):
+        value = entry()
+        data = {**response(value), "implemented": [], "remaining": sorted(provider.SDK_LANGUAGES),
+                "candidates": ["java"]}
+        self.bind(value, data)
+        self.assertEqual(value["status"], "blocked")
+        self.assertNotIn("resolved", value["java_provider"])
+
     def test_unavailable_changed_duplicate_or_incomplete_capability_is_blocked(self):
         variants = [b"not json", b'{"policy":{},"policy":{}}']
         for group, values in (("implemented", [[], ["java", "java"], [True]]),

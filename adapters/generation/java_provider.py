@@ -103,6 +103,24 @@ def environment(root: Path, tools: dict, folder: Path, original: dict) -> dict:
             "PYTHONPYCACHEPREFIX": str(cache), "PYTHONNOUSERSITE": "1", "PYTHONDONTWRITEBYTECODE": "1"}
 
 
+def verify_capabilities(value: object, requested: dict) -> None:
+    """Keep candidate declarations separate from implemented language support."""
+    fields = {"policy", "implemented", "remaining"}
+    require(type(value) is dict and set(value) in (fields, fields | {"candidates"})
+            and type(value["policy"]) is dict and digest(value["policy"]) == digest(requested),
+            "provider changed the complete requested policy or capability fields")
+    implemented, remaining = value["implemented"], value["remaining"]
+    require(type(implemented) is list and type(remaining) is list
+            and all(type(name) is str for name in implemented + remaining)
+            and len(set(implemented + remaining)) == len(implemented + remaining)
+            and set(implemented + remaining) == SDK_LANGUAGES and "java" in implemented,
+            "public provider has no supported Java capability")
+    candidates = value.get("candidates", [])
+    require(type(candidates) is list and all(type(name) is str for name in candidates)
+            and len(set(candidates)) == len(candidates) and set(candidates) <= set(remaining),
+            "candidate languages must be distinct remaining capabilities")
+
+
 def bind(entry: dict, root: Path, workspace: Path, tools: dict, execute: Callable) -> None:
     """Retain a public config-only capability response before any application call."""
     if entry["status"] != "ready" or not prepared(entry):
@@ -121,16 +139,7 @@ def bind(entry: dict, root: Path, workspace: Path, tools: dict, execute: Callabl
                                   "status": result.returncode, "stdout": result.stdout.decode(), "stderr": result.stderr.decode()}
         require(result.returncode == 0, "public configuration probe failed")
         value = capture.strict_json(result.stdout)
-        require(type(value) is dict and set(value) == {"policy", "implemented", "remaining"}
-                and type(value["policy"]) is dict
-                and digest(value["policy"]) == digest(configuration(entry, endpoint, service)),
-                "provider changed the complete requested policy")
-        implemented, remaining = value["implemented"], value["remaining"]
-        require(type(implemented) is list and type(remaining) is list
-                and all(type(name) is str for name in implemented + remaining)
-                and len(set(implemented + remaining)) == len(implemented + remaining)
-                and set(implemented + remaining) == SDK_LANGUAGES
-                and "java" in implemented, "public provider has no supported Java capability")
+        verify_capabilities(value, configuration(entry, endpoint, service))
         entry["java_provider"]["resolved"] = value
     except (ValueError, OSError, KeyError) as error:
         entry["status"], entry["reason"] = "blocked", "Java prepared provider unavailable: " + str(error)
