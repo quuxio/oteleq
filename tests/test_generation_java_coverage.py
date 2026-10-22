@@ -81,11 +81,13 @@ class JavaCoverageTests(unittest.TestCase):
                 calls.append((arguments, kwargs))
                 if "report" in arguments:
                     Path(arguments[arguments.index("--xml") + 1]).write_text(report(9, 1).replace('</package>',
-                        '<class name="OteleqCompile"><counter type="LINE" covered="9" missed="1"/></class></package>'))
+                        '<class name="OteleqCompile"><counter type="LINE" covered="9" missed="1"/></class>'
+                        '<class name="OteleqArchives"><counter type="LINE" covered="9" missed="1"/></class></package>'))
 
-            with patch.object(java_coverage, "verified", return_value=True), patch.object(java_coverage, "compiler_probe") as compiler_probe, patch.object(java_coverage.subprocess, "run", side_effect=execute), patch("builtins.print") as printed:
+            with patch.object(java_coverage, "verified", return_value=True), patch.object(java_coverage, "compiler_probe") as compiler_probe, patch.object(java_coverage, "archive_probe") as archive_probe, patch.object(java_coverage.subprocess, "run", side_effect=execute), patch("builtins.print") as printed:
                 java_coverage.check(root / "tools", root)
             compiler_probe.assert_called_once()
+            archive_probe.assert_called_once()
             self.assertEqual(len(calls), 2)
             environment = calls[0][1]["env"]
             self.assertIn("OTELEQ_JAVA_COVERAGE_AGENT", environment)
@@ -111,6 +113,26 @@ class JavaCoverageTests(unittest.TestCase):
             self.assertEqual({path.name for path in classes.iterdir()}, {"OteleqCompile.class", "OteleqCompile$Manager.class"})
             self.assertEqual(len(calls), 2)
             self.assertIn("includes=OteleqCompile*", calls[1][0][1])
+            self.assertTrue(all("env" not in options for _, options in calls))
+
+    def test_archive_probe_reports_only_the_resolver_product_with_a_scoped_agent(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            classes = root / "classes"
+            classes.mkdir()
+            calls = []
+            def execute(arguments, **kwargs):
+                calls.append((arguments, kwargs))
+                if "-d" in arguments:
+                    compiled = Path(arguments[arguments.index("-d") + 1])
+                    for name in ("OteleqArchives.class", "JavaArchiveProbe.class"):
+                        (compiled / name).write_bytes(b"compiled")
+            with patch.object(java_coverage.subprocess, "run", side_effect=execute):
+                java_coverage.archive_probe(root / "tools", root, root, classes, root / "jacoco.exec")
+            self.assertEqual({path.name for path in classes.iterdir()}, {"OteleqArchives.class"})
+            self.assertEqual(len(calls), 2)
+            self.assertIn("includes=OteleqArchives", calls[1][0][1])
+            self.assertNotIn("includes=*", calls[1][0][1])
             self.assertTrue(all("env" not in options for _, options in calls))
 
     def test_main_selects_only_setup_or_check(self):

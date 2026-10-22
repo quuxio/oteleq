@@ -86,7 +86,7 @@ def jar_classes(path: Path) -> dict:
         raise ValueError("Java classpath: invalid JAR") from error
 
 
-def jar_entry(row: zipfile.ZipInfo) -> None:
+def jar_entry(row: zipfile.ZipInfo, *, allow_versioned: bool = False) -> None:
     """JAR names are logical paths; none can request implicit host file lookup."""
     name = row.filename
     path = PurePosixPath(name)
@@ -96,7 +96,8 @@ def jar_entry(row: zipfile.ZipInfo) -> None:
     require(not row.flag_bits & 1 and row.compress_type in (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED),
             "unsupported JAR encryption or compression")
     folded = name.casefold()
-    require(not folded.startswith("meta-inf/versions/"), "multi-release JARs require a qualified producer profile")
+    require(allow_versioned or not folded.startswith("meta-inf/versions/"),
+            "multi-release JARs require a qualified producer profile")
     require(folded != "meta-inf/index.list", "implicit JAR indexes are unsupported")
     require(folded != MANIFEST.casefold() or name == MANIFEST, "noncanonical manifest path")
     if name == MANIFEST:
@@ -108,6 +109,33 @@ def manifest_header(raw: bytes) -> None:
     text = raw.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n").replace("\n ", "")
     require(not any(line.casefold().startswith("class-path:") for line in text.splitlines()),
             "implicit JAR Class-Path is unsupported")
+
+
+def jar_members(path: Path) -> dict[str, str]:
+    """Catalogue physical class members without deciding compiler/runtime selection."""
+    require(path.suffix.lower() == ".jar", "expected a bounded JAR")
+    original = digest(path)
+    try:
+        with zipfile.ZipFile(path) as archive:
+            rows = archive.infolist()
+            names = [row.filename for row in rows]
+            require(len(rows) <= MAX_FILES and len(names) == len(set(names)),
+                    "too many or duplicate JAR entries")
+            require(sum(row.file_size for row in rows) <= MAX_TOTAL_BYTES,
+                    "expanded JAR exceeds its budget")
+            result = {}
+            for row in rows:
+                jar_entry(row, allow_versioned=True)
+                if row.filename.endswith(".class") and not row.is_dir():
+                    require(row.file_size <= MAX_CLASS_BYTES,
+                            "class definition exceeds its byte budget")
+                    result[row.filename] = hashlib.sha256(archive.read(row)).hexdigest()
+            if MANIFEST in names:
+                manifest_header(archive.read(MANIFEST))
+    except (zipfile.BadZipFile, UnicodeDecodeError) as error:
+        raise ValueError("Java classpath: invalid JAR") from error
+    require(digest(path) == original, "JAR changed while cataloguing members")
+    return result
 
 
 def inspect(path: Path) -> dict:
@@ -136,8 +164,10 @@ def class_reads(reads: object, entries: list[dict]) -> None:
     expected = {}
     for entry in entries:
         root = Path(entry["path"])
-        for row in entry["classes"].values():
-            expected[(str(root), row["entry"])] = row["sha256"]
+        # javac can read a different physical member from the runtime JarFile view.
+        members = entry.get("members", {row["entry"]: row["sha256"] for row in entry["classes"].values()})
+        for name, sha in members.items():
+            expected[(str(root), name)] = sha
     for uri, sha in reads.items():
         require(type(uri) is str and type(sha) is str, "invalid compiler classpath read")
         if uri.startswith("jar:"):

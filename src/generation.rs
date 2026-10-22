@@ -22,6 +22,14 @@ const RESOURCES: &[(&str, &str)] = &[
         include_str!("../adapters/generation/java_classpath.py"),
     ),
     (
+        "java_archives.py",
+        include_str!("../adapters/generation/java_archives.py"),
+    ),
+    (
+        "OteleqArchives.java",
+        include_str!("../adapters/generation/OteleqArchives.java"),
+    ),
+    (
         "native_profile.py",
         include_str!("../adapters/generation/native_profile.py"),
     ),

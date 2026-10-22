@@ -4,6 +4,8 @@ CI caches only the pinned `cargo-llvm-cov` executable using an OS, architecture,
 
 ## Current scope
 
+The independent [Java runtime archive resolver](java-runtime-archives.md) has separate 80% line-coverage floors for `java_archives.py` and compiled `OteleqArchives`. Real-JDK regressions compare exact selected members with plain-JVM method/resource outcomes, preserve compiler reads separately and reject altered identities, implicit dependencies and selection overrides. These component checks do not enable generated multi-release JAR workflows or qualify a replacement provider.
+
 The [Python package-context regression](qualification/python-package-2026-10-22.json) verifies 80 application launches on one corrected CLI/provider, plus refused namespace, ambiguous-root and shadowed receiver fixtures. Constructor/function fixtures cannot clear an import-context blocker. Maintained generated and detached suites also fail those fixtures without launching application code; regular package imports retain their actual module identity.
 
 The [Node source-context profile](node-source-context.md) has a separate 80% line coverage floor for `node_project.py`. Its [22 October qualification](qualification/node-projects-2026-10-22.json) completes 245 unique application launches across eleven module contexts, CommonJS receivers, all four retained routes, scalar reduction and refusal controls. An independent verifier checks complete fixed-fixture graphs, literal application channels, actual loader receipts and decoded raw OTLP. The same CLI also passes the existing 186-launch Node receiver corpus. These results leave dependency installation, general TypeScript/build integration and shipping qualification open.
