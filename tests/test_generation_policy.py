@@ -265,7 +265,7 @@ expected_baseline={kind="return_value",value={kind="integer",type="python.int",v
             options = argparse.Namespace(workspace=workspace)
             with self.assertRaisesRegex(ValueError, "plan is unsealed"):
                 generation.clean(options)
-            generation.write(workspace / generation.PLAN_FILE, {"source_manifest": {}})
+            generation.write(workspace / generation.PLAN_FILE, {"schema_version": 1, "source_manifest": {}})
             with self.assertRaisesRegex(ValueError, "plan identity changed"):
                 generation.clean(options)
             data = generation.read(workspace / generation.PLAN_FILE)

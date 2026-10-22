@@ -20,6 +20,8 @@ Open `new-presentation/index.html` and configure your CI's JUnit publisher to co
 
 The page shows the number of retained paired cases separately from the callable inventory. Multiple cases for one function are multiple case results. Inventory entries which are blocked, excluded or lack a retained case have separate rows. Every observation retains the comparison's source/policy/artefact identities, declared byte channels, repeat counts, reasons, differences and scope gaps. Requested and actual scalar arguments remain distinct; large integer digits are retained without conversion to floating point.
 
+Optional `owned_source_exclusions` list [verified retained output bundles](retained-source-selection.md). HTML source/policy details and the JUnit property preserve each path, workspace ID, plan digest and reason. These are source-scope records, not additional tests or skipped callables. Earlier reports without this field render an empty list.
+
 | Retained result | HTML | JUnit |
 | --- | --- | --- |
 | `equivalent_observed` | One matched case | Successful test case |

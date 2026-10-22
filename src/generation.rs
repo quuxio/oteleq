@@ -70,6 +70,10 @@ const RESOURCES: &[(&str, &str)] = &[
         include_str!("../adapters/generation/native_workspace.py"),
     ),
     (
+        "owned_workspace.py",
+        include_str!("../adapters/generation/owned_workspace.py"),
+    ),
+    (
         "native_names.py",
         include_str!("../adapters/generation/native_names.py"),
     ),

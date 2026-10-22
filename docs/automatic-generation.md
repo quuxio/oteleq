@@ -29,6 +29,8 @@ OTELEQ_WORKSPACE=/tmp/oteleq-run-actual-id
 
 The report directory must be new and outside the application, otelc and workspace. Generation never edits the application, its dependencies, manifests or locks. Workspaces remain available until explicit cleanup; there is no automatic deletion after a successful run.
 
+If an earlier exported suite lives inside the application, the planner [verifies and excludes that retained bundle](retained-source-selection.md) from application inputs. Its helpers and frozen snapshot do not become new targets. Edited or unsealed bundles stop planning; the plan and report list verified exclusions.
+
 The CLI embeds its adapter sources, so an installed binary does not depend on an oteleq source checkout. It still needs the selected Python environment, otelc build and language tools. Keep the same CLI and tool contents for replay; changing them requires a new plan. `cargo install --path . --locked` installs the CLI locally.
 
 The generated suite remembers the CLI path used during generation. If the same binary is moved, export `OTELEQ_CLI=/new/path/to/quux-oteleq` before running the suite; its content identity must still match the plan. `OTELEQ_PYTHON` selects the qualified adapter-host environment. See the [command/flag reference](cli-and-configuration.md#implemented-commands) and [actual workspace layout](test-generation.md#current-workspace).
