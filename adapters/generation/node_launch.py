@@ -61,14 +61,14 @@ def command(root: Path, project: Path, entry: dict, tools: dict,
              "gc_fixture": sequences.collects(entry), "timeout_ms": entry["node_timeout_ms"]}
     worker.write(folder / REQUEST_FILE, value)
     worker.write(folder / "node-source-environment.json", environment_records(environment))
-    return supervisor_command(tools, folder)
+    return supervisor_command(tools)
 
 
-def supervisor_command(tools: dict, folder: Path) -> list:
+def supervisor_command(tools: dict) -> list:
     """Both launch and verification use the fixed embedded-module entrypoint."""
     here = Path(__file__).parent
     bootstrap = "import runpy,sys;sys.path.insert(0,sys.argv.pop(1));runpy.run_module('node_source_worker',run_name='__main__')"
-    return [tools["python-host"], "-I", "-B", "-c", bootstrap, here, folder / REQUEST_FILE]
+    return [tools["python-host"], "-I", "-B", "-c", bootstrap, here]
 
 
 def expected_original(value: dict, configuration: dict, environment: dict) -> dict:
@@ -202,7 +202,7 @@ def verify(root: Path, project: Path, entry: dict, tools: dict, folder: Path, la
     original = expected_original(value, configuration, read(folder / "node-source-environment.json"))
     launch_manifest(manifest, value, original, root, entry)
     process = read(folder / PROCESS_FILE)
-    same(process["argv"], list(map(str, supervisor_command(tools, folder))), "actual supervisor command differs")
+    same(process["argv"], list(map(str, supervisor_command(tools))), "actual supervisor command differs")
     provider.require(manifest["launcher_pid"] == process["pid"], "SDK launcher is not the actual supervisor")
     same(read(folder / "node-source-command.json"), worker.expected_argv(value), "actual application command differs")
     inputs = read(runtime / (prefix + "-inputs.json"))

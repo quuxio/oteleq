@@ -10,17 +10,36 @@ import time
 from typing import Any
 
 import node_source
-from otelc_capture import strict_json
+from otelc_capture import strict_json, tree_paths
 
 FIELDS = {"schema_version", "provider", "project", "entry", "runtime", "policy", "node",
           "language", "compiler", "plain", "gc_fixture", "timeout_ms"}
 
 
+def project_entry(project: Path, requested: str) -> Path:
+    """Select from prepared source rather than querying a receipt-selected path."""
+    entry = next((candidate for candidate in tree_paths(project) if str(candidate) == requested), None)
+    node_source.require(entry is not None, "supervisor entry is not a prepared project input")
+    node_source.require(entry.is_file() and not entry.is_symlink() and entry.resolve(strict=True) == entry,
+                        "supervisor entry must be a regular canonical project input")
+    return entry
+
+
+def provider_boundary(runtime: Path, module) -> None:
+    """A provider alias cannot put runtime output inside the SDK actually loaded."""
+    root = Path(module.__file__).resolve(strict=True).parent.parent
+    node_source.require(not runtime.is_relative_to(root), "runtime must be outside the loaded provider")
+
+
 def request(path: Path) -> dict[str, Any]:
     """A fixed request describes source intent, never an arbitrary command vector."""
-    node_source.require(path.is_file() and not path.is_symlink() and path.stat().st_size <= 1024 * 1024,
+    project = Path.cwd().resolve(strict=True)
+    folder = project.parent
+    filename = folder / "node-source-request.json"
+    node_source.require(path == filename, "supervisor request must use its fixed run filename")
+    node_source.require(filename.is_file() and not filename.is_symlink() and filename.stat().st_size <= 1024 * 1024,
                         "missing, linked or oversized supervisor request")
-    value = strict_json(path.read_bytes())
+    value = strict_json(filename.read_bytes())
     node_source.require(type(value) is dict and set(value) == FIELDS
                         and type(value["schema_version"]) is int and value["schema_version"] == 1,
                         "invalid supervisor request fields")
@@ -32,16 +51,19 @@ def request(path: Path) -> dict[str, Any]:
                         and type(value["plain"]) is bool and type(value["gc_fixture"]) is bool
                         and type(value["timeout_ms"]) is int and 1 <= value["timeout_ms"] <= 3600000,
                         "invalid source execution controls")
-    project, runtime = Path(value["project"]), Path(value["runtime"])
-    node_source.require(project.resolve(strict=True) == Path.cwd().resolve()
-                        and Path(value["entry"]).resolve(strict=True).is_relative_to(project.resolve())
-                        and runtime.parent.resolve() == path.parent.resolve()
+    runtime = folder / "node-runtime"
+    policy = folder / "policy.toml"
+    node_source.require(value["project"] == str(project) and value["runtime"] == str(runtime)
+                        and value["policy"] == str(policy)
                         and not runtime.exists() and not runtime.is_symlink(),
                         "supervisor source/runtime boundaries differ")
-    node_source.require(not runtime.resolve().is_relative_to(Path(value["provider"]).resolve())
-                        and not runtime.resolve().is_relative_to(project.resolve()),
+    entry = project_entry(project, value["entry"])
+    node_source.require(not runtime.is_relative_to(Path(value["provider"]))
+                        and not runtime.is_relative_to(project),
                         "runtime must be outside application and provider")
-    return value
+    return {"schema_version": 1, "project": str(project), "runtime": str(runtime), "policy": str(policy),
+            "entry": str(entry), **{key: value[key] for key in
+            ("provider", "node", "language", "compiler", "plain", "gc_fixture", "timeout_ms")}}
 
 
 def write(path: Path, value: Any) -> None:
@@ -106,10 +128,11 @@ def run(value: dict[str, Any], folder: Path) -> int:
     from otelc.config import Policy
     from otelc import node, node_provenance
 
+    runtime = folder / "node-runtime"
+    provider_boundary(runtime, node)
     os.environ["OTELC_NODE"] = value["node"]
     node_source.verify_protocols(node.protocols())
     policy = Policy.load(Path(value["policy"]))
-    runtime = Path(value["runtime"])
     command = node.command(policy, runtime, value["language"], root=Path(value["project"]),
                            entry=Path(value["entry"]), backend=value["compiler"],
                            plain=value["plain"], gc_fixture=value["gc_fixture"])
@@ -150,5 +173,6 @@ def run(value: dict[str, Any], folder: Path) -> int:
 
 
 if __name__ == "__main__":
-    filename = Path(sys.argv[1])
+    node_source.require(len(sys.argv) == 1, "supervisor accepts no command-line request override")
+    filename = Path.cwd().parent / "node-source-request.json"
     raise SystemExit(run(request(filename), filename.parent))

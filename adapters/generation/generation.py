@@ -1020,6 +1020,14 @@ def attempt_policy(entry, endpoint, service, runtime):
     return policy(entry, endpoint)
 
 
+def attempt_receiver_options(entry, runtime):
+    """Only the explicit source provider permits bounded chunked OTLP."""
+    options = {"max_requests": java_provider.MAX_TELEMETRY_REQUESTS} if runtime is not None else {}
+    if node_source.enabled(entry):
+        options["allow_chunked"] = True
+    return options
+
+
 def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, http_fixtures, runtime):
     """Capture each lane with the same private source, effects and process budgets."""
     root, language = Path(data["otelc_root"]), entry["language"]
@@ -1043,9 +1051,7 @@ def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, ht
         write(folder / "collection-controls.json", {"NODE_OPTIONS": "--expose-gc", "sequence": case["sequence"]})
     immutable = manifest(project)
     java_context = java_project.materialise(workspace, data, folder, project) if language == "java" else None
-    receiver_options = {"max_requests": java_provider.MAX_TELEMETRY_REQUESTS} if runtime is not None else {}
-    if node_source.enabled(entry):
-        receiver_options["allow_chunked"] = True
+    receiver_options = attempt_receiver_options(entry, runtime)
     with capture.receiver(**receiver_options, response_path=folder / "http-responses.json") as (endpoint, bodies, errors):
         config = folder / "policy.toml"
         config.write_text(attempt_policy(entry, endpoint, service, runtime))

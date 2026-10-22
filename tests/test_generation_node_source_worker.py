@@ -35,11 +35,11 @@ class NodeSourceWorkerTests(unittest.TestCase):
         provider = self.root / "provider"
         provider.mkdir(exist_ok=True)
         value = {"schema_version": 1, "provider": str(provider), "project": str(project),
-                 "entry": str(entry), "runtime": str(folder / "runtime"),
+                 "entry": str(entry), "runtime": str(folder / "node-runtime"),
                  "policy": str(folder / "policy.toml"), "node": str(self.root / "node"),
                  "language": "javascript", "compiler": "native", "plain": plain,
                  "gc_fixture": False, "timeout_ms": 60000}
-        path = folder / "request.json"
+        path = folder / "node-source-request.json"
         path.write_text(json.dumps(value))
         return folder, path, value
 
@@ -53,6 +53,8 @@ class NodeSourceWorkerTests(unittest.TestCase):
                         {**value, "plain": 1}, {**value, "gc_fixture": 0},
                         {**value, "timeout_ms": False}, {**value, "timeout_ms": 0},
                         {**value, "entry": str(path)}, {**value, "project": str(folder)},
+                        {**value, "policy": str(self.root / "policy.toml")},
+                        {**value, "runtime": str(folder / "another-runtime")},
                         {**value, "provider": str(folder)}]
             for changed in variants:
                 path.write_text(json.dumps(changed))
@@ -63,6 +65,15 @@ class NodeSourceWorkerTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 worker.request(path)
             Path(value["runtime"]).unlink()
+            with self.assertRaisesRegex(ValueError, "fixed run filename"):
+                worker.request(folder / "another-request.json")
+            entry = Path(value["entry"])
+            entry.unlink()
+            entry.symlink_to(path)
+            with self.assertRaisesRegex(ValueError, "regular canonical"):
+                worker.request(path)
+            entry.unlink()
+            entry.write_text("function add(value){return value+1;}\n")
             path.write_text('{"schema_version":1,"schema_version":1}')
             with self.assertRaises(ValueError):
                 worker.request(path)
@@ -77,6 +88,29 @@ class NodeSourceWorkerTests(unittest.TestCase):
             requested = {**value, "language": language, "plain": plain, "gc_fixture": True}
             self.assertEqual(worker.expected_argv(requested), [value["node"], "--enable-source-maps", "--expose-gc",
                 "--require", str(Path(value["runtime"]) / (prefix + "-bootstrap.cjs")), value["entry"]])
+
+    def test_loaded_provider_location_rejects_an_alias_into_the_runtime_parent(self):
+        folder, _, value = self.fixture()
+        physical = folder / "otelc/node.py"
+        physical.parent.mkdir()
+        physical.write_text("# Isolated provider-origin fixture.\n")
+        alias = self.root / "sdk-alias"
+        alias.symlink_to(folder, target_is_directory=True)
+        module = types.SimpleNamespace(__file__=str(alias / "otelc/node.py"))
+        with self.assertRaisesRegex(ValueError, "loaded provider"):
+            worker.provider_boundary(Path(value["runtime"]), module)
+
+    def test_cli_accepts_only_the_fixed_run_request_and_no_argument_override(self):
+        folder, path, value = self.fixture()
+        path.write_text('{}')
+        script = ("import runpy,sys;sys.path[:0]=" + repr([str(REPO / "adapters/generation"), str(REPO / "examples")])
+                  + ";runpy.run_module('node_source_worker',run_name='__main__')")
+        for args, message in (([], b"invalid supervisor request fields"), (["override.json"], b"no command-line request override")):
+            result = subprocess.run([sys.executable, "-I", "-B", "-c", script, *args],
+                                    cwd=value["project"], capture_output=True, timeout=10)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(message, result.stderr)
+            self.assertFalse((folder / "node-source-application.json").exists())
 
     def test_sdk_exit_requires_actual_termination_and_owned_process_group(self):
         for sdk in (None, True, 1, 100):
@@ -115,6 +149,10 @@ class NodeSourceWorkerTests(unittest.TestCase):
         folder, _, value = self.fixture(plain)
         package = types.ModuleType("otelc")
         config, node, provenance = (types.ModuleType("otelc." + name) for name in ("config", "node", "node_provenance"))
+        module_path = Path(value["provider"]) / "otelc/node.py"
+        module_path.parent.mkdir(exist_ok=True)
+        module_path.write_text("# Fixed module origin for this protocol fixture.\n")
+        node.__file__ = str(module_path)
         config.Policy = Mock()
         report = {"pid": app_pid, "sdk_pid": 102, "phase": phase}
         node.wait_report = Mock(return_value=report)
