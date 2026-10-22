@@ -37,7 +37,7 @@ The CLI embeds its adapter sources, so an installed binary does not depend on an
 
 The generated suite remembers the CLI path used during generation. If the same binary is moved, export `OTELEQ_CLI=/new/path/to/quux-oteleq` before running the suite; its content identity must still match the plan. `OTELEQ_PYTHON` selects the qualified adapter-host environment. See the [command/flag reference](cli-and-configuration.md#implemented-commands) and [actual workspace layout](test-generation.md#current-workspace).
 
-[Current-source promotion](current-source-tests.md) creates an optional reusable entrypoint from a generated workspace. Its file plan requires explicit `--apply`; each later discovery creates new private snapshots and per-case unittest tests for the current checkout, using the reviewed policy and pinned tool/provider contents. Actual eight-language qualification of this new route remains pending.
+[Current-source promotion](current-source-tests.md) creates an optional reusable entrypoint from a generated workspace. Its file plan requires explicit `--apply`; each later discovery creates new private snapshots and per-case unittest tests for the current checkout, using the reviewed policy and pinned tool/provider contents. The [956-launch qualification](qualification/current-source-tests-2026-10-22.json) covers the supported eight-language profiles, changed bodies, checkout relocation, new functions and explicit refusal controls.
 
 Path flags accept both `--source PATH` and `--source=PATH` forms. Use full option names; abbreviated options are rejected. Input repository boundaries are checked before extracting embedded workers.
 
