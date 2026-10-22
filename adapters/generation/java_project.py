@@ -1,10 +1,12 @@
 """Freeze declared Java source roots and independent ordered dependency inputs."""
+from collections.abc import Callable
 import json
 import os
 from pathlib import Path, PurePosixPath
 import shutil
 
 import java_classpath as classpath
+import java_archive_context as archive_context
 
 DIRECTORY = "java-context"
 CONTEXT_FILE = "java-build-context.json"
@@ -38,11 +40,14 @@ def path_list(value: object, label: str, *, relative: bool) -> list[str]:
 
 def settings(value: dict) -> dict:
     """An absent context preserves the qualified standalone compiler recipe."""
-    if not {"source_roots", "classpath"} & set(value):
+    if not {"source_roots", "classpath"} & set(value) and not archive_context.enabled(value):
         return {}
     roots = path_list(value.get("source_roots", ["."]), "source_roots", relative=True)
     require(bool(roots), "source_roots must not be empty")
-    return {"source_roots": roots, "classpath": path_list(value.get("classpath", []), "classpath", relative=False)}
+    paths = path_list(value.get("classpath", []), "classpath", relative=False)
+    require(not archive_context.enabled(value) or len(paths) < MAX_ENTRIES,
+            "runtime archive classpath allows at most 255 dependencies plus application output")
+    return {"source_roots": roots, "classpath": paths}
 
 
 def source_files(source: Path, options: dict, ignored: set[str]) -> list[str]:
@@ -81,7 +86,7 @@ def bind_entry(entry: dict, context: dict | None) -> None:
     if entry["path"] not in context["source_units"]:
         entry.update(status="blocked", reason="selected Java source is outside declared source roots")
     else:
-        entry["java_context_profile"] = PROFILE
+        entry["java_context_profile"] = context["profile"]
 
 
 def snapshot_exclusions(source: Path, options: dict) -> list[str]:
@@ -122,10 +127,12 @@ def protect_destination(destination: Path, locations: list[Path]) -> None:
             "generated outputs must be outside declared dependencies")
 
 
-def prepare(source: Path, workspace: Path, options: dict, ignored: set[str]) -> dict | None:
+def prepare(source: Path, workspace: Path, options: dict, ignored: set[str], *,
+            java: Path | None = None, environment: dict | None = None, execute: Callable | None = None) -> dict | None:
     """Copy existing dependencies without running a build manager in the repository."""
     if "source_roots" not in options:
         return None
+    active = archive_context.enabled(options)
     origins = input_locations(source, options)
     protect_destination(workspace, origins)
     require(not any(path.is_relative_to(workspace) for path in origins), "dependency is inside the owned workspace")
@@ -139,26 +146,36 @@ def prepare(source: Path, workspace: Path, options: dict, ignored: set[str]) -> 
         origin = requested.resolve(strict=True)
         require(origin not in locations, "duplicate resolved classpath location")
         locations.add(origin)
-        record = classpath.inspect(origin)
+        record = archive_context.inspect(origin) if active else classpath.inspect(origin)
         total += sum((origin / name).stat().st_size for name in record["files"]) if record["kind"] == "directory" else origin.stat().st_size
         require(total <= classpath.MAX_TOTAL_BYTES, "combined classpath exceeds its byte budget")
         require(not names.intersection(record["classes"]), "duplicate class definitions in declared classpath")
         names.update(record["classes"])
         owned = "classpath/" + str(index).zfill(4) + (".jar" if record["kind"] == "jar" else "")
         target = root / owned
-        if record["kind"] == "jar":
-            shutil.copy2(origin, target)
-        else:
-            shutil.copytree(origin, target)
-        require(classpath.inspect(origin) == record and classpath.inspect(target) == record, "dependency changed while freezing")
+        freeze_dependency(origin, target, record, active)
         entries.append({"requested": str(requested), "source": str(origin), "owned": owned, **record})
     context = {"schema_version": 1, "profile": PROFILE, "source_roots": options["source_roots"],
                "excluded_source_jars": snapshot_exclusions(source, options),
                "source_units": units, "entries": entries}
+    if active:
+        require(java is not None and environment is not None and execute is not None,
+                "runtime archives require an explicit selected JDK and bounded executor")
+        archive_context.bind(context, root, java, environment, execute)
     raw = json.dumps(context, indent=2) + "\n"
     require(len(raw.encode()) <= 16 * 1024 * 1024, "context metadata exceeds its byte budget")
     (root / "context.json").write_text(raw)
     return context
+
+
+def freeze_dependency(origin: Path, target: Path, record: dict, active: bool) -> None:
+    """Recheck both complete byte catalogues after making the private copy."""
+    if record["kind"] == "jar":
+        shutil.copy2(origin, target)
+    else:
+        shutil.copytree(origin, target)
+    inspect = archive_context.inspect if active else classpath.inspect
+    require(inspect(origin) == record and inspect(target) == record, "dependency changed while freezing")
 
 
 def verify(workspace: Path, data: dict, *, originals: bool = True) -> None:
@@ -173,20 +190,36 @@ def verify(workspace: Path, data: dict, *, originals: bool = True) -> None:
     require(context_manifest(workspace) == data["java_context_manifest"], "frozen Java context changed")
     require(json.loads((root / "context.json").read_text()) == context, "Java context identity changed")
     options = data["configuration"]["adapters"]["java"]
-    require(context["schema_version"] == 1 and context["profile"] == PROFILE
+    active = archive_context.enabled(options)
+    require(type(context["schema_version"]) is int and (context["schema_version"], context["profile"]) ==
+            ((2, archive_context.PROFILE) if active else (1, PROFILE))
             and context["source_roots"] == options["source_roots"]
             and len(context["entries"]) == len(options["classpath"]), "Java context configuration differs")
+    if active:
+        require(set(context) == {"schema_version", "profile", "source_roots", "excluded_source_jars",
+                                "source_units", "entries", "archive_feature", "archive_jdk"},
+                "unknown runtime archive context fields")
+        archive_context.verify_jdk(context, root, Path(data["tools"]["java"]["java"]))
     require(source_files(workspace / "snapshot", options, set(data["excluded_directories"])) == context["source_units"],
             "Java source unit set changed")
     for index, entry in enumerate(context["entries"]):
         require(entry["kind"] in ("jar", "directory")
                 and entry["owned"] == "classpath/" + str(index).zfill(4) + (".jar" if entry["kind"] == "jar" else ""),
                 "invalid owned classpath location")
-        expected = {key: entry[key] for key in classpath.RECORD_FIELDS}
-        require(classpath.inspect(root / entry["owned"]) == expected, "frozen dependency differs")
+        expected = {key: entry[key] for key in archive_context.fields(entry, active)}
+        if active:
+            require(set(entry) == {"requested", "source", "owned", *archive_context.fields(entry, active)},
+                    "unknown runtime archive entry fields")
+        require(inspect_entry(root / entry["owned"], entry, context) == expected, "frozen dependency differs")
         if originals:
             require(Path(entry["requested"]).resolve(strict=True) == Path(entry["source"])
-                    and classpath.inspect(Path(entry["source"])) == expected, "original dependency changed")
+                    and inspect_entry(Path(entry["source"]), entry, context) == expected, "original dependency changed")
+
+
+def inspect_entry(path: Path, entry: dict, context: dict) -> dict:
+    """Runtime catalogues validate physical members without a second selection algorithm."""
+    return (archive_context.inspect(path, expected=entry, feature=context["archive_feature"])
+            if archive_context.configured(context) else classpath.inspect(path))
 
 
 def materialise(workspace: Path, data: dict, folder: Path, project: Path) -> dict | None:
@@ -198,6 +231,7 @@ def materialise(workspace: Path, data: dict, folder: Path, project: Path) -> dic
     root = folder / "java-classpath"
     root.mkdir()
     entries = []
+    active = archive_context.configured(context)
     for entry in context["entries"]:
         original = workspace / DIRECTORY / entry["owned"]
         target = root / Path(entry["owned"]).name
@@ -205,10 +239,12 @@ def materialise(workspace: Path, data: dict, folder: Path, project: Path) -> dic
             shutil.copy2(original, target)
         else:
             shutil.copytree(original, target)
-        entries.append({"path": str(target), **{key: entry[key] for key in classpath.RECORD_FIELDS}})
-    result = {"schema_version": 1, "profile": PROFILE,
+        entries.append({"path": str(target), **{key: entry[key] for key in archive_context.fields(entry, active)}})
+    result = {"schema_version": context["schema_version"], "profile": context["profile"],
               "source_roots": [str(project / name) for name in context["source_roots"]],
               "source_units": [str(project / name) for name in context["source_units"]], "entries": entries}
+    if active:
+        result.update(archive_feature=context["archive_feature"], archive_jdk=context["archive_jdk"])
     (folder / CONTEXT_FILE).write_text(json.dumps(result, indent=2) + "\n")
     verify_attempt(folder, result)
     return result
@@ -217,8 +253,10 @@ def materialise(workspace: Path, data: dict, folder: Path, project: Path) -> dic
 def verify_attempt(folder: Path, expected: dict) -> None:
     """Neither application code nor retained metadata can replace dependency inputs."""
     require(json.loads((folder / CONTEXT_FILE).read_text()) == expected, "attempt Java context changed")
+    active = archive_context.configured(expected)
     for entry in expected["entries"]:
-        require(classpath.inspect(Path(entry["path"])) == {key: entry[key] for key in classpath.RECORD_FIELDS},
+        actual = inspect_entry(Path(entry["path"]), entry, expected)
+        require(actual == {key: entry[key] for key in archive_context.fields(entry, active)},
                 "private dependency bytes changed")
 
 

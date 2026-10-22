@@ -2,7 +2,21 @@
 
 ## Current status
 
-The independent consumer resolver and its regression checks are implemented. Generated project workflows still refuse versioned JAR layouts. The replacement SDK launch-schema-2 integration and exact-provider qualification are in progress; this component alone does not enable multi-release JAR support or invocation-scoped attribution.
+The explicit prepared `archive-methods-v1` profile integrates the independent consumer resolver into generated project workflows. Its [260-JVM qualification](qualification/java-archives-2026-10-22.json) uses frozen consumer runtime `9b60417` and SDK `c06eb43`, with complete independent state/outcome checks, compiler/runtime member identities, decoded telemetry and source preservation. It requires that matching runtime-archive contract and helper tool. The original `stock-methods-v1` and `safe-methods-v1` recipes retain their existing behaviour and refuse versioned layouts. Invocation-scoped attribution remains open.
+
+## Select the profile
+
+```toml
+[adapters.java]
+backend = "prepared"
+profile = "archive-methods-v1"
+source_roots = ["src/main/java", "target/generated-sources"]
+classpath = ["lib/library.jar", "build/dependency-classes"]
+```
+
+Source roots default to `["."]` and the classpath defaults to empty for this profile. It accepts at most 255 explicit dependency entries, leaving one slot for compiled application output. JARs keep their complete original bytes and resources. Ordered directories and JARs are copied independently into each attempt. Planning binds the actual selected JDK and effective dependency catalogue; every attempt repeats independent JDK resolution before SDK preparation and verifies it again after execution. Export carries the private dependencies and original probe records. Changed source, tools, catalogues or dependency bytes require a new plan.
+
+The matching provider must supply `adapters/java/target/java-extension-0.2.0-SNAPSHOT-helper-tool.jar` in addition to the corrected extension, official agent and pinned bootstrap parser patch. The profile explicitly disables task and HTTP instrumentation in its schema-3 policy. If application classes collide with active SDK helper namespaces, the consumer independently derives the mapping and reproduces the pinned helper transformation before checking the SDK's private extension, properties and descriptor. Application classes and dependencies are preserved.
 
 The resolver follows the selected JDK's `JarFile` runtime APIs without loading application classes. It records the actual effective ZIP member name and SHA-256, the complete original archive hash, the JDK feature and the archive's position in the full ordered classpath. Ordinary, inactive, false, active, intermediate, future, versioned-only, folded-manifest and identical-byte fixtures have direct regression coverage. Package metadata remains visible; module metadata is excluded from ordinary class definitions. The tests compare selected class bytes with independently constructed fixture classes and actual plain-JVM method/resource outcomes.
 
@@ -24,8 +38,12 @@ The new provider must bind its resolver helper-tool identity in both plain and i
 
 ## Checks and remaining work
 
+The corpus covers eleven archive variants through direct, fixed replay, generated and exported suites. The detached route removes both original source and external dependency directories. It also covers same-return global mutation, scalar reduction from `[7]` to `[0]`, independently reproduced real helper relocation, 48 private receiver JVMs with four live metric states, ordinary private receiver compatibility and 13 input/evidence controls. All 112 frozen provider files and 25 owned workspaces are revalidated after execution. Copied original shrink evidence is retained separately and does not inflate the 260 actual JVMs.
+
 `make check` runs the real JDK matrix and enforces separate 80% line-coverage floors for `java_archives.py` and the compiled `OteleqArchives` resolver. JaCoCo is confined to regression probes; application/provider qualification uses ordinary JVMs.
 
-Before generated workflows can accept this profile, integrate the frozen SDK's public launcher, compiler/runtime catalogues and exact tooling record. Qualify direct, generated, replay, detached export and scalar reduction routes, loaded origins, source/resource preservation, same-process metric controls and their refusal controls against the actual provider. Shipping artefacts, custom classloaders, application changes to JDK selection properties and general Maven/Gradle/module integration remain outside this component.
+`make generation-java-archive-otelc OTELC_ROOT=/absolute/provider REPORT_DIR=/new/report` runs the maintained fixed JDK21 corpus against the actual provider. It checks direct, generated, replay and detached-export routes, complete independently specified scalar graphs, literal compiler reads, runtime members and loaded origins. Active and identical-member evidence controls reject altered member identities even when the class bytes are equal. The corpus also covers scalar reduction and same-process metric states. This target requires the matching qualified provider and ordinary JDK21 tools; its actual result remains separate from the component regressions.
+
+Shipping artefacts, custom classloaders, application changes to JDK selection properties and general Maven/Gradle/module integration remain outside this profile.
 
 The result remains **equivalence over these tests and observations**.

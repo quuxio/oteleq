@@ -4,7 +4,7 @@ CI caches only the pinned `cargo-llvm-cov` executable using an OS, architecture,
 
 ## Current scope
 
-The independent [Java runtime archive resolver](java-runtime-archives.md) has separate 80% line-coverage floors for `java_archives.py` and compiled `OteleqArchives`. Real-JDK regressions compare exact selected members with plain-JVM method/resource outcomes, preserve compiler reads separately and reject altered identities, implicit dependencies and selection overrides. These component checks do not enable generated multi-release JAR workflows or qualify a replacement provider.
+The independent [Java runtime archive resolver](java-runtime-archives.md) and its explicit generated project profile have separate 80% line-coverage floors for `java_archives.py`, `java_archive_context.py`, `java_helper_binding.py` and compiled `OteleqArchives`. Real-JDK regressions compare exact selected members with plain-JVM method/resource outcomes, preserve compiler reads separately and reject altered identities, implicit dependencies and selection overrides. Actual-provider qualification of generated workflows remains separate from these component checks.
 
 The [Python package-context regression](qualification/python-package-2026-10-22.json) verifies 80 application launches on one corrected CLI/provider, plus refused namespace, ambiguous-root and shadowed receiver fixtures. Constructor/function fixtures cannot clear an import-context blocker. Maintained generated and detached suites also fail those fixtures without launching application code; regular package imports retain their actual module identity.
 

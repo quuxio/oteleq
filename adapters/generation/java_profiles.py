@@ -5,6 +5,7 @@ import zipfile
 
 STOCK = "stock-methods-v1"
 SAFE = "safe-methods-v1"
+ARCHIVES = "archive-methods-v1"
 PATCH = "adapters/java/target/java-extension-0.2.0-SNAPSHOT-bootstrap-patch.jar"
 PARSER = "io/opentelemetry/javaagent/shaded/io/opentelemetry/api/trace/propagation/internal/W3CTraceContextEncoding.class"
 PARSER_SHA256 = "bb56f27410ee111a92ab5c172eacb136f1e69795d4e84906a036d7d3b1b42712"
@@ -19,8 +20,13 @@ def require(condition: bool, reason: str) -> None:
 
 def name(value: object) -> str:
     """Provider metadata and filenames cannot select another launch recipe."""
-    require(type(value) is str and value in (STOCK, SAFE), "unknown profile")
+    require(type(value) is str and value in (STOCK, SAFE, ARCHIVES), "unknown profile")
     return value
+
+
+def corrected(value: object) -> bool:
+    """Both later profiles use the qualified advice and bootstrap parser patch."""
+    return name(value) in (SAFE, ARCHIVES)
 
 
 def settings(value: dict) -> dict:

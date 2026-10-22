@@ -12,6 +12,7 @@ import otelc_capture as capture
 AGENT = "build/tools/opentelemetry-javaagent-2.32.0.jar"
 AGENT_SHA256 = "f787eb6c7f3d18e69a431e108a15278d25ee37f83d68b678f621e063f3988f82"
 EXTENSION = "adapters/java/target/java-extension-0.2.0-SNAPSHOT.jar"
+HELPER = "adapters/java/target/java-extension-0.2.0-SNAPSHOT-helper-tool.jar"
 SDK_MODULES = {"__init__.py", "__main__.py", "config.py", "java.py", "prepared_java.py", "health.py", "control.py"}
 SDK_LANGUAGES = {"c", "cpp", "rust", "python", "java", "javascript", "typescript", "go"}
 MAX_METADATA = 256 * 1024
@@ -43,8 +44,10 @@ def artefacts(root: Path, tools: dict, profile: str = java_profiles.STOCK) -> di
     package = root / "otelc"
     require(package.is_dir() and not package.is_symlink(), "missing SDK Python package")
     paths = [root / AGENT, root / EXTENSION, root / "adapters/java/pom.xml"]
-    if java_profiles.name(profile) == java_profiles.SAFE:
+    if java_profiles.corrected(profile):
         paths.extend(java_profiles.patch_inputs(root))
+    if profile == java_profiles.ARCHIVES:
+        paths.append(root / HELPER)
     for tree in (package, root / "adapters/java/src/main"):
         require(tree.is_dir() and not tree.is_symlink(), "missing SDK source tree: " + str(tree))
         for path in sorted(tree.rglob("*")):
@@ -61,7 +64,7 @@ def artefacts(root: Path, tools: dict, profile: str = java_profiles.STOCK) -> di
 
 def configuration(entry: dict, endpoint: str, service: str) -> dict:
     """Supply every schema-3 field so producer defaults cannot change the recipe."""
-    return {"schema_version": 3, "languages": ["java"], "resource": {"service_name": service},
+    result = {"schema_version": 3, "languages": ["java"], "resource": {"service_name": service},
             "export": {"endpoint": endpoint, "interval_ms": 1000, "timeout_ms": 1000, "shutdown_timeout_ms": 10000},
             "sources": {"include": [entry["path"]], "exclude": []},
             "functions": {"include": [entry["otelc_function"]], "exclude": []},
@@ -70,6 +73,9 @@ def configuration(entry: dict, endpoint: str, service: str) -> dict:
             "traces": {"enabled": True, "sample_ratio": 1.0},
             "lifetimes": {"enabled": False, "include": [], "exclude": [], "max_live": 4096, "release_methods": ["close"]},
             "benchmark": {"iterations": 10000, "samples": 15, "warmup": 5}}
+    if entry.get("java_profile") == java_profiles.ARCHIVES:
+        result["context"] = {"tasks": False, "http": False}
+    return result
 
 
 def policy(entry: dict, endpoint: str, service: str) -> str:

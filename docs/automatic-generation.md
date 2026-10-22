@@ -53,6 +53,8 @@ Static-language observers use restricted codecs. Rust formats only canonical pri
 
 Java can explicitly declare [source roots and dependency classpaths](java-project-context.md). This retains generated Java units, complete original JARs and class/resource directories in independent private builds. It does not infer a Maven/Gradle build or broaden observed globals.
 
+The explicit prepared [runtime archive profile](java-runtime-archives.md) additionally resolves multi-release layouts through the selected JDK. It preserves separate physical, compiler-read and runtime-selected member identities, with fresh probes and exact launch/tooling checks. Use its matching provider and qualification record; original prepared profiles retain their existing recipes.
+
 ## Project policy and concrete fixtures
 
 Pass `--config /absolute/path/to/equivalence.toml` to `plan`. The [example policy](../examples/equivalence.toml) is executable. Unknown keys, unsupported schema/language IDs, duplicate selectors/cases and unsafe limits fail validation. A policy is at most 1 MiB. CLI `--language` and `--cases` override the corresponding policy values; CLI exclusions extend the policy exclusions.

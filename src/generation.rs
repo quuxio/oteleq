@@ -26,6 +26,14 @@ const RESOURCES: &[(&str, &str)] = &[
         include_str!("../adapters/generation/java_archives.py"),
     ),
     (
+        "java_archive_context.py",
+        include_str!("../adapters/generation/java_archive_context.py"),
+    ),
+    (
+        "java_helper_binding.py",
+        include_str!("../adapters/generation/java_helper_binding.py"),
+    ),
+    (
         "OteleqArchives.java",
         include_str!("../adapters/generation/OteleqArchives.java"),
     ),

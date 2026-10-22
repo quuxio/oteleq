@@ -29,6 +29,7 @@ import java_control_receipt
 import java_provider
 import java_profiles
 import java_project
+import java_archive_context
 import java_telemetry
 import node_receivers
 import node_project
@@ -236,6 +237,8 @@ def discovery_tools(root: Path, language: str, adapters: dict) -> tuple[dict, di
     if language == "java":
         selected["javac"] = capture.tool_path(str(selected["java"].parent / "javac"))
         selected["java-modules"] = java_build.module_image(selected["java"])
+        if adapters.get("java", {}).get("profile") == java_profiles.ARCHIVES:
+            selected["javap"] = capture.tool_path(str(selected["java"].parent / "javap"))
     qualified = (java_provider.artefacts(root, selected, adapters["java"].get("profile", java_profiles.STOCK))
                  if language == "java" and adapters.get("java", {}).get("backend") == "prepared"
                  else capture.artefacts(root, language, selected, rust_backend=rust_backend))
@@ -524,7 +527,12 @@ def plan(args):
     write(workspace / OWNED_MARKER, {"schema_version": VERSION, "id": uuid.uuid4().hex})
     contents, native_projects = native_profile.prepare_inputs(
         sys.modules[__name__], source, root, workspace, configuration, contents, excluded_files=excluded_jars)
-    java_context = java_project.prepare(source, workspace, java_options, discovery.IGNORED)
+    java_settings = {}
+    if java_archive_context.enabled(java_options):
+        selected, _ = discovery_tools(root, "java", configuration["adapters"])
+        java_settings = {"java": selected["java"], "execute": execute,
+                         "environment": capture.environment(workspace, selected, "oteleq-archive-plan", root)}
+    java_context = java_project.prepare(source, workspace, java_options, discovery.IGNORED, **java_settings)
     contents = java_source_manifest(source, java_options, contents)
     snapshot = snapshot_source(source, workspace, contents)
     native_profile.directories(snapshot, native_projects)
@@ -598,7 +606,8 @@ def generator_identity():
     names = ("generation.py", "policy.py", "return_expectations.py", "filesystem_effects.py", "http_effects.py", "domains.py", "shrinking.py", "sequences.py", "typescript_provider.py", "python_project.py", "go_project.py", "go_receivers.py", "go_graph.py", "go_observe.go", "node_receivers.py", "java_receivers.py", "java_build.py", "java_control.py", "java_profiles.py", "java_live.py", "java_control_receipt.py", "java_health.py", "java_launch.py", "java_provider.py", "java_telemetry.py", "OteleqCompile.java", "java_graph.py", "OteleqGraph.java", "cpp_models.py", "cpp_receivers.py", "cpp_worker.py", "cpp_graph.py", "cpp_observe.hpp", "native_names.py", "discovery.py", "harness.py", "observe.py", "node_observe.mjs", "node_sequence.mjs", "typed_capture.py", "discover.mjs", "discover.go", "Discover.java")
     files = {name: capture.file_digest(here / name) for name in names}
     files.update({name: capture.file_digest(here / name) for name in (
-        'java_project.py', 'java_classpath.py', 'java_archives.py', 'OteleqArchives.java',
+        'java_project.py', 'java_classpath.py', 'java_archives.py', 'java_archive_context.py',
+        'java_helper_binding.py', 'OteleqArchives.java',
         'node_project.py', 'node_context.mjs',
         'native_profile.py', 'native_project.py', 'native_dependencies.py', 'native_frontend.py',
         'native_discover.cpp', 'native_context.py', 'native_workers.py', 'native_workspace.py')})
