@@ -20,6 +20,8 @@ The [Python package-context regression](qualification/python-package-2026-10-22.
 
 The [Node source-context profile](node-source-context.md) has a separate 80% line coverage floor for `node_project.py`. Its [22 October qualification](qualification/node-projects-2026-10-22.json) completes 245 unique application launches across eleven module contexts, CommonJS receivers, all four retained routes, scalar reduction and refusal controls. An independent verifier checks complete fixed-fixture graphs, literal application channels, actual loader receipts and decoded raw OTLP. The same CLI also passes the existing 186-launch Node receiver corpus. These results leave dependency installation, general TypeScript/build integration and shipping qualification open.
 
+The separately selected rebuilt [Node source5/execution1 profile](node-source-context.md#rebuilt-sdk-source-profile) has [1,800-launch qualification](qualification/node-source-provider-2026-10-22.json). It checks complete literal application graphs, binary output, declared effects, actual app/SDK identities and independently decoded raw telemetry through retained and promoted suites. All 456 comparisons were recomputed; 1,832 raw receipts reduce to 1,800 distinct launches after copied shrink records are removed from the count. The frozen SDK's 8,284 input records, twelve links and three external tool hashes remain unchanged. Each new source/provider/runtime scope requires its own qualification.
+
 The explicit prepared Java recipe validator has its own 80% line coverage floor. Its regressions reject cross-profile substitutions, altered bootstrap parser bytes, foreign/duplicate JAR entries, missing tooling and changed frozen inputs.
 
 The optional [Java live metric profile](java-metric-controls.md) adds separate 80% line floors for `java_control.py`, `java_live.py` and `java_control_receipt.py`. Private-socket, malformed-data, process cleanup, checkpoint/state, independent counter and receipt regressions are contributor gates. Actual-provider qualification additionally needs same-PID four-state execution, direct exported data and complete independent application-state oracles.
@@ -72,9 +74,13 @@ rustup toolchain install 1.98.1 --profile minimal \
 rustup run 1.98.1 cargo install cargo-llvm-cov --version 0.8.7 --locked
 make setup
 python3 -m venv .venv
-.venv/bin/python -m pip install --only-binary=:all: coverage==7.16.2
+.venv/bin/python -m pip install --require-hashes --only-binary=:all: -r ci/requirements.txt
 rustup run 1.98.1 make check PYTHON=.venv/bin/python
 ```
+
+The pinned validation environment includes the OTLP protobuf decoder used by the Node telemetry regressions. Each dependency has an exact version and permitted wheel hashes; pip requires those hashes in contributor setup and CI.
+
+`make examples` also parses every GitHub workflow with the locked YAML parser installed by `make setup`. Its regression checks the quoting required for pip's `--only-binary=:all:` argument.
 
 Use Python 3.12+ and Node 24/npm for these contributor tools. `make setup` installs locked Markdown tooling and TypeScript 6.0.3 for real compiler-API inventory regressions; it does not install dependencies into an application or provider. Rust 1.98.1 and matching LLVM tools are pinned in CI. A newer compiler may build the application, but its coverage instrumentation requires matching LLVM tools; do not assume Homebrew's current Rust is compatible with LLVM 22.
 

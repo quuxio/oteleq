@@ -1,8 +1,10 @@
 // Syntax inventory only: no application module is loaded.
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
-const require = createRequire(process.argv[2] + '/adapters/node/package.json');
-const ts = require('typescript');
+const sourceProvider = process.argv[3] === 'source-v1';
+if (process.argv[3] && !sourceProvider) throw new Error('unknown Node inventory provider');
+const require = createRequire(process.argv[2] + (sourceProvider ? '/package.json' : '/adapters/node/package.json'));
+const ts = require(sourceProvider ? 'typescript-api' : 'typescript');
 // Source arrives on the dedicated bounded worker input, not an arbitrary CLI filesystem path.
 const input = JSON.parse(fs.readFileSync(0, 'utf8'));
 const source = ts.createSourceFile(input.filename, input.source, ts.ScriptTarget.Latest, true);

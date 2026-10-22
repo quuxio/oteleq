@@ -1,9 +1,11 @@
 """Independent Node qualification rejects equal-but-wrong state and raw telemetry."""
 import copy
+import hashlib
 import json
 from pathlib import Path
 import sys
 import tempfile
+import tomllib
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -44,6 +46,21 @@ def observation(spec: dict, lane: str, argument: float = 7.0) -> dict:
 
 
 class NodeProjectQualificationTests(unittest.TestCase):
+    def test_source_profile_keeps_legacy_defaults_and_freezes_each_compiler_choice(self):
+        for compiler in ("native", "api"):
+            options = {"backend": "source-v1", "typescript_compiler": compiler}
+            for context in qualifier.CONTEXTS:
+                spec, _, _ = qualifier.fixture(context, node_options=options)
+                self.assertEqual(spec["format"], "module" if context[0] == "ts-default" else context[3])
+                self.assertEqual(tomllib.loads(qualifier.policy(spec))["adapters"]["node"], options)
+            spec, source, _ = qualifier.fixture(qualifier.CONTEXTS[4], different=True, node_options=options)
+            self.assertIn("/node-bootstrap.cjs", source)
+            self.assertEqual(spec["source_sha256"], hashlib.sha256(source.encode()).hexdigest())
+        legacy, source, _ = qualifier.fixture(qualifier.CONTEXTS[8], different=True)
+        self.assertEqual(legacy["format"], "commonjs")
+        self.assertIn("/node/register.mjs", source)
+        self.assertNotIn("adapters", tomllib.loads(qualifier.policy(legacy)))
+
     def test_all_eleven_formats_have_explicit_source_inputs_and_return_values(self):
         self.assertEqual(len(qualifier.CONTEXTS), 11)
         for context in qualifier.CONTEXTS:
@@ -174,6 +191,34 @@ class NodeProjectQualificationTests(unittest.TestCase):
             value["caller"]["source_sha256"] = "0" * 64
             write(value)
             with self.assertRaises(ValueError):
+                oracle.check_context(folder, spec, entry)
+
+    def test_source_compiler_receipt_binds_private_context_without_equating_original_paths(self):
+        options = {"backend": "source-v1", "typescript_compiler": "api"}
+        spec, source, _ = qualifier.fixture(qualifier.CONTEXTS[7], node_options=options)
+        spec["node_version"] = "v24.21.0"
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            caller = folder / "project" / spec["filename"]
+            caller.parent.mkdir()
+            caller.write_text(source)
+            receipt = {"schema_version": 1, "format": "module", "loader_hint": "module", "package": None,
+                       "node_version": spec["node_version"], "source_sha256": spec["source_sha256"],
+                       "source_compiler": {"profile": "module-format-only-v1", "configuration_reads": [],
+                         "compiler": {"backend": "api", "transformer_profile": "none", "cwd": "/snapshot"}}}
+            original = copy.deepcopy(receipt)
+            original["source_compiler"]["compiler"]["cwd"] = "/original"
+            entry = {"node_context": receipt, "node_original_context": original}
+            value = {"original": receipt, "caller": copy.deepcopy(receipt)}
+            probe = folder / "node-context-probe/stdout"
+            probe.parent.mkdir()
+            probe.write_text(json.dumps(value["caller"]))
+            path = folder / "node-context.json"
+            path.write_text(json.dumps(value))
+            oracle.check_context(folder, spec, entry)
+            value["original"] = original
+            path.write_text(json.dumps(value))
+            with self.assertRaisesRegex(ValueError, "private source compiler"):
                 oracle.check_context(folder, spec, entry)
 
 

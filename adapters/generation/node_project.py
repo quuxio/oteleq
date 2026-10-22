@@ -4,30 +4,48 @@ import json
 from pathlib import Path, PurePosixPath
 from typing import Callable
 
+import node_source_context
+
 
 def context(path: Path, snapshot: Path, language: str, provider: Path,
-            node: Path, execute: Callable) -> dict:
+            node: Path, execute: Callable, *, source_backend: str | None = None,
+            evidence: Path | None = None) -> dict:
     """Read the selected loader's module format without evaluating application code."""
     source_digest = hashlib.sha256(path.read_bytes()).hexdigest()
     command = [node]
-    if language == "typescript":
+    if language == "typescript" and source_backend is None:
         command.extend(["--import", provider / "adapters/node/plain.mjs"])
     command.append(Path(__file__).with_name("node_context.mjs"))
     request = {"filename": str(path.resolve()), "root": str(snapshot.resolve()),
                "source_sha256": source_digest}
+    if source_backend is not None:
+        if language != "typescript" or source_backend not in ("native", "api") or evidence is None:
+            raise ValueError("explicit source compiler inspection requires TypeScript, backend and evidence directory")
+        if evidence.resolve().is_relative_to(snapshot.resolve()) or evidence.resolve().is_relative_to(provider.resolve()):
+            raise ValueError("compiler inspection output must be outside source and provider")
+        evidence.mkdir(mode=0o700, parents=True, exist_ok=False)
+        request["source_provider"] = {"root": str(provider), "backend": source_backend, "directory": str(evidence)}
     result = execute(command, snapshot, input_data=json.dumps(request).encode(), max_output_bytes=16384)
+    if evidence is not None:
+        (evidence / "request.json").write_text(json.dumps(request, indent=2) + "\n")
+        (evidence / "stdout").write_bytes(result.stdout)
+        (evidence / "stderr").write_bytes(result.stderr)
     if result.returncode:
         raise ValueError("Node source/package context is unavailable: " + result.stderr.decode(errors="replace")[-2000:])
     value = json.loads(result.stdout)
-    _receipt(value, source_digest)
+    _receipt(value, source_digest, source_compiler=source_backend is not None)
+    if source_backend is not None:
+        node_source_context.validate(value["source_compiler"], source_digest, provider, source_backend, evidence, cwd=snapshot)
     if hashlib.sha256(path.read_bytes()).hexdigest() != source_digest:
         raise ValueError("Node source changed during context inspection")
     _package(snapshot, value["package"])
     return value
 
 
-def _receipt(value: object, source_digest: str) -> None:
+def _receipt(value: object, source_digest: str, *, source_compiler: bool = False) -> None:
     fields = {"schema_version", "format", "loader_hint", "source_sha256", "package", "node_version"}
+    if source_compiler:
+        fields.add("source_compiler")
     if (not isinstance(value, dict) or set(value) != fields
             or type(value.get("schema_version")) is not int or value["schema_version"] != 1
             or value.get("source_sha256") != source_digest
@@ -52,16 +70,21 @@ def _package(snapshot: Path, package: object) -> None:
 
 
 def inventory_context(path: Path, snapshot: Path, original_source: Path | None,
-                      language: str, provider: Path, node: Path, execute: Callable) -> dict:
+                      language: str, provider: Path, node: Path, execute: Callable, *,
+                      source_backend: str | None = None, evidence: Path | None = None) -> dict:
     """Keep original/private loader receipts or one explicit named inventory blocker."""
     try:
-        value = context(path, snapshot, language, provider, node, execute)
+        options = {"source_backend": source_backend, "evidence": evidence / "private"} if source_backend else {}
+        value = context(path, snapshot, language, provider, node, execute, **options)
         result = {"node_context": value}
         if original_source is not None:
+            original_options = {"source_backend": source_backend, "evidence": evidence / "original"} if source_backend else {}
             original = context(original_source / path.relative_to(snapshot), original_source,
-                               language, provider, node, execute)
+                               language, provider, node, execute, **original_options)
             if any(original[key] != value[key] for key in ("format", "package", "node_version")):
                 raise ValueError("private Node source/package context differs from the original application")
+            if source_backend and node_source_context.configuration_signature(original["source_compiler"], original_source) != node_source_context.configuration_signature(value["source_compiler"], snapshot):
+                raise ValueError("private TypeScript compiler configuration differs from the original application")
             result["node_original_context"] = original
         return result
     except (ValueError, OSError, KeyError) as error:
@@ -100,8 +123,14 @@ def verify_attempt(project: Path, entry: dict, provider: Path, node: Path,
                    execute: Callable, folder: Path) -> None:
     """Recheck the materialised caller's actual format and unchanged package bytes."""
     expected = entry["node_context"]
-    actual = context(project / entry["path"], project, entry["language"], provider, node, execute)
+    source = entry.get("node_backend") == "source-v1" and entry["language"] == "typescript"
+    options = {"source_backend": entry["node_compiler"], "evidence": folder / "node-compiler-context"} if source else {}
+    actual = context(project / entry["path"], project, entry["language"], provider, node, execute, **options)
     receipt = {"original": expected, "caller": actual}
     (folder / "node-context.json").write_text(json.dumps(receipt, indent=2) + "\n")
     if any(actual[key] != expected[key] for key in ("format", "package", "node_version")):
         raise ValueError("generated Node caller changed its source/package module context")
+    if source:
+        snapshot = Path(entry["node_context_root"])
+        if node_source_context.configuration_signature(actual["source_compiler"], project) != node_source_context.configuration_signature(expected["source_compiler"], snapshot):
+            raise ValueError("generated caller changed its TypeScript compiler configuration")

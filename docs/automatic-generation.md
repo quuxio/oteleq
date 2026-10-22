@@ -4,7 +4,7 @@ oteleq now inventories source files and generates an external `unittest` suite f
 
 ## Build and run
 
-Prepare a qualified otelc provider and its matching compiler/runtime adapters first. The default pre-rebuild contract uses revisions such as frozen `d6d03b7` in the [integrated-provider record](qualification/integrated-provider-2026-10-20.json). Java can instead explicitly select the [prepared SDK provider](java-prepared-provider.md); that setting does not implement the replacement SDK's other language adapters. Use the selected provider's locked CPython 3.12 environment so the OTLP protobuf decoder and Python adapter agree. Build oteleq with Rust 1.98.1 or newer:
+Prepare a qualified otelc provider and its matching compiler/runtime adapters first. The default pre-rebuild contract uses revisions such as frozen `d6d03b7` in the [integrated-provider record](qualification/integrated-provider-2026-10-20.json). Java's [prepared SDK provider](java-prepared-provider.md) and Node's [source SDK profile](node-source-context.md#rebuilt-sdk-source-profile) are explicit alternatives with separate qualification records. Use the selected provider's recorded Python/decoder environment: the legacy record uses CPython 3.12 and the Node source record uses CPython 3.14. Build oteleq with Rust 1.98.1 or newer:
 
 ```sh
 cargo build --locked

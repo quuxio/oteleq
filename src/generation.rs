@@ -29,6 +29,38 @@ const RESOURCES: &[(&str, &str)] = &[
         include_str!("../adapters/generation/node_context.mjs"),
     ),
     (
+        "node_source_context.mjs",
+        include_str!("../adapters/generation/node_source_context.mjs"),
+    ),
+    (
+        "node_source_context.py",
+        include_str!("../adapters/generation/node_source_context.py"),
+    ),
+    (
+        "node_source.py",
+        include_str!("../adapters/generation/node_source.py"),
+    ),
+    (
+        "node_source_worker.py",
+        include_str!("../adapters/generation/node_source_worker.py"),
+    ),
+    (
+        "node_launch.py",
+        include_str!("../adapters/generation/node_launch.py"),
+    ),
+    (
+        "node_inputs.py",
+        include_str!("../adapters/generation/node_inputs.py"),
+    ),
+    (
+        "node_execution.py",
+        include_str!("../adapters/generation/node_execution.py"),
+    ),
+    (
+        "node_telemetry.py",
+        include_str!("../adapters/generation/node_telemetry.py"),
+    ),
+    (
         "java_project.py",
         include_str!("../adapters/generation/java_project.py"),
     ),

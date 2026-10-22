@@ -209,7 +209,15 @@ def attach_cpp_models(inventory: dict, document: dict, path: Path) -> None:
                             + [item for item in inventory["globals"] if item.get("inaccessible")] + unbound)
 
 
-def discover(path, language, root, tools, execute):
+def node_command(here, root, tool, source_backend):
+    """Select the fixed parser package for the explicit Node provider."""
+    command = [tool, here / "discover.mjs", root]
+    if source_backend:
+        command.append("source-v1")
+    return command
+
+
+def discover(path, language, root, tools, execute, *, node_source=False):
     here = Path(__file__).parent
     if language == "python":
         return python_inventory(path.read_text())
@@ -220,7 +228,7 @@ def discover(path, language, root, tools, execute):
         compiler = tools["clang++" if language == "cpp" else "clang"]
         command = [compiler, *native_flags(language), "-Xclang", "-ast-dump=json", "-fsyntax-only", path]
     elif language in ("javascript", "typescript"):
-        command = [tools[language], here / "discover.mjs", root]
+        command = node_command(here, root, tools[language], node_source)
     elif language == "go":
         command = [tools[language], "run", here / "discover.go", "--", path]
     else:

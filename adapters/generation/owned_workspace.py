@@ -13,7 +13,7 @@ def verify_layout(workflow, workspace: Path) -> None:
     """Reserved run/cache output remains owned; unexpected root entries do not."""
     allowed = {MARKER, workflow.PLAN_FILE, "snapshot", "tests", workflow.GENERATED_MANIFEST,
                workflow.README_FILE, "runs", "go-cache", workflow.native_profile.DIRECTORY,
-               workflow.java_project.DIRECTORY, workflow.java_provider.DIRECTORY}
+               workflow.java_project.DIRECTORY, workflow.java_provider.DIRECTORY, workflow.node_source.DIRECTORY}
     if workspace.is_symlink() or not workspace.is_dir():
         raise ValueError(OWNERSHIP_ERROR)
     if any(path.name not in allowed or path.is_symlink() for path in workspace.iterdir()):
@@ -34,6 +34,7 @@ def verify_contexts(workflow, workspace: Path, data: dict) -> None:
         raise ValueError("native context is missing; retain and inspect it")
     workflow.java_project.verify_owned(workspace, data)
     workflow.java_provider.verify_probes(workflow, workspace, data)
+    workflow.node_source.verify_probes(workflow, workspace, data)
 
 
 def verify_suite(workflow, workspace: Path) -> None:

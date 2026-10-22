@@ -16,6 +16,7 @@ import java_profiles
 import java_project
 import go_project
 import native_project
+import node_source
 import python_project
 import preconditions
 import return_expectations
@@ -164,7 +165,7 @@ def load(path: Path | None) -> dict[str, Any]:
 
 def adapters(value: Any) -> dict[str, Any]:
     """Freeze explicit provider selection without guessing execution support."""
-    keys(value, {"c", "cpp", "rust", "python", "go", "typescript", "java"}, "adapters")
+    keys(value, {"c", "cpp", "rust", "python", "go", "typescript", "java", "node"}, "adapters")
     rust = value.get("rust", {})
     keys(rust, {"backend"}, "adapters.rust")
     backend = rust.get("backend", "compiler")
@@ -174,10 +175,14 @@ def adapters(value: Any) -> dict[str, Any]:
     keys(python, {"import_roots"}, "adapters.python")
     typed = value.get("typescript", {})
     keys(typed, {"backend"}, "adapters.typescript")
+    node = node_source.settings(value["node"]) if "node" in value else None
+    if node is not None and node["backend"] == node_source.SOURCE and typed.get("backend", "source") != "source":
+        raise ValueError("source-v1 uses adapters.node.typescript_compiler; legacy TypeScript backend must remain source")
     java = value.get("java", {})
     keys(java, {"backend", "profile", "source_roots", "classpath"}, "adapters.java")
     java_provider.backend(java.get("backend", "legacy"))
     return {**{language: native_project.settings(value[language]) for language in ('c', 'cpp') if language in value},
+            **({"node": node} if node is not None else {}),
             "rust": {"backend": backend},
             "typescript": {"backend": typescript_provider.backend(typed.get("backend", "source"))},
             "java": {**java_profiles.settings(java), **java_project.settings(java)},

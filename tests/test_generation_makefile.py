@@ -20,13 +20,16 @@ class QualificationRecipeTests(unittest.TestCase):
             for flag in ("--cli", "--comparator"):
                 if line.startswith("\t") and flag + " " in line:
                     targets[target] = flag
-        self.assertEqual(len(targets), 32)
+        self.assertEqual(len(targets), 35)
         self.assertIn("generation-project-tests-otelc", targets)
         self.assertIn("generation-preconditions-otelc", targets)
         self.assertIn("generation-domains-otelc", targets)
         self.assertIn("generation-input-walks-otelc", targets)
         self.assertIn("generation-retained-source-otelc", targets)
         self.assertIn("generation-node-project-otelc", targets)
+        self.assertIn("generation-node-source-collection-otelc", targets)
+        self.assertIn("generation-node-source-effects-otelc", targets)
+        self.assertIn("generation-node-source-channels-otelc", targets)
         self.assertIn("generation-native-project-otelc", targets)
         self.assertIn("generation-http-otelc", targets)
         self.assertIn("generation-java-receiver-otelc", targets)
@@ -72,6 +75,9 @@ class QualificationRecipeTests(unittest.TestCase):
         self.assertIn("generation-native-project-otelc Qualify explicit C/C++ targets", result.stdout)
         self.assertIn("generation-java-project-otelc Qualify Java roots", result.stdout)
         self.assertIn("generation-node-project-otelc Qualify Node module formats", result.stdout)
+        self.assertIn("generation-node-source-collection-otelc Qualify source SDK collection", result.stdout)
+        self.assertIn("generation-node-source-effects-otelc Qualify source SDK file/HTTP", result.stdout)
+        self.assertIn("generation-node-source-channels-otelc Qualify nonempty binary", result.stdout)
 
 
 if __name__ == "__main__":
