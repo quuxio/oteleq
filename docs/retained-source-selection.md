@@ -32,3 +32,5 @@ make generation-retained-source-otelc \
 ```
 
 The maintained corpus uses eight language IDs, fixed scalar arguments and complete independently declared before/outcome/after graphs. It checks replanning after in-source export, an explicit Java source-root context, generated suites, a second retained bundle, detached runs with original source unavailable, visible report exclusions and prelaunch refusal controls. Unit regressions separately cover explicit native inputs, generated Java roots, missing contexts, source changes and cleanup preservation.
+
+If the qualification stops after its first direct and generated-suite routes, the maintainer script accepts `--resume` with the same paths and CLI. It revalidates both retained routes and frozen source/provider/tool identities before proceeding. Later partial routes are refused and retained for inspection. This option does not restart an active run or change the application's public CLI.

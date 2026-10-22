@@ -17,6 +17,7 @@ import generation as gen
 import java_project
 import native_profile
 import owned_workspace
+import qualify_retained_source
 
 
 class OwnedInputTests(unittest.TestCase):
@@ -149,13 +150,14 @@ class OwnedInputTests(unittest.TestCase):
         self.assertEqual(records[0]["path"], "equivalence-tests")
 
     def test_unknown_context_and_linked_root_cannot_be_excluded_or_cleaned(self):
+        cleanup = argparse.Namespace(workspace=self.retained)
         for name in (native_profile.DIRECTORY, gen.java_project.DIRECTORY, gen.java_provider.DIRECTORY):
             with self.subTest(name=name):
                 (self.retained / name).mkdir()
                 with self.assertRaises(ValueError):
                     self.plan()
                 with self.assertRaises(ValueError):
-                    gen.clean(argparse.Namespace(workspace=self.retained))
+                    gen.clean(cleanup)
                 (self.retained / name).rmdir()
         (self.retained / "runs").symlink_to(self.base, target_is_directory=True)
         with self.assertRaisesRegex(ValueError, "unowned"):
@@ -231,6 +233,13 @@ class OwnedInputTests(unittest.TestCase):
         self.assertEqual(len(owned_workspace.exclusions(gen, self.source)), 1)
         gen.clean(argparse.Namespace(workspace=self.retained))
         self.assertFalse(self.retained.exists())
+
+    def test_qualifier_resolves_corpus_language_through_its_inventory_binding(self):
+        data = {"inventory": [{"id": "native", "language": "c", "status": "ready"},
+                              {"id": "python", "language": "python", "status": "ready"}]}
+        corpus = [{"id": "native-case", "function_id": "native"},
+                  {"id": "python-case", "function_id": "python"}]
+        self.assertEqual(qualify_retained_source.python_case_id(data, corpus), "python-case")
 
 
 if __name__ == "__main__":

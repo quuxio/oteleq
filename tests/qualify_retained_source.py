@@ -58,9 +58,10 @@ def check_report(path: Path, exclusions: set[str], count: int = 8) -> set[str]:
     return attempts
 
 
-def framework(workspace: Path, folder: Path, name: str, exclusions: set[str]) -> set[str]:
+def framework(workspace: Path, folder: Path, name: str, exclusions: set[str], *, resume: bool = False) -> set[str]:
     """Check all eight retained framework replays without counting copies."""
-    text = command([sys.executable, workspace / "tests/test_equivalence.py"], folder, name)
+    text = ((folder / (name + ".stdout")).read_text() if resume else
+            command([sys.executable, workspace / "tests/test_equivalence.py"], folder, name))
     reports = [json.loads(line) for line in text.splitlines()]
     assert len(reports) == 8
     attempts = set()
@@ -122,23 +123,54 @@ def refusal_controls(cli: Path, provider: Path, application: Path, folder: Path,
     return len(controls)
 
 
+def python_case_id(data: dict, corpus: list[dict]) -> str:
+    """Corpus cases bind language through inventory; no language field is assumed."""
+    function = next(entry["id"] for entry in data["inventory"]
+                    if entry["language"] == "python" and entry["status"] == "ready")
+    return next(case["id"] for case in corpus if case["function_id"] == function)
+
+
+def resume_inputs(cli: Path, provider: Path, folder: Path) -> tuple[Path, Path, Path, Path]:
+    """Resume only after two complete routes, rechecking the exact frozen inputs."""
+    if any((folder / name).exists() for name in ("initial-replay.stdout", "detached", "application/retained-second")):
+        raise ValueError("resume requires only the first two routes; retain later partial evidence for inspection")
+    initial = Path((folder / "initial-plan.stdout").read_text().strip())
+    workspace = Path((folder / "replan-plan.stdout").read_text().strip())
+    for name, path in (("initial", initial), ("replan", workspace)):
+        data = json.loads((path / "plan.json").read_text())
+        if Path(data["otelc_root"]).resolve() != provider:
+            raise ValueError("resume provider differs from frozen plan")
+        command([cli, "export-tests", "--workspace", path, "--destination", folder / ("resume-check-" + name)],
+                folder, "resume-check-" + name)
+    for index in range(4):
+        assert "invalid retained oteleq workspace" in (folder / f"refusal-{index}.stderr").read_text()
+    return folder / "application", initial, folder / "policy.toml", workspace
+
+
 def main() -> None:
     """Retain four full execution routes, source guards and detached evidence."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--cli", type=Path, required=True)
     parser.add_argument("--otelc-root", type=Path, required=True)
     parser.add_argument("--report-dir", type=Path, required=True)
+    parser.add_argument("--resume", action="store_true")
     args = parser.parse_args()
     cli, provider = args.cli.resolve(strict=True), args.otelc_root.resolve(strict=True)
     folder = args.report_dir.resolve()
-    folder.mkdir(mode=0o700, exist_ok=False)
     os.environ.update(OTELEQ_CLI=str(cli), OTELEQ_PYTHON=sys.executable, PYTHONDONTWRITEBYTECODE="1")
-    application, initial, config = prepare(cli, provider, folder)
+    if args.resume:
+        application, initial, config, workspace = resume_inputs(cli, provider, folder)
+        controls = 4
+    else:
+        folder.mkdir(mode=0o700, exist_ok=False)
+        application, initial, config = prepare(cli, provider, folder)
+        retained = application / "retained"
+        command([cli, "export-tests", "--workspace", initial, "--destination", retained, "--apply"], folder, "retain")
+        controls = refusal_controls(cli, provider, application, folder, config)
+        workspace = plan(cli, provider, application, folder, config, "replan")
+        command([cli, "generate", "--workspace", workspace], folder, "generate")
+        command([cli, "run", "--workspace", workspace, "--report-dir", folder / "comparison"], folder, "run")
     first = json.loads((initial / "plan.json").read_text())
-    retained = application / "retained"
-    command([cli, "export-tests", "--workspace", initial, "--destination", retained, "--apply"], folder, "retain")
-    controls = refusal_controls(cli, provider, application, folder, config)
-    workspace = plan(cli, provider, application, folder, config, "replan")
     data = json.loads((workspace / "plan.json").read_text())
     assert data["source_manifest"] == first["source_manifest"] and len(data["source_manifest"]) == 8
     fields = ("id", "path", "language", "name", "status", "reason", "source_sha256")
@@ -146,11 +178,9 @@ def main() -> None:
         [entry[field] for field in fields] for entry in first["inventory"]]
     assert data["java_context"]["source_units"] == ["java/App.java"]
     assert [item["path"] for item in data["owned_source_exclusions"]] == ["retained"]
-    command([cli, "generate", "--workspace", workspace], folder, "generate")
-    command([cli, "run", "--workspace", workspace, "--report-dir", folder / "comparison"], folder, "run")
     attempts = check_report(folder / "comparison/report.json", {"retained"})
-    attempts |= framework(workspace, folder, "framework", {"retained"})
-    python_id = next(case["id"] for case in json.loads((initial / "tests/corpus.json").read_text()) if case["language"] == "python")
+    attempts |= framework(workspace, folder, "framework", {"retained"}, resume=args.resume)
+    python_id = python_case_id(first, json.loads((initial / "tests/corpus.json").read_text()))
     replay = json.loads(command([cli, "replay", "--workspace", initial, "--case", python_id], folder, "initial-replay"))
     attempts |= check_report(Path(replay["report"]), {"retained"}, 1)
     command([cli, "export-tests", "--workspace", workspace, "--destination", application / "retained-second", "--apply"], folder, "retain-second")
@@ -171,6 +201,7 @@ def main() -> None:
     command([cli, "export-tests", "--workspace", workspace, "--destination", folder / "identity-check"], folder, "identity-check")
     summary = {"claim": "equivalence over these tests and observations", "artefact_class": "diagnostic",
                "cli_sha256": hashlib.sha256(cli.read_bytes()).hexdigest(), "languages": list(LANGUAGES),
+               "driver_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(), "resumed": args.resume,
                "actual_application_launches": len(attempts), "refusal_controls": controls,
                "source_files_before_and_after_retention": 8, "selected_ready_functions": 8,
                "java_source_units": ["java/App.java"], "actual_attempt_directories": sorted(attempts),
