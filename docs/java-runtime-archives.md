@@ -10,7 +10,7 @@ The resolver follows the selected JDK's `JarFile` runtime APIs without loading a
 
 Compiler evidence retains its literal JAR URI and the digest of the bytes read. The physical member catalogue is separate from effective runtime classes. Both readings can be valid when the compiler and runtime select different members.
 
-On the characterised OpenJDK 21, a folded `Multi-Release: tr` value with continuation ` ue` parses as the attribute value `true`, while `JarFile.isMultiRelease()` is false. The ordinary JVM uses the base member, while javac and feature-matched javap can use a versioned member. The consumer delegates selection to the actual chosen JDK; it does not implement another manifest/version algorithm in Python or infer a unique entry from its hash.
+On the characterised OpenJDK 21, a folded `Multi-Release: tr` value with a continuation line containing a space followed by `ue` parses as the attribute value `true`, while `JarFile.isMultiRelease()` is false. The ordinary JVM uses the base member, while javac and feature-matched javap can use a versioned member. The consumer delegates selection to the actual chosen JDK; it does not implement another manifest/version algorithm in Python or infer a unique entry from its hash.
 
 Metadata inspection can use an owned private directory containing unmodified copies of exactly the selected class members. This directory is for inspection only. Application launches must retain their original ordered JAR/directory classpath and resource bytes. Tests check selected bytes through javap and verify that application initialisers have not executed. Identical bytes in base and versioned members do not permit a different claimed member identity.
 
