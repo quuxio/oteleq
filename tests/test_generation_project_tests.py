@@ -197,6 +197,14 @@ class ProjectSuiteTests(unittest.TestCase):
             {"function": "*selected", "cases": [["\U0001f642", 'a"b\\c\n']]}]})
         self.assertEqual(gen.project_policy.validate(tomllib.loads(project_tests.policy_text(configuration))), configuration)
 
+    def test_policy_export_preserves_escaped_ascii_control_characters(self):
+        for codepoint in [*range(32), 127]:
+            with self.subTest(codepoint=codepoint):
+                original = '[[fixtures]]\nfunction="*selected"\ncases=[["\\u' + format(codepoint, "04x") + '"]]\n'
+                configuration = gen.project_policy.validate(tomllib.loads(original))
+                actual = project_tests.policy_text(configuration)
+                self.assertEqual(gen.project_policy.validate(tomllib.loads(actual)), configuration)
+
     def test_resolved_optional_fields_and_unbounded_integer_expectations_roundtrip(self):
         configuration = gen.project_policy.validate({"fixtures": [{"function": "*selected", "cases": [[1]],
             "expected_baseline": {"kind": "return_value", "value": {

@@ -47,6 +47,8 @@ def toml_value(value) -> str:
 def policy_text(configuration: dict) -> str:
     """Keep the resolved policy, including CLI selection overrides, as TOML."""
     text = "\n".join(json.dumps(key, ensure_ascii=False) + "=" + toml_value(value) for key, value in configuration.items()) + "\n"
+    # JSON leaves DEL literal, whereas TOML requires its Unicode escape.
+    text = text.replace("\x7f", "\\u007f")
     if project_policy.validate(tomllib.loads(text)) != configuration:
         raise ValueError("resolved policy cannot be represented as TOML")
     return text

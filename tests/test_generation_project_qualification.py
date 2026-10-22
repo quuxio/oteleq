@@ -64,6 +64,8 @@ class ProjectQualificationOracleTests(unittest.TestCase):
         self.assertEqual(argument, {"kind": "string", "type": "python.string", "encoding": "codepoints32_be", "value": "0001f642"})
         returned = attempt["observation"]["outcome"]["graph"]["roots"]["result"]
         self.assertIsNone(returned["bits"])
+        control = oracle.graph("python", "text", ["\x7f"])
+        self.assertEqual(control["nodes"][0]["fields"]["item:0"]["value"], "0000007f")
         for graph in ("before", "after"):
             attempt["observation"][graph]["nodes"][0]["fields"]["item:0"]["value"] = "00000078"
         self.save(attempt)

@@ -9,7 +9,7 @@ import subprocess
 import sys
 
 from precondition_fixture_oracle import LANGUAGES, SEQUENCES, source
-from project_fixture_oracle import EMOJI, STAGES, check_suite
+from project_fixture_oracle import STAGES, TEXT_VALUES, check_suite
 from qualify_preconditions import fixture
 
 
@@ -43,7 +43,7 @@ def toml(value) -> str:
         return "{" + ",".join(key + "=" + toml(item) for key, item in value.items() if item is not None) + "}"
     if isinstance(value, list):
         return "[" + ",".join(map(toml, value)) + "]"
-    return json.dumps(value, ensure_ascii=False, allow_nan=False)
+    return json.dumps(value, ensure_ascii=False, allow_nan=False).replace("\x7f", "\\u007f")
 
 
 def policy(path: Path, *, preflight: bool = False) -> None:
@@ -54,7 +54,7 @@ def policy(path: Path, *, preflight: bool = False) -> None:
         if language in SEQUENCES:
             kinds.append("sequence")
         fixtures.extend(fixture(language, kind) for kind in kinds)
-    fixtures.append({"source": "python/app.py", "function": "*current_text", "cases": [[EMOJI]],
+    fixtures.append({"source": "python/app.py", "function": "*current_text", "cases": [[value] for value in TEXT_VALUES],
         "expected_baseline": {"kind": "return_value", "value": {
             "kind": "integer", "type": "python.int", "value": "1", "signed": True}}})
     includes = ["*Meter.numeric_step*", "*current_text"] if preflight else [
@@ -115,7 +115,7 @@ def suite(bundle: Path, folder: Path, name: str, stage: str, *, preflight: bool 
     assert application_sources(source_path or bundle.parent) == before
     plan = json.loads((workspace / "plan.json").read_text())
     assert plan["source_manifest"] == before
-    count = 4 if preflight else STAGES[stage][1]
+    count = 5 if preflight else STAGES[stage][1]
     assert "Ran " + str(count) + " test" in (folder / (name + ".stderr")).read_text()
     write(folder / (name + ".checked.json"), {"workspace": str(workspace), "stage": stage,
         "source_manifest": before, "cases": count, "attempts": sorted(attempts)})
@@ -242,7 +242,7 @@ def full_routes(cli: Path, provider: Path, folder: Path, application: Path) -> t
     _, observed = suite(external, folder, "different", "different", source_path=application)
     assert attempts.isdisjoint(observed)
     attempts |= observed
-    assert len(attempts) == 900
+    assert len(attempts) == 916
     return application, external, attempts
 
 
@@ -273,7 +273,7 @@ def main() -> None:
     assert attempts.isdisjoint(observed)
     attempts |= observed
     controls = refusal_controls(cli, provider, folder, external, application)
-    assert len(attempts) == 916
+    assert len(attempts) == 936
     write(folder / "qualification.json", {"status": "complete", "claim": "equivalence over these tests and observations",
         "cli": str(cli), "provider": str(provider), "cli_sha256": digest(cli),
         "actual_launches": len(attempts), "prelaunch_refusals": controls,

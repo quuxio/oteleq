@@ -9,7 +9,8 @@ from precondition_fixture_oracle import check_sequence, pairs, plain_graph
 from qualify_returns import scalar
 
 EMOJI = "\U0001f642"
-STAGES = {"initial": (20, 52), "changed": (20, 52), "added": (28, 60), "different": (29, 61)}
+TEXT_VALUES = (EMOJI, "\x7f")
+STAGES = {"initial": (20, 53), "changed": (20, 53), "added": (28, 61), "different": (29, 62)}
 
 
 def kind_of(entry: dict) -> str:
@@ -24,7 +25,7 @@ def kind_of(entry: dict) -> str:
 def arguments_for(language: str, kind: str) -> list[list]:
     if kind in ("integer", "float", "sequence"):
         return pairs(language, kind)
-    return [[EMOJI]] if kind == "text" else [[]]
+    return [[value] for value in TEXT_VALUES] if kind == "text" else [[]]
 
 
 def graph(language: str, kind: str, arguments: list, result: int | None = None) -> dict:
@@ -34,7 +35,7 @@ def graph(language: str, kind: str, arguments: list, result: int | None = None) 
     value = {"roots": {}, "nodes": []}
     if language == "python":
         value = {"roots": {"arguments": reference("n0")}, "nodes": [{"id": "n0", "type": "python.builtins.list",
-            "fields": {"item:0": typed(language, "string", EMOJI)} if kind == "text" else {}}]}
+            "fields": {"item:0": typed(language, "string", arguments[0])} if kind == "text" else {}}]}
     elif language in ("javascript", "typescript"):
         value = {"roots": {"arguments": reference("n0")}, "nodes": [object_node(language, "n0",
             "ecmascript.array.prototype:Array", {"length": number(language, 0)}, array=True)]}
@@ -114,7 +115,7 @@ def check_suite(stdout: Path, stage: str, *, preflight: bool = False) -> tuple[P
     data = json.loads((workspace / "plan.json").read_text())
     ready = [entry for entry in data["inventory"] if entry["status"] == "ready"]
     assert not any(entry["status"] == "blocked" for entry in data["inventory"])
-    functions, count = (4, 4) if preflight else STAGES[stage]
+    functions, count = (4, 5) if preflight else STAGES[stage]
     assert len(ready) == functions and len(records) == count + 1
     expected_kinds = {"sequence", "text"} if preflight else {"integer", "float", "sequence", "text"}
     if stage in ("added", "different"):
