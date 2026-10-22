@@ -8,6 +8,8 @@
 
 ## Current workspace
 
+[Declared independent scalar domains](domain-generation.md) can generate concrete case values without a literal `cases` list. Planning freezes the requests in the inventory, and retained suites consume those values. Existing explicit case lists keep their values and order. Relational preconditions and richer argument/factory generation remain open.
+
 [Declared scalar return values](expected-returns.md) optionally check an independently known result in every baseline repeat and declared sequence call. Equal results that violate the fixture expectation remain blocked. The same contract is retained by generated suites, replay, export and scalar shrinking.
 
 `plan` creates a new private `oteleq-run-*` directory outside the application and otelc repositories. `--workspace-parent` selects its parent; the default uses a qualified operating-system temporary parent. Use the actual path printed by `plan`. The selected original source is copied, without writable hard links, into an immutable snapshot. Discovery, helpers and builds operate on private copies, and source identities are checked again.

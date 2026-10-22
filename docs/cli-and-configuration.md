@@ -2,7 +2,7 @@
 
 ## Status
 
-Updated 22 October 2026. `quux-oteleq` implements the commands below. The scalar workflow uses embedded workers and a frozen JSON workspace contract. The generator consumes a validated TOML selection/input/budget policy through `plan --config`, including explicit expected baseline outcomes and independent scalar domains for shrinking. Generated workers for all eight language IDs retain raw evidence and emit the versioned typed boundary graph bundle for `compare-observations`. The later build/observer configuration and adapter sections describe proposed interfaces; project build integration and richer object/factory codecs remain incomplete.
+Updated 22 October 2026. `quux-oteleq` implements the commands below. The scalar workflow uses embedded workers and a frozen JSON workspace contract. The generator consumes a validated TOML selection/input/budget policy through `plan --config`, including explicit expected baseline outcomes and independent scalar domains for [automatic input generation](domain-generation.md) and shrinking. Generated workers for all eight language IDs retain raw evidence and emit the versioned typed boundary graph bundle for `compare-observations`. The later build/observer configuration and adapter sections describe proposed interfaces; project build integration and richer object/factory codecs remain incomplete.
 
 ## Implemented commands
 

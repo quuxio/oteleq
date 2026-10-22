@@ -285,6 +285,8 @@ def qualify_entry(entry, snapshot, count):
         node_project.require_callable(entry)
         if entry.get("go_shadowed_recovery", False):
             raise ValueError("shadowed Go panic/recover requires an observation fixture")
+        if "input_domains" in entry and "input_cases" not in entry:
+            entry["input_cases"] = harness.domain_cases(entry, count)
         harness.corpus(entry, count)
         outputs = harness.INTEGERS | harness.FLOATS | harness.BOOLS | harness.VOIDS | harness.STRINGS
         if entry["language"] in ("c", "cpp"):
@@ -441,7 +443,8 @@ def configure_fixture(entry, discovered, fixture):
     """Keep reviewed input, receiver and expected-outcome declarations together."""
     entry["expected_baseline"] = fixture["expected_baseline"] if fixture else {"kind": "return"}
     if fixture is not None:
-        entry["input_cases"] = fixture["cases"]
+        if "cases" in fixture:
+            entry["input_cases"] = fixture["cases"]
         if "receiver" in fixture:
             receiver_fixture(entry, discovered, fixture["receiver"])
         if "domains" in fixture:

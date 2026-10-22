@@ -1,10 +1,13 @@
-"""Declared scalar domains and deterministic, strictly simpler candidate values."""
+"""Declared scalar domains, bounded input sampling and strictly simpler candidates."""
 import json
+import itertools
 import math
+import random
 import struct
 from typing import Any, Iterator
 
 MAX_STRING = 4096
+MAX_CASES = 1024
 
 
 def finite(value: Any) -> bool:
@@ -91,6 +94,11 @@ def float_step(value: float, target: float, width: int) -> float:
     """Move one representable value towards the anchor in the actual scalar width."""
     if width == 64:
         return math.nextafter(value, target)
+    if value == target:
+        return struct.unpack('>f', struct.pack('>f', target))[0]
+    if value == 0:
+        bits = 1 if target > 0 else 0x80000001
+        return struct.unpack('>f', bits.to_bytes(4, 'big'))[0]
     bits = int.from_bytes(struct.pack('>f', value), 'big')
     bits += -1 if (value > target) == (value > 0) else 1
     return struct.unpack('>f', bits.to_bytes(4, 'big'))[0]
@@ -145,3 +153,105 @@ def string_reductions(value: str, domain: dict) -> Iterator[str]:
     first = domain["alphabet"][0]
     for index in range(len(value)):
         yield value[:index] + first + value[index + 1:]
+
+
+def sample_count(domain: dict, budget: int) -> int:
+    """Stop at finite cardinality without expanding an entire Cartesian domain."""
+    kind = domain["kind"]
+    if kind == "boolean":
+        return min(budget, 2)
+    if kind == "integer":
+        return min(budget, domain["maximum"] - domain["minimum"] + 1)
+    if kind == "float":
+        if domain["minimum"] == domain["maximum"]:
+            return min(budget, 2 if domain["minimum"] == 0 else 1)
+        return budget
+    size = 0
+    for length in range(domain["minimum_length"], domain["maximum_length"] + 1):
+        size += len(domain["alphabet"]) ** length
+        if size >= budget:
+            return budget
+    return size
+
+
+def sample_edges(domain: dict) -> list:
+    """Prefer zero or its nearest endpoint, bounds and a central value."""
+    kind = domain["kind"]
+    if kind == "boolean":
+        return [False, True]
+    if kind == "string":
+        alphabet = domain["alphabet"]
+        return [alphabet[0] * domain["minimum_length"], alphabet[0] * domain["maximum_length"],
+                alphabet[-1] * domain["minimum_length"], alphabet[-1] * domain["maximum_length"]]
+    low, high = domain["minimum"], domain["maximum"]
+    middle = (low + high) // 2 if kind == "integer" else low / 2 + high / 2
+    return [anchor(domain), low, high, middle, *([0.0, -0.0] if kind == "float" and low <= 0 <= high else [])]
+
+
+def sample_draws(domain: dict, count: int, rng: random.Random) -> Iterator:
+    """Use a local seeded generator with a fixed exploration bound."""
+    for _ in range(count * 8):
+        kind = domain["kind"]
+        if kind == "boolean":
+            yield bool(rng.getrandbits(1))
+        elif kind == "integer":
+            yield rng.randint(domain["minimum"], domain["maximum"])
+        elif kind == "float":
+            fraction = rng.random()
+            value = (1 - fraction) * domain["minimum"] + fraction * domain["maximum"]
+            yield max(domain["minimum"], min(domain["maximum"], value))
+        else:
+            length = rng.randint(domain["minimum_length"], domain["maximum_length"])
+            yield "".join(rng.choice(domain["alphabet"]) for _ in range(length))
+
+
+def sample_fallback(domain: dict, width: int) -> Iterator:
+    """Fill small finite pools lazily instead of relying on random collisions."""
+    kind = domain["kind"]
+    if kind == "boolean":
+        yield from (False, True)
+    elif kind == "integer":
+        yield from range(domain["minimum"], domain["maximum"] + 1)
+    elif kind == "string":
+        for length in range(domain["minimum_length"], domain["maximum_length"] + 1):
+            for characters in itertools.product(domain["alphabet"], repeat=length):
+                yield "".join(characters)
+    else:
+        value, high = domain["minimum"], domain["maximum"]
+        while value <= high:
+            yield value
+            if value == high:
+                break
+            following = float_step(value, high, width)
+            if following <= value:
+                break
+            value = following
+
+
+def floating_sample(value: Any, width: int) -> float:
+    """Round before de-duplication so narrow target domains remain bounded."""
+    try:
+        return struct.unpack('>f', struct.pack('>f', value))[0] if width == 32 else float(value)
+    except OverflowError as error:
+        raise ValueError("declared domain exceeds the floating representation") from error
+
+
+def samples(domain: dict, count: int, rng: random.Random, *, width: int = 64) -> list:
+    """Materialise bounded independent scalar values, retaining exact distinctions."""
+    domain = validate(domain)
+    if type(count) is not int or not 1 <= count <= MAX_CASES or width not in (32, 64):
+        raise ValueError("invalid declared-domain sample budget or floating width")
+    target = sample_count(domain, count)
+    values = {}
+    candidates = itertools.chain(sample_edges(domain), sample_draws(domain, target, rng),
+                                 sample_fallback(domain, width))
+    for value in candidates:
+        if domain["kind"] == "float":
+            value = floating_sample(value, width)
+        if contains(value, domain):
+            values.setdefault(key([value]), value)
+            if len(values) == target:
+                break
+    if not values:
+        raise ValueError("declared domain has no representable generated values")
+    return list(values.values())

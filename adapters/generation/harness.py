@@ -1,6 +1,7 @@
 """Deterministic scalar corpora and diagnostic harness materialisation."""
 import json
 import ctypes
+import itertools
 import math
 import posixpath
 from pathlib import Path
@@ -31,6 +32,7 @@ FLOATS = {"float", "double", "f32", "f64", "float32", "float64", "number"}
 STRINGS = {"str", "string", "String", "java.lang.String"}
 BOOLS = {"bool", "boolean", "_Bool"}
 VOIDS = {"void", "()", "None", "NoneType"}
+MAX_DOMAIN_INPUT_BYTES = 1024 * 1024
 
 
 def native_scalar_types(language: str) -> set[str]:
@@ -168,9 +170,99 @@ def scalar_sample(name: str, language: str, rng: random.Random):
     return "".join(rng.choice("abcXYZ0129 ") for _ in range(rng.randrange(1, 25)))
 
 
+def integer_domain(name: str, language: str, domain: dict) -> dict:
+    """Refuse declared integer bounds which exceed the qualified target range."""
+    if name in INTEGERS:
+        low, high = integer_range(name, language)
+    elif language in ("javascript", "typescript") and name in FLOATS | {"dynamic", "unknown"}:
+        low, high = -(2**53 - 1), 2**53 - 1
+    elif language == "python" and name in ("dynamic", "unknown"):
+        low = high = None
+    else:
+        raise ValueError("automatic integer domain requires an integer or supported Node numeric parameter")
+    if low is not None and (domain["minimum"] < low or domain["maximum"] > high):
+        raise ValueError("declared integer domain exceeds the qualified target range: " + name)
+    return domain
+
+
+def floating_domain(name: str, language: str, domain: dict) -> tuple[dict, int]:
+    """Select inward representable endpoints without changing the declared interval."""
+    dynamic = language in ("python", "javascript", "typescript") and name in ("dynamic", "unknown")
+    if name not in FLOATS and not dynamic:
+        raise ValueError("automatic floating domain requires a floating or supported dynamic parameter")
+    width = float_width(name, language)
+    for bound in (domain["minimum"], domain["maximum"]):
+        validate_float(bound, name, language)
+    representation = ">f" if width == 32 else ">d"
+    low, high = (struct.unpack(representation, struct.pack(representation, float(domain[key])))[0]
+                 for key in ("minimum", "maximum"))
+    if low < domain["minimum"]:
+        low = domains.float_step(low, math.inf, width)
+    if high > domain["maximum"]:
+        high = domains.float_step(high, -math.inf, width)
+    if low > high or not domains.contains(low, domain) or not domains.contains(high, domain):
+        raise ValueError("declared domain has no representable target value")
+    return {**domain, "minimum": low, "maximum": high}, width
+
+
+def domain_pool(entry: dict, index: int, domain: dict, count: int, rng: random.Random) -> list:
+    """Check generated requests before and after the actual target coercion."""
+    name, language = scalar_type(entry["parameters"][index]), entry["language"]
+    selected, width = domain, 64
+    if domain["kind"] == "integer":
+        selected = integer_domain(name, language, domain)
+    elif domain["kind"] == "float":
+        selected, width = floating_domain(name, language, domain)
+    values = {}
+    scalar = {"parameters": [entry["parameters"][index]], "language": language}
+    for requested in domains.samples(selected, count, rng, width=width):
+        actual = concrete_arguments(scalar, [requested])[0]
+        if not domains.contains(requested, domain) or not domains.contains(actual, domain):
+            raise ValueError("generated input does not satisfy its declared scalar domain")
+        if domain["kind"] == "integer" and actual != requested:
+            raise ValueError("generated integer is not exactly representable in the target")
+        values.setdefault(domains.key([actual]), requested)
+    return list(values.values())
+
+
+def domain_cases(entry: dict, count: int, seed: int = 20261008) -> list[list]:
+    """Freeze bounded combinations of independent pools valid for the target."""
+    if type(count) is not int or not 1 <= count <= domains.MAX_CASES:
+        raise ValueError("invalid generated domain case budget")
+    declared = entry["input_domains"]
+    if len(declared) != len(entry["parameters"]):
+        raise ValueError("declared domain argument count differs from the callable")
+    rng, pools, size = random.Random(entry.get("generation_seed", seed)), [], 0
+    for index, domain in enumerate(declared):
+        pool = domain_pool(entry, index, domain, count, rng)
+        size += len(domains.key(pool).encode())
+        if size > MAX_DOMAIN_INPUT_BYTES:
+            raise ValueError("generated domain pools exceed their input byte budget")
+        pools.append(pool)
+    if not pools:
+        return [[]]
+    diagonal = ([pool[index % len(pool)] for pool in pools] for index in range(count))
+    values, size = {}, 0
+    for candidate in itertools.chain(diagonal, itertools.product(*pools)):
+        requested = list(candidate)
+        actual = concrete_arguments(entry, requested)
+        token = domains.key(actual)
+        if token in values:
+            continue
+        size += len(domains.key(requested).encode())
+        if size > MAX_DOMAIN_INPUT_BYTES:
+            raise ValueError("generated domain cases exceed their input byte budget")
+        values[token] = requested
+        if len(values) == count:
+            break
+    return list(values.values())
+
+
 def corpus(entry, count, seed=20261008):
-    if "input_cases" in entry:
-        concrete = [concrete_arguments(entry, arguments) for arguments in entry["input_cases"]]
+    """Use frozen fixture requests before any deterministic scalar sampling."""
+    if "input_cases" in entry or "input_domains" in entry:
+        requested = entry["input_cases"] if "input_cases" in entry else domain_cases(entry, count, seed)
+        concrete = [concrete_arguments(entry, arguments) for arguments in requested]
         if "input_domains" in entry:
             for arguments in concrete:
                 domains.arguments(arguments, entry["input_domains"])
