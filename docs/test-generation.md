@@ -12,6 +12,8 @@
 
 The [exact-revision domain corpus](qualification/domain-generation-2026-10-22.json) checks 30 functions and 82 initial cases through all four direct/framework/detached routes, then frozen replay, reduction and seeded inputs: 1,384 actual launches. Its two deliberate differences per full route remain failures in generated unittest and JUnit output. Fourteen refused domain contracts cannot become passing empty suites.
 
+The separate [numeric-precondition corpus](qualification/numeric-preconditions-2026-10-22.json) checks 20 functions and 54 initial cases through 912 distinct launches, including Java/Node ordered calls, all four retained routes, frozen replay and relation-preserving reduction. Twenty-four invalid contracts refuse before application execution. Its three intentional differences remain failures; three excluded constructors are separately visible in HTML/JUnit.
+
 [Declared scalar return values](expected-returns.md) optionally check an independently known result in every baseline repeat and declared sequence call. Equal results that violate the fixture expectation remain blocked. The same contract is retained by generated suites, replay, export and scalar shrinking.
 
 `plan` creates a new private `oteleq-run-*` directory outside the application and otelc repositories. `--workspace-parent` selects its parent; the default uses a qualified operating-system temporary parent. Use the actual path printed by `plan`. The selected original source is copied, without writable hard links, into an immutable snapshot. Discovery, helpers and builds operate on private copies, and source identities are checked again.

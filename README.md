@@ -39,7 +39,7 @@ The [original-source Rust compiler corpus](docs/rust-build-bundles.md) qualifies
 
 The result is **equivalence over these tests and observations**. It is not a blanket proof that every function is identical.
 
-Declared [numeric argument preconditions](docs/numeric-preconditions.md), such as `start < end`, constrain automatic domain generation and scalar reduction. They remain frozen through generated suites and replay/export, and apply to every supported ordered method call. The new capability has component coverage; actual-provider qualification is pending.
+Declared [numeric argument preconditions](docs/numeric-preconditions.md), such as `start < end`, constrain automatic domain generation and scalar reduction. They remain frozen through generated suites and replay/export, and apply to every supported ordered method call. Their [912-launch qualification](docs/qualification/numeric-preconditions-2026-10-22.json) covers all eight scalar profiles, Java/Node ordered calls, all four retained routes, replay, reduction and 24 prelaunch refusals.
 
 [Node caller context](docs/node-source-context.md) preserves actual CommonJS/ES-module formats across original sources, private snapshots and generated callers, including `.js`/`.ts` package interpretation. Its [245-launch qualification](docs/qualification/node-projects-2026-10-22.json) covers eleven module contexts, declared receivers, detached suites, replay, reduction and refusal controls; the existing receiver corpus separately passes 186 launches on that same CLI. General Node dependency/build integration remains open.
 
