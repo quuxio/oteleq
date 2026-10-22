@@ -26,10 +26,13 @@ CONTEXTS = (
 )
 
 
-def fixture(context: tuple, *, receiver: bool = False, different: bool = False) -> tuple[dict, str, str | None]:
+def fixture(context: tuple, *, receiver: bool = False, different: bool = False,
+            node_options: dict | None = None) -> tuple[dict, str, str | None]:
     """Declare fixed source and complete expected values independently of workers."""
     name, suffix, package_type, module_format = context
     language = "typescript" if suffix in (".ts", ".mts", ".cts") else "javascript"
+    if node_options and name == "ts-default":
+        module_format = "module"
     annotation = ":number" if language == "typescript" else ""
     if receiver:
         source = ("class Counter {\nconstructor(start" + annotation
@@ -42,20 +45,29 @@ def fixture(context: tuple, *, receiver: bool = False, different: bool = False) 
         source = "let state=2;\n" + prefix + "function selected(n" + annotation + "){state+=n" + extra + ";return " + result + ";}\n"
     source += 'console.log(typeof require==="function"?"commonjs":"module");\n'
     source += '// trailing source comment without a final newline'
+    if node_options:
+        source = source.replace('/node/register.mjs', '/node-bootstrap.cjs')
     package_text = json.dumps({"type": package_type}) + "\n" if package_type else None
     spec = {"context": name, "filename": "sample" + suffix, "language": language,
             "format": module_format, "receiver": receiver, "different": different,
             "function": "sample.Counter.add" if receiver else "sample.selected",
             "source_sha256": hashlib.sha256(source.encode()).hexdigest(),
             "package": {"path": "package.json", "sha256": hashlib.sha256(package_text.encode()).hexdigest()} if package_text else None}
+    if node_options:
+        spec["node_options"] = node_options
     return spec, source, package_text
+
+
+def node_policy(options: dict | None) -> str:
+    """Freeze the selected provider separately from the legacy default."""
+    return "[adapters.node]\n" + "".join(key + "=" + json.dumps(value) + "\n" for key, value in options.items()) if options else ""
 
 
 def policy(spec: dict) -> str:
     """Use one known concrete input and an independently declared return value."""
     result = 17.0 if spec["receiver"] else 7.0 if spec["different"] else 16.0
     value = ("schema_version=1\nlanguages=" + json.dumps([spec["language"]])
-             + "\n[functions]\ninclude=" + json.dumps([spec["function"]])
+             + "\n" + node_policy(spec.get("node_options")) + "[functions]\ninclude=" + json.dumps([spec["function"]])
              + "\n[[fixtures]]\nfunction=" + json.dumps(spec["function"]) + "\ncases=[[7]]\n"
              + 'expected_baseline={kind="return_value",value={kind="float",type="'
              + spec["language"] + '.float64",bits="' + oracle.number(spec["language"], result)["bits"] + '"}}\n')
@@ -144,9 +156,9 @@ def reduction(cli: Path, folder: Path, workspace: Path, spec: dict) -> set[str]:
 
 def qualify(cli: Path, provider: Path, destination: Path, context: tuple,
             node_version: str, direct: Path | None = None, *, receiver: bool = False,
-            different: bool = False) -> dict:
+            different: bool = False, node_options: dict | None = None) -> dict:
     """Qualify one frozen module context through all consumer routes."""
-    spec, source, package = fixture(context, receiver=receiver, different=different)
+    spec, source, package = fixture(context, receiver=receiver, different=different, node_options=node_options)
     spec["node_version"] = node_version
     folder = destination / (spec["context"] + ("-receiver" if receiver else "-difference" if different else ""))
     if direct is not None:
@@ -169,9 +181,9 @@ def qualify(cli: Path, provider: Path, destination: Path, context: tuple,
             "actual_application_launches": len(launches), "application_command_identities": sorted(launches), "source_preserved": True}
 
 
-def refusal(cli: Path, provider: Path, destination: Path, kind: str) -> dict:
+def refusal(cli: Path, provider: Path, destination: Path, kind: str, *, node_options: dict | None = None) -> dict:
     """Prove unsafe context is refused before launching an application."""
-    spec, source, package = fixture(CONTEXTS[4])
+    spec, source, package = fixture(CONTEXTS[4], node_options=node_options)
     folder = destination / kind
     if kind == "shadowed-require":
         source = "const require=()=>({});\n" + source
@@ -208,7 +220,7 @@ def refusal(cli: Path, provider: Path, destination: Path, kind: str) -> dict:
     return {"control": kind, "exit_code": expected, "actual_application_launches": 0}
 
 
-def ambient_refusal(cli: Path, provider: Path, destination: Path) -> dict:
+def ambient_refusal(cli: Path, provider: Path, destination: Path, *, node_options: dict | None = None) -> dict:
     """An original parent package cannot disappear silently in a private snapshot."""
     folder = destination / "ambient-package"
     folder.mkdir()
@@ -220,8 +232,10 @@ def ambient_refusal(cli: Path, provider: Path, destination: Path) -> dict:
     (folder / "package.json").write_text('{"type":"module"}\n')
     parent = destination / "isolated-workspaces"
     parent.mkdir()
+    config = folder / "equivalence.toml"
+    config.write_text('schema_version=1\nlanguages=["javascript"]\n' + node_policy(node_options))
     workspace = Path(command([cli, "plan", "--source", source, "--otelc-root", provider,
-        "--workspace-parent", parent, "--language", "javascript"], folder, "plan"))
+        "--workspace-parent", parent, "--config", config], folder, "plan"))
     command([cli, "generate", "--workspace", workspace], folder, "generate")
     comparison = folder / "comparison"
     command([cli, "run", "--workspace", workspace, "--report-dir", comparison], folder, "run", expected=3)
@@ -232,9 +246,9 @@ def ambient_refusal(cli: Path, provider: Path, destination: Path) -> dict:
     return {"control": "ambient-package", "exit_code": 3, "actual_application_launches": 0}
 
 
-def rebound_refusal(cli: Path, provider: Path, destination: Path) -> dict:
+def rebound_refusal(cli: Path, provider: Path, destination: Path, *, node_options: dict | None = None) -> dict:
     """Startup rebinding cannot substitute a different callable for the source body."""
-    spec, source, package = fixture(CONTEXTS[4])
+    spec, source, package = fixture(CONTEXTS[4], node_options=node_options)
     folder = destination / "rebound-callable"
     source += "\nselected=()=>99;\n"
     workspace = prepare(cli, provider, folder, spec, source, package)
@@ -255,7 +269,10 @@ def main() -> None:
     parser.add_argument("--otelc-root", type=Path, required=True)
     parser.add_argument("--report-dir", type=Path, required=True)
     parser.add_argument("--direct-matrix", type=Path)
+    parser.add_argument("--node-backend", choices=("legacy", "source-v1"), default="legacy")
+    parser.add_argument("--typescript-compiler", choices=("native", "api"), default="native")
     args = parser.parse_args()
+    node_options = {"backend": "source-v1", "typescript_compiler": args.typescript_compiler} if args.node_backend == "source-v1" else None
     cli, provider, destination = args.cli.resolve(strict=True), args.otelc_root.resolve(strict=True), args.report_dir.resolve()
     if destination.is_relative_to(provider) or destination.is_relative_to(Path(__file__).resolve().parents[1]):
         parser.error("report directory must be new and outside both repositories")
@@ -265,15 +282,18 @@ def main() -> None:
     version = subprocess.run([node, "--version"], capture_output=True, text=True, check=True).stdout.strip()
     results = []
     for context in CONTEXTS:
-        results.append(qualify(cli, provider, destination, context, version, args.direct_matrix))
+        results.append(qualify(cli, provider, destination, context, version, args.direct_matrix, node_options=node_options))
         (destination / "progress.json").write_text(json.dumps(results, indent=2) + "\n")
     for context in (CONTEXTS[4], CONTEXTS[10]):
-        results.append(qualify(cli, provider, destination, context, version, receiver=True))
-    results.append(qualify(cli, provider, destination, CONTEXTS[4], version, different=True))
-    controls = [refusal(cli, provider, destination, kind) for kind in ("shadowed-require", "changed-source", "forged-format")]
-    controls.extend((ambient_refusal(cli, provider, destination), rebound_refusal(cli, provider, destination)))
+        results.append(qualify(cli, provider, destination, context, version, receiver=True, node_options=node_options))
+    results.append(qualify(cli, provider, destination, CONTEXTS[4], version, different=True, node_options=node_options))
+    controls = [refusal(cli, provider, destination, kind, node_options=node_options)
+                for kind in ("shadowed-require", "changed-source", "forged-format")]
+    controls.extend((ambient_refusal(cli, provider, destination, node_options=node_options),
+                     rebound_refusal(cli, provider, destination, node_options=node_options)))
     summary = {"claim": "equivalence over these tests and observations", "artefact_class": "diagnostic",
-               "cli_sha256": oracle.digest(cli), "cases": results, "controls": controls,
+               "cli_sha256": oracle.digest(cli), "node_provider": node_options or {"backend": "legacy"},
+               "cases": results, "controls": controls,
                "actual_application_launches": sum(r["actual_application_launches"] for r in [*results, *controls]),
                "scope": "Fixed source formats and supported own state; dependency installation, semantic TypeScript builds and shipping artefacts remain open."}
     (destination / "QUALIFICATION.json").write_text(json.dumps(summary, indent=2) + "\n")

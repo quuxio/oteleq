@@ -7,6 +7,7 @@ JAVA_PROFILE ?= stock-methods-v1
 MARKDOWNLINT ?= ./ci/markdownlint/node_modules/.bin/markdownlint
 
 .PHONY: generation-project-tests-otelc generation-preconditions-otelc generation-domains-otelc generation-input-walks-otelc generation-retained-source-otelc generation-native-project-otelc generation-return-otelc generation-java-sequence-otelc generation-java-controls-otelc generation-java-project-otelc generation-java-archive-otelc generation-node-project-otelc
+.PHONY: node-source-context-check
 
 .PHONY: help setup lint examples docs-check observer-check generation-check effect-qualification-check node-observer-check node-sequence-check java-observer-check go-observer-check cpp-observer-check generation-cpp-receiver-otelc generation-go-receiver-otelc generation-java-receiver-otelc generation-otelc generation-policy-otelc generation-rust-otelc rust-semantic-otelc generation-native-otelc generation-shrink-otelc generation-python-project-otelc generation-receiver-otelc generation-node-receiver-otelc generation-go-build-otelc generation-go-project-otelc generation-sequence-otelc generation-typescript-sequence-otelc generation-filesystem-otelc generation-http-otelc resource-otelc capture-otelc report core-check coverage check
 
@@ -103,7 +104,10 @@ go-observer-check:
 cpp-observer-check:
 	$(PYTHON) ci/cpp_coverage.py
 
-generation-check: node-observer-check node-sequence-check java-observer-check go-observer-check cpp-observer-check effect-qualification-check
+node-source-context-check:
+	$(NODE) --test --experimental-test-coverage --test-coverage-include='adapters/generation/node_source_context.mjs' --test-coverage-lines=80 --test-coverage-functions=80 --test-coverage-branches=80 tests/node_source_context.test.mjs
+
+generation-check: node-observer-check node-sequence-check node-source-context-check java-observer-check go-observer-check cpp-observer-check effect-qualification-check
 	$(PYTHON) -m coverage run --data-file=.generation.coverage --source=adapters/generation,ci -m unittest discover -s tests -p 'test_generation*.py' -v
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/generation.py' --fail-under=80
@@ -116,6 +120,13 @@ generation-check: node-observer-check node-sequence-check java-observer-check go
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_archive_context.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_helper_binding.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/node_project.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/node_source.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/node_source_worker.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/node_source_context.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/node_launch.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/node_inputs.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/node_execution.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/node_telemetry.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_health.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_provider.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_profiles.py' --fail-under=80
@@ -224,12 +235,12 @@ generation-java-controls-otelc:
 generation-node-project-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_node_project.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
+	$(PYTHON) tests/qualify_node_project.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" $(GENERATION_ARGS)
 
 generation-node-receiver-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_node_receivers.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
+	$(PYTHON) tests/qualify_node_receivers.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" $(GENERATION_ARGS)
 
 generation-go-build-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"

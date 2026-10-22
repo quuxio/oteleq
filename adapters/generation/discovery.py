@@ -209,7 +209,7 @@ def attach_cpp_models(inventory: dict, document: dict, path: Path) -> None:
                             + [item for item in inventory["globals"] if item.get("inaccessible")] + unbound)
 
 
-def discover(path, language, root, tools, execute):
+def discover(path, language, root, tools, execute, *, node_source=False):
     here = Path(__file__).parent
     if language == "python":
         return python_inventory(path.read_text())
@@ -221,6 +221,8 @@ def discover(path, language, root, tools, execute):
         command = [compiler, *native_flags(language), "-Xclang", "-ast-dump=json", "-fsyntax-only", path]
     elif language in ("javascript", "typescript"):
         command = [tools[language], here / "discover.mjs", root]
+        if node_source:
+            command.append("source-v1")
     elif language == "go":
         command = [tools[language], "run", here / "discover.go", "--", path]
     else:

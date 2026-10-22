@@ -33,6 +33,9 @@ import java_archive_context
 import java_telemetry
 import node_receivers
 import node_project
+import node_source
+import node_launch
+import node_telemetry
 import owned_workspace
 import native_profile
 import otelc_capture as capture
@@ -238,6 +241,10 @@ def discovery_tools(root: Path, language: str, adapters: dict) -> tuple[dict, di
     """Resolve the selected compiler/runtime tools and their provider identities."""
     rust_backend = adapters.get("rust", {}).get("backend", "compiler")
     selected = capture.selected_tools(root, language)
+    if language in node_source.LANGUAGES and adapters.get("node", {}).get("backend") == node_source.SOURCE:
+        selected = {name: path.resolve(strict=True) for name, path in selected.items()}
+        selected["python-host"] = Path(sys.executable).absolute()
+        return selected, node_source.artefacts(root, selected)
     if language == "java":
         selected["javac"] = capture.tool_path(str(selected["java"].parent / "javac"))
         selected["java-modules"] = java_build.module_image(selected["java"])
@@ -268,11 +275,16 @@ def discover_file(name, language, root, snapshot, workspace, tools, artefacts, a
         if language == "go" and adapters.get("go", {}).get("module_roots"):
             return go_project.discover(snapshot / name, snapshot, adapters["go"], tools[language]["go"],
                                        discover_execute, adapter_state.setdefault("go_cache", {}))
-        discovered = discovery.discover(snapshot / name, language, root, tools[language], discover_execute)
+        source_node = language in node_source.LANGUAGES and adapters.get("node", {}).get("backend") == node_source.SOURCE
+        discovery_options = {"node_source": True} if source_node else {}
+        discovered = discovery.discover(snapshot / name, language, root, tools[language], discover_execute, **discovery_options)
         if language in ("javascript", "typescript"):
             original = Path(adapter_state["source"]) if "source" in adapter_state else None
+            options = ({"source_backend": adapters["node"]["typescript_compiler"],
+                        "evidence": workspace / node_source.DIRECTORY / "context" / identity(name)}
+                       if source_node and language == "typescript" else {})
             discovered.update(node_project.inventory_context(snapshot / name, snapshot, original, language,
-                                                             root, tools[language][language], discover_execute))
+                                                             root, tools[language][language], discover_execute, **options))
         return discovered
     except (ValueError, OSError, KeyError, SyntaxError, RecursionError) as error:
         return {"functions": [{"name": "<parse-or-tool-gap>", "line": 1, "parameters": [],
@@ -406,6 +418,9 @@ def configure_entry_context(entry, discovered, configuration, snapshot, excluded
     adapters = configuration["adapters"]
     if language in ("javascript", "typescript"):
         node_project.bind_entry(entry, discovered)
+        if adapters.get("node", {}).get("backend") == node_source.SOURCE:
+            entry.update(node_backend=node_source.SOURCE, node_compiler=adapters["node"]["typescript_compiler"],
+                         node_context_root=str(snapshot), node_timeout_ms=configuration["limits"]["case_timeout_ms"])
     if language == "typescript":
         entry["typescript_backend"] = adapters["typescript"]["backend"]
     if language == "rust":
@@ -493,7 +508,9 @@ def inventory_tree(contents, root, snapshot, workspace, args, native_projects=No
             entry = inventory_entry(function, discovered, name, language, sha, snapshot, args)
             java_project.bind_entry(entry, java_context)
             filesystem_effects.bind(entry, args.configuration)
-            typescript_provider.bind(entry, root, workspace, tools.get(language, {}), execute, policy)
+            if not node_source.enabled(entry):
+                typescript_provider.bind(entry, root, workspace, tools.get(language, {}), execute, policy)
+            node_source.bind(entry, root, workspace, tools.get(language, {}), execute)
             java_provider.bind(entry, root, workspace, tools.get(language, {}), execute)
             inventory.append(entry)
     return tools, artefacts, inventory
@@ -583,6 +600,8 @@ def plan(args):
         java_project.verify(workspace, data)
     if (workspace / java_provider.DIRECTORY).exists():
         data["java_provider_manifest"] = manifest(workspace / java_provider.DIRECTORY)
+    if (workspace / node_source.DIRECTORY).exists():
+        data["node_provider_manifest"] = manifest(workspace / node_source.DIRECTORY)
     write(workspace / PLAN_FILE, data)
     marker = read(workspace / OWNED_MARKER)
     marker["plan_sha256"] = identity(data)
@@ -640,7 +659,7 @@ def generator_identity():
     files.update({name: capture.file_digest(here / name) for name in (
         'java_project.py', 'java_classpath.py', 'java_archives.py', 'java_archive_context.py',
         'java_helper_binding.py', 'OteleqArchives.java',
-        'node_project.py', 'node_context.mjs',
+        'node_project.py', 'node_context.mjs', 'node_source_context.mjs', 'node_source_context.py', 'node_source.py', 'node_source_worker.py', 'node_launch.py', 'node_inputs.py', 'node_telemetry.py',
         'native_profile.py', 'native_project.py', 'native_dependencies.py', 'native_frontend.py',
         'native_discover.cpp', 'native_context.py', 'native_workers.py', 'native_workspace.py',
         'owned_workspace.py', 'preconditions.py', 'project_tests.py', 'project_runner.py')})
@@ -675,6 +694,7 @@ def load_workspace(path, generated=False):
     native_profile.verify(sys.modules[__name__], workspace, data)
     java_project.verify(workspace, data, originals="original_source" not in data)
     java_provider.verify_probes(sys.modules[__name__], workspace, data)
+    node_source.verify_probes(sys.modules[__name__], workspace, data)
     if generated and manifest(workspace / "tests") != read(workspace / GENERATED_MANIFEST):
         raise ValueError("generated suite or corpus changed; create a new plan")
     return workspace, data
@@ -753,6 +773,8 @@ if __name__=="__main__":unittest.main()
 
 
 def policy(entry, endpoint, *, service="oteleq-generation"):
+    if node_source.enabled(entry):
+        return node_source.policy(entry, endpoint, service)
     if java_provider.prepared(entry):
         return java_provider.policy(entry, endpoint, service)
     language = entry["language"]
@@ -847,6 +869,8 @@ def build_command(root, project, entry, driver, config, tools, env, folder, scra
             return execute(command, cwd, env, folder / "node-context-probe", input_data=input_data,
                            max_output_bytes=max_output_bytes)
         node_project.verify_attempt(project, entry, root, tools[language], inspect_node, folder)
+    if node_source.enabled(entry):
+        return node_launch.command(root, project, entry, tools, folder, lane, env)
     # Use the proven build recipes, with bounded execution for every build and launch.
     timeout = go_project.build_timeout(entry.get("go_build_timeout_ms", 180000)) / 1000 if language == "go" else 180
     old_execute = capture.execute
@@ -943,6 +967,8 @@ def qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, 
     witness = None
     if lane == "baseline":
         baseline_receipt(entry, folder, bodies)
+    elif node_source.enabled(entry):
+        witness = node_telemetry.witness(folder, entry, bodies, service, decoder)
     elif prepared_runtime is not None:
         witness = java_telemetry.witness(prepared_runtime, folder, entry, bodies, service, decoder)
     else:
@@ -960,6 +986,8 @@ def provider_stable(root, language, tools, expected, entry):
     """Re-enumerate the selected provider without changing its frozen API."""
     if java_provider.prepared(entry):
         java_provider.require(java_provider.artefacts(root, tools, entry.get("java_profile", java_profiles.STOCK)) == expected, "SDK or selected tools changed")
+    elif node_source.enabled(entry):
+        node_source.require(node_source.artefacts(root, tools) == expected, "SDK or selected Node tools changed")
     else:
         capture.stable(root, language, tools, expected, rust_backend=entry.get("rust_backend", "compiler"))
 
@@ -992,16 +1020,18 @@ def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, ht
                 "OTELEQ_OBSERVATION": str(folder / "observation"), "OTELC_REPORT_PATH": str(folder / "runtime.json")})
     if "go_options" in entry:
         env.update(go_project.environment(entry["go_options"]))
-    if sequences.collects(entry):
+    if sequences.collects(entry) and not node_source.enabled(entry):
         env["NODE_OPTIONS"] = "--expose-gc"
         write(folder / "collection-controls.json", {"NODE_OPTIONS": "--expose-gc", "sequence": case["sequence"]})
     immutable = manifest(project)
     java_context = java_project.materialise(workspace, data, folder, project) if language == "java" else None
     receiver_options = {"max_requests": java_provider.MAX_TELEMETRY_REQUESTS} if runtime is not None else {}
+    if node_source.enabled(entry):
+        receiver_options["allow_chunked"] = True
     with capture.receiver(**receiver_options, response_path=folder / "http-responses.json") as (endpoint, bodies, errors):
         config = folder / "policy.toml"
-        config.write_text(policy(entry, endpoint, service=service) if runtime is not None else policy(entry, endpoint))
-        if language == "typescript":
+        config.write_text(policy(entry, endpoint, service=service) if runtime is not None or node_source.enabled(entry) else policy(entry, endpoint))
+        if language == "typescript" and not node_source.enabled(entry):
             env["OTELC_TYPESCRIPT_BACKEND"] = capture.typescript_backend(root, language, entry, config.read_bytes())
             write(folder / "typescript-controls.json", {"OTELC_TYPESCRIPT_BACKEND": env["OTELC_TYPESCRIPT_BACKEND"],
                                                         "provider": entry.get("typescript_provider")})
@@ -1041,7 +1071,7 @@ def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, ht
 
 def execution_options(entry, case, lane, folder, runtime, bodies, env):
     """Add only explicitly requested process recording and live Java checkpoints."""
-    options = {"record_process": True} if runtime is not None else {}
+    options = {"record_process": True} if runtime is not None or node_source.enabled(entry) else {}
     if sequences.controls(entry):
         interaction = java_live.Session(folder, runtime, case["sequence"], bodies, plain=lane == "baseline")
         env.update(interaction.environment())
@@ -1058,6 +1088,8 @@ def verify_attempt_inputs(data, entry, project, folder, scratch, tools, immutabl
     """Recheck private sources, compiler products and the selected launch/provider."""
     root, language = Path(data["otelc_root"]), entry["language"]
     validate_private_sources(project, immutable, folder)
+    if node_source.enabled(entry):
+        node_launch.verify(root, project, entry, tools, folder, lane)
     if language == "java":
         java_build.verify(project, scratch / "classes", folder)
     if runtime is not None:
@@ -1221,6 +1253,8 @@ def export_tests(args):
             files.append(java_project.DIRECTORY)
         if 'java_provider_manifest' in data:
             files.append(java_provider.DIRECTORY)
+        if 'node_provider_manifest' in data:
+            files.append(node_source.DIRECTORY)
         print(json.dumps({"destination": str(destination), "copy": files, "mode": "dry-run"}))
         return 0
     destination.mkdir(mode=0o700)
@@ -1232,6 +1266,8 @@ def export_tests(args):
         shutil.copytree(workspace / java_project.DIRECTORY, destination / java_project.DIRECTORY)
     if 'java_provider_manifest' in data:
         shutil.copytree(workspace / java_provider.DIRECTORY, destination / java_provider.DIRECTORY)
+    if 'node_provider_manifest' in data:
+        shutil.copytree(workspace / node_source.DIRECTORY, destination / node_source.DIRECTORY)
     for name in (OWNED_MARKER, GENERATED_MANIFEST, README_FILE):
         shutil.copyfile(workspace / name, destination / name)
     data["original_source"] = data["source"]

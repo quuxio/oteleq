@@ -28,25 +28,28 @@ function make_counter(start){return new Counter(start);}
 '''
 
 
-def fixture_source(language):
+def fixture_source(language, node_options=None):
+    original = SOURCE.replace('/node/register.mjs', '/node-bootstrap.cjs') if node_options else SOURCE
     if language=='javascript':
-        return SOURCE
-    text=SOURCE.replace('constructor(start)','constructor(start:number)').replace('function make_counter(start)','function make_counter(start:number)')
+        return original
+    text=original.replace('constructor(start)','constructor(start:number)').replace('function make_counter(start)','function make_counter(start:number)')
     for method in ('change',*METHODS):
         text=text.replace(method+'(amount){',method+'(amount:number){')
     return text
 
 
-def prepare(cli,provider,folder,language,methods=METHODS,factory_override=None,wrong_class=False):
+def prepare(cli,provider,folder,language,methods=METHODS,factory_override=None,wrong_class=False,*,node_options=None):
     folder.mkdir()
     source=folder/'application';source.mkdir()
     filename='sample.mjs' if language=='javascript' else 'sample.mts'
-    text=fixture_source(language)
+    text=fixture_source(language,node_options)
     if wrong_class:
         text=text.replace('return new Counter(start);','return {};')
     (source/filename).write_text(text)
     config=folder/'equivalence.toml'
     text='schema_version=1\nlanguages='+json.dumps([language])+'\n[functions]\ninclude='+json.dumps(['sample.Counter.'+name for name in methods])+'\n'
+    if node_options:
+        text+='[adapters.node]\n'+''.join(key+'='+json.dumps(value)+'\n' for key,value in node_options.items())
     for name in methods:
         factory=factory_override or ('make_counter' if name=='silent' else 'Counter')
         text+='\n[[fixtures]]\nfunction='+json.dumps('sample.Counter.'+name)+'\ncases=[[7]]\n'
@@ -127,11 +130,11 @@ def framework(workspace,folder,name,count):
     return sum(check_report(Path(result['report']),1) for result in results)
 
 
-def controls(cli,provider,folder,language,report):
-    missing=prepare(cli,provider,folder/'missing',language,methods=('silent',),factory_override='missing_factory')
+def controls(cli,provider,folder,language,report,*,node_options=None):
+    missing=prepare(cli,provider,folder/'missing',language,methods=('silent',),factory_override='missing_factory',node_options=node_options)
     command([cli,'run','--workspace',missing,'--report-dir',folder/'missing/comparison'],folder,'missing',expected=3)
     observed=json.loads((folder/'missing/comparison/report.json').read_text());assert len(observed['blocked'])==1 and not observed['cases']
-    wrong=prepare(cli,provider,folder/'wrong',language,methods=('silent',),wrong_class=True)
+    wrong=prepare(cli,provider,folder/'wrong',language,methods=('silent',),wrong_class=True,node_options=node_options)
     command([cli,'run','--workspace',wrong,'--report-dir',folder/'wrong/comparison'],folder,'wrong',expected=4)
     observed=json.loads((folder/'wrong/comparison/report.json').read_text());assert observed['source_preserved'] and observed['cases'][0]['exit_code']==4
     assert len(list((folder/'wrong/comparison').rglob('command.json')))==1
@@ -148,9 +151,9 @@ def controls(cli,provider,folder,language,report):
     return 1
 
 
-def qualify(cli,provider,folder,language):
+def qualify(cli,provider,folder,language,*,node_options=None):
     folder.mkdir()
-    workspace=prepare(cli,provider,folder/'complete',language)
+    workspace=prepare(cli,provider,folder/'complete',language,node_options=node_options)
     command([cli,'run','--workspace',workspace,'--report-dir',folder/'comparison'],folder,'comparison',expected=1)
     launches=check_report(folder/'comparison/report.json',6)
     launches+=framework(workspace,folder,'framework',6)
@@ -168,7 +171,7 @@ def qualify(cli,provider,folder,language):
     launches+=framework(Path(shrink['workspace']),folder,'shrunk-framework',1)
     replay=json.loads(command([cli,'replay','--workspace',Path(shrink['workspace']),'--case',selected['case']],folder,'shrunk-replay',expected=1))
     launches+=check_report(Path(replay['report']),1)
-    refused=controls(cli,provider,folder,language,report)
+    refused=controls(cli,provider,folder,language,report,node_options=node_options)
     command([cli,'render-report',folder/'comparison/report.json','--output-dir',folder/'presentation'],folder,'presentation',expected=1)
     for path in [workspace,exported,Path(shrink['workspace'])]:
         plan=json.loads((path/'plan.json').read_text())
@@ -179,14 +182,19 @@ def qualify(cli,provider,folder,language):
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--otelc-root',type=Path,required=True);parser.add_argument('--cli',type=Path,required=True);parser.add_argument('--report-dir',type=Path,required=True)
+    parser.add_argument('--node-backend',choices=('legacy','source-v1'),default='legacy')
+    parser.add_argument('--typescript-compiler',choices=('native','api'),default='native')
     args=parser.parse_args();cli=args.cli.resolve(strict=True);provider=args.otelc_root.resolve(strict=True);destination=args.report_dir.resolve()
+    if args.node_backend=='legacy' and args.typescript_compiler!='native':
+        parser.error('--typescript-compiler requires --node-backend source-v1')
+    node_options={'backend':'source-v1','typescript_compiler':args.typescript_compiler} if args.node_backend=='source-v1' else None
     if destination.is_relative_to(provider) or destination.is_relative_to(Path(__file__).resolve().parents[1]):
         parser.error('report directory must be new and outside both repositories')
     destination.mkdir(mode=0o700,exist_ok=False)
     os.environ['OTELEQ_PYTHON'],os.environ['OTELEQ_CLI']=sys.executable,str(cli)
-    results=[qualify(cli,provider,destination/language,language) for language in ('javascript','typescript')]
+    results=[qualify(cli,provider,destination/language,language,node_options=node_options) for language in ('javascript','typescript')]
     summary={'claim':'equivalence over these tests and observations','artefact_class':'diagnostic','cli_sha256':hashlib.sha256(cli.read_bytes()).hexdigest(),
-             'languages':results,'actual_application_launches':sum(item['qualified_launches']+item['refused_control_launches'] for item in results),
+             'node_provider':node_options or {'backend':'legacy'},'languages':results,'actual_application_launches':sum(item['qualified_launches']+item['refused_control_launches'] for item in results),
              'scope':'Declared plain source classes, own data/static descriptors and awaited method completion; no private slots, inherited/prototype mutation, arbitrary mutable inputs, scheduler sequences, other-language receivers or shipping qualification.'}
     (destination/'QUALIFICATION.json').write_text(json.dumps(summary,indent=2)+'\n');print(json.dumps(summary),flush=True)
 

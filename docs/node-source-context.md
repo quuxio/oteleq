@@ -14,6 +14,28 @@ quux-oteleq plan --source /absolute/path/to/application \
 
 The normal [generation, run, replay and export commands](automatic-generation.md#build-and-run) then apply. No module-format override is needed. Select the TypeScript emitter through the existing `[adapters.typescript] backend` setting.
 
+## Rebuilt SDK profile in qualification
+
+The explicit `source-v1` Node profile uses the rebuilt SDK's public schema-3 policy and source-launch APIs. Select it in the project policy:
+
+```toml
+[adapters.node]
+backend = "source-v1"
+typescript_compiler = "native"
+```
+
+`typescript_compiler` accepts `native` or `api`. These identify the SDK's Microsoft native TypeScript compiler and TypeScript API compiler respectively. Keep the legacy `[adapters.typescript] backend` at its default `source`; a conflicting legacy emitter is refused. Use `OTELEQ_PYTHON` to select the SDK's matching Python environment and `OTELC_NODE` to select its prepared Node runtime. The provider must contain its locked dependencies and matching prebuilt observer; planning does not install or build SDK products.
+
+Planning requires the public source5/execution1 protocol descriptor, probes it once per workspace and retains the complete public capability response, including candidate declarations. It freezes installed SDK/dependency/tool identities. A candidate declaration permits this explicit profile to be tested; it does not qualify an adapter automatically. An older or mismatched protocol is refused before application launch. TypeScript inspection uses the selected SDK compiler with plain emission, then replaces the selected application module before evaluation. Raw compiler inputs, options, outputs, maps and actual configuration reads are retained separately from application-launch evidence.
+
+Each attempt uses a fixed consumer supervisor. It retains the actual Node PID, process group and exit, waits for the independent SDK's actual exit, and checks the original request, generated recipe, startup journal, versioned input-verification receipt, final health and decoded OTLP. It independently rechecks the raw source journal, retained source/compiler/emission bytes, fixed compiler recipes and original input identities. After verified SDK shutdown, it removes the inactive event FIFO and records that cleanup; retained evidence can then be copied during reduction. Plain JavaScript has no fabricated SDK report or loader journal. The OTLP receiver accepts bounded chunked requests only for this explicit profile. Function metrics and traces are checked separately from application stdout/stderr and state.
+
+Source5 keeps returned code separate from observed module-body entry. The consumer independently checks the closed execution1 witness against the actual application PID, original source, load identity, returned emission digest and pinned observation helper. It recomputes every module outcome from the raw journal. A deferred earlier attempt requires a complete same-URL reentry chain ending in a later witnessed entry; its execution format remains unobserved. Compiler phases must remain complete and ordered. Actual selected entries must match the independently inspected module context. Plain TypeScript includes a metadata-only body-entry helper; its raw compiler output is retained separately. These witnesses identify module entry, not individual function invocation or module completion.
+
+The `node-source-provider` directory seals planning/compiler evidence and travels with exported and reduced suites. Changed evidence prevents replay and cleanup. Current-source promotion retains the provider settings and makes fresh context receipts for each new snapshot.
+
+This profile remains in qualification. Initial source4 development evidence covers scalar public CLI runs on Node 24 and 26, both TypeScript compilers, retained Node 24 suites, receiver diagnostics, collection and reduction. Broader context checks found unresolved or retried format evidence in default JavaScript/TypeScript contexts. Those failed runs remain separate; they are not adapter admission. The first delivered profile requires corrected source5/execution1 evidence and a new immutable SDK handoff. Complete runtime/context/control qualification, final review and protected CI delivery remain pending. Live Node metric controls and invocation-scoped action attribution remain unimplemented.
+
 Include every `package.json` and `tsconfig.json` required by this source context within the selected tree. Selecting only a `src` subdirectory can omit a parent package which changes `.js` or `.ts` interpretation. An ambient package outside the selected root is a visible blocker. The private workspace must also have no undeclared parent package.
 
 ## What is checked
@@ -52,6 +74,8 @@ make generation-node-project-otelc \
 ```
 
 This creates fresh fixtures and tests them through public run/replay commands, the generated `unittest` suite and an exported suite with its original application directory detached. It also reduces a same-return global-state difference from argument `7` to `0` and retains every trial and confirmation. The report directory must be new and outside both repositories.
+
+To qualify the explicit rebuilt SDK profile, add `GENERATION_ARGS='--node-backend source-v1 --typescript-compiler native'` to that command and use its immutable source5/execution1 provider. Repeat with `api` for the other TypeScript compiler and a fresh report directory. This selects a separate contract: default Preserve `.ts` executes as a module under these Microsoft compiler profiles, while the legacy default remains unchanged. The maintained oracle checks complete fixed application graphs, actual module context, direct final SDK status and independently decoded raw function signals. The command does not admit the profile merely because its metadata handshake succeeds.
 
 ## Qualified scope
 

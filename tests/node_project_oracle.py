@@ -72,13 +72,23 @@ def check_observation(value: dict, spec: dict, lane: str, argument: float) -> No
 def check_context(folder: Path, spec: dict, entry: dict) -> None:
     value = json.loads((folder / "node-context.json").read_text())
     require(set(value) == {"original", "caller"}, "context receipt fields differ")
+    compiler = bool(spec.get("node_options")) and spec["language"] == "typescript"
+    fields = CONTEXT_FIELDS | ({"source_compiler"} if compiler else set())
     for label in ("original", "caller"):
         receipt = value[label]
-        require(set(receipt) == CONTEXT_FIELDS and type(receipt["schema_version"]) is int and receipt["schema_version"] == 1,
+        require(set(receipt) == fields and type(receipt["schema_version"]) is int and receipt["schema_version"] == 1,
                 "closed context schema differs")
         require(receipt["format"] == spec["format"] and receipt["package"] == spec["package"], "module/package receipt differs")
         require(receipt["node_version"] == spec["node_version"], "Node version differs")
-    require(value["original"] == entry["node_context"] == entry["node_original_context"], "original/private source binding differs")
+        if compiler:
+            compilation = receipt["source_compiler"]
+            require(compilation["profile"] == "module-format-only-v1"
+                    and compilation["compiler"]["backend"] == spec["node_options"]["typescript_compiler"]
+                    and compilation["compiler"]["transformer_profile"] == "none", "compiler context recipe differs")
+    originals = [value["original"], entry["node_context"], entry["node_original_context"]]
+    require(all({key: item[key] for key in CONTEXT_FIELDS} == {key: originals[0][key] for key in CONTEXT_FIELDS}
+                for item in originals), "original/private source binding differs")
+    require(value["original"] == entry["node_context"], "private source compiler context differs")
     require(value["original"]["source_sha256"] == spec["source_sha256"], "original source digest differs")
     require(value["caller"]["source_sha256"] == digest(folder / "project" / spec["filename"]), "caller source digest differs")
     probe = json.loads((folder / "node-context-probe/stdout").read_bytes())
@@ -245,8 +255,12 @@ def check_attempt(folder: Path, attempt: dict, spec: dict, entry: dict, lane: st
     if lane == "baseline":
         require(capture["bodies"] == [] and execution["witness"] is None, "baseline emitted telemetry")
     else:
-        pid = check_health(json.loads((folder / "runtime.json").read_text()), spec)
-        check_telemetry(decode(folder, capture), spec["function"], pid)
+        if spec.get("node_options"):
+            from node_source_oracle import check_attempt as check_source
+            check_source(folder, spec, capture)
+        else:
+            pid = check_health(json.loads((folder / "runtime.json").read_text()), spec)
+            check_telemetry(decode(folder, capture), spec["function"], pid)
         require(execution["witness"]["functions"] == {spec["function"]: 1}, "production witness differs from raw evidence")
     command = json.loads((folder / "command.json").read_text())
     cwd = json.loads((folder / "working-directory.json").read_text())

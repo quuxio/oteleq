@@ -44,7 +44,16 @@ MAX_REQUEST_BYTES = 1024 * 1024
 TRACE_PATH = "/v1/traces"
 MAX_REQUESTS = 32
 MAX_CAPTURE_BYTES = MAX_REQUESTS * MAX_REQUEST_BYTES
+MAX_REQUEST_CHUNKS = 4096
 REQUEST_TIMEOUT = 2
+
+
+class CaptureBodyError(ValueError):
+    """Reject incomplete or over-budget chunk framing without retaining a body."""
+
+    def __init__(self, status: int):
+        super().__init__("invalid or over-budget chunked capture body")
+        self.status = status
 
 
 class Receiver(BaseHTTPRequestHandler):
@@ -77,13 +86,16 @@ class Receiver(BaseHTTPRequestHandler):
     def do_POST(self):
         self.server.requests += 1
         lengths = self.headers.get_all("Content-Length", [])
-        if (len(lengths) != 1 or not lengths[0].isascii() or not lengths[0].isdecimal()
-                or self.headers.get("Transfer-Encoding") is not None
+        transfers = self.headers.get_all("Transfer-Encoding", [])
+        chunked = (self.server.allow_chunked and not lengths and len(transfers) == 1
+                   and transfers[0].strip().lower() == "chunked")
+        if ((not chunked and (len(lengths) != 1 or not lengths[0].isascii() or not lengths[0].isdecimal()
+                              or transfers))
                 or self.headers.get("Content-Encoding", "identity") != "identity"
                 or self.path not in (TRACE_PATH, "/v1/metrics")):
             self.send_error(400)
             return
-        size = int(lengths[0])
+        size = 0 if chunked else int(lengths[0])
         if (size > MAX_REQUEST_BYTES or self.server.requests > self.server.max_requests
                 or size > self.server.max_bytes - self.server.received_bytes):
             self.send_error(413)
@@ -91,6 +103,9 @@ class Receiver(BaseHTTPRequestHandler):
         deadline = time.monotonic() + REQUEST_TIMEOUT
         body = bytearray()
         try:
+            if chunked:
+                body = self.read_chunked(deadline)
+                size = len(body)
             while len(body) < size:
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
@@ -101,6 +116,9 @@ class Receiver(BaseHTTPRequestHandler):
                     self.send_error(400)
                     return
                 body.extend(chunk)
+        except CaptureBodyError as error:
+            self.send_error(error.status)
+            return
         except OSError:
             self.send_error(408)
             return
@@ -113,6 +131,59 @@ class Receiver(BaseHTTPRequestHandler):
         self.send_header("Content-Length", "0")
         self.end_headers()
 
+    def read_chunked(self, deadline: float) -> bytearray:
+        """Accept bounded exporter chunks; extensions and trailers remain unsupported."""
+        body = bytearray()
+        for count in range(MAX_REQUEST_CHUNKS + 1):
+            header = self.chunk_header(deadline)
+            size_text = header[:-2]
+            if (not header.endswith(b"\r\n") or not size_text
+                    or any(value not in b"0123456789abcdefABCDEF" for value in size_text)):
+                raise CaptureBodyError(400)
+            size = int(size_text, 16)
+            if size == 0:
+                self.chunk_terminator(deadline)
+                return body
+            if (count == MAX_REQUEST_CHUNKS or size > MAX_REQUEST_BYTES - len(body)
+                    or size > self.server.max_bytes - self.server.received_bytes - len(body)):
+                raise CaptureBodyError(413)
+            end = len(body) + size
+            while len(body) < end:
+                self.body_deadline(deadline)
+                chunk = self.rfile.read1(min(65536, end - len(body)))
+                if not chunk:
+                    raise CaptureBodyError(400)
+                body.extend(chunk)
+            self.chunk_terminator(deadline)
+        raise CaptureBodyError(413)
+
+    def chunk_header(self, deadline: float) -> bytes:
+        """Check the absolute deadline between every bounded framing byte."""
+        header = bytearray()
+        for _ in range(66):
+            self.body_deadline(deadline)
+            value = self.rfile.read1(1)
+            if not value:
+                raise CaptureBodyError(400)
+            header.extend(value)
+            if header.endswith(b"\r\n"):
+                return bytes(header)
+        raise CaptureBodyError(400)
+
+    def chunk_terminator(self, deadline: float) -> None:
+        """Only the exact CRLF terminator is part of this exporter profile."""
+        for expected in (b"\r", b"\n"):
+            self.body_deadline(deadline)
+            if self.rfile.read1(1) != expected:
+                raise CaptureBodyError(400)
+
+    def body_deadline(self, deadline: float) -> None:
+        """Chunk headers, payloads and terminators share one request deadline."""
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError
+        self.connection.settimeout(remaining)
+
     def log_message(self, *_):
         # Request failures are retained in the capture status, not application stderr.
         pass
@@ -122,7 +193,10 @@ class Receiver(BaseHTTPRequestHandler):
 
 
 class CaptureServer(HTTPServer):
-    def __init__(self, max_requests=MAX_REQUESTS, *, max_bytes=MAX_CAPTURE_BYTES):
+    def __init__(self, max_requests=MAX_REQUESTS, *, max_bytes=MAX_CAPTURE_BYTES, allow_chunked=False):
+        if type(allow_chunked) is not bool:
+            raise ValueError("allow_chunked must be an explicit boolean")
+        self.allow_chunked = allow_chunked
         self.max_requests = max_requests
         self.max_bytes = max_bytes
         self.received_bytes = 0
@@ -877,9 +951,10 @@ def commands(root, workspace, language, source, policy, tools, environment, evid
 
 
 @contextmanager
-def receiver(*, max_requests=MAX_REQUESTS, max_bytes=MAX_CAPTURE_BYTES, response_path: Path | None = None):
+def receiver(*, max_requests=MAX_REQUESTS, max_bytes=MAX_CAPTURE_BYTES, response_path: Path | None = None,
+             allow_chunked=False):
     """Expose exact received bytes and every transport failure to the observer."""
-    server = CaptureServer(max_requests, max_bytes=max_bytes)
+    server = CaptureServer(max_requests, max_bytes=max_bytes, allow_chunked=allow_chunked)
     worker = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True)
     worker.start()
     try:

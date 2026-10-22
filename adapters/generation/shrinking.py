@@ -247,6 +247,9 @@ def run(args: argparse.Namespace, workflow) -> int:
     if 'java_provider_manifest' in original:
         shutil.copytree(original_workspace / workflow.java_provider.DIRECTORY,
                         workspace / workflow.java_provider.DIRECTORY)
+    if 'node_provider_manifest' in original:
+        shutil.copytree(original_workspace / workflow.node_source.DIRECTORY,
+                        workspace / workflow.node_source.DIRECTORY)
     workflow.write(workspace / workflow.OWNED_MARKER, {"schema_version": workflow.VERSION, "id": uuid.uuid4().hex})
     data = derived_data(workflow, original, entry, case)
     best, trials, status = search(workflow, workspace, data, entry, case["arguments"], wanted, destination, args.trials)
