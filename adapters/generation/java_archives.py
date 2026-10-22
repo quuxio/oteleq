@@ -48,6 +48,8 @@ def catalogues(paths: list[Path]) -> dict[str, dict]:
 
 def validate(value: object, paths: list[Path], raw: dict[str, dict]) -> None:
     """Require the closed profile and exact physical members in every selected JAR."""
+    if not isinstance(value, dict):
+        raise ValueError("Java runtime archives: unsupported resolution record")
     require(type(value) is dict and set(value) == {"schema_version", "profile", "jdk_feature", "archives"}
             and type(value["schema_version"]) is int and value["schema_version"] == 1
             and value["profile"] == PROFILE and type(value["jdk_feature"]) is int
@@ -109,19 +111,23 @@ def inspect(paths: list[Path], java: Path, folder: Path, environment: dict,
     return record
 
 
-def verify(claim: object, record: dict, paths: list[Path]) -> None:
+def verify(claim: object, record: dict, paths: list[Path], *, java: Path, folder: Path) -> None:
     """A producer claim must match independent member identities, even for equal bytes."""
     raw = catalogues(paths)
-    require(raw == record["raw_archives"]
-            and all(capture.file_digest(Path(path)) == sha for path, sha in record["inputs_sha256"].items()),
+    expected = [java, "-Xshare:off", "-cp", folder / "empty-classpath", folder / FRONTEND.name, *paths]
+    require(set(record) == {"resolution", "raw_archives", "inputs_sha256", "argv"}
+            and raw == record["raw_archives"] and record["inputs_sha256"] == inputs(java, folder / FRONTEND.name)
+            and record["argv"] == list(map(str, expected)),
             "retained resolution inputs changed")
+    require(capture.strict_json((folder / "probe/stdout").read_bytes()) == record["resolution"],
+            "retained selected-JDK result changed")
     validate(claim, paths, raw)
     require(claim == record["resolution"], "producer resolution differs from the selected JDK")
 
 
-def materialise(record: dict, paths: list[Path], destination: Path) -> list[Path]:
+def materialise(record: dict, paths: list[Path], destination: Path, *, java: Path, folder: Path) -> list[Path]:
     """Copy exact selected bytes for metadata inspection, never for application launch."""
-    verify(record["resolution"], record, paths)
+    verify(record["resolution"], record, paths, java=java, folder=folder)
     require(destination.is_absolute() and destination.resolve() == destination and not destination.exists()
             and all(not destination.is_relative_to(path) for path in paths),
             "metadata view must be new and outside classpath inputs")
@@ -137,5 +143,5 @@ def materialise(record: dict, paths: list[Path], destination: Path) -> list[Path
                 path.write_bytes(source.read(member["entry"]))
                 require(classpath.digest(path) == member["sha256"], "selected metadata bytes changed")
         result[archive["classpath_index"]] = target
-    verify(record["resolution"], record, paths)
+    verify(record["resolution"], record, paths, java=java, folder=folder)
     return result

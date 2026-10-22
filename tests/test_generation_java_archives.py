@@ -142,7 +142,8 @@ class JavaRuntimeArchiveTests(unittest.TestCase):
                 record = self.inspect(name)
                 jar = self.matrix[name]
                 original = jar.read_bytes()
-                view = archives.materialise(record, [self.classes, jar], self.folder / (name + "-view"))
+                view = archives.materialise(record, [self.classes, jar], self.folder / (name + "-view"),
+                                            java=self.java, folder=self.folder / name)
                 self.assertEqual(view[0], self.classes)
                 member = record["resolution"]["archives"][0]["classes"]["dep.Flags"]
                 self.assertEqual(classpath.digest(view[1] / "dep/Flags.class"), member["sha256"])
@@ -159,7 +160,8 @@ class JavaRuntimeArchiveTests(unittest.TestCase):
         claim = copy.deepcopy(record["resolution"])
         claim["archives"][0]["classes"]["dep.Flags"]["entry"] = "dep/Flags.class"
         with self.assertRaisesRegex(ValueError, "differs from the selected JDK"):
-            archives.verify(claim, record, [self.classes, self.matrix["identical"]])
+            archives.verify(claim, record, [self.classes, self.matrix["identical"]],
+                            java=self.java, folder=self.folder / "identical")
 
     def test_closed_schema_full_classpath_indices_and_jdk_feature_are_bound(self):
         record = self.inspect("active")
@@ -179,7 +181,10 @@ class JavaRuntimeArchiveTests(unittest.TestCase):
             elif fault == "unknown": archive["unknown"] = 0
             else: archive["multi_release"] = 1
             with self.subTest(fault=fault), self.assertRaises(ValueError):
-                archives.verify(claim, record, paths)
+                archives.verify(claim, record, paths, java=self.java, folder=self.folder / "active")
+        for claim in (None, [], 0, True, "record"):
+            with self.subTest(claim=claim), self.assertRaisesRegex(ValueError, "unsupported resolution"):
+                archives.verify(claim, record, paths, java=self.java, folder=self.folder / "active")
 
     def test_duplicate_inputs_ambient_options_and_existing_outputs_refuse(self):
         jar = self.matrix["active"]
@@ -206,12 +211,12 @@ class JavaRuntimeArchiveTests(unittest.TestCase):
         with zipfile.ZipFile(jar, "a") as archive:
             archive.writestr("changed-resource", "changed")
         with self.assertRaisesRegex(ValueError, "inputs changed"):
-            archives.verify(record["resolution"], record, paths)
+            archives.verify(record["resolution"], record, paths, java=self.java, folder=self.folder / "probe")
         jar.write_bytes(original)
         frontend = Path(next(path for path in record["inputs_sha256"] if path.endswith(".java")))
         frontend.write_text(frontend.read_text() + "\n// changed\n")
         with self.assertRaisesRegex(ValueError, "inputs changed"):
-            archives.verify(record["resolution"], record, paths)
+            archives.verify(record["resolution"], record, paths, java=self.java, folder=self.folder / "probe")
         def failed(*args, **kwargs):
             return subprocess.CompletedProcess(args[0], 1, b"", b"failed")
         with self.assertRaisesRegex(ValueError, "resolution failed"):
@@ -240,6 +245,25 @@ class JavaRuntimeArchiveTests(unittest.TestCase):
         malformed.write_bytes(b"not a jar")
         with self.assertRaisesRegex(ValueError, "invalid JAR"):
             classpath.jar_members(malformed)
+
+    def test_missing_tool_hashes_changed_commands_and_forged_local_results_refuse(self):
+        record = self.inspect("active")
+        paths = [self.classes, self.matrix["active"]]
+        probe = self.folder / "active"
+        for fault in ("missing-tool", "extra-tool", "command", "unknown-field", "result"):
+            edited = copy.deepcopy(record)
+            if fault == "missing-tool":
+                del edited["inputs_sha256"][str(self.java)]
+            elif fault == "extra-tool":
+                edited["inputs_sha256"]["/not/a/selected/tool"] = "0" * 64
+            elif fault == "command":
+                edited["argv"][0] = "/not/the/selected/java"
+            elif fault == "unknown-field":
+                edited["unknown"] = 0
+            else:
+                edited["resolution"]["archives"][0]["multi_release"] = False
+            with self.subTest(fault=fault), self.assertRaises(ValueError):
+                archives.verify(edited["resolution"], edited, paths, java=self.java, folder=probe)
 
     def test_ordinary_generation_still_refuses_unqualified_versioned_jars(self):
         for name, jar in self.matrix.items():

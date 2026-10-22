@@ -10,6 +10,7 @@ MAX_FILES = 20000
 MAX_FILE_BYTES = 128 * 1024 * 1024
 MAX_TOTAL_BYTES = 512 * 1024 * 1024
 MAX_CLASS_BYTES = 16 * 1024 * 1024
+CLASS_BUDGET_ERROR = "class definition exceeds its byte budget"
 MANIFEST = "META-INF/MANIFEST.MF"
 RECORD_FIELDS = ("kind", "files", "classes", "directories")
 
@@ -77,7 +78,7 @@ def jar_classes(path: Path) -> dict:
                 jar_entry(row)
                 name = binary_name(row.filename)
                 if name is not None:
-                    require(row.file_size <= MAX_CLASS_BYTES, "class definition exceeds its byte budget")
+                    require(row.file_size <= MAX_CLASS_BYTES, CLASS_BUDGET_ERROR)
                     result[name] = {"entry": row.filename, "sha256": hashlib.sha256(archive.read(row)).hexdigest()}
             if MANIFEST in names:
                 manifest_header(archive.read(MANIFEST))
@@ -127,8 +128,7 @@ def jar_members(path: Path) -> dict[str, str]:
             for row in rows:
                 jar_entry(row, allow_versioned=True)
                 if row.filename.endswith(".class") and not row.is_dir():
-                    require(row.file_size <= MAX_CLASS_BYTES,
-                            "class definition exceeds its byte budget")
+                    require(row.file_size <= MAX_CLASS_BYTES, CLASS_BUDGET_ERROR)
                     result[row.filename] = hashlib.sha256(archive.read(row)).hexdigest()
             if MANIFEST in names:
                 manifest_header(archive.read(MANIFEST))
@@ -148,7 +148,7 @@ def inspect(path: Path) -> dict:
         for entry, sha in files.items():
             name = binary_name(entry)
             if name is not None:
-                require((path / entry).stat().st_size <= MAX_CLASS_BYTES, "class definition exceeds its byte budget")
+                require((path / entry).stat().st_size <= MAX_CLASS_BYTES, CLASS_BUDGET_ERROR)
                 classes[name] = {"entry": entry, "sha256": sha}
         directories = sorted(item.relative_to(path).as_posix() for item in path.rglob("*") if item.is_dir())
         return {"kind": "directory", "files": files, "classes": classes, "directories": directories}
