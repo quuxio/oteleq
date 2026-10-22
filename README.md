@@ -100,7 +100,7 @@ OTELEQ_WORKSPACE=/tmp/oteleq-run-actual-id
 "$OTELEQ_CLI" generate --workspace "$OTELEQ_WORKSPACE"
 "$OTELEQ_CLI" run --workspace "$OTELEQ_WORKSPACE" \
   --report-dir /absolute/path/to/new-report
-"$OTELEQ_PYTHON" "$OTELEQ_WORKSPACE/tests/test_equivalence.py"
+"$OTELEQ_PYTHON" -I -B "$OTELEQ_WORKSPACE/tests/test_equivalence.py"
 ```
 
 Render a retained run as [standalone HTML and JUnit XML](docs/reporting.md):
@@ -153,7 +153,7 @@ Export includes a frozen application snapshot and runnable suite. It refuses exi
 
 [Planning after an in-source export](docs/retained-source-selection.md) verifies and excludes retained oteleq bundles from application discovery and snapshots. Invalid or edited bundles stop planning; plans and reports disclose the exclusions.
 
-For future application changes, [promote a current-source suite](docs/current-source-tests.md). `promote --workspace "$OTELEQ_WORKSPACE" --source /absolute/path/to/application --destination /absolute/path/to/application/equivalence-tests` prints its file plan; add `--apply` to create it. Run its `test_equivalence.py` to generate and execute fresh per-case tests from the current checkout in external private workspaces. Tool/provider context and policy remain frozen, and selected gaps remain failures. Actual eight-language qualification of promotion remains pending.
+For future application changes, [promote a current-source suite](docs/current-source-tests.md). `promote --workspace "$OTELEQ_WORKSPACE" --source /absolute/path/to/application --destination /absolute/path/to/application/equivalence-tests` prints its file plan; add `--apply` to create it. Run `python3 -I -B` on its `test_equivalence.py` to generate and execute fresh per-case tests from the current checkout in external private workspaces. Tool/provider context and policy remain frozen, and selected gaps remain failures. Actual eight-language qualification of promotion remains pending.
 
 [Input inspection](docs/input-inspection.md) refuses unreadable or vanished directories instead of silently omitting their contents from plans or byte identities. On qualified POSIX hosts, shared hashing also rejects named pipes without waiting for a writer.
 

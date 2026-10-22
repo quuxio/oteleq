@@ -20,17 +20,17 @@ This prints the destination and proposed files without copying. Add `--apply` to
 "$OTELEQ_CLI" promote --workspace "$OTELEQ_WORKSPACE" \
   --source /absolute/path/to/application \
   --destination /absolute/path/to/application/equivalence-tests --apply
-python3 /absolute/path/to/application/equivalence-tests/test_equivalence.py
+python3 -I -B /absolute/path/to/application/equivalence-tests/test_equivalence.py
 ```
 
 An in-repository suite finds the application relative to its own directory, so the checkout can move. For a suite kept outside the application, identify the current source explicitly on each run:
 
 ```sh
 OTELEQ_SOURCE=/absolute/path/to/current/application \
-  python3 /absolute/path/to/external-tests/test_equivalence.py
+  python3 -I -B /absolute/path/to/external-tests/test_equivalence.py
 ```
 
-For discovery by another Python runner, set `PYTHONDONTWRITEBYTECODE=1` before importing the suite. A Python cache inside the sealed bundle is an unexpected file and prevents planning.
+Use `python3 -I -B -m unittest discover -s /absolute/path/to/equivalence-tests` for discovery. Isolated mode prevents ambient Python import roots from becoming tooling inputs; `-B` prevents Python caches inside the sealed bundle. Such a cache is an unexpected file and prevents planning. An existing test runner's own setup remains outside the captured application observations.
 
 ## What is kept
 

@@ -62,7 +62,7 @@ def verified_project() -> dict:
     expected = {".oteleq-owned.json", "project.json", "project-policy.toml", "test_equivalence.py", "README.txt", "GENERATED-LICENSE.txt"}
     entries = list(ROOT.iterdir())
     if {path.name for path in entries} != expected or any(path.is_symlink() or not path.is_file() for path in entries):
-        raise ValueError("owned project suite has missing or extra files; use PYTHONDONTWRITEBYTECODE=1 for discovery")
+        raise ValueError("owned project suite has missing or extra files; use python3 -I -B for discovery")
     data, marker = read(ROOT / "project.json"), read(ROOT / ".oteleq-owned.json")
     validate_metadata(data)
     identity = hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()

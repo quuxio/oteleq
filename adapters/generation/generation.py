@@ -746,7 +746,7 @@ if __name__=="__main__":unittest.main()
             shutil.copyfile(workspace / "snapshot" / name, target)
         harness.materialise(preview, entry, case["arguments"])
     write(workspace / GENERATED_MANIFEST, manifest(destination))
-    (workspace / README_FILE).write_text("Generated scalar diagnostic suite. Boilerplate: MIT; application snapshot retains its original licence.\nRun: OTELEQ_PYTHON=/path/to/otelc/.venv/bin/python python3 tests/test_equivalence.py\nOr: quux-oteleq run --workspace . --report-dir /new/external/report\nEvery blocked selected callable fails the generated strict suite. No shipping-artefact or universal equivalence claim.\nKeep this whole workspace, or export-tests to a new destination.\n")
+    (workspace / README_FILE).write_text("Generated scalar diagnostic suite. Boilerplate: MIT; application snapshot retains its original licence.\nRun: OTELEQ_PYTHON=/path/to/otelc/.venv/bin/python python3 -I -B tests/test_equivalence.py\nOr: quux-oteleq run --workspace . --report-dir /new/external/report\nEvery blocked selected callable fails the generated strict suite. No shipping-artefact or universal equivalence claim.\nKeep this whole workspace, or export-tests to a new destination.\n")
     print(json.dumps({"workspace": str(workspace), "cases": len(cases), "ready_functions": sum(e["status"] == "ready" for e in data["inventory"]), "blocked_functions": sum(e["status"] == "blocked" for e in data["inventory"])}))
     return 0
 

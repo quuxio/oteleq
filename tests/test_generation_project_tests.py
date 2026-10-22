@@ -193,8 +193,23 @@ class ProjectSuiteTests(unittest.TestCase):
             project_tests.policy_text({"invalid": None})
 
     def test_policy_export_preserves_non_bmp_strings_and_escaped_content(self):
-        configuration = {"fixtures": [{"function": "*selected", "cases": [["\U0001f642", 'a"b\\c\n']]}]}
-        self.assertEqual(tomllib.loads(project_tests.policy_text(configuration)), configuration)
+        configuration = gen.project_policy.validate({"fixtures": [
+            {"function": "*selected", "cases": [["\U0001f642", 'a"b\\c\n']]}]})
+        self.assertEqual(gen.project_policy.validate(tomllib.loads(project_tests.policy_text(configuration))), configuration)
+
+    def test_resolved_optional_fields_and_unbounded_integer_expectations_roundtrip(self):
+        configuration = gen.project_policy.validate({"fixtures": [{"function": "*selected", "cases": [[1]],
+            "expected_baseline": {"kind": "return_value", "value": {
+                "kind": "integer", "type": "python.int", "value": "2", "signed": True}}}]})
+        self.assertIsNone(configuration["fixtures"][0]["language"])
+        self.assertIsNone(configuration["fixtures"][0]["expected_baseline"]["value"]["bits"])
+        text = project_tests.policy_text(configuration)
+        self.assertEqual(gen.project_policy.validate(tomllib.loads(text)), configuration)
+
+    def test_policy_export_retains_zero_false_and_empty_values(self):
+        configuration = gen.project_policy.validate({"generation": {"seed": 0},
+            "fixtures": [{"function": "*selected", "cases": [[0, False, ""]]}]})
+        self.assertEqual(gen.project_policy.validate(tomllib.loads(project_tests.policy_text(configuration))), configuration)
 
     def test_generator_identity_includes_numeric_rules_and_project_boilerplate(self):
         original = gen.capture.file_digest

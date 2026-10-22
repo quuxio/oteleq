@@ -24,7 +24,7 @@ OTELEQ_WORKSPACE=/tmp/oteleq-run-actual-id
   --report-dir /absolute/path/to/new-report
 
 # The retained suite uses Python's standard unittest framework for every language.
-"$OTELEQ_PYTHON" "$OTELEQ_WORKSPACE/tests/test_equivalence.py"
+"$OTELEQ_PYTHON" -I -B "$OTELEQ_WORKSPACE/tests/test_equivalence.py"
 ```
 
 The report directory must be new and outside the application, otelc and workspace. Generation never edits the application, its dependencies, manifests or locks. Workspaces remain available until explicit cleanup; there is no automatic deletion after a successful run.
