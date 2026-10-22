@@ -447,20 +447,21 @@ def inventory_entry(function, discovered, name, language, source_hash, snapshot,
 def configure_fixture(entry, discovered, fixture):
     """Keep reviewed input, receiver and expected-outcome declarations together."""
     entry["expected_baseline"] = fixture["expected_baseline"] if fixture else {"kind": "return"}
-    if fixture is not None:
-        if "cases" in fixture:
-            entry["input_cases"] = fixture["cases"]
-        if "receiver" in fixture:
-            receiver_fixture(entry, discovered, fixture["receiver"])
-        if "domains" in fixture:
-            entry["input_domains"] = fixture["domains"]
-        if "preconditions" in fixture:
-            entry["input_preconditions"] = fixture["preconditions"]
-        if "sequence" in fixture:
-            try:
-                sequences.configure(entry, fixture["sequence"], harness.concrete_arguments)
-            except ValueError as error:
-                entry["reason"] = entry["reason"] or str(error)
+    if fixture is None:
+        return
+    if "cases" in fixture:
+        entry["input_cases"] = fixture["cases"]
+    if "receiver" in fixture:
+        receiver_fixture(entry, discovered, fixture["receiver"])
+    if "domains" in fixture:
+        entry["input_domains"] = fixture["domains"]
+    if "preconditions" in fixture:
+        entry["input_preconditions"] = fixture["preconditions"]
+    if "sequence" in fixture:
+        try:
+            sequences.configure(entry, fixture["sequence"], harness.concrete_arguments)
+        except ValueError as error:
+            entry["reason"] = entry["reason"] or str(error)
 
 
 def inventory_tree(contents, root, snapshot, workspace, args, native_projects=None, java_context=None, *, original_source=None):

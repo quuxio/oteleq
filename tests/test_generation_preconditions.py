@@ -110,9 +110,10 @@ class NumericPreconditionTests(unittest.TestCase):
             harness.corpus(data, 3)
 
     def test_search_budget_does_not_turn_partial_generated_inputs_into_success(self):
+        data = entry()
         with patch.object(preconditions, "MAX_CANDIDATES", 6):
             with self.assertRaisesRegex(ValueError, "candidate budget"):
-                harness.corpus(entry(), 3)
+                harness.corpus(data, 3)
 
     def test_reduction_never_yields_a_relation_breaking_candidate(self):
         data = entry(conditions=[{**LESS, "operator": ">="}])
