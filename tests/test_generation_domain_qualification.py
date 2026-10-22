@@ -19,8 +19,10 @@ class DomainQualificationTests(unittest.TestCase):
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name)
 
-    def report(self):
-        entry = {"id": "case", "language": "python", "name": "domain_integer", "otelc_function": "app.domain_integer"}
+    def report(self, language="python", kind="integer"):
+        value = oracle.arguments(language, kind)[0]
+        function = "app.domain_" + kind
+        entry = {"id": "case", "language": language, "name": "domain_" + kind, "otelc_function": function}
         parent = self.root / "case-0"
         parent.mkdir()
         bundle = {"contract": {"expected_baseline": {"kind": "return"}}}
@@ -30,10 +32,10 @@ class DomainQualificationTests(unittest.TestCase):
                 folder = parent / (lane + "-" + str(index))
                 folder.mkdir()
                 observed = {"fixture": {"status": "ready"}, "gaps": [],
-                    "before": oracle.graph("python", "integer", 7),
-                    "after": oracle.graph("python", "integer", 7),
-                    "outcome": {"kind": "return", "graph": oracle.graph("python", "integer", 7, returned=True)}}
-                witness = ({"functions": {"app.domain_integer": 1}, "spans": 1, "pending": 0,
+                    "before": oracle.graph(language, kind, value),
+                    "after": oracle.graph(language, kind, value),
+                    "outcome": {"kind": "return", "graph": oracle.graph(language, kind, value, returned=True)}}
+                witness = ({"functions": {function: 1}, "spans": 1, "pending": 0,
                             "losses": {"export": 0}} if lane == "instrumented_on" else None)
                 attempts.append({"observation": observed, "execution": {"capture_complete": True,
                     "termination": {"kind": "exit", "code": 0}, "channels": {"stdout": [], "stderr": []},
@@ -44,7 +46,7 @@ class DomainQualificationTests(unittest.TestCase):
             bundle[lane] = attempts
         (parent / "typed-bundle.json").write_text(json.dumps({"cases": [bundle]}))
         report = {"source_preserved": True, "blocked": [], "inventory": [entry], "exit_code": 0,
-                  "cases": [{"case": "case-0", "function": "app.domain_integer", "arguments": [7], "exit_code": 0}]}
+                  "cases": [{"case": "case-0", "function": function, "arguments": [value], "exit_code": 0}]}
         path = self.root / "report.json"
         path.write_text(json.dumps(report))
         return path, parent, bundle
@@ -68,7 +70,7 @@ class DomainQualificationTests(unittest.TestCase):
         self.assertEqual(oracle.typed("c", "boolean", True),
                          {"kind": "boolean", "type": "c._Bool", "value": True})
         self.assertEqual(oracle.typed("java", "float", 0.1),
-                         {"kind": "float", "type": "java.lang.Float", "bits": "3dcccccd"})
+                         {"kind": "float", "type": "java.float", "bits": "3dcccccd"})
         self.assertEqual(oracle.typed("go", "string", "\u03bb"),
                          {"kind": "string", "type": "go.string", "encoding": "raw_bytes", "value": "cebb"})
         self.assertEqual(oracle.typed("python", "string", "\u03bb")["value"], "000003bb")
@@ -79,6 +81,24 @@ class DomainQualificationTests(unittest.TestCase):
         self.assertEqual(len(oracle.check_report(path, count=1)), 4)
         with self.assertRaises(AssertionError):
             oracle.check_report(path, count=2)
+
+    def test_java_primitive_float_label_is_preserved_and_boxed_substitution_is_rejected(self):
+        path, parent, bundle = self.report("java", "float")
+        for lane in ("baseline", "instrumented_on"):
+            for index, attempt in enumerate(bundle[lane]):
+                observed = attempt["observation"]
+                observed["outcome"]["graph"]["roots"]["result"]["type"] = "java.float"
+                (parent / (lane + "-" + str(index)) / "typed-observation.json").write_text(json.dumps(observed))
+        (parent / "typed-bundle.json").write_text(json.dumps({"cases": [bundle]}))
+        self.assertEqual(len(oracle.check_report(path, count=1)), 4)
+        for lane in ("baseline", "instrumented_on"):
+            for index, attempt in enumerate(bundle[lane]):
+                observed = attempt["observation"]
+                observed["outcome"]["graph"]["roots"]["result"]["type"] = "java.lang.Float"
+                (parent / (lane + "-" + str(index)) / "typed-observation.json").write_text(json.dumps(observed))
+        (parent / "typed-bundle.json").write_text(json.dumps({"cases": [bundle]}))
+        with self.assertRaises(AssertionError):
+            oracle.check_report(path, count=1)
 
     def test_equal_but_wrong_results_are_rejected_in_both_lanes(self):
         path, parent, bundle = self.report()
@@ -114,4 +134,3 @@ class DomainQualificationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

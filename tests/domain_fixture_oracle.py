@@ -85,7 +85,7 @@ def typed(language: str, kind: str, value) -> dict:
         return {"kind": "boolean", "type": labels.get(language, language + ".boolean"), "value": value}
     if kind == "float":
         labels = {"c": "c.float", "cpp": "cpp.float", "rust": "rust.f32", "python": "python.float64",
-                  "java": "java.lang.Float", "go": "go.float32"}
+                  "java": "java.float", "go": "go.float32"}
         width = ">d" if language in ("python", "javascript", "typescript") else ">f"
         return {"kind": "float", "type": labels.get(language, language + ".float64"),
                 "bits": struct.pack(width, value).hex()}
@@ -162,4 +162,3 @@ def check_report(path: Path, *, count: int, expected_arguments: list | None = No
     assert len(attempts) == count * 4
     assert report["exit_code"] == max(case["exit_code"] for case in report["cases"])
     return attempts
-
