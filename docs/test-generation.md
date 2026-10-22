@@ -53,6 +53,8 @@ There is no automatic successful-run deletion or `--keep-workspace` flag. Keep r
 
 Cleanup requires `.oteleq-owned.json`, rejects unknown top-level files, unsealed plans/suites and edited snapshots/suites, and does not require the original application or toolchain still to exist. It removes the owned workspace, including its internal replay evidence; independently stored external reports remain available.
 
+Java runtime-archive cleanup checks the sealed private context, dependency bytes and retained probe files. Execution and detached replay separately require the known selected JDK. Removing or upgrading that JDK therefore permits cleanup of an unchanged owned workspace while preventing replay with unavailable or changed tools.
+
 ## Optional incorporation into a repository
 
 Use `export-tests --workspace PATH --destination PATH` to inspect the copy plan, then add `--apply` to perform it. The destination must be new and independent of the workspace. Choosing a new subdirectory in the application's repository explicitly incorporates the copied bundle; it does not edit existing tests, dependencies, manifests or locks.

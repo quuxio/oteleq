@@ -179,7 +179,21 @@ def freeze_dependency(origin: Path, target: Path, record: dict, active: bool) ->
 
 
 def verify(workspace: Path, data: dict, *, originals: bool = True) -> None:
-    """Original plans guard original inputs; exported plans use their frozen copies."""
+    """Execution always verifies the selected JDK, including detached exports."""
+    context = verify_owned(workspace, data)
+    if context is None:
+        return
+    if archive_context.configured(context):
+        archive_context.verify_jdk(context, workspace / DIRECTORY, Path(data["tools"]["java"]["java"]))
+    if originals:
+        for entry in context["entries"]:
+            expected = {key: entry[key] for key in archive_context.fields(entry, archive_context.configured(context))}
+            require(Path(entry["requested"]).resolve(strict=True) == Path(entry["source"])
+                    and inspect_entry(Path(entry["source"]), entry, context) == expected, "original dependency changed")
+
+
+def verify_owned(workspace: Path, data: dict) -> dict | None:
+    """Check sealed private inputs without requiring original sources or a JDK."""
     context = data.get("java_context")
     root = workspace / DIRECTORY
     if context is None:
@@ -199,7 +213,6 @@ def verify(workspace: Path, data: dict, *, originals: bool = True) -> None:
         require(set(context) == {"schema_version", "profile", "source_roots", "excluded_source_jars",
                                 "source_units", "entries", "archive_feature", "archive_jdk"},
                 "unknown runtime archive context fields")
-        archive_context.verify_jdk(context, root, Path(data["tools"]["java"]["java"]))
     require(source_files(workspace / "snapshot", options, set(data["excluded_directories"])) == context["source_units"],
             "Java source unit set changed")
     for index, entry in enumerate(context["entries"]):
@@ -211,9 +224,7 @@ def verify(workspace: Path, data: dict, *, originals: bool = True) -> None:
             require(set(entry) == {"requested", "source", "owned", *archive_context.fields(entry, active)},
                     "unknown runtime archive entry fields")
         require(inspect_entry(root / entry["owned"], entry, context) == expected, "frozen dependency differs")
-        if originals:
-            require(Path(entry["requested"]).resolve(strict=True) == Path(entry["source"])
-                    and inspect_entry(Path(entry["source"]), entry, context) == expected, "original dependency changed")
+    return context
 
 
 def inspect_entry(path: Path, entry: dict, context: dict) -> dict:

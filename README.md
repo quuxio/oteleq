@@ -141,6 +141,8 @@ For a reproducible difference, [counterexample shrinking](docs/counterexample-sh
 "$OTELEQ_CLI" clean --workspace "$OTELEQ_WORKSPACE"
 ```
 
+Cleanup can remove an unchanged owned workspace after its original sources or toolchain have been removed. [Retention and cleanup](docs/test-generation.md#retention-and-cleanup) explains the preservation checks.
+
 Export includes a frozen application snapshot and runnable suite. It refuses existing destinations and may be placed in the application only by that explicit choice. Generated boilerplate is MIT licensed; application code retains its licence. Retained suites test their frozen snapshot; create a new plan for changed application code. See [capabilities, limits and complete usage](docs/automatic-generation.md). Pass the executable [example policy](examples/equivalence.toml) with `plan --config PATH` for selection, scalar fixtures and budgets. Broader build/factory and generated graph-adapter integration remain on the [completion checklist](docs/completion.md).
 
 ### Compare an existing workload bundle
