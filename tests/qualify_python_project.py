@@ -50,6 +50,53 @@ def run_framework(workspace: Path, destination: Path, name: str) -> int:
     return sum(check_report(Path(json.loads(line)['report']), expected_cases=1) for line in summaries)
 
 
+def receiver_import_refusal(cli: Path, provider: Path, folder: Path, context: str, factory: str) -> None:
+    """Construction fixtures cannot erase unresolved source-package bindings."""
+    folder.mkdir()
+    application = folder / 'application'
+    source = application / 'src/pkg/api.py'
+    source.parent.mkdir(parents=True)
+    marker = folder / 'application-started'
+    source.write_text('open(' + repr(str(marker)) + ',"w").write("started")\n'
+        + 'class Counter:\n def __init__(self,start:int):self.value=start\n'
+        + ' def add(self,n:int)->int:\n  self.value+=n\n  return self.value\n'
+        + 'def make_counter(start:int):return Counter(start)\n')
+    roots = ['.', 'src'] if context == 'ambiguous' else ['first', 'src'] if context == 'shadowed' else ['src']
+    if context != 'namespace':
+        source.with_name('__init__.py').write_text('')
+    if context == 'shadowed':
+        other = application / 'first/pkg/__init__.py'
+        other.parent.mkdir(parents=True)
+        other.write_text('')
+    before = {p.relative_to(application).as_posix(): p.read_bytes() for p in application.rglob('*') if p.is_file()}
+    config = folder / 'equivalence.toml'
+    config.write_text('schema_version=1\nlanguages=["python"]\n[adapters.python]\nimport_roots='
+        + json.dumps(roots) + '\n[functions]\ninclude=["*.Counter.add"]\n[[fixtures]]\n'
+        + 'function="*.Counter.add"\ncases=[[7]]\nreceiver={factory=' + json.dumps(factory) + ',arguments=[10]}\n')
+    workspace = Path(command([cli, 'plan', '--source', application, '--otelc-root', provider,
+        '--workspace-parent', folder, '--config', config], folder, 'plan'))
+    command([cli, 'generate', '--workspace', workspace], folder, 'generate')
+    comparison = folder / 'comparison'
+    command([cli, 'run', '--workspace', workspace, '--report-dir', comparison], folder, 'run', expected=3)
+    report = json.loads((comparison / 'report.json').read_text())
+    assert report['source_preserved'] and len(report['blocked']) == 1 and not report['cases']
+    reason = {'namespace': 'namespace', 'ambiguous': 'exactly one', 'shadowed': 'shadowed'}[context]
+    assert reason in report['blocked'][0]['reason'] and 'Counter.add' in json.dumps(report['blocked'])
+    command([sys.executable, workspace / 'tests/test_equivalence.py'], folder, 'framework', expected=1)
+    exported = folder / 'exported'
+    command([cli, 'export-tests', '--workspace', workspace, '--destination', exported], folder, 'export-dry-run')
+    assert not exported.exists()
+    command([cli, 'export-tests', '--workspace', workspace, '--destination', exported, '--apply'], folder, 'export-apply')
+    detached = folder / 'detached-application'
+    application.rename(detached)
+    try:
+        command([sys.executable, exported / 'tests/test_equivalence.py'], folder, 'detached-framework', expected=1)
+    finally:
+        detached.rename(application)
+    assert not marker.exists() and not list(folder.rglob('command.json'))
+    assert before == {p.relative_to(application).as_posix(): p.read_bytes() for p in application.rglob('*') if p.is_file()}
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--otelc-root', type=Path, required=True)
@@ -93,10 +140,18 @@ def main() -> None:
         plan = json.loads((workspace / 'plan.json').read_text())
         assert all(hashlib.sha256((source / path).read_bytes()).hexdigest() == value
                    for path, value in plan['source_manifest'].items())
+    receiver_refusals = 0
+    for context in ('namespace', 'ambiguous', 'shadowed'):
+        for factory in ('Counter', 'make_counter'):
+            receiver_import_refusal(cli, root, destination / (context + '-' + factory), context, factory)
+            receiver_refusals += 1
     result = {'claim': 'equivalence over these tests and observations', 'artefact_class': 'diagnostic',
               'cli_sha256': hashlib.sha256(cli.read_bytes()).hexdigest(), 'projects': 2, 'cases': cases,
               'actual_application_launches': launches, 'generated_unittest_runs': 4, 'generated_tests': 8,
               'changed_local_dependency_controls_rejected': controls, 'source_preserved': True,
+              'receiver_import_context_controls_rejected': receiver_refusals,
+              'receiver_refusal_application_launches': 0,
+              'receiver_refusal_generated_suite_runs': receiver_refusals * 2,
               'scope': 'Explicit regular Python source packages and src layout, module-local state and scalar calls; no namespace, installed project metadata, imported-root or shipping qualification.'}
     (destination / 'QUALIFICATION.json').write_text(json.dumps(result, indent=2)+'\n')
     print(json.dumps(result), flush=True)
