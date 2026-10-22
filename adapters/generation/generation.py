@@ -987,7 +987,7 @@ def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, ht
     immutable = manifest(project)
     java_context = java_project.materialise(workspace, data, folder, project) if language == "java" else None
     receiver_options = {"max_requests": java_provider.MAX_TELEMETRY_REQUESTS} if runtime is not None else {}
-    with capture.receiver(**receiver_options) as (endpoint, bodies, errors):
+    with capture.receiver(**receiver_options, response_path=folder / "http-responses.json") as (endpoint, bodies, errors):
         config = folder / "policy.toml"
         config.write_text(policy(entry, endpoint, service=service) if runtime is not None else policy(entry, endpoint))
         if language == "typescript":

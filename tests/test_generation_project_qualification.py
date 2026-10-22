@@ -27,6 +27,16 @@ class ProjectQualificationOracleTests(unittest.TestCase):
         entry = {"language": language, "otelc_function": "selected"}
         attempt = {"observation": observation, "execution": execution}
         self.save(attempt)
+        events, bodies = [], []
+        if lane == "instrumented_on":
+            bodies = [{"path": "/v1/traces", "file": "otlp-0.protobuf"}]
+            events = [{"path": "/v1/traces", "status": 200, "body_index": 0,
+                "request_started_ns": 1, "body_received_ns": 2, "response_started_ns": 3,
+                "headers_written_ns": 4, "handler_finished_ns": 5, "headers_write_failed": False}]
+        (self.folder / "http-capture.json").write_text(json.dumps({"errors": [], "bodies": bodies}))
+        (self.folder / "http-responses.json").write_text(json.dumps({"schema_version": 1,
+            "scope": "server response headers; client acknowledgement is not observed", "clock": "monotonic_ns",
+            "events": events, "unrecorded_events": 0}))
         return attempt, entry, arguments
 
     def save(self, attempt: dict) -> None:
@@ -89,6 +99,25 @@ class ProjectQualificationOracleTests(unittest.TestCase):
     def test_unclassified_functions_cannot_enter_the_accepted_corpus(self):
         with self.assertRaises(AssertionError):
             oracle.kind_of({"name": "unknown"})
+
+    def test_received_body_cannot_hide_missing_failed_or_reordered_response_evidence(self):
+        self.attempt("python", "added", "added", "instrumented_on")
+        path = self.folder / "http-responses.json"
+        original = json.loads(path.read_text())
+        for change in ({"headers_write_failed": True}, {"headers_written_ns": None},
+                       {"headers_written_ns": 1}, {"body_index": 1}, {"status": 503}, {"handler_finished_ns": True},
+                       {"headers_write_failed": 0}, {"body_index": False}):
+            altered = copy.deepcopy(original)
+            altered["events"][0].update(change)
+            path.write_text(json.dumps(altered))
+            with self.subTest(change=change), self.assertRaises(AssertionError):
+                oracle.check_server_responses(self.folder, "instrumented_on")
+        for key in ("schema_version", "unrecorded_events"):
+            altered = copy.deepcopy(original)
+            altered[key] = bool(altered[key])
+            path.write_text(json.dumps(altered))
+            with self.subTest(key=key), self.assertRaises(AssertionError):
+                oracle.check_server_responses(self.folder, "instrumented_on")
 
 
 if __name__ == "__main__":

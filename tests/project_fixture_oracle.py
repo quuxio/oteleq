@@ -57,6 +57,23 @@ def expected_result(language: str, kind: str, arguments: list, lane: str, stage:
     return int(lane == "instrumented_on")
 
 
+def check_server_responses(folder: Path, lane: str) -> None:
+    """A received body cannot stand in for even a completed server header write."""
+    record = json.loads((folder / "http-responses.json").read_text())
+    captured = json.loads((folder / "http-capture.json").read_text())
+    assert type(record["schema_version"]) is int and record["schema_version"] == 1 and record["clock"] == "monotonic_ns"
+    assert record["scope"] == "server response headers; client acknowledgement is not observed"
+    assert type(record["unrecorded_events"]) is int and record["unrecorded_events"] == 0 and not captured["errors"]
+    assert len(record["events"]) == len(captured["bodies"])
+    assert bool(record["events"]) == (lane == "instrumented_on")
+    for index, event in enumerate(record["events"]):
+        assert type(event["body_index"]) is int and event["body_index"] == index and event["path"] == captured["bodies"][index]["path"]
+        assert type(event["status"]) is int and event["status"] == 200 and event["headers_write_failed"] is False
+        times = [event[name] for name in ("request_started_ns", "body_received_ns", "response_started_ns",
+                                          "headers_written_ns", "handler_finished_ns")]
+        assert all(type(value) is int and value > 0 for value in times) and times == sorted(times)
+
+
 def check_attempt(folder: Path, attempt: dict, entry: dict, kind: str, arguments: list,
                   lane: str, stage: str) -> None:
     """Agreement alone cannot hide a wrong caller, codec, return or witness."""
@@ -78,6 +95,7 @@ def check_attempt(folder: Path, attempt: dict, entry: dict, kind: str, arguments
         assert execution["witness"] is None
     assert json.loads((folder / "typed-observation.json").read_text()) == observed
     assert (folder / "stdout").read_bytes() == (folder / "stderr").read_bytes() == b""
+    check_server_responses(folder, lane)
 
 
 def check_report(path: Path, stage: str) -> tuple[str, set[str]]:
