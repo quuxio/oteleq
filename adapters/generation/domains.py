@@ -236,11 +236,17 @@ def floating_sample(value: Any, width: int) -> float:
         raise ValueError("declared domain exceeds the floating representation") from error
 
 
+def sampling_budget(count: int, width: int) -> None:
+    """Keep pure sampling entry points within the same bounded profile."""
+    if (type(count) is not int or not 1 <= count <= MAX_CASES
+            or type(width) is not int or width not in (32, 64)):
+        raise ValueError("invalid declared-domain sample budget or floating width")
+
+
 def samples(domain: dict, count: int, rng: random.Random, *, width: int = 64) -> list:
     """Materialise bounded independent scalar values, retaining exact distinctions."""
     domain = validate(domain)
-    if type(count) is not int or not 1 <= count <= MAX_CASES or width not in (32, 64):
-        raise ValueError("invalid declared-domain sample budget or floating width")
+    sampling_budget(count, width)
     target = sample_count(domain, count)
     values = {}
     candidates = itertools.chain(sample_edges(domain), sample_draws(domain, target, rng),

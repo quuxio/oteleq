@@ -169,9 +169,10 @@ class GeneratedDomainTests(unittest.TestCase):
 
     def test_generated_input_budgets_refuse_instead_of_truncating_a_passing_corpus(self):
         long = {**STRING, "minimum_length": 100, "maximum_length": 100}
+        candidate = entry(parameter="str", declared=long)
         with patch.object(harness, "MAX_DOMAIN_INPUT_BYTES", 128):
             with self.assertRaisesRegex(ValueError, "budget"):
-                harness.corpus(entry(parameter="str", declared=long), 3)
+                harness.corpus(candidate, 3)
 
     def test_combined_case_payload_is_bounded_separately_from_parameter_pools(self):
         declared = {**STRING, "minimum_length": 20, "maximum_length": 20}
@@ -181,11 +182,13 @@ class GeneratedDomainTests(unittest.TestCase):
                 harness.corpus(data, 3)
 
     def test_invalid_sampling_budgets_and_widths_are_not_empty_successes(self):
+        rng = random.Random(1)
         for count in (0, -1, True, 1025):
             with self.subTest(count=count), self.assertRaises(ValueError):
-                domains.samples(INTEGER, count, random.Random(1))
-        with self.assertRaises(ValueError):
-            domains.samples(FLOAT, 3, random.Random(1), width=16)
+                domains.samples(INTEGER, count, rng)
+        for width in (16, 32.0):
+            with self.subTest(width=width), self.assertRaises(ValueError):
+                domains.samples(FLOAT, 3, rng, width=width)
 
     def test_existing_context_blockers_are_not_cleared_by_domain_generation(self):
         data = {**entry(), "reason": "unsupported original import context"}

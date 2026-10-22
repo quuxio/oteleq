@@ -83,6 +83,24 @@ def scalar_arguments(value: Any) -> bool:
                                           and (type(item) is not float or math.isfinite(item)) for item in value)
 
 
+def fixture_cases(value: dict, label: str) -> list[list[Any]] | None:
+    """A missing case list selects domain generation; explicit lists stay strict."""
+    if "cases" not in value:
+        if "domains" not in value:
+            raise ValueError(f"{label} requires concrete cases or declared scalar domains")
+        return None
+    cases = value["cases"]
+    if not isinstance(cases, list) or not 1 <= len(cases) <= MAX_CASES:
+        raise ValueError(f"{label}.cases must contain 1 to {MAX_CASES} argument lists")
+    for arguments in cases:
+        if not scalar_arguments(arguments):
+            raise ValueError(f"{label} currently requires finite scalar arguments")
+    identities = [json.dumps(arguments, ensure_ascii=True, allow_nan=False) for arguments in cases]
+    if len(identities) != len(set(identities)):
+        raise ValueError(f"{label} contains duplicate concrete cases")
+    return cases
+
+
 def fixture(value: Any, index: int) -> dict[str, Any]:
     """Validate concrete cases or independent domains without executing target code."""
     label = f"fixtures[{index}]"
@@ -93,23 +111,13 @@ def fixture(value: Any, index: int) -> dict[str, Any]:
     language = value.get("language")
     if language is not None and language not in LANGUAGES:
         raise ValueError(f"{label} has an unsupported language")
-    cases = value.get("cases", [])
-    if "cases" in value and (not isinstance(cases, list) or not 1 <= len(cases) <= MAX_CASES):
-        raise ValueError(f"{label}.cases must contain 1 to {MAX_CASES} argument lists")
-    if "cases" not in value and "domains" not in value:
-        raise ValueError(f"{label} requires concrete cases or declared scalar domains")
-    for arguments in cases:
-        if not scalar_arguments(arguments):
-            raise ValueError(f"{label} currently requires finite scalar arguments")
-    identities = [json.dumps(arguments, ensure_ascii=True, allow_nan=False) for arguments in cases]
-    if len(identities) != len(set(identities)):
-        raise ValueError(f"{label} contains duplicate concrete cases")
+    cases = fixture_cases(value, label)
     result = {"function": function, "source": source, "language": language,
               "expected_baseline": expected_baseline(value.get("expected_baseline", {"kind": "return"}))}
-    if "cases" in value:
+    if cases is not None:
         result["cases"] = cases
     if "domains" in value:
-        result["domains"] = fixture_domains(value["domains"], cases, label)
+        result["domains"] = fixture_domains(value["domains"], cases or [], label)
     if "receiver" in value:
         result["receiver"] = receiver(value["receiver"])
     if "sequence" in value:

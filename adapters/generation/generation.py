@@ -278,6 +278,13 @@ def discover_file(name, language, root, snapshot, workspace, tools, artefacts, a
                                "output": "unknown", "reason": str(error), "inventory_gap": True}], "globals": []}
 
 
+def qualify_inputs(entry: dict, count: int) -> None:
+    """Freeze generated domain requests before checking the common corpus."""
+    if "input_domains" in entry and "input_cases" not in entry:
+        entry["input_cases"] = harness.domain_cases(entry, count)
+    harness.corpus(entry, count)
+
+
 def qualify_entry(entry, snapshot, count):
     if entry["reason"]:
         return "blocked"
@@ -285,9 +292,7 @@ def qualify_entry(entry, snapshot, count):
         node_project.require_callable(entry)
         if entry.get("go_shadowed_recovery", False):
             raise ValueError("shadowed Go panic/recover requires an observation fixture")
-        if "input_domains" in entry and "input_cases" not in entry:
-            entry["input_cases"] = harness.domain_cases(entry, count)
-        harness.corpus(entry, count)
+        qualify_inputs(entry, count)
         outputs = harness.INTEGERS | harness.FLOATS | harness.BOOLS | harness.VOIDS | harness.STRINGS
         if entry["language"] in ("c", "cpp"):
             outputs = harness.native_scalar_types(entry["language"]) | {"void"}
