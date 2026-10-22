@@ -146,7 +146,8 @@ class JavaRuntimeArchiveTests(unittest.TestCase):
                                             java=self.java, folder=self.folder / name)
                 self.assertEqual(view[0], self.classes)
                 member = record["resolution"]["archives"][0]["classes"]["dep.Flags"]
-                self.assertEqual(classpath.digest(view[1] / "dep/Flags.class"), member["sha256"])
+                with zipfile.ZipFile(view[1]) as metadata:
+                    self.assertEqual(hashlib.sha256(metadata.read("dep/Flags.class")).hexdigest(), member["sha256"])
                 javap = str(self.java.parent / "javap")
                 result = subprocess.run([javap, "-constants", "-cp", os.pathsep.join(map(str, view)), "dep.Flags"],
                                         capture_output=True, check=True, env=self.environment, timeout=30)
@@ -264,6 +265,45 @@ class JavaRuntimeArchiveTests(unittest.TestCase):
                 edited["resolution"]["archives"][0]["multi_release"] = False
             with self.subTest(fault=fault), self.assertRaises(ValueError):
                 archives.verify(edited["resolution"], edited, paths, java=self.java, folder=probe)
+
+    def test_metadata_view_preserves_case_and_unicode_distinct_class_names(self):
+        names = ("Foo", "foo", "Caf\u00e9", "Cafe\u0301")
+        expected = {}
+        jar = self.folder / "distinct.jar"
+        with zipfile.ZipFile(jar, "w") as target:
+            for index, name in enumerate(names):
+                folder = self.folder / str(index)
+                folder.mkdir()
+                source = folder / (name + ".java")
+                source.write_text("package distinct; public class " + name
+                                  + " { public static final int VALUE=" + str(index + 7) + "; }")
+                subprocess.run([self.javac, "-encoding", "UTF-8", "-d", str(folder), str(source)],
+                               capture_output=True, check=True, env=self.environment, timeout=30)
+                member = "distinct/" + name + ".class"
+                data = (folder / member).read_bytes()
+                target.writestr(member, data)
+                expected[member] = hashlib.sha256(data).hexdigest()
+        original = jar.read_bytes()
+        paths = [self.classes, jar]
+        probe = self.folder / "probe"
+        record = archives.inspect(paths, self.java, probe, self.environment, generation.execute)
+        view = archives.materialise(record, paths, self.folder / "view", java=self.java, folder=probe)[1]
+        if view.is_dir():
+            observed = {member: classpath.digest(view / member) for member in expected}
+        else:
+            with zipfile.ZipFile(view) as archive:
+                observed = {name: hashlib.sha256(archive.read(name)).hexdigest() for name in archive.namelist()}
+        self.assertEqual(observed, expected)
+        self.assertEqual(view.suffix, ".jar")
+        repeated = archives.materialise(record, paths, self.folder / "repeated-view", java=self.java, folder=probe)[1]
+        self.assertEqual(view.read_bytes(), repeated.read_bytes())
+        with self.assertRaisesRegex(ValueError, "new and outside"):
+            archives.materialise(record, paths, self.folder / "view", java=self.java, folder=probe)
+        for index, name in enumerate(names):
+            result = subprocess.run([str(self.java.parent / "javap"), "-constants", "-cp", str(view), "distinct." + name],
+                                    capture_output=True, check=True, env=self.environment, timeout=30)
+            self.assertIn(f"VALUE = {index + 7};".encode(), result.stdout)
+        self.assertEqual(jar.read_bytes(), original)
 
     def test_ordinary_generation_still_refuses_unqualified_versioned_jars(self):
         for name, jar in self.matrix.items():

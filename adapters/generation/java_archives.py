@@ -1,5 +1,6 @@
 """Independent selected-JDK archive evidence for the new Java launch contract."""
 from collections.abc import Callable
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -126,7 +127,7 @@ def verify(claim: object, record: dict, paths: list[Path], *, java: Path, folder
 
 
 def materialise(record: dict, paths: list[Path], destination: Path, *, java: Path, folder: Path) -> list[Path]:
-    """Copy exact selected bytes for metadata inspection, never for application launch."""
+    """Make ordinary metadata JARs, retaining names even on normalising filesystems."""
     verify(record["resolution"], record, paths, java=java, folder=folder)
     require(destination.is_absolute() and destination.resolve() == destination and not destination.exists()
             and all(not destination.is_relative_to(path) for path in paths),
@@ -134,14 +135,20 @@ def materialise(record: dict, paths: list[Path], destination: Path, *, java: Pat
     destination.mkdir(parents=True)
     result = list(paths)
     for archive in record["resolution"]["archives"]:
-        target = destination / str(archive["classpath_index"]).zfill(4)
-        target.mkdir()
-        with zipfile.ZipFile(archive["path"]) as source:
+        target = destination / (str(archive["classpath_index"]).zfill(4) + ".jar")
+        expected = {}
+        with zipfile.ZipFile(archive["path"]) as source, zipfile.ZipFile(target, "x") as view:
             for name, member in archive["classes"].items():
-                path = target / (name.replace(".", "/") + ".class")
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_bytes(source.read(member["entry"]))
-                require(classpath.digest(path) == member["sha256"], "selected metadata bytes changed")
+                logical = name.replace(".", "/") + ".class"
+                data = source.read(member["entry"])
+                require(hashlib.sha256(data).hexdigest() == member["sha256"], "selected metadata bytes changed")
+                # ZipInfo's fixed timestamp and explicit attributes make repeated views identical.
+                entry = zipfile.ZipInfo(logical)
+                entry.compress_type = zipfile.ZIP_DEFLATED
+                entry.external_attr = 0o600 << 16
+                view.writestr(entry, data)
+                expected[name] = {"entry": logical, "sha256": member["sha256"]}
+        require(classpath.jar_classes(target) == expected, "selected metadata bytes changed")
         result[archive["classpath_index"]] = target
     verify(record["resolution"], record, paths, java=java, folder=folder)
     return result
