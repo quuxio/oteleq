@@ -454,6 +454,8 @@ def configure_fixture(entry, discovered, fixture):
             receiver_fixture(entry, discovered, fixture["receiver"])
         if "domains" in fixture:
             entry["input_domains"] = fixture["domains"]
+        if "preconditions" in fixture:
+            entry["input_preconditions"] = fixture["preconditions"]
         if "sequence" in fixture:
             try:
                 sequences.configure(entry, fixture["sequence"], harness.concrete_arguments)

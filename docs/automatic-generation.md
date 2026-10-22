@@ -41,7 +41,7 @@ Path flags accept both `--source PATH` and `--source=PATH` forms. Use full optio
 
 ## Selection and inputs
 
-Fixtures can [generate concrete inputs from declared independent scalar domains](domain-generation.md) by omitting their literal `cases` list. Explicit lists retain their existing behaviour. Planning materialises the requested values before either lane runs; the same values remain bound through replay, export and scalar shrinking.
+Fixtures can [generate concrete inputs from declared independent scalar domains](domain-generation.md) by omitting their literal `cases` list. Explicit lists retain their existing behaviour. Optional [numeric argument preconditions](numeric-preconditions.md) filter generated combinations and scalar reductions without executing application callbacks. Planning materialises the requested values before either lane runs; the same values remain bound through replay, export and scalar shrinking.
 
 All recognised files are inventoried by default. Use repeated `--language ID` to select a subset; the report records that selection. `--exclude 'qualified.pattern'` explicitly excludes matching function identities. Free entrypoints named `main`, Java static `void main(String[])` methods and native declarations without a source body are inventoried as excluded callers/declarations. Nested or instance methods named `main` remain blockers. Exclusions remain visible. No selected unsupported function becomes a passing skipped test.
 

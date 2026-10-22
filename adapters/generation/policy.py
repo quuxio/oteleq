@@ -17,6 +17,7 @@ import java_project
 import go_project
 import native_project
 import python_project
+import preconditions
 import return_expectations
 import sequences
 import typescript_provider
@@ -104,7 +105,7 @@ def fixture_cases(value: dict, label: str) -> list[list[Any]] | None:
 def fixture(value: Any, index: int) -> dict[str, Any]:
     """Validate concrete cases or independent domains without executing target code."""
     label = f"fixtures[{index}]"
-    keys(value, {"function", "source", "language", "cases", "expected_baseline", "domains", "receiver", "sequence"}, label)
+    keys(value, {"function", "source", "language", "cases", "expected_baseline", "domains", "preconditions", "receiver", "sequence"}, label)
     function, source = value.get("function"), value.get("source", "**")
     if any(not isinstance(item, str) or not item.strip() for item in (function, source)):
         raise ValueError(f"{label} requires a function pattern and source pattern")
@@ -118,6 +119,12 @@ def fixture(value: Any, index: int) -> dict[str, Any]:
         result["cases"] = cases
     if "domains" in value:
         result["domains"] = fixture_domains(value["domains"], cases or [], label)
+    if "preconditions" in value:
+        result["preconditions"] = preconditions.validate(value["preconditions"])
+        if "domains" in result:
+            preconditions.bind(result["preconditions"], len(result["domains"]))
+        for arguments in cases or []:
+            preconditions.require(arguments, result["preconditions"])
     if "receiver" in value:
         result["receiver"] = receiver(value["receiver"])
     if "sequence" in value:
