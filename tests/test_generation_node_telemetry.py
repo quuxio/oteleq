@@ -269,8 +269,9 @@ class NodeTelemetryTests(unittest.TestCase):
             self.assertEqual(witness["pending"], 0)
             state["lifetimes"].update(gc_completed=1, current_live=0, censored=0)
             path.write_text(json.dumps(state))
+            bodies = self.bodies()
             with self.assertRaisesRegex(ValueError, "independently witnessed"):
-                telemetry.witness(folder, entry, self.bodies(), "case", ExportTraceServiceRequest)
+                telemetry.witness(folder, entry, bodies, "case", ExportTraceServiceRequest)
 
 
 if __name__ == "__main__":
