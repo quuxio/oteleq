@@ -53,7 +53,7 @@ There is no automatic successful-run deletion or `--keep-workspace` flag. Keep r
 
 Cleanup requires `.oteleq-owned.json`, rejects unknown top-level files, unsealed plans/suites and edited snapshots/suites, and does not require the original application or toolchain still to exist. It removes the owned workspace, including its internal replay evidence; independently stored external reports remain available.
 
-Java runtime-archive cleanup checks the sealed private context, dependency bytes and retained probe files. Execution and detached replay separately require the known selected JDK. Removing or upgrading that JDK therefore permits cleanup of an unchanged owned workspace while preventing replay with unavailable or changed tools.
+Java runtime-archive cleanup checks the sealed private context, dependency bytes and retained probe files. Execution and detached replay separately require the known selected JDK. Removing or upgrading that JDK therefore permits cleanup of an unchanged owned workspace while preventing replay with unavailable or changed tools. The [cleanup qualification](qualification/java-cleanup-2026-10-22.json) retains failing-before/passing-after CLI evidence, detached replay and preservation controls.
 
 ## Optional incorporation into a repository
 

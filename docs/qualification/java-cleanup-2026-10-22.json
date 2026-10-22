@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-22",
+  "platform": "macOS ARM64",
+  "scope": "Ownership-based Java runtime-archive cleanup; execution keeps selected-JDK checks. This does not add a runtime/build profile.",
+  "source_commit": "5f0f2de3d4446b49217a0ff9b8974f0a1ac02c3d",
+  "cli_sha256": "ba5bf8305849d77aa5e9e3a639d1811a35b6a9e1cd8832702e15faecd49d6a41",
+  "source_archive_sha256": "1ae2f197048fcb814811382865f3c6aaa40de3bce878bdf1648b9199db45da8d",
+  "previous_cli_commit": "9b60417ed0e424036df0345cf0cfdecb9f310ed1",
+  "provider_commit": "c06eb438012116a7b2ec9b635a2cb7434d8e713d",
+  "actual_application_jvm_launches": 8,
+  "actual_instrumented_application_jvms": 4,
+  "results": {
+    "actual_application_jvm_launches": 8,
+    "launches": {
+      "raw_attempt_folders": 16,
+      "unique_command_identities": 8
+    },
+    "prepared": {
+      "retained_attempts": 16,
+      "unique_processes": 8,
+      "retained_instrumented_receipts": 8,
+      "short_runtimes_removed": true
+    },
+    "complete_independent_graphs_verified": true,
+    "detached_original_source_and_dependencies_unavailable": true,
+    "before_fix_clean_exit": 4,
+    "after_fix_clean_exit": 0,
+    "missing_jdk_replay_exit": 4,
+    "missing_jdk_replay_application_launches": 0,
+    "edited_probe_refused_and_retained": true,
+    "unknown_user_file_refused_and_retained": true,
+    "cleanup_original_source_sdk_and_jdk_paths_unavailable": true,
+    "fixture_method": "sealed private fixture with rebased missing external paths; installed JDK and frozen SDK were not modified"
+  },
+  "regressions": {
+    "failing_before": "cleanup raises FileNotFoundError for the unavailable selected JDK",
+    "focused_cleanup_after": "2 passed",
+    "all_java_after": "162 passed",
+    "full_gate": "make check passed",
+    "distinct_python": 645,
+    "distinct_rust": 70,
+    "distinct_node": 17,
+    "distinct_go": 4,
+    "total_distinct": 736
+  },
+  "coverage": {
+    "java_project": 99,
+    "generation": 92,
+    "rust_product": 97.32
+  },
+  "retained_evidence_sha256": {
+    "runtime.json": "11ea45f2786506eb74621890179480df9dfb2d25f61c36db1de806de9d5c58f8",
+    "check.exit.json": "3dabd618ece92f87f723e79de06c0db7aa9882b9f4d05afaea6c249697c10794",
+    "cli-proof.exit.json": "bcb6c60665c466d4018bba4f9d14caf952d29cce99850465e005fab5bb1c95f9",
+    "cli-proof/qualification.json": "36e3f9cc728b0e105d0cba9f307f4b82f3c8587c794efc7e4cc685983e8113f3",
+    "cli-proof/before-clean.stderr": "e08f70a61f3c40858e1f1a4641f093475f644872977b5b1f5f7fb36fff020568",
+    "cli-proof/missing-jdk-replay.stderr": "e08f70a61f3c40858e1f1a4641f093475f644872977b5b1f5f7fb36fff020568",
+    "cli-proof/edited-refusal.stderr": "92044fac49fcf270bc869da63304456d8ef1f93810919b9d9773a212a54418f4",
+    "cli-proof/unknown-file-refusal.stderr": "0140314db7690373f8aab95c5627574841d4c3d529a468af6bfc8fc8f77edee3"
+  },
+  "fixture_boundary": "Sealed metadata references missing original source, SDK, dependency and JDK paths. The installed JDK and frozen SDK were not moved, deleted or modified.",
+  "gaps": [
+    "The existing full runtime-archive corpus remains qualified at its separately recorded runtime revision.",
+    "The broader project completion checklist remains open."
+  ]
+}
