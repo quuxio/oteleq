@@ -87,6 +87,8 @@ To qualify the explicit rebuilt SDK profile, add `GENERATION_ARGS='--node-backen
 
 `make generation-node-source-effects-otelc` takes the same provider/report settings and checks declared filesystem and HTTP fixtures through direct execution, replay, generated suites and detached export. It also promotes a current-source suite, changes the fixture body, adds a function and moves the checkout. Each route checks complete scalar graphs, literal effect bytes, actual process identities and independently decoded SDK telemetry. The default fixture is TypeScript with the native compiler; use `GENERATION_ARGS='--language javascript'` or `GENERATION_ARGS='--typescript-compiler api'` for the other profiles. Opaque corpus function IDs resolve through the frozen inventory when selecting the expected replay verdict.
 
+`make generation-node-source-channels-otelc` separately checks nonempty stdout and stderr, including NUL and non-UTF8 bytes. Its same-return/state control changes only stdout in the instrumented lane. Both literal channels, complete state/results and direct SDK receipts are checked through ordinary execution, replay, generated tests and detached export. The default is JavaScript; select TypeScript and its compiler with `GENERATION_ARGS='--language typescript --typescript-compiler api'`.
+
 ## Qualified scope
 
 Maintainer regressions cover actual loader formats, CommonJS free/receiver callers, exact scalar state and return values, source preservation, binding/intrinsic refusal, named context blockers and detached export. They use a limited compiler fixture for JS-compatible TypeScript unit cases.
