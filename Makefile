@@ -83,6 +83,7 @@ lint:
 
 examples:
 	$(PYTHON) -c 'import json, pathlib, tomllib; files = list(pathlib.Path("examples").rglob("*.json")) + list(pathlib.Path(".badges").glob("*.json")); [json.loads(p.read_text()) for p in files]; tomllib.loads(pathlib.Path("examples/equivalence.toml").read_text()); print("JSON and TOML syntax valid")'
+	$(NODE) --test tests/workflow_syntax.test.mjs
 
 docs-check: lint examples
 	$(MAKE) observer-check

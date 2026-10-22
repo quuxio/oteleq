@@ -78,6 +78,8 @@ rustup run 1.98.1 make check PYTHON=.venv/bin/python
 
 The pinned validation environment includes the OTLP protobuf decoder used by the Node telemetry regressions.
 
+`make examples` also parses every GitHub workflow with the locked YAML parser installed by `make setup`. Its regression checks the quoting required for pip's `--only-binary=:all:` argument.
+
 Use Python 3.12+ and Node 24/npm for these contributor tools. `make setup` installs locked Markdown tooling and TypeScript 6.0.3 for real compiler-API inventory regressions; it does not install dependencies into an application or provider. Rust 1.98.1 and matching LLVM tools are pinned in CI. A newer compiler may build the application, but its coverage instrumentation requires matching LLVM tools; do not assume Homebrew's current Rust is compatible with LLVM 22.
 
 The validation dependencies follow otelc's locked Markdown tooling. `npm ci` disables package lifecycle scripts. GitHub Actions are pinned to full action commits. Document prose is kept on logical lines and relative documentation links are checked during delivery. `make lint examples` checks Markdown and illustrative syntax; `make docs-check` also runs observer/generation regressions, while `make check` includes Rust checks and coverage.
