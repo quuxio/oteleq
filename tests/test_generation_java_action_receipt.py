@@ -304,6 +304,24 @@ class JavaActionReceiptTests(unittest.TestCase):
         report, message = fixture()
         with self.assertRaises(ValueError):qualify(report, message, bodies=[("/v1/traces", b"\xff")])
 
+    def test_resource_and_scope_attribute_loss_or_duplicate_scope_keys_refuse(self):
+        for kind in ("resource_loss", "scope_loss", "scope_duplicate", "scope_missing_value"):
+            report, message = fixture()
+            resource = message.resource_spans[0]
+            scope = resource.scope_spans[0].scope
+            if kind == "resource_loss":resource.resource.dropped_attributes_count = 1
+            elif kind == "scope_loss":scope.dropped_attributes_count = 1
+            else:
+                value = scope.attributes.add();value.key = "fixture"
+                if kind == "scope_duplicate":
+                    value.value.string_value = "same"
+                    scope.attributes.append(value)
+            with self.subTest(kind=kind), self.assertRaises(ValueError):qualify(report, message)
+        report, message = fixture()
+        value = message.resource_spans[0].scope_spans[0].scope.attributes.add()
+        value.key = "fixture";value.value.string_value = "retained"
+        self.assertEqual(qualify(report, message)["scoped_spans"], 3)
+
     def test_raw_record_and_decode_budgets_refuse_without_partial_success(self):
         report, message = fixture();body = message.SerializeToString()
         for bodies in ([], None, [None], [("/v1/traces",)], [("/logs", body)], [("/v1/traces", "text")]):

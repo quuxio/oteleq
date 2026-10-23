@@ -196,7 +196,10 @@ def qualify(report: dict, identity: witness.Identity, actions: list[Action], tar
         message = telemetry.decode(decoder, body)
         for resource in message.resource_spans:
             telemetry.resource(resource.resource, service)
+            witness.require(resource.resource.dropped_attributes_count == 0, "OTLP resource lost attributes")
             for group in resource.scope_spans:
+                witness.require(group.scope.dropped_attributes_count == 0, "OTLP scope lost attributes")
+                telemetry.attributes(group.scope.attributes)
                 instrumentation = group.scope.name, group.scope.version
                 for span in group.spans:
                     key = capture.span_identity(span)
