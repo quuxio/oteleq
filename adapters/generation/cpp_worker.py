@@ -200,7 +200,7 @@ return std::fclose(output)==0 && ok?0:92;}
         if self.sequence is not None:
             main = self.sequence_main()
         generated = "namespace __oteleq_cpp {\n" + aliases + forwards + access + writers + main + "}\n"
-        clean = cpp_receivers.sanitise_identifiers(self.contract) + native_names.undefinitions(generated)
+        clean = cpp_receivers.sanitise_identifiers(self.contract) + native_names.undefinitions(generated, cpp=True)
         return clean + generated + '\nint main(){try{return __oteleq_cpp::access<::' + owner + '>::run();}\n' + '''
 catch(const __oteleq_cpp::capture_failure& error){std::fprintf(stderr,"C++ observation incomplete: %s\\n",error.reason);return 91;}
 catch(...){std::fputs("C++ fixture or exception needs another codec\\n",stderr);return 91;}}

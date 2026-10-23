@@ -554,7 +554,8 @@ fputs("before\\n",out);
 ''' + arguments_checked + '\n' + state + '\n' + invocation + '\nfputs("after\\n",out);\n' + state + '\nreturn fclose(out)!=0;}\n'
     names = [entry['name'], *entry['parameters'], entry['output'], *(item['name'] for item in entry['globals'])]
     preserve = {'__oteleq_bytes', '__oteleq_assert_scalar', '__oteleq_assert_value', '__oteleq_scalar_value'}
-    clean = native_names.undefinitions(support + worker, names, preserve=preserve)
+    clean = native_names.undefinitions(support + worker, names, preserve=preserve,
+                                      cpp=entry['language'] == 'cpp')
     return (support + '#define main __oteleq_original_main\n#include ' + json.dumps(entry['path'])
             + '\n#undef main\n' + clean + worker)
 
