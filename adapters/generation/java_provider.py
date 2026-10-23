@@ -73,6 +73,9 @@ def configuration(entry: dict, endpoint: str, service: str) -> dict:
             "traces": {"enabled": True, "sample_ratio": 1.0},
             "lifetimes": {"enabled": False, "include": [], "exclude": [], "max_live": 4096, "release_methods": ["close"]},
             "benchmark": {"iterations": 10000, "samples": 15, "warmup": 5}}
+    sequence = entry.get("sequence_configuration", [])
+    if sequence and "metrics" in sequence[0]:
+        result["metrics"].update(sequence[0]["metrics"])
     if entry.get("java_profile") == java_profiles.ARCHIVES:
         result["context"] = {"tasks": False, "http": False}
     return result

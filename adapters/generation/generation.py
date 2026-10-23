@@ -1085,7 +1085,7 @@ def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, ht
             env.update(bindings)
             write(folder / "http-controls.json", {"declarations": http_effects.selected(data["configuration"]), "environment": bindings})
         with http_effects.observe(http_fixtures, folder, data["configuration"]["limits"]["max_capture_bytes"]) as requests:
-            options = execution_options(entry, case, lane, folder, runtime, bodies, env)
+            options = execution_options(entry, case, lane, folder, runtime, bodies, env, service=service)
             result = execute(command, working_directory, env, folder, timeout=data["configuration"]["limits"]["case_timeout_ms"] / 1000,
                              **options)
     capture.retain_http(folder, bodies, errors)
@@ -1099,13 +1099,14 @@ def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, ht
                            extra_channels=effect_channels, capture_complete=complete, prepared_runtime=runtime)
 
 
-def execution_options(entry, case, lane, folder, runtime, bodies, env):
+def execution_options(entry, case, lane, folder, runtime, bodies, env, *, service=None):
     """Add only explicitly requested process recording and live host checkpoints."""
     options = {"record_process": True} if runtime is not None or node_source.enabled(entry) else {}
     if sequences.controls(entry):
         interaction = (node_live.Session(folder, case["sequence"], bodies, language=entry["language"], plain=lane == "baseline")
                        if node_source.enabled(entry)
-                       else java_live.Session(folder, runtime, case["sequence"], bodies, plain=lane == "baseline"))
+                       else java_live.Session(folder, runtime, case["sequence"], bodies, plain=lane == "baseline",
+                                              service=service, method=entry["otelc_function"].split("(", 1)[0].rsplit(".", 1)[-1]))
         env.update(interaction.environment())
         options["interaction"] = interaction
     return options

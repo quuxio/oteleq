@@ -20,7 +20,7 @@ class QualificationRecipeTests(unittest.TestCase):
             for flag in ("--cli", "--comparator"):
                 if line.startswith("\t") and flag + " " in line:
                     targets[target] = flag
-        self.assertEqual(len(targets), 36)
+        self.assertEqual(len(targets), 37)
         self.assertIn("generation-project-tests-otelc", targets)
         self.assertIn("generation-preconditions-otelc", targets)
         self.assertIn("generation-domains-otelc", targets)
@@ -36,6 +36,7 @@ class QualificationRecipeTests(unittest.TestCase):
         self.assertIn("generation-java-receiver-otelc", targets)
         self.assertIn("generation-java-sequence-otelc", targets)
         self.assertIn("generation-java-controls-otelc", targets)
+        self.assertIn("generation-java-startup-otelc", targets)
         self.assertIn("generation-java-project-otelc", targets)
         self.assertIn("generation-java-archive-otelc", targets)
         self.assertIn("generation-go-receiver-otelc", targets)
@@ -67,8 +68,10 @@ class QualificationRecipeTests(unittest.TestCase):
                         self.assertEqual(result.returncode, 0, result.stderr)
                         arguments = json.loads(record.read_text())
                         self.assertEqual(arguments[arguments.index(flag) + 1], expected)
-                        if name == 'generation-node-controls-otelc':
+                        if name in ('generation-node-controls-otelc', 'generation-java-startup-otelc'):
                             self.assertEqual(arguments[arguments.index('--startup-state') + 1], 'both-on')
+                        if name == 'generation-java-startup-otelc':
+                            self.assertEqual(arguments[arguments.index('--java-profile') + 1], 'safe-methods-v1')
 
     def test_node_control_recipe_retains_the_explicit_startup_state(self):
         result = subprocess.run(['make', '--no-print-directory', '-n', 'generation-node-controls-otelc',
@@ -87,6 +90,14 @@ class QualificationRecipeTests(unittest.TestCase):
         self.assertIn("generation-node-source-collection-otelc Qualify source SDK collection", result.stdout)
         self.assertIn("generation-node-source-effects-otelc Qualify source SDK file/HTTP", result.stdout)
         self.assertIn("generation-node-source-channels-otelc Qualify nonempty binary", result.stdout)
+        self.assertIn("generation-java-startup-otelc Qualify Java startup flags", result.stdout)
+
+    def test_java_startup_recipe_retains_explicit_state_and_profile(self):
+        result = subprocess.run(['make', '--no-print-directory', '-n', 'generation-java-startup-otelc',
+            'OTELC_ROOT=/tmp/provider', 'REPORT_DIR=/tmp/evidence', 'JAVA_CONTROL_STARTUP=both-off',
+            'JAVA_STARTUP_PROFILE=archive-methods-v1'], cwd=ROOT, capture_output=True, text=True, check=True)
+        self.assertIn('--startup-state "both-off"', result.stdout)
+        self.assertIn('--java-profile "archive-methods-v1"', result.stdout)
 
 
 if __name__ == "__main__":

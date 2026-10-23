@@ -6,7 +6,7 @@ Updated 23 October 2026. The [Rust byte-channel comparator](workload-comparison.
 
 [Prepared Java live metric sequences](java-metric-controls.md) use one unchanged JVM/build, independent collection/emission setters, bounded export-off windows and direct restoration checks. This advances the selected synchronous receiver profile; general SDK instruments, other language controls and invocation-scoped attribution remain open.
 
-The explicit [Node live metric schedule](node-metric-controls.md) has [696-launch qualification](qualification/node-metric-controls-2026-10-23.json) on Node 24/26 and both TypeScript compilers. It checks all four same-process metric states, complete intermediate graphs and actual telemetry through generated/detached suites, replay, reduction and current-source promotion. Startup-off, broader actions and invocation attribution remain open.
+The explicit [Node live metric schedule](node-metric-controls.md) has [696-launch qualification](qualification/node-metric-controls-2026-10-23.json) on Node 24/26 and both TypeScript compilers. It checks all four same-process metric states, complete intermediate graphs and actual telemetry through generated/detached suites, replay, reduction and current-source promotion. The separate [2,784-launch startup qualification](qualification/node-startup-metric-controls-2026-10-23.json) covers all four initial states in the recorded Node profiles. Broader actions and invocation attribution remain open.
 
 [Declared scalar returns](expected-returns.md) now provide an optional independent baseline result check, retained through generated suites, replay, export and scalar shrinking. Their [260-launch qualification](qualification/expected-returns-2026-10-21.json) covers all eight language IDs against the frozen pre-rebuild SDK. Java now has a separately qualified [prepared SDK provider](java-prepared-provider.md); other replacement-SDK adapters remain open.
 
@@ -53,6 +53,8 @@ The opt-in [native project profile](native-project-context.md) consumes explicit
 Acceptance includes typed buffers/aliasing, observable globals, internal-linkage access limits, exceptions, constructor/resource sequences, distinct C++ overload/template instances and no padding/uninitialised-memory comparison. Validate production artefact identity separately from helper/fuzz/sanitised builds. Publish exact ABI, compiler and platform qualification.
 
 ## Stage 5: Java
+
+[Prepared Java startup qualification](qualification/java-startup-metric-controls-2026-10-23.json) covers all four initial states in the recorded stock, safe and archive profiles: 2,256 distinct JVMs, 168 evidence refusals and 576 recomputed comparisons. Original failed archive audits remain recorded separately from corrected retained-only verification. Broader Java acceptance below remains open.
 
 Deliver classpath/module-aware inventory, private JUnit/jqwik test project, receiver/static graph codecs, independent JVM workers and pinned otelc bytecode-agent integration.
 

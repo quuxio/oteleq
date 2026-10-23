@@ -94,10 +94,9 @@ def configure_controls(entry: dict, value: list[dict]) -> None:
             or any(step["action"] != "call" or "metrics" not in step for step in value)):
         raise ValueError("live metrics require prepared Java or source-v1 Node calls with an explicit state for every call")
     positive = {"collection": True, "emission": True}
-    if source_node and not any(step["metrics"] == positive for step in value):
-        raise ValueError("live Node metrics require a collection-on/emission-on positive control")
-    if prepared_java and value[0]["metrics"] != positive:
-        raise ValueError("live metrics require an initial collection-on/emission-on positive control")
+    if not any(step["metrics"] == positive for step in value):
+        language = "Java" if prepared_java else "Node"
+        raise ValueError("live " + language + " metrics require a collection-on/emission-on positive control")
 
 
 def concrete(entry: dict, arguments: list, coerce: Callable) -> list[dict]:

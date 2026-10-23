@@ -37,20 +37,21 @@ SOURCE = r'''class Counter {
 
 
 def prepare(cli: Path, provider: Path, folder: Path, profile: str, *, source_text: str = SOURCE,
-            classpath: list[str] | None = None) -> Path:
+            classpath: list[str] | None = None, states=STATES, case_timeout_ms: int = 20000) -> Path:
     """All states execute in one JVM per lane, using only existing source methods."""
+    assert len(states) == 4 and set(states) == set(STATES)
     folder.mkdir();source = folder / "application";source.mkdir()
     (source / "Counter.java").write_text(source_text)
     text = 'schema_version=1\nlanguages=["java"]\n[adapters.java]\nbackend="prepared"\n'
     text += 'profile=' + json.dumps(profile) + '\n'
     if classpath is not None:
         text += 'source_roots=["."]\nclasspath=' + json.dumps(classpath) + '\n'
-    text += '[functions]\ninclude=' + json.dumps(list(FUNCTIONS)) + '\n[limits]\ncase_timeout_ms=20000\n'
+    text += '[functions]\ninclude=' + json.dumps(list(FUNCTIONS)) + '\n[limits]\ncase_timeout_ms=' + str(case_timeout_ms) + '\n'
     for function, method in FUNCTIONS.items():
         text += '\n[[fixtures]]\nfunction=' + json.dumps(function) + '\ncases=[[7]]\n'
         text += 'receiver={factory=' + json.dumps("make" if method == "secret" else "Counter") + ',arguments=[10]}\n'
         text += 'sequence=[\n'
-        for index, (collection, emission) in enumerate(STATES):
+        for index, (collection, emission) in enumerate(states):
             arguments = '"case"' if index == 0 else '[' + str(index + 1) + ']'
             expected = ',expected_baseline={kind="error",category="exception",type="java.lang.IllegalArgumentException"}' if method == "fail" and index == 1 else ''
             text += ' {action="call",arguments=' + arguments + expected + ',metrics={collection=' + str(collection).lower() + ',emission=' + str(emission).lower() + '}},\n'
@@ -111,8 +112,9 @@ def transition(rows: list, pid: int, previous: tuple, selected: tuple, completed
     assert selected[1] or rows[-1]["status"]["effective_emission_off"]
 
 
-def controls(folder: Path, method: str, *, plain: bool) -> dict:
+def controls(folder: Path, method: str, *, plain: bool, states=STATES) -> dict:
     """Recheck actual SDK acknowledgements and every private checkpoint pair."""
+    assert len(states) == 4 and set(states) == set(STATES)
     record = json.loads((folder / "java-controls.json").read_text())
     process = json.loads((folder / "process.json").read_text())
     assert type(process) is dict and set(process) == {"pid", "argv"}
@@ -124,8 +126,8 @@ def controls(folder: Path, method: str, *, plain: bool) -> dict:
     assert type(record["steps"]) is list and len(record["steps"]) == 4
     http = json.loads((folder / "http-capture.json").read_text());assert not http["errors"]
     cursor, maximum = 0, len(http["bodies"])
-    size, before, previous = (2 if method == "recursive" else 1), 0, STATES[0]
-    for index, (step, state) in enumerate(zip(record["steps"], STATES)):
+    size, before, previous = (2 if method == "recursive" else 1), 0, states[0]
+    for index, (step, state) in enumerate(zip(record["steps"], states)):
         assert type(step) is dict and set(step) == {"id", "requested", "before", "after"} and step["id"] == "step-" + str(index)
         assert json.dumps(step["requested"], sort_keys=True) == json.dumps(dict(collection=state[0], emission=state[1]), sort_keys=True)
         assert set(step["before"]) == {"history", "cursor"}
@@ -153,8 +155,8 @@ def controls(folder: Path, method: str, *, plain: bool) -> dict:
     if plain:
         assert restored["history"] == [] and restored["flush"] is None
     else:
-        transition(restored["history"], pid, previous, STATES[0], before)
-        control_status(restored["flush"], pid, STATES[0], before)
+        transition(restored["history"], pid, previous, (True, True), before)
+        control_status(restored["flush"], pid, (True, True), before)
     root = folder / "java-rendezvous"
     phases = [prefix + "-" + str(index) for index in range(4) for prefix in ("before", "after")] + ["finish"]
     assert {path.name for path in root.iterdir()} == {phase + suffix for phase in phases for suffix in (".ready", ".resume")}
@@ -167,7 +169,7 @@ def controls(folder: Path, method: str, *, plain: bool) -> dict:
     return record
 
 
-def check_report(path: Path, count: int) -> int:
+def check_report(path: Path, count: int, *, states=STATES, console_prefix: str = "") -> int:
     report = json.loads(path.read_text())
     assert count in (1, 6) and report["source_preserved"] and not report["blocked"] and len(report["cases"]) == count
     assert len({row["function"] for row in report["cases"]}) == count
@@ -186,8 +188,8 @@ def check_report(path: Path, count: int) -> int:
             for index, attempt in enumerate(bundle[lane]):
                 observation(attempt["observation"], method, amount, lane == "instrumented_on")
                 folder = path.parent / case["case"] / (lane + "-" + str(index))
-                controls(folder, method, plain=lane == "baseline")
-                expected_out = ''.join("out" + str(value) + "\n" for value in (amount, 2, 3, 4)).encode() if method == "secret" else b""
+                controls(folder, method, plain=lane == "baseline", states=states)
+                expected_out = ''.join(console_prefix + "out" + str(value) + "\n" for value in (amount, 2, 3, 4)).encode() if method == "secret" else b""
                 expected_err = expected_out.replace(b"out", b"err")
                 assert (folder / "stdout").read_bytes() == expected_out and (folder / "stderr").read_bytes() == expected_err
                 if lane == "instrumented_on":
@@ -199,13 +201,13 @@ def check_report(path: Path, count: int) -> int:
 
 
 def verify_receipt(folder: Path, launch: dict, pid: int, trace_decoder, metric_decoder,
-                   *, getter: bool = False) -> None:
+                   *, getter: bool = False, states=STATES) -> None:
     """Known fixture counts corroborate final health and actual retained metrics."""
     function = json.loads((folder / "typed-observation.json").read_text())["function_id"]
     if getter:
         assert function == "Counter.run(int)"
     method = "run" if getter else FUNCTIONS[function];size = 2 if method == "recursive" else 1
-    record = controls(folder, method, plain=False)
+    record = controls(folder, method, plain=False, states=states)
     health = json.loads((folder / "sdk-runtime/health.json").read_text())
     assert record["pid"] == health["pid"] == pid and health["phase"] == "final" and health["sdk_attached"] is True
     assert health["policy_sha256"] == launch["policy_sha256"] and health["selection_sha256"] == launch["selection_sha256"]
@@ -242,12 +244,13 @@ def verify_receipt(folder: Path, launch: dict, pid: int, trace_decoder, metric_d
         assert type(start) is int and type(end) is int and 0 <= start <= end <= len(http["bodies"])
         received = [position for position in range(start, end) if http["bodies"][position]["path"] == "/v1/metrics"]
         assert step["after"]["metric_bodies"] == received
-        if not STATES[index][1]:
+        if not states[index][1]:
             assert received == []
-        if index == 0:
+        if states[index] == (True, True):
+            completed = size * sum(state[0] for state in states[:index + 1])
             for name in all_values:
                 values = [value for position in received for value in series[position][name]]
-                assert values and sorted(values)[-1][1] == size
+                assert values and sorted(values)[-1][1] == completed
     start, end = record["steps"][-1]["after"]["cursor"], record["restored"]["cursor"]
     assert type(start) is int and type(end) is int and 0 <= start <= end <= len(http["bodies"])
     for name in all_values:

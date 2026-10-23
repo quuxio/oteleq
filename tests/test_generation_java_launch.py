@@ -171,6 +171,67 @@ class JavaLaunchTests(unittest.TestCase):
             context.__enter__()
         self.assertFalse(list(source.iterdir()))
 
+    def test_runtime_archive_failure_keeps_the_primary_execution_error(self):
+        primary = ValueError("primary metric receipt failed")
+        with self.assertRaisesRegex(ValueError, "primary metric receipt failed; SDK runtime archive failed:.*special file") as failure:
+            with launch.runtime(self.entry, self.folder) as runtime:
+                runtime.mkdir(mode=0o700)
+                os.mkfifo(runtime / "fifo")
+                raise primary
+        self.assertIs(failure.exception.__cause__, primary)
+        self.assertFalse(runtime.exists())
+
+    def test_runtime_archive_io_failure_keeps_the_primary_exception_as_cause(self):
+        primary = RuntimeError("application failed")
+        with patch.object(launch, "archive", side_effect=OSError("archive read failed")), \
+             self.assertRaisesRegex(ValueError, "application failed; SDK runtime archive failed: archive read failed") as failure:
+            with launch.runtime(self.entry, self.folder) as runtime:
+                runtime.mkdir(mode=0o700)
+                raise primary
+        self.assertIs(failure.exception.__cause__, primary)
+        self.assertFalse(runtime.exists())
+
+    def test_runtime_archive_failure_preserves_cancellation_identity_and_diagnostics(self):
+        for primary in (KeyboardInterrupt("cancelled"), SystemExit(7), GeneratorExit("closed")):
+            with self.subTest(kind=type(primary).__name__):
+                destination = self.base / type(primary).__name__
+                destination.mkdir()
+                with self.assertRaises(type(primary)) as failure:
+                    with launch.runtime(self.entry, destination) as runtime:
+                        runtime.mkdir(mode=0o700)
+                        os.mkfifo(runtime / "fifo")
+                        raise primary
+                self.assertIs(failure.exception, primary)
+                self.assertIsInstance(primary.__cause__, ValueError)
+                self.assertIn("SDK runtime archive failed:", primary.__notes__[0])
+                diagnostic = json.loads((destination / "runtime-archive-error.json").read_text())
+                self.assertEqual(diagnostic["primary_type"], type(primary).__name__)
+                self.assertIn("special file", diagnostic["archive_error"])
+                self.assertFalse(runtime.exists())
+
+    def test_cancellation_still_propagates_when_archive_diagnostic_cannot_be_written(self):
+        path = self.folder / "runtime-archive-error.json"
+        path.write_text("preserve existing diagnostic")
+        primary = KeyboardInterrupt("cancelled")
+        with self.assertRaises(KeyboardInterrupt) as failure:
+            with launch.runtime(self.entry, self.folder) as runtime:
+                runtime.mkdir(mode=0o700)
+                os.mkfifo(runtime / "fifo")
+                raise primary
+        self.assertIs(failure.exception, primary)
+        self.assertEqual(path.read_text(), "preserve existing diagnostic")
+        self.assertIn("could not retain", primary.__notes__[-1])
+        self.assertFalse(runtime.exists())
+
+    def test_cancellation_archive_diagnostic_has_an_explicit_truncation_marker(self):
+        primary = KeyboardInterrupt("cancelled")
+        launch.retain_cancellation(primary, ValueError("\U0001f600" * 4096), self.folder)
+        raw = (self.folder / "runtime-archive-error.json").read_bytes()
+        diagnostic = json.loads(raw)
+        self.assertLess(len(raw), 16 * 1024)
+        self.assertEqual(diagnostic["archive_error"], "\U0001f600" * 1024)
+        self.assertTrue(diagnostic["archive_error_truncated"])
+
     def test_runtime_links_special_files_and_budgets_refuse(self):
         foreign = self.base / "foreign";foreign.write_text("preserve")
         for fault in ("link", "fifo", "bytes", "count"):

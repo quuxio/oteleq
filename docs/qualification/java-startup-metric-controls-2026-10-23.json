@@ -1,0 +1,353 @@
+{
+  "qualification_schema_version": 1,
+  "date": "2026-10-23",
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "scope_status": "qualified recorded synchronous prepared Java schedules across all four initial states",
+  "platform": {
+    "os": "macOS",
+    "architecture": "arm64",
+    "jdk": "21.0.12.1",
+    "python": "3.12.15"
+  },
+  "runtime": {
+    "repository": "quuxio/oteleq",
+    "commit": "bb1fb9696abea1b57b9b1e2ad605c5614f92c387",
+    "source_archive_sha256": "15017294445413374124796d920dabd27e9f0389b03862515dad49e64f96fc0e",
+    "cli_sha256": "59a27ba2a5b95140fd9fddf83f4fec98745fdd56d5372fa1f147c3aaada7aea7",
+    "source_files_preserved": 397
+  },
+  "verifier": {
+    "repository": "quuxio/oteleq",
+    "commit": "d0282c49d2c085dd7c265bad5aeeec0be8629839",
+    "source_archive_sha256": "aac3dfa52701539d91b69a7e06bb9b8fe8190e94662f4e90288da0d8c8fc3c05",
+    "source_files_preserved": 400,
+    "offline_recheck_script": "tests/qualify_java_startup.py --recheck",
+    "independent_review_sha256": "71d50cfa90faf7f62f054f634ebc2fe056f37b9a512e909e19d02a2d9a1bfe88"
+  },
+  "final_production_compatibility": {
+    "commit": "6571c7c2b028a4acb9e153550da6dbe91cef3639",
+    "cli_sha256": "8f619fc5793a66d36f7da89e35ff9688c95a48318936c98a8d7d977a7675ff2d",
+    "source_files_preserved": 398,
+    "separate_smoke_jvms": 16,
+    "smoke_profile": "safe-methods-v1",
+    "smoke_initial_states": 4,
+    "note": "Later archive/cancellation cleanup changes have separate component and 16-JVM compatibility evidence. They did not execute this twelve-corpus matrix; verifier/publication-only changes preserve these production bytes."
+  },
+  "providers": [
+    {
+      "repository": "quuxio/otelc",
+      "profile": "stock-methods-v1",
+      "commit": "f3279fdff099e9f2406c122fc5c3b6ae4ba4f84f",
+      "all_files_preserved": 64,
+      "source_checks": 62,
+      "product_checks": 2,
+      "file_map_sha256": "221ab8abba1e583eaf4f38f8dbae1e3d3f477fd11ef528b1b20d60403e556120"
+    },
+    {
+      "repository": "quuxio/otelc",
+      "profile": "safe-methods-v1",
+      "commit": "e4aaafaeb617db335146cc22be2f6dd5b8be68cd",
+      "all_files_preserved": 150,
+      "source_checks": 78,
+      "product_checks": 4,
+      "file_map_sha256": "f4535f5022511a0bd63f784bfe6a6453b75053d1bc758cd147943ff9598b4b04"
+    },
+    {
+      "repository": "quuxio/otelc",
+      "profile": "archive-methods-v1",
+      "commit": "c06eb438012116a7b2ec9b635a2cb7434d8e713d",
+      "all_files_preserved": 112,
+      "source_checks": 112,
+      "product_checks": 4,
+      "file_map_sha256": "5af691705bdbbc379d9e364b2a5129c81133a738651c079ab59478276d81a959"
+    }
+  ],
+  "external_tools": {
+    "/opt/homebrew/opt/openjdk@21/bin/java": {
+      "resolved": "/opt/homebrew/Cellar/openjdk@21/21.0.12.1/libexec/openjdk.jdk/Contents/Home/bin/java",
+      "sha256": "d7ab2ea6a7e731a8a2cee7d722046c9f7d8c5f184cd769b9954a392592337770"
+    },
+    "/opt/homebrew/opt/openjdk@21/bin/javac": {
+      "resolved": "/opt/homebrew/Cellar/openjdk@21/21.0.12.1/libexec/openjdk.jdk/Contents/Home/bin/javac",
+      "sha256": "ab9b94d81dd22c843ef637be9aa2121253c6d4cfe2ba0a89a7bde5c0b9567945"
+    },
+    "/opt/homebrew/opt/openjdk@21/bin/javap": {
+      "resolved": "/opt/homebrew/Cellar/openjdk@21/21.0.12.1/libexec/openjdk.jdk/Contents/Home/bin/javap",
+      "sha256": "45e7ec2c0b002e6dc716651ede247ac1f2c25d4cc8cf37ee20591ddc439162ac"
+    }
+  },
+  "results": {
+    "completed_corpora": 12,
+    "actual_jvms": 2256,
+    "raw_attempts": 2304,
+    "copied_attempts_excluded": 48,
+    "refusals_rechecked": 168,
+    "comparisons_recomputed": 576,
+    "qualified_reports": 456,
+    "required_route_commands_checked": 228,
+    "new_application_launches": 0
+  },
+  "corpora": [
+    {
+      "profile": "archive-methods-v1",
+      "provider_commit": "c06eb438012116a7b2ec9b635a2cb7434d8e713d",
+      "startup": "both-off",
+      "actual_jvms": 188,
+      "raw_attempts": 192,
+      "copied_attempts_excluded": 4,
+      "reports": 38,
+      "typed_comparisons_recomputed": 48,
+      "refusals_rechecked": 14,
+      "required_route_commands": 19,
+      "qualification_sha256": "62347b9d81e4bd2069966bc119c5fe1eee45f2e78ac170366df2505a8322d710"
+    },
+    {
+      "profile": "archive-methods-v1",
+      "provider_commit": "c06eb438012116a7b2ec9b635a2cb7434d8e713d",
+      "startup": "both-on",
+      "actual_jvms": 188,
+      "raw_attempts": 192,
+      "copied_attempts_excluded": 4,
+      "reports": 38,
+      "typed_comparisons_recomputed": 48,
+      "refusals_rechecked": 14,
+      "required_route_commands": 19,
+      "qualification_sha256": "98213c9e6bb81fcbbc12639409ce8f675aa8dcba2d03c5db747202e0869c0b5c"
+    },
+    {
+      "profile": "archive-methods-v1",
+      "provider_commit": "c06eb438012116a7b2ec9b635a2cb7434d8e713d",
+      "startup": "collection-off",
+      "actual_jvms": 188,
+      "raw_attempts": 192,
+      "copied_attempts_excluded": 4,
+      "reports": 38,
+      "typed_comparisons_recomputed": 48,
+      "refusals_rechecked": 14,
+      "required_route_commands": 19,
+      "qualification_sha256": "5d254f5379a10664151182a15643fd57a658fe582f5d93c397917a125901dd76"
+    },
+    {
+      "profile": "archive-methods-v1",
+      "provider_commit": "c06eb438012116a7b2ec9b635a2cb7434d8e713d",
+      "startup": "emission-off",
+      "actual_jvms": 188,
+      "raw_attempts": 192,
+      "copied_attempts_excluded": 4,
+      "reports": 38,
+      "typed_comparisons_recomputed": 48,
+      "refusals_rechecked": 14,
+      "required_route_commands": 19,
+      "qualification_sha256": "c1e30eef77cfafa3f4db142d461a11a8484b04ddc849ab51d549e49ef4e94afd"
+    },
+    {
+      "profile": "safe-methods-v1",
+      "provider_commit": "e4aaafaeb617db335146cc22be2f6dd5b8be68cd",
+      "startup": "both-off",
+      "actual_jvms": 188,
+      "raw_attempts": 192,
+      "copied_attempts_excluded": 4,
+      "reports": 38,
+      "typed_comparisons_recomputed": 48,
+      "refusals_rechecked": 14,
+      "required_route_commands": 19,
+      "qualification_sha256": "a062bfd47903987f4c1ce20f6d0bc38c96cbaff285a74b313fc8db74ffdac521"
+    },
+    {
+      "profile": "safe-methods-v1",
+      "provider_commit": "e4aaafaeb617db335146cc22be2f6dd5b8be68cd",
+      "startup": "both-on",
+      "actual_jvms": 188,
+      "raw_attempts": 192,
+      "copied_attempts_excluded": 4,
+      "reports": 38,
+      "typed_comparisons_recomputed": 48,
+      "refusals_rechecked": 14,
+      "required_route_commands": 19,
+      "qualification_sha256": "d1eab8a48dae3128132237391eac351d7b79d4c051f8d4ec9b0e2abe931b78bd"
+    },
+    {
+      "profile": "safe-methods-v1",
+      "provider_commit": "e4aaafaeb617db335146cc22be2f6dd5b8be68cd",
+      "startup": "collection-off",
+      "actual_jvms": 188,
+      "raw_attempts": 192,
+      "copied_attempts_excluded": 4,
+      "reports": 38,
+      "typed_comparisons_recomputed": 48,
+      "refusals_rechecked": 14,
+      "required_route_commands": 19,
+      "qualification_sha256": "7d0cc5ca7e3970e62056b7f3402b967cab168d20582ada11d128c15a7227d507"
+    },
+    {
+      "profile": "safe-methods-v1",
+      "provider_commit": "e4aaafaeb617db335146cc22be2f6dd5b8be68cd",
+      "startup": "emission-off",
+      "actual_jvms": 188,
+      "raw_attempts": 192,
+      "copied_attempts_excluded": 4,
+      "reports": 38,
+      "typed_comparisons_recomputed": 48,
+      "refusals_rechecked": 14,
+      "required_route_commands": 19,
+      "qualification_sha256": "cd9a8c3523579099d14d77bafd3f838bfd9b1e0d45428d7d14b9df31cb5b62fe"
+    },
+    {
+      "profile": "stock-methods-v1",
+      "provider_commit": "f3279fdff099e9f2406c122fc5c3b6ae4ba4f84f",
+      "startup": "both-off",
+      "actual_jvms": 188,
+      "raw_attempts": 192,
+      "copied_attempts_excluded": 4,
+      "reports": 38,
+      "typed_comparisons_recomputed": 48,
+      "refusals_rechecked": 14,
+      "required_route_commands": 19,
+      "qualification_sha256": "83949b917ccb71e74447955cbc6d09427ab5eb804e5976cc34c32475357ddf6a"
+    },
+    {
+      "profile": "stock-methods-v1",
+      "provider_commit": "f3279fdff099e9f2406c122fc5c3b6ae4ba4f84f",
+      "startup": "both-on",
+      "actual_jvms": 188,
+      "raw_attempts": 192,
+      "copied_attempts_excluded": 4,
+      "reports": 38,
+      "typed_comparisons_recomputed": 48,
+      "refusals_rechecked": 14,
+      "required_route_commands": 19,
+      "qualification_sha256": "a3b52f71df4b4dfb7039e6962f8dd4067525313b8fc1d53f30c08a8c39877cd3"
+    },
+    {
+      "profile": "stock-methods-v1",
+      "provider_commit": "f3279fdff099e9f2406c122fc5c3b6ae4ba4f84f",
+      "startup": "collection-off",
+      "actual_jvms": 188,
+      "raw_attempts": 192,
+      "copied_attempts_excluded": 4,
+      "reports": 38,
+      "typed_comparisons_recomputed": 48,
+      "refusals_rechecked": 14,
+      "required_route_commands": 19,
+      "qualification_sha256": "3cbed1466fdaf8e76792a5348dfd2cad56450ea82457dd0ca4b09c64551cefda"
+    },
+    {
+      "profile": "stock-methods-v1",
+      "provider_commit": "f3279fdff099e9f2406c122fc5c3b6ae4ba4f84f",
+      "startup": "emission-off",
+      "actual_jvms": 188,
+      "raw_attempts": 192,
+      "copied_attempts_excluded": 4,
+      "reports": 38,
+      "typed_comparisons_recomputed": 48,
+      "refusals_rechecked": 14,
+      "required_route_commands": 19,
+      "qualification_sha256": "deab410ce6394a684de48b8bbcda4d98ba0c970d1e2338ded4013264b7179a5c"
+    }
+  ],
+  "fixture": {
+    "source_sha256": "b01793c56fb40a877755fac4e751e9e0b53e9556edc5379939cde31f2a19f31b",
+    "methods": [
+      "identity",
+      "secret",
+      "transient_value",
+      "withheld",
+      "fail",
+      "recursive"
+    ],
+    "matching_methods": 4,
+    "intentional_state_differences": 2,
+    "call_arguments": [
+      7,
+      2,
+      3,
+      4
+    ],
+    "receiver_factory_argument": 10,
+    "observations": [
+      "complete supported receiver/argument/own-static graphs at each call boundary",
+      "private source-bound factories and methods, arrays, aliases and cycles",
+      "exact supported exception payloads and binary application stdout/stderr",
+      "independent initial flag receipts, setters, actual process/build continuity",
+      "complete serial trace trees, collection-enabled metric trees, export-off windows and retained measurements on restoration"
+    ],
+    "states": [
+      {
+        "collection": true,
+        "emission": true
+      },
+      {
+        "collection": false,
+        "emission": true
+      },
+      {
+        "collection": true,
+        "emission": false
+      },
+      {
+        "collection": false,
+        "emission": false
+      }
+    ],
+    "schedule": "Each corpus rotates the complete four-state sequence to begin in its named initial state."
+  },
+  "routes": [
+    "direct run",
+    "generated unittest",
+    "per-case replay",
+    "detached exported direct run and unittest",
+    "scalar7-to0 reduction with original/trial/confirmation evidence",
+    "reduced unittest and replay",
+    "current-source promotion dry-run/apply",
+    "promoted original and actually changed console bodies"
+  ],
+  "recovery": {
+    "original_controller_results": {
+      "success": 8,
+      "failed_final_build_audit": 4
+    },
+    "original_matrix_sha256": "b8bcbcb2ffa427e17904b6aef18611265c82b57c1d575ef2ff1c0ff8e88cac2c",
+    "reason": "The original archive checker applied standalone argv positions to context-v2 compiler launches. A fixed closed archive-context oracle rechecks actual products and JDK/frontend/context identities. A later fix independently requires every one of 19 route commands. Original failures are retained; no application rerun, profile downgrade or error waiver was used.",
+    "initial_offline_environment_refusal": "A first retained recheck omitted the pinned JDK. Its four archive refusals remain recorded separately from complete pinned-environment rechecks.",
+    "original_result_files_preserved": true
+  },
+  "evidence": {
+    "raw_files_sealed": 156853,
+    "raw_manifest_sha256": "e9445c010a422997337a391a9ac66a00b2cf38aaef57e87fe7250c0030844b27",
+    "offline_recheck_index_sha256": "17d0c6104a2bba1140504ab0f7a9e025f37fdecb7f38a7cf03e3bf6a55e99a6a",
+    "final_audit_sha256": "373ead79ec46a7884b351e3ca1ed227b2e5de32da6cc84a21b250c18d10f1f7d",
+    "audit_script_sha256": "8dbc2b852b7b3be5263d448d838390e06e920218961c4d89e387ca4acedd8547",
+    "providers_after_sha256": "6008f1c97fbe4228507e518b395274ffb39af3a8144c98b3b95bd7f8e53e102d",
+    "scope": "Local qualification archive under 2026-10-23/java-startup-controls retains raw evidence; this repository record publishes its identities and qualified scope."
+  },
+  "presentation": {
+    "actual_report_visually_inspected": true,
+    "scope": "stock-methods-v1 both-off direct report",
+    "matching_cases": 4,
+    "deliberate_differences": 2,
+    "incomplete_or_error_entries": 0,
+    "explicit_exclusions": 4,
+    "inventory": 10,
+    "junit_tests": 10,
+    "junit_failures": 2,
+    "junit_errors": 0,
+    "junit_skipped": 4,
+    "html_sha256": "841c2cc521df18b1cf8130873320ba2e70e5d5b2070c4b8dd07bc4a61de7f470",
+    "junit_sha256": "19cac8af095e93af52ed7a60c08b4c55cdc3adb57d901383c3b2dcc1afcfd6dc",
+    "review_receipt_sha256": "e32a04b7b2a8d4c016e3084f94f6e42d4c18c448a999f3ccf58569450136ab19"
+  },
+  "delivery": {
+    "pull_request": "https://github.com/quuxio/oteleq/pull/70",
+    "note": "Publication-head and merged-main protected checks are separate delivery evidence."
+  },
+  "limits": [
+    "Recorded six-method synchronous source receiver fixture and three explicit prepared provider profiles on selected JDK 21/macOS arm64 only",
+    "No invocation-cookie/action-scoped attribution, concurrent/GC/resource or exporter-fault schedule admission",
+    "Empty declared archive-context fixture; broader runtime archive variants retain their separate qualification",
+    "No shipping artefact, general build-system/module or unrecorded provider/platform qualification",
+    "Trace durations, wait times and instrumentation-owned state are not application equality dimensions",
+    "The two intentional application state differences remain failures in generated suites and HTML/JUnit",
+    "All 21 broader project completion requirements remain in scope"
+  ]
+}

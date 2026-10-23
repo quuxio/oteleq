@@ -128,7 +128,9 @@ def expected_argv(root: Path, java: Path, classes: Path, main: str, runtime: Pat
 
 def plan_values(runtime: Path, data: dict, selection: dict) -> dict:
     """Verify policy-owned controls, hashes and shutdown budget independently."""
-    return {"control.socket": str(runtime / CONTROL_SOCKET), "metrics.collection": "true", "metrics.emission": "true",
+    return {"control.socket": str(runtime / CONTROL_SOCKET),
+            "metrics.collection": str(data["metrics"]["collection"]).lower(),
+            "metrics.emission": str(data["metrics"]["emission"]).lower(),
             "metrics.buckets": ",".join(map(str, data["metrics"]["histogram_boundaries_seconds"])),
             "health.report": str(runtime / "health.json"), "health.policy-sha256": provider.digest(data),
             "health.selection-sha256": provider.digest(selection),
@@ -266,6 +268,20 @@ def archive(runtime: Path, folder: Path) -> None:
     (folder / "runtime-archive.json").write_text(json.dumps({"original": str(runtime), "files": records}, indent=2) + "\n")
 
 
+def retain_cancellation(failure: BaseException, archive_error: Exception, folder: Path) -> None:
+    """Keep bounded cleanup evidence without replacing cancellation or exit status."""
+    message = str(archive_error)
+    diagnostic = {"schema_version": 1, "primary_type": type(failure).__name__[:128],
+                  "archive_error": message[:1024], "archive_error_truncated": len(message) > 1024}
+    failure.add_note("SDK runtime archive failed: " + diagnostic["archive_error"])
+    try:
+        descriptor = os.open(folder / "runtime-archive-error.json", os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(descriptor, "w") as output:
+            output.write(json.dumps(diagnostic) + "\n")
+    except OSError as diagnostic_error:
+        failure.add_note("could not retain SDK runtime archive diagnostic: " + str(diagnostic_error)[:1024])
+
+
 @contextmanager
 def runtime(entry: dict, folder: Path, *, source_roots: tuple[Path, ...] = ()) -> Iterator[Path | None]:
     """The SDK socket needs a short path; all runtime files remain caller-owned."""
@@ -277,11 +293,23 @@ def runtime(entry: dict, folder: Path, *, source_roots: tuple[Path, ...] = ()) -
         path = Path(temporary).resolve() / "r"
         provider.require(len(os.fsencode(path / CONTROL_SOCKET)) <= 100,
                          "runtime socket path exceeds 100 bytes; select a shorter TMPDIR before planning")
+        failure: BaseException | None = None
         try:
             yield path
+        except BaseException as error:
+            failure = error
+            raise
         finally:
             if path.exists() or path.is_symlink():
-                archive(path, folder)
+                try:
+                    archive(path, folder)
+                except (ValueError, OSError) as archive_error:
+                    if failure is None:
+                        raise
+                    if not isinstance(failure, Exception):
+                        retain_cancellation(failure, archive_error, folder)
+                        raise failure from archive_error
+                    raise ValueError(f"{failure}; SDK runtime archive failed: {archive_error}") from failure
 
 
 def origins(runtime: Path, folder: Path, entry: dict, *, context: dict | None = None) -> None:

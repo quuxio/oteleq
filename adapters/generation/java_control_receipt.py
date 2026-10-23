@@ -59,7 +59,7 @@ def dimensions(step: dict, previous: int, maximum: int) -> int:
     return after["cursor"]
 
 
-def history(rows: list, pid: int, requested: dict, completed: int) -> int:
+def history(rows: list, pid: int, requested: dict, completed: int, *, initial: bool = False) -> int:
     """Each independent setter must preserve the other actual control and counter."""
     control.require(type(rows) is list and 3 <= len(rows) <= control.MAX_STATUS_RECORDS, "missing bounded control history")
     commands = ["status", "collection " + ("on" if requested["collection"] else "off"),
@@ -70,6 +70,9 @@ def history(rows: list, pid: int, requested: dict, completed: int) -> int:
                         and row["command"] == (commands[index] if index < 3 else "status"), "unexpected control acknowledgement")
         current = control.status(row["status"], pid)
         control.require(current["completed"] == completed, "selected measurements changed during a control transition")
+        if initial and index == 0:
+            control.require(all(current[key] == value for key, value in requested.items()),
+                            "initial metric state differs from the declared startup state")
         if index > 0:
             independent_transition(index, current, previous, requested)
         previous = current
@@ -107,9 +110,9 @@ def qualify(record: dict, pid: int, bodies: list, sizes: list[int], series: dict
     """Direct receipt must include collected calls and exclude uncollected calls."""
     control.require(len(record["steps"]) == len(sizes), "control calls and selected roots differ")
     completed, statuses = 0, 0
-    for step, size in zip(record["steps"], sizes):
+    for index, (step, size) in enumerate(zip(record["steps"], sizes)):
         requested, before, after = step["requested"], step["before"], step["after"]
-        statuses += history(before["history"], pid, requested, completed)
+        statuses += history(before["history"], pid, requested, completed, initial=index == 0)
         completed += size if requested["collection"] else 0
         for name in ("status", "flush", "settled"):
             value = control.status(after[name], pid)

@@ -59,14 +59,19 @@ def marker(path: Path, expected: bytes) -> None:
 class Session:
     """Advance one JVM through its fixed calls without blocking output monitoring."""
 
-    def __init__(self, folder: Path, runtime: Path, sequence: list[dict], bodies: list, *, plain: bool):
+    def __init__(self, folder: Path, runtime: Path, sequence: list[dict], bodies: list, *, plain: bool,
+                 service: str, method: str):
+        control.require(type(service) is str and bool(service) and type(method) is str and bool(method),
+                        "missing metric receipt identity")
         self.folder, self.runtime, self.sequence, self.bodies, self.plain = folder, runtime, sequence, bodies, plain
+        self.service, self.method = service, method
         self.root = folder / "java-rendezvous"
         self.root.mkdir(mode=0o700)
         self.token = uuid.uuid4().hex
         self.phases = [phase + "-" + str(index) for index in range(len(sequence)) for phase in ("before", "after")] + ["finish"]
         self.position, self.pid, self.statuses = 0, None, 0
         self.holding = None
+        self.restoring = None
         self.record = {"control_schema_version": 1, "plain": plain, "pid": None,
                        "interval_ms": INTERVAL_MS, "steps": [], "restored": None}
 
@@ -114,6 +119,9 @@ class Session:
         requested = self.sequence[index]["metrics"]
         history = self.transition(requested, deadline)
         if history:
+            if index == 0:
+                control.require(all(history[0]["status"][key] == value for key, value in requested.items()),
+                                "initial metric state differs from the declared startup state")
             previous = self.record["steps"][-1]["after"]["settled"] if index else {"completed": 0}
             control.require(history[0]["status"]["completed"] == previous["completed"],
                             "selected calls ran outside declared checkpoints")
@@ -139,11 +147,16 @@ class Session:
     def settle(self, deadline: float) -> None:
         pending = self.holding
         step = self.record["steps"][pending["index"]]
-        settled = self.query("flush", deadline)
+        if "settled" not in pending:
+            pending["settled"] = self.query("flush", deadline)
+        settled = pending["settled"]
         if settled is not None:
             control.require(settled["completed"] == pending["status"]["completed"]
                             and all(settled[key] == value for key, value in step["requested"].items()),
                             "selected calls or controls changed at a paused checkpoint")
+            if all(step["requested"].values()) and not self.metrics_ready(pending,
+                    step["before"]["cursor"], settled["completed"]):
+                return
         end = len(self.bodies)
         received = metric_bodies(self.bodies, step["before"]["cursor"], end)
         control.require(step["requested"]["emission"] or not received, "metrics were received after the effective emission-off barrier")
@@ -154,14 +167,40 @@ class Session:
         self.acknowledge()
 
     def restore(self, deadline: float) -> None:
-        history = self.transition({"collection": True, "emission": True}, deadline)
-        flushed = self.query("flush", deadline)
+        if self.restoring is None:
+            self.restoring = {"history": self.transition({"collection": True, "emission": True}, deadline),
+                              "flush": self.query("flush", deadline)}
+        history, flushed = self.restoring["history"], self.restoring["flush"]
         if flushed is not None:
             control.require(flushed["completed"] == self.record["steps"][-1]["after"]["settled"]["completed"]
                             and flushed["collection"] and flushed["emission"], "final restoration changed selected measurements")
+            if not self.metrics_ready(self.restoring,
+                    self.record["steps"][-1]["after"]["cursor"], flushed["completed"]):
+                return
         self.record["restored"] = {"history": history, "flush": flushed, "cursor": len(self.bodies)}
+        self.restoring = None
         self.save()
         self.acknowledge()
+
+    def metrics_ready(self, pending: dict, start: int, completed: int) -> bool:
+        """Keep the app paused until both cumulative series actually arrive.
+
+        A flush acknowledgement alone does not establish collector receipt.
+        Decode each new body once and keep the existing process/capture budgets.
+        """
+        from opentelemetry.proto.collector.metrics.v1.metrics_service_pb2 import ExportMetricsServiceRequest
+        import java_telemetry as telemetry
+
+        recorded = pending.setdefault("measurements", {telemetry.CALLS: [], telemetry.DURATION: []})
+        end = len(self.bodies)
+        for path, raw in self.bodies[pending.get("observed_cursor", start):end]:
+            if path == "/v1/metrics":
+                message = telemetry.decode(ExportMetricsServiceRequest.FromString, raw)
+                telemetry.metrics(message, self.service, self.method, recorded)
+        pending["observed_cursor"] = end
+        control.require(all(value <= completed for points in recorded.values() for _, value in points),
+                        "paused metric receipt includes uncollected calls")
+        return all(points and max(points)[1] == completed for points in recorded.values())
 
     def poll(self, process, deadline: float) -> None:
         """The execution loop keeps enforcing the common process/output budgets."""

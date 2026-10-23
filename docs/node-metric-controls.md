@@ -36,7 +36,7 @@ sequence = [
 
 Generate and run this policy with the ordinary [automatic-generation commands](automatic-generation.md). TypeScript can select its explicit `native` or `api` compiler. Legacy Node providers, mixed declared/undeclared states and release/collection actions in a live metric schedule remain blockers.
 
-To start with metrics disabled, set the first call's collection and emission flags to `false` and include a later call with both `true`. Either flag can also start disabled independently. The common policy carries these flags into SDK creation, before the first call. The first actual status must already match that policy; changing the flags at the first checkpoint cannot qualify an incorrect startup state. These startup states have their own [recorded qualification](qualification/node-startup-metric-controls-2026-10-23.json). Prepared Java retains its initial both-on requirement.
+To start with metrics disabled, set the first call's collection and emission flags to `false` and include a later call with both `true`. Either flag can also start disabled independently. The common policy carries these flags into SDK creation, before the first call. The first actual status must already match that policy; changing the flags at the first checkpoint cannot qualify an incorrect startup state. These startup states have their own [recorded qualification](qualification/node-startup-metric-controls-2026-10-23.json). Prepared [Java startup schedules](java-metric-controls.md) also support all four initial states, with separate [2,256-JVM qualification](qualification/java-startup-metric-controls-2026-10-23.json) in three recorded prepared profiles.
 
 ## What the runner verifies
 

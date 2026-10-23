@@ -36,7 +36,11 @@ sequence = [
 ]
 ```
 
-Use the normal `plan --config`, `generate`, `run`, `replay`, `shrink` and `export-tests` commands. The first call must provide a collection-on/emission-on positive control. Every call in a live schedule must declare both booleans. Fixed arguments, construction inputs, required roots and states remain frozen through generated suites, export and scalar shrinking. Other provider/language profiles remain explicit blockers.
+Use the normal `plan --config`, `generate`, `run`, `replay`, `shrink` and `export-tests` commands. A call in the schedule must provide a collection-on/emission-on positive control. Every call in a live schedule must declare both booleans. The first call's flags set the SDK's actual startup state in both the common policy and independently checked launch properties. The first status must already match those flags; later setters cannot repair an incorrect initial state. Fixed arguments, construction inputs, required roots and states remain frozen through generated suites, export and scalar shrinking. Other provider/language profiles remain explicit blockers.
+
+The earlier qualifications below cover positive-first schedules. The separate [2,256-JVM startup qualification](qualification/java-startup-metric-controls-2026-10-23.json) covers all four initial states in the recorded stock, safe and archive prepared profiles. Each application retains its original PID and build while the flags change independently and together.
+
+Positive and restored checkpoints keep the application paused until the collector receives both cumulative function series with the required service, method and completed-call totals. A flush acknowledgement alone cannot close those windows. New bodies are decoded once; waiting does not repeat setters or control commands. Existing process, output, time and capture budgets remain enforced. Missing or partial series cannot become a successful checkpoint. The [startup qualification](qualification/java-startup-metric-controls-2026-10-23.json) checks this receipt barrier in all twelve recorded corpora; earlier records retain their own runtime identities.
 
 | Requested state | Selected function measurements | Metric export | Tracing |
 | --- | --- | --- | --- |
@@ -81,7 +85,26 @@ The qualifier's `--recheck` validates completed retained reports, compiler produ
 
 Set `JAVA_PROFILE=safe-methods-v1 GETTER_EXPECTATION=equivalent` when qualifying a corrected SDK. The defaults retain the original stock recipe and known getter difference. The qualifier exposes the same choices as `--java-profile` and `--getter-expectation`; use the same values for `--recheck`.
 
+## Qualify startup schedules
+
+The maintained startup corpus uses the complete six-method receiver fixture, including private access, aliases/cycles, recursion, an intermediate exception and two declared state differences. It exercises direct/generated and detached/exported suites, replay, scalar reduction and current-source promotion before and after a real console-body change. The [recorded twelve-corpus qualification](qualification/java-startup-metric-controls-2026-10-23.json) checks 2,256 distinct JVM launches, 168 copied actual-evidence refusals and 576 freshly recomputed comparisons. The altered copies and 48 retained shrink duplicates do not count as new JVM launches.
+
+```sh
+make generation-java-startup-otelc \
+  PYTHON=/absolute/path/to/qualified/python \
+  OTELC_ROOT=/absolute/path/to/frozen/provider \
+  REPORT_DIR=/absolute/path/to/new-startup-evidence \
+  JAVA_CONTROL_STARTUP=both-off \
+  JAVA_STARTUP_PROFILE=safe-methods-v1
+```
+
+`JAVA_CONTROL_STARTUP` also accepts `both-on` (the default), `collection-off` and `emission-off`. Each run rotates the complete four-state schedule. `JAVA_STARTUP_PROFILE` defaults to `safe-methods-v1`; `stock-methods-v1` and `archive-methods-v1` require their own matching frozen provider. The script accepts the same values through `--startup-state` and `--java-profile`. Startup corpus cases explicitly allow 60 seconds per attempt; earlier positive-first corpus budgets remain unchanged.
+
+The script's explicit `--recheck` option audits a complete retained corpus without launching an application. It checks the original profile, all 19 required route commands and their contract-known exit codes, retained command output, all observations, standalone or archive-context compiler bindings, actual receipts and alteration controls. It writes fresh comparisons and a new qualification result under `offline-recheck-*`, preserving the original controller result and any failure. Missing or unfinished routes, whole-record omissions and substituted commands are refused. Optional historical comparison records do not supply route-completion evidence.
+
 ## Published qualification
+
+The [23 October startup record](qualification/java-startup-metric-controls-2026-10-23.json) identifies executed runtime `bb1fb96` and offline verifier `d0282c4` separately. All twelve completed corpora pass the corrected verifier, including 228 independently required route commands. The original four archive controllers failed their final build audit because it assumed standalone compiler argv positions. Their failures remain unchanged; the corrected archive-context audit uses the actual retained products and selected JDK without relaunching applications. The record also keeps a first offline attempt's ambient-JDK refusal separate. Final cleanup/cancellation production code `6571c7c` has its own component and sixteen-JVM compatibility evidence; it did not execute the twelve-corpus matrix. An actual stock both-off HTML/JUnit report retains four matching methods, two deliberate state differences and four excluded callables.
 
 The [21 October record](qualification/java-metric-controls-2026-10-21.json) qualifies runtime `0288559` with frozen prepared SDK `f3279fd` and legacy provider `d6d03b7`: 164 actual JVM launches, including 140 through the six-method live corpus, eight getter-regression launches and eight ordinary calls per backend. The main corpus has four matching methods and two deliberately different methods. Complete intermediate receiver/static/error graphs, private factories, recursion, stdout/stderr and all four live states are checked through generated suites, replay, detached export and scalar shrinking from seven to zero. Four copied original shrink attempts remain retained once in the 168 observations and do not inflate actual launches.
 
