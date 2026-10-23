@@ -129,6 +129,9 @@ def history(rows: list, record: dict, requested: dict, completed: int) -> int:
         provider.require(current["sdk_pid"] == record["sdk_pid"] and current["launch_id"] == record["launch_id"]
                          and current["language"] == record["language"]
                          and current["function_completions"] == completed, "live Node transition changed process or calls")
+        provider.require(index != 0 or completed != 0
+                         or all(current[key] is flag for key, flag in requested.items()),
+                         "live Node initial metric state differs from the requested startup state")
         if index:
             key, other = ("collection", "emission") if index == 1 else ("emission", "collection")
             provider.require(current[key] is requested[key] and current[other] is previous[other],

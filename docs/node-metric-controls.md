@@ -6,7 +6,7 @@ The explicit `source-v1` JavaScript/TypeScript provider implements metric collec
 
 ## Declare a schedule
 
-Use an existing source constructor or factory through the [receiver fixture](receiver-fixtures.md). Every step must call the selected method and declare both booleans. The first step enables both as a positive control.
+Use an existing source constructor or factory through the [receiver fixture](receiver-fixtures.md). Every step must call the selected method and declare both booleans. The first step fixes the actual SDK startup flags. At least one call must enable both as a positive control.
 
 ```toml
 schema_version = 1
@@ -36,6 +36,8 @@ sequence = [
 
 Generate and run this policy with the ordinary [automatic-generation commands](automatic-generation.md). TypeScript can select its explicit `native` or `api` compiler. Legacy Node providers, mixed declared/undeclared states and release/collection actions in a live metric schedule remain blockers.
 
+To start with metrics disabled, set the first call's collection and emission flags to `false` and include a later call with both `true`. Either flag can also start disabled independently. The common policy carries these flags into SDK creation, before the first call. The first actual status must already match that policy; changing the flags at the first checkpoint cannot qualify an incorrect startup state. These startup states have their own [recorded qualification](qualification/node-startup-metric-controls-2026-10-23.json). Prepared Java retains its initial both-on requirement.
+
 ## What the runner verifies
 
 One application process, its independent SDK process and the same prepared source/build remain in use throughout the schedule. Only generated private callers contain checkpoints; application and dependency sources need no coding changes. The caller yields its event loop while the external host changes the actual authenticated SDK endpoint.
@@ -52,7 +54,7 @@ The pinned SDK's own processed-span and queue metrics remain separate from funct
 
 The maintained corpus contains synchronous, awaited asynchronous and expected-error calls, plus a same-return static mutation which is restored before the final boundary. Complete independent graphs include every intermediate field, descriptor and alias. Nonempty binary stdout/stderr, real control acknowledgements and decoded OTLP are checked through direct execution, generated suites, replay and detached export. It also exercises scalar reduction and its retained suite/replay, followed by current-source promotion before and after a real return-value change. Actual process identities prevent copied reduction evidence from inflating launch counts.
 
-Thirteen alterations to copied actual control/OTLP evidence check process identities, flag independence, completion counts, disabled windows, restoration, missing traces, withheld retained metrics, off-state export admissions, counter rollback and final SDK bounds. The product verifier must refuse every alteration for its intended reason and still accept the preserved original. These checks add no application launches.
+The published positive-first record uses thirteen alterations to copied actual control/OTLP evidence check process identities, flag independence, completion counts, disabled windows, restoration, missing traces, withheld retained metrics, off-state export admissions, counter rollback and final SDK bounds. The product verifier must refuse every alteration for its intended reason and still accept the preserved original. These checks add no application launches.
 
 ```sh
 make generation-node-controls-otelc \
@@ -63,4 +65,10 @@ make generation-node-controls-otelc \
 
 Select the Node executable with `OTELC_NODE` before invoking the recipe. Qualify each recorded runtime separately. Completed corpus records, source/tool preservation, negative controls, review and protected checks are required before this profile is admitted.
 
-This is diagnostic **equivalence over these tests and observations**. Serial named trace trees do not establish invocation-cookie attribution. Startup-off profiles, arbitrary concurrent schedules, other action targets, general Node dependency/build integration, combined GC/resource schedules, exporter faults and shipping artefacts still require separate qualification. The published record covers the positive-first routes above: 348 distinct applications per Node runtime, 78 altered-evidence refusals in total and 180 recomputed typed comparisons. The 720 raw attempt folders include 24 copied attempts which are excluded from launch counts. All provider/source/tool identities remain unchanged; the exact runtime passes 1,015 distinct regressions with 97.38% Rust product line coverage. Trace duration and observer waiting time are not equality dimensions.
+Use `NODE_CONTROL_STARTUP=collection-off`, `emission-off` or `both-off` to rotate the complete schedule so that the SDK starts in that state; the default is `both-on`. The direct script accepts the same names through `--startup-state`. Each run retains the selected initial flags through all three language/compiler profiles, generated/detached suites, replay, reduction and current-source promotion. Error metric expectations follow collection state at the actual throwing call. Fourteen alterations include a wrong initial status which later setters would otherwise hide.
+
+The separate [startup qualification](qualification/node-startup-metric-controls-2026-10-23.json) completes all 24 runtime/initial-state/language/compiler combinations: 2,784 distinct applications, 336 altered-evidence refusals and 720 independently recomputed comparisons. The 2,880 raw attempt folders include 96 copied reduction attempts, which are excluded from launch counts. It covers Node 24/26, JavaScript `.cjs`, native TypeScript `.cts` and API TypeScript `.mts`. All 8,284 frozen provider entries, 206 source files, 12 links, 939 read-only directories and three external tools remain unchanged.
+
+The executed runtime is `88ca22d`; the maintained verifier is `c9fef1f`. Their production source bytes match, but their commit identities remain separate. Runtime and verifier gates pass 1,019 and 1,023 distinct regressions respectively, with 97.38% Rust product line coverage and all component floors. A rendered actual both-off report retains three matching cases, one deliberate intermediate difference and two explicit exclusions. The [earlier positive-first record](qualification/node-metric-controls-2026-10-23.json) retains its own 696-launch scope.
+
+This is diagnostic **equivalence over these tests and observations**. Serial named trace trees do not establish invocation-cookie attribution. Arbitrary concurrent schedules, other action targets, general Node dependency/build integration, combined GC/resource schedules, exporter faults, unrecorded profiles and shipping artefacts still require separate qualification. Trace duration and observer waiting time are not equality dimensions. All 21 broader project completion requirements remain in scope.

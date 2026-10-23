@@ -21,6 +21,65 @@ import qualify_node_controls as qualification
 
 
 class NodeControlsOracleTests(unittest.TestCase):
+    def test_startup_rotations_keep_policy_states_and_error_collection_independent(self):
+        for name, offset in qualification.STARTUP_OFFSETS.items():
+            states = qualification.startup_states(name)
+            self.assertEqual(states, qualification.STATES[offset:] + qualification.STATES[:offset])
+            self.assertEqual(sum(state['collection'] for state in states), 2)
+            self.assertEqual(sum(all(state.values()) for state in states), 1)
+            for language, compiler in (('javascript', 'native'), ('typescript', 'native'), ('typescript', 'api')):
+                configured = policy.validate(tomllib.loads(qualification.policy(language, compiler, states=states)))
+                for fixture in configured['fixtures']:
+                    self.assertEqual([step['metrics'] for step in fixture['sequence']], list(states))
+            for method in oracle.METHODS:
+                expected = {'otelc.function.calls': 2, 'otelc.function.duration': 2}
+                if method == 'expected' and states[2]['collection']:
+                    expected['otelc.function.unwinds'] = 1
+                self.assertEqual(qualification.expected_metrics(method, states), expected)
+            states[0]['collection'] = not states[0]['collection']
+            self.assertEqual(qualification.startup_states(name)[0], qualification.STATES[offset])
+        with self.assertRaisesRegex(ValueError, 'startup metric state'):
+            qualification.startup_states('unknown')
+
+    def test_rotated_framework_retains_the_expected_state_in_each_report_check(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            report = root / 'report.json'
+            report.write_text(json.dumps({'cases': [{'function': 'controls.Counter.difference'}]}))
+            states = qualification.startup_states('both-off')
+            with patch.object(qualification, 'command', return_value=json.dumps({'report': str(report)})), \
+                    patch.object(qualification, 'check_report', return_value={('runtime', 101)}) as check:
+                self.assertEqual(qualification.framework(root, root, 'rotated', {'difference'}, states=states),
+                                 {('runtime', 101)})
+                check.assert_called_once_with(report, {'difference'}, states=states)
+
+    def test_receipt_alterations_change_actual_flags_and_only_disabled_windows(self):
+        for name in qualification.STARTUP_OFFSETS:
+            states = qualification.startup_states(name)
+            record = {'steps': [
+                {'requested': state.copy(), 'before': {'history': [
+                    {'status': state.copy()}, {'status': {'emission': state['emission'],
+                        'effective_emission_off': not state['emission'], 'in_flight_exports': 0}}]},
+                 'after': {'held_ns': 1000000000, 'metric_bodies': []}}
+                for state in states]}
+            edits = routes.receipt_edits(states)
+            self.assertEqual(len(edits), 9)
+            for edit, key, index in (('held-window', 'held_ns', 0), ('metric-window', 'metric_bodies', [0])):
+                changed = copy.deepcopy(record)
+                edits[edit](changed)
+                altered = [i for i, (old, new) in enumerate(zip(record['steps'], changed['steps'])) if old != new]
+                self.assertEqual(len(altered), 1)
+                self.assertFalse(all(states[altered[0]].values()))
+                self.assertEqual(changed['steps'][altered[0]]['after'][key], index)
+            for edit, step, reply, flag in (('initial-state', 0, 0, 'collection'), ('setter', 1, 1, 'emission')):
+                changed = copy.deepcopy(record)
+                before = changed['steps'][step]['before']['history'][reply]['status'][flag]
+                edits[edit](changed)
+                self.assertIs(changed['steps'][step]['before']['history'][reply]['status'][flag], not before)
+                if edit == 'setter':
+                    status = changed['steps'][step]['before']['history'][reply]['status']
+                    self.assertIs(status['effective_emission_off'], not status['emission'])
+
     def test_retained_negative_controls_change_only_the_requested_raw_signal(self):
         from opentelemetry.proto.collector.metrics.v1.metrics_service_pb2 import ExportMetricsServiceRequest
         from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceRequest

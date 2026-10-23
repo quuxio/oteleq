@@ -56,13 +56,15 @@ def configuration(entry: dict, endpoint: str, service: str) -> dict:
     if creator is not None:
         functions.append(creator)
     collecting = sequences.collects(entry)
+    initial = (entry["sequence_configuration"][0]["metrics"] if sequences.controls(entry)
+               else {"collection": True, "emission": True})
     return {"schema_version": 3, "languages": [entry["language"]],
             "resource": {"service_name": service},
             "export": {"endpoint": endpoint, "interval_ms": 1000, "timeout_ms": 1000,
                        "shutdown_timeout_ms": 10000},
             "sources": {"include": [entry["path"]], "exclude": []},
             "functions": {"include": functions, "exclude": []},
-            "metrics": {"collection": True, "emission": True,
+            "metrics": {**initial,
                         "histogram_boundaries_seconds": [1e-6, 1e-5, 1e-4, .001, .01, .1, 1.]},
             "traces": {"enabled": True, "sample_ratio": 1.0},
             "lifetimes": {"enabled": collecting, "include": [entry["node_class_label"]] if collecting else [], "exclude": [],

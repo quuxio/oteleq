@@ -85,6 +85,9 @@ class Session:
         previous = self.record["steps"][-1]["after"]["settled"]["function_completions"] if index and history else 0
         provider.require(not history or history[0]["status"]["function_completions"] == previous,
                          "selected calls ran outside the live Node schedule")
+        provider.require(index != 0 or not history
+                         or all(history[0]["status"][key] is flag for key, flag in requested.items()),
+                         "initial Node metric state differs from the frozen first call")
         self.record["steps"].append({"id": self.sequence[index]["id"], "requested": requested.copy(),
                                      "before": {"history": history, "cursor": len(self.bodies)}, "after": None})
         self.save()
