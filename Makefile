@@ -166,6 +166,7 @@ generation-check: node-observer-check node-sequence-check node-source-context-ch
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_health.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_witness.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_action.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_action_receipt.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_provider.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_profiles.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_launch.py' --fail-under=80
