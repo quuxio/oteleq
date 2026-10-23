@@ -13,6 +13,7 @@ Updated 23 October 2026, `quux-oteleq compare-workload` runs the Rust comparator
 | [Java compiler bindings](java-build-bundles.md) | Inspect actual source origins, JDK/compiler identities and retained class products |
 | [Java runtime archives](java-runtime-archives.md) | Configure the explicit prepared profile and review selected-JDK member evidence |
 | [Prepared Java SDK provider](java-prepared-provider.md) | Select the replacement Java SDK and verify launch, PID, origins and health/OTLP receipt |
+| [Java action witness components](java-action-witness.md) | Inspect the independent v2 reader/private JDK harness and outstanding runtime qualification |
 | [Node source SDK provider](node-source-context.md#rebuilt-sdk-source-profile) | Select source5/execution1 and review exact module, receiver, collection, output and effect qualification |
 | [Node live metric controls](node-metric-controls.md) | Configure declared same-process collection/emission states and inspect the Node 24/26 qualification record |
 | [Filesystem effects](filesystem-effects.md) | Seed independent directories and compare declared bytes, kinds and permissions |

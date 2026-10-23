@@ -83,6 +83,8 @@ Declared [Python ordered calls](docs/ordered-sequences.md#python-call-sequences)
 
 Rebuilt Python [provider negotiation and prepared-runtime readers](docs/python-prepared-provider.md) are available for integration work, including a separate fixed-workload process/health/OTLP qualification command and an explicit journal-2 relation reader. Relation consistency does not qualify a producer's source-origin mechanism. Selecting `adapters.python.backend = "prepared"` currently retains explicit source-origin blockers; generated Python execution continues to require its qualified legacy provider.
 
+Independent [Java action-v2 readers and a private JDK harness channel](docs/java-action-witness.md) are implemented for integration work. Generated invocation-scoped SDK execution and actual decoded action receipt still require qualification; existing generated Java workers retain their documented witness limits.
+
 ### Build
 
 With Git and Rust 1.98.1 or newer installed:

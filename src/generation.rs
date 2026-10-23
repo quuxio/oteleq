@@ -249,6 +249,18 @@ const RESOURCES: &[(&str, &str)] = &[
         include_str!("../adapters/generation/java_health.py"),
     ),
     (
+        "java_witness.py",
+        include_str!("../adapters/generation/java_witness.py"),
+    ),
+    (
+        "java_action.py",
+        include_str!("../adapters/generation/java_action.py"),
+    ),
+    (
+        "OteleqRendezvous.java",
+        include_str!("../adapters/generation/OteleqRendezvous.java"),
+    ),
+    (
         "java_control.py",
         include_str!("../adapters/generation/java_control.py"),
     ),

@@ -2,7 +2,7 @@
 
 ## Status
 
-This is a producer/consumer design proposal. The current generated workers use a decoded, name-only invocation tree with source/binding guards. They do not implement this protocol, expose compiler probe IDs or prove that arbitrary concurrent activity belongs to a test action. Existing qualification must retain that limitation.
+This is a producer/consumer design with separately implemented [Java v2 reader and private JDK harness components](java-action-witness.md). The current generated workers use a decoded, name-only invocation tree with source/binding guards. They do not yet implement the complete protocol, expose qualified compiler probe IDs or prove that arbitrary concurrent activity belongs to a test action. Existing qualification must retain that limitation.
 
 The proposed capability binds telemetry to one generated action using a compiler-identified wrapper, a live runtime context and a fresh scope ID. A process-wide nonce or a static wrapper ID alone cannot identify an invocation: another call can occur between arming and the intended action.
 

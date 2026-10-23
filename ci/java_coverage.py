@@ -115,8 +115,9 @@ def check(cache: Path, repo: Path) -> None:
         environment = {**os.environ, "OTELEQ_JAVA_COVERAGE_CLASSES": str(classes),
                        "OTELEQ_JAVA_COVERAGE_AGENT": str(cache / "jacocoagent.jar"),
                        "OTELEQ_JAVA_COVERAGE_EXEC": str(execution)}
-        subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "tests", "-p", "test_generation_java_receivers.py", "-v"],
-                       cwd=repo, env=environment, check=True, timeout=120)
+        for pattern in ("test_generation_java_receivers.py", "test_generation_java_action.py"):
+            subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "tests", "-p", pattern, "-v"],
+                           cwd=repo, env=environment, check=True, timeout=120)
         compiler_probe(cache, repo, folder, classes, execution)
         archive_probe(cache, repo, folder, classes, execution)
         subprocess.run([java, "-jar", str(cache / "jacococli.jar"), "report", str(execution),
@@ -125,6 +126,7 @@ def check(cache: Path, repo: Path) -> None:
     print(f"Java observer line coverage: {coverage(report):.2f}%")
     print(f"Java compiler frontend line coverage: {coverage(report, 'OteleqCompile', nested=True):.2f}%")
     print(f"Java runtime archive resolver line coverage: {coverage(report, 'OteleqArchives'):.2f}%")
+    print(f"Java private action rendezvous line coverage: {coverage(report, 'OteleqRendezvous'):.2f}%")
 
 
 def main() -> None:

@@ -82,18 +82,20 @@ class JavaCoverageTests(unittest.TestCase):
                 if "report" in arguments:
                     Path(arguments[arguments.index("--xml") + 1]).write_text(report(9, 1).replace('</package>',
                         '<class name="OteleqCompile"><counter type="LINE" covered="9" missed="1"/></class>'
-                        '<class name="OteleqArchives"><counter type="LINE" covered="9" missed="1"/></class></package>'))
+                        '<class name="OteleqArchives"><counter type="LINE" covered="9" missed="1"/></class>'
+                        '<class name="OteleqRendezvous"><counter type="LINE" covered="9" missed="1"/></class></package>'))
 
             with patch.object(java_coverage, "verified", return_value=True), patch.object(java_coverage, "compiler_probe") as compiler_probe, patch.object(java_coverage, "archive_probe") as archive_probe, patch.object(java_coverage.subprocess, "run", side_effect=execute), patch("builtins.print") as printed:
                 java_coverage.check(root / "tools", root)
             compiler_probe.assert_called_once()
             archive_probe.assert_called_once()
-            self.assertEqual(len(calls), 2)
+            self.assertEqual(len(calls), 3)
             environment = calls[0][1]["env"]
             self.assertIn("OTELEQ_JAVA_COVERAGE_AGENT", environment)
             self.assertIn("OTELEQ_JAVA_COVERAGE_EXEC", environment)
-            self.assertNotIn("env", calls[1][1])
+            self.assertNotIn("env", calls[2][1])
             self.assertEqual(calls[0][0][-2:], ["test_generation_java_receivers.py", "-v"])
+            self.assertEqual(calls[1][0][-2:], ["test_generation_java_action.py", "-v"])
             self.assertIn("90.00%", printed.call_args[0][0])
             self.assertTrue((root / "build/java-observer-coverage.xml").is_file())
 
