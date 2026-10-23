@@ -8,6 +8,7 @@ import re
 import socket
 import stat
 import time
+from typing import cast
 
 from java_live import read_owned
 import node_source as provider
@@ -16,17 +17,19 @@ from otelc_capture import strict_json
 COMMANDS = {"status", "flush", "collection on", "collection off", "emission on", "emission off"}
 MAX_REPLY = 4096
 MAX_STATUSES = 512
+CONTROL_FILE = "control.json"
 RUNTIME_LOSSES = {"function_capacity", "active_call_capacity", "invalid", "async_origin", "incomplete"}
 
 
 def status(value: object, pid: int) -> dict:
     """An actual application owns a separate healthy SDK while calls are paused."""
     provider.require(type(value) is dict, "missing live control status")
+    value = cast(dict, value)
     provider.require(type(value.get("schema_version")) is int and value["schema_version"] == 1
                      and type(value.get("pid")) is int and value["pid"] == pid and pid > 1
                      and type(value.get("sdk_pid")) is int and value["sdk_pid"] > 1 and value["sdk_pid"] != pid
                      and value.get("phase") == "running"
-                     and value.get("language") in provider.LANGUAGES
+                     and type(value.get("language")) is str and value["language"] in provider.LANGUAGES
                      and type(value.get("launch_id")) is str and re.fullmatch("[a-f0-9]{32}", value["launch_id"]),
                      "live control process or launch identity differs")
     provider.require(all(type(value.get(key)) is bool for key in ("collection", "emission", "effective_emission_off")),
@@ -55,7 +58,7 @@ def status(value: object, pid: int) -> dict:
 def endpoint(path: Path, pid: int) -> tuple[dict, tuple[int, int, str]]:
     """Read fixed private metadata without retaining or logging authentication bytes."""
     parent = path.parent.lstat()
-    provider.require(path.name == "control.json" and path.parent.resolve(strict=True) == path.parent
+    provider.require(path.name == CONTROL_FILE and path.parent.resolve(strict=True) == path.parent
                      and stat.S_ISDIR(parent.st_mode) and parent.st_uid == os.getuid()
                      and stat.S_IMODE(parent.st_mode) == 0o700, "unsafe Node control runtime")
     before = path.lstat()

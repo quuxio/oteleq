@@ -41,6 +41,9 @@ class NodeControlTests(unittest.TestCase):
                         {**status(), "handoff": {**status()["handoff"], "sdk_process_failed": True}}):
             with self.assertRaises(ValueError):
                 control.status(changed, 101)
+        changed = {**status(), "language": []}
+        with self.assertRaises(ValueError):
+            control.status(changed, 101)
 
     def descriptor(self, root, port=1):
         filename = root / "control.json"
@@ -73,10 +76,11 @@ class NodeControlTests(unittest.TestCase):
             alias.symlink_to(filename)
             with self.assertRaises(ValueError):
                 control.endpoint(alias, 101)
+            deadline, expired = time.monotonic() + 1, time.monotonic() - 1
             with self.assertRaises(ValueError):
-                control.request(filename, "on", 101, time.monotonic() + 1)
+                control.request(filename, "on", 101, deadline)
             with self.assertRaises(ValueError):
-                control.request(filename, "status", 101, time.monotonic() - 1)
+                control.request(filename, "status", 101, expired)
 
     def test_actual_tcp_frames_are_authenticated_bounded_and_process_bound(self):
         replies = [json.dumps(status()).encode() + b"\n", b"{}\n{}\n", b"x" * 4097, b"", b"{}\n"]
@@ -88,12 +92,13 @@ class NodeControlTests(unittest.TestCase):
                     filename, descriptor = self.descriptor(root, server.server_address[1])
                     thread = threading.Thread(target=server.handle_request)
                     thread.start()
+                    deadline = time.monotonic() + 3
                     try:
                         if index == 0:
                             self.assertEqual(control.request(filename, "status", 101, time.monotonic() + 3), status())
                         else:
                             with self.assertRaises(ValueError):
-                                control.request(filename, "status", 101, time.monotonic() + 3)
+                                control.request(filename, "status", 101, deadline)
                     finally:
                         thread.join(timeout=4)
                     self.assertFalse(thread.is_alive())
@@ -119,5 +124,6 @@ class NodeControlTests(unittest.TestCase):
         self.assertEqual(len(rows), 4)
         for replies in ([status(), status(collection=False, emission=False)],
                         [status(), status(1, collection=False)]):
+            filename, deadline = Path("unused"), time.monotonic() + 1
             with patch.object(control, "request", side_effect=replies), self.assertRaises(ValueError):
-                control.switch(Path("unused"), 101, {"collection": False, "emission": False}, time.monotonic() + 1)
+                control.switch(filename, 101, {"collection": False, "emission": False}, deadline)

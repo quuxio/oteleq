@@ -6,7 +6,7 @@ from pathlib import Path
 import time
 import uuid
 
-from java_live import marker, metric_bodies
+from java_live import marker, metric_bodies, read_owned
 import node_control as control
 import node_source as provider
 from otelc_capture import strict_json
@@ -61,14 +61,14 @@ class Session:
     def query(self, command: str, deadline: float) -> dict | None:
         if self.plain:
             return None
-        value = control.request(self.runtime / "control.json", command, self.pid, deadline)
+        value = control.request(self.runtime / control.CONTROL_FILE, command, self.pid, deadline)
         self.retain([{"command": command, "status": value}])
         return value
 
     def transition(self, requested: dict, deadline: float) -> list[dict]:
         if self.plain:
             return []
-        return self.retain(control.switch(self.runtime / "control.json", self.pid, requested, deadline))
+        return self.retain(control.switch(self.runtime / control.CONTROL_FILE, self.pid, requested, deadline))
 
     def acknowledge(self) -> None:
         phase = self.phases[self.position]
@@ -129,6 +129,21 @@ class Session:
         self.save()
         self.acknowledge()
 
+    def bind_application(self) -> bool:
+        """Wait for complete publication before binding the actual owned PID."""
+        application = self.folder / "node-source-application.json"
+        staged = application.with_name(application.name + ".staging")
+        if ((not application.exists() and not application.is_symlink())
+                or staged.exists() or staged.is_symlink()):
+            return False
+        receipt = strict_json(read_owned(application, 4096))
+        self.pid = receipt["pid"]
+        provider.require(type(self.pid) is int and self.pid > 1 and self.pid != self.supervisor
+                         and receipt == {"pid": self.pid, "supervisor_pid": self.supervisor, "group": self.supervisor}
+                         and os.getpgid(self.pid) == self.supervisor, "actual live Node application identity differs")
+        self.record["pid"] = self.pid
+        return True
+
     def poll(self, process, deadline: float) -> None:
         """Keep the outer process monitor active while the application yields."""
         if self.supervisor is None:
@@ -146,14 +161,9 @@ class Session:
         if not path.exists() and not path.is_symlink():
             return
         marker(path, (self.token + " " + phase + "\n").encode())
-        if self.pid is None:
-            receipt = strict_json((self.folder / "node-source-application.json").read_bytes())
-            self.pid = receipt["pid"]
-            provider.require(type(self.pid) is int and self.pid > 1 and self.pid != self.supervisor
-                             and receipt == {"pid": self.pid, "supervisor_pid": self.supervisor, "group": self.supervisor}
-                             and os.getpgid(self.pid) == self.supervisor, "actual live Node application identity differs")
-            self.record["pid"] = self.pid
-        if self.position == 0 and not self.plain and not (self.runtime / "control.json").exists():
+        if self.pid is None and not self.bind_application():
+            return
+        if self.position == 0 and not self.plain and not (self.runtime / control.CONTROL_FILE).exists():
             return
         if phase == "finish":
             self.restore(deadline)

@@ -23,6 +23,14 @@ async function collection(weak,step) {
   return {completed,rounds};
 }
 
+/** Keep each method call between its host state transition and receipt barrier. */
+async function observeCall(receiver,step,index,controls) {
+  if(controls) await checkpoint('before-'+index);
+  const observed=await receiver.observe(step.arguments);
+  if(controls) await checkpoint('after-'+index);
+  return {id:step.id,action:step.action,gaps:[],...observed};
+}
+
 /** Execute the exact frozen call/release schedule with independent state at each step. */
 export async function runSequence(record,call,roots,validBinding) {
   const selected=call.sequence;
@@ -33,11 +41,9 @@ export async function runSequence(record,call,roots,validBinding) {
   let weak,lastCall;
   for(const [index,step] of selected.entries()) {
     if(step.action==='call') {
-      if(controls) await checkpoint('before-'+index); // NOSONAR: the host must acknowledge each declared state before the call.
-      const observed=await receiver.observe(step.arguments); // NOSONAR: declared actions share one receiver and must execute in order.
-      if(controls) await checkpoint('after-'+index); // NOSONAR: the host must finish this call's receipt before the next action.
+      const observed=await observeCall(receiver,step,index,controls); // NOSONAR: declared actions share one receiver and must execute in order.
       lastCall=observed.outcome;
-      steps.push({id:step.id,action:step.action,gaps:[],...observed});
+      steps.push(observed);
       continue;
     }
     const before=receiver.snapshot();

@@ -20,6 +20,7 @@ import harness
 import node_control
 import node_control_receipt
 import node_live
+import node_source_worker
 import policy
 import sequences
 import typed_capture
@@ -42,15 +43,52 @@ class NodeLiveTests(unittest.TestCase):
         package.mkdir(parents=True)
         (package / "typescript").symlink_to(ROOT / "ci/markdownlint/node_modules/typescript", target_is_directory=True)
 
-    def supervisor(self, folder, driver):
+    def supervisor(self, folder, driver, *, delay_receipt=False):
         """The controlled plain fixture launches a real independent Node PID."""
         return [sys.executable, "-I", "-B", "-c",
-                'import json,os,subprocess,sys;from pathlib import Path;'
+                'import os,subprocess,sys,time;from pathlib import Path;sys.path[:0]='
+                + repr([str(ROOT / "adapters/generation"), str(ROOT / "examples")])
+                + ';from node_source_worker import write;'
                 'folder=Path(sys.argv[1]);app=subprocess.Popen(sys.argv[2:]);'
-                '(folder/"node-source-application.json").write_text(json.dumps({"pid":app.pid,"supervisor_pid":os.getpid(),"group":os.getpgrp()}));'
+                + ('time.sleep(.25);' if delay_receipt else '')
+                + 'write(folder/"node-source-application.json",{"pid":app.pid,"supervisor_pid":os.getpid(),"group":os.getpgrp()});'
                 'result=app.wait();'
-                '(folder/"node-source-completion.json").write_text(json.dumps({"application_pid":app.pid,"sdk_pid":None}));'
+                'write(folder/"node-source-completion.json",{"application_pid":app.pid,"sdk_pid":None});'
                 'sys.exit(result)', folder, NODE, driver]
+
+    def test_checkpoint_waits_for_delayed_atomic_application_pid_publication(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary).resolve();project = folder / "project";project.mkdir()
+            sequence = [{"id": "step-0", "action": "call", "metrics": STATES[0]}]
+            session = node_live.Session(folder, sequence, [], language="javascript", plain=True)
+            driver = project / "driver.mjs"
+            driver.write_text('import {checkpoint} from ' + json.dumps((ROOT / 'adapters/generation/node_checkpoint.mjs').as_uri())
+                              + ';await checkpoint("before-0");await checkpoint("after-0");await checkpoint("finish");')
+            result = generation.execute(self.supervisor(folder, driver, delay_receipt=True), project,
+                                        {**os.environ, **session.environment()}, folder, timeout=5,
+                                        record_process=True, interaction=session)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout + result.stderr, b"")
+            self.assertEqual(session.position, 3)
+            self.assertNotEqual(session.record["pid"], session.record["supervisor_pid"])
+            self.assertIsNone(session.record["sdk_pid"])
+            self.assertFalse(list(folder.glob('*.staging')))
+
+    def test_pid_binding_waits_until_the_publication_staging_link_is_removed(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary).resolve()
+            session = node_live.Session(folder, [], [], language="javascript", plain=True)
+            session.supervisor = 100
+            application = folder / "node-source-application.json"
+            staged = application.with_name(application.name + ".staging")
+            node_source_worker.write(application, {"pid": 101, "supervisor_pid": 100, "group": 100})
+            os.link(application, staged)
+            self.assertFalse(session.bind_application())
+            self.assertIsNone(session.pid)
+            staged.unlink()
+            with patch.object(node_live.os, "getpgid", return_value=100):
+                self.assertTrue(session.bind_application())
+            self.assertEqual(session.pid, 101)
 
     def test_actual_generated_plain_sequence_completes_every_checkpoint_and_keeps_state(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -122,13 +160,15 @@ class NodeLiveTests(unittest.TestCase):
             session.poll(process, time.monotonic() + 1)
             with self.assertRaises(ValueError):
                 session.finish(process)
+            foreign, deadline = SimpleNamespace(pid=101), time.monotonic() + 1
             with self.assertRaises(ValueError):
-                session.poll(SimpleNamespace(pid=101), time.monotonic() + 1)
+                session.poll(foreign, deadline)
             with patch.object(node_live, "MAX_RECORD_BYTES", 1), self.assertRaises(ValueError):
                 session.save()
             session.statuses = node_control.MAX_STATUSES
+            reply = {"command": "status", "status": status()}
             with self.assertRaises(ValueError):
-                session.retain([{"command": "status", "status": status()}])
+                session.retain([reply])
 
     def test_live_policy_requires_explicit_source_backend_and_complete_call_states(self):
         base = {"language": "javascript", "node_backend": "source-v1", "receiver_fixture": {},

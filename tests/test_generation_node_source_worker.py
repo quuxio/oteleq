@@ -16,6 +16,29 @@ import node_source_worker as worker
 
 
 class NodeSourceWorkerTests(unittest.TestCase):
+    def test_receipts_publish_complete_private_bytes_and_preserve_existing_evidence(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve();filename = root / 'receipt.json'
+            value = {"pid": 101, "data": "x" * 100000}
+            real_link = os.link
+            def publish(staged, destination, **options):
+                self.assertFalse(filename.exists())
+                self.assertEqual(json.loads(Path(staged).read_bytes()), value)
+                self.assertEqual(Path(staged).stat().st_mode & 0o777, 0o600)
+                return real_link(staged, destination, **options)
+            with patch.object(worker.os, 'link', side_effect=publish):
+                worker.write(filename, value)
+            self.assertEqual(json.loads(filename.read_bytes()), value)
+            self.assertEqual(filename.stat().st_mode & 0o777, 0o600)
+            self.assertFalse(list(root.glob('*.staging')))
+            with self.assertRaises(FileExistsError):
+                worker.write(filename, {"changed": True})
+            self.assertEqual(json.loads(filename.read_bytes()), value)
+            self.assertFalse(list(root.glob('*.staging')))
+            staged = root / 'other.json.staging';staged.write_text('preserve unknown data')
+            with self.assertRaises(FileExistsError):
+                worker.write(root / 'other.json', {})
+            self.assertEqual(staged.read_text(), 'preserve unknown data')
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)

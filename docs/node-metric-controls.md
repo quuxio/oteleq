@@ -40,6 +40,8 @@ Generate and run this policy with the ordinary [automatic-generation commands](a
 
 One application process, its independent SDK process and the same prepared source/build remain in use throughout the schedule. Only generated private callers contain checkpoints; application and dependency sources need no coding changes. The caller yields its event loop while the external host changes the actual authenticated SDK endpoint.
 
+The supervisor publishes complete private PID receipts atomically. A caller can reach its first checkpoint before the parent is scheduled; the host waits within the same case budget for completed publication and then verifies actual process-group ownership.
+
 Each transition sets collection and emission separately, verifies that the other flag and completed-call count remain unchanged, and waits for already admitted metric exports to drain before an emission-off window starts. Disabled windows last at least the configured one-second export interval. The ordinary case deadline still applies, so longer schedules need a sufficient budget.
 
 The runner retains actual replies and raw receiver positions in `node-controls.json`. It verifies serial complete trace trees for every call, including calls made with collection disabled. Function metric totals include only collection-enabled trees. Direct positive receipts and the final restoration distinguish suppressed recording from emission-only suppression: measurements recorded with emission off must appear when both switches return on. Plain attempts complete the same checkpoints and fabricate no SDK responses.
