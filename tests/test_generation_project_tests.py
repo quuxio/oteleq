@@ -222,7 +222,7 @@ class ProjectSuiteTests(unittest.TestCase):
     def test_generator_identity_includes_numeric_rules_and_project_boilerplate(self):
         original = gen.capture.file_digest
         before = gen.generator_identity()
-        for name in ("preconditions.py", "project_tests.py", "project_runner.py"):
+        for name in ("preconditions.py", "project_tests.py", "project_runner.py", "python_origin.py", "python_code_match.py"):
             with self.subTest(name=name), patch.object(gen.capture, "file_digest",
                 side_effect=lambda path: "f" * 64 if Path(path).name == name else original(path)):
                 self.assertNotEqual(gen.generator_identity(), before)
