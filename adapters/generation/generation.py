@@ -811,6 +811,12 @@ max_spans_per_trace = 256
 endpoint = {json.dumps(endpoint)}
 interval_ms = 50
 '''
+    if language == "cpp" and "sequence_configuration" in entry:
+        calls = sequences.call_count(entry)
+        if calls > 8:
+            # The native provider shares this bound with completed root trees.
+            # A fast synchronous sequence can finish before its first drain.
+            text += 'max_queued_batches = ' + str(calls) + '\n'
     if language == "go":
         text += '[adapters.go]\nbackend = "compile"\n'
     if language == "rust":
