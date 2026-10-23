@@ -133,6 +133,33 @@ class JavaActionReceiptTests(unittest.TestCase):
                                                 ("/v1/traces", second.SerializeToString())])
         self.assertEqual((value["trace_batches"], value["scoped_spans"]), (2, 5))
 
+    def test_synchronous_recursive_siblings_cannot_overlap_in_either_arrival_order(self):
+        for start, accepted in ((350, True), (400, True), (200, False)):
+            for reverse in (False, True):
+                report, message = fixture(recursive=True)
+                roles, methods = message.resource_spans[0].scope_spans
+                roles.spans[2].end_time_unix_nano = 350
+                methods.spans[1].end_time_unix_nano = 300
+                other_role = copy.deepcopy(roles.spans[2])
+                other_method = copy.deepcopy(methods.spans[1])
+                other_role.span_id = bytes.fromhex("7" * 16)
+                other_method.span_id = bytes.fromhex("8" * 16)
+                other_method.parent_span_id = other_role.span_id
+                other_role.start_time_unix_nano, other_role.end_time_unix_nano = start, 700
+                other_method.start_time_unix_nano, other_method.end_time_unix_nano = start + 50, 650
+                roles.spans.append(other_role);methods.spans.append(other_method)
+                for key in ("started_ids", "ended_ids", "exported_ids"):
+                    report["scopes"][0][key].extend(["7" * 16, "8" * 16])
+                report["scopes"][0]["target_entries"] = "3"
+                if reverse:
+                    roles.spans.reverse();methods.spans.reverse()
+                with self.subTest(start=start, reverse=reverse):
+                    if accepted:
+                        self.assertEqual(qualify(report, message)["scoped_spans"], 7)
+                    else:
+                        with self.assertRaisesRegex(ValueError, "synchronous siblings overlap"):
+                            qualify(report, message)
+
     def test_two_actual_scopes_have_distinct_actions_contexts_and_fresh_traces(self):
         report, message = fixture()
         second = copy.deepcopy(report["scopes"][0])
@@ -142,11 +169,27 @@ class JavaActionReceiptTests(unittest.TestCase):
         for group in second_resource.scope_spans:
             for span in group.spans:
                 span.trace_id = bytes.fromhex("7" * 32)
+                span.start_time_unix_nano += 1000
+                span.end_time_unix_nano += 1000
                 attribute(span, receipt.SCOPE).string_value = "b" * 32
                 attribute(span, receipt.PREFIX + "context_cookie").string_value = "a" * 32
         message.resource_spans.append(second_resource)
         other = expected(action_id="a" * 64, cookie="a" * 32, sequence="2", scope_id="b" * 32)
         self.assertEqual(qualify(report, message, actions=[expected(), other])["scoped_spans"], 6)
+        touching = copy.deepcopy(message)
+        for group in touching.resource_spans[1].scope_spans:
+            for span in group.spans:
+                span.start_time_unix_nano -= 10
+                span.end_time_unix_nano -= 10
+        self.assertEqual(qualify(report, touching, actions=[expected(), other])["scoped_spans"], 6)
+        for changed_resource, shift in ((1, -11), (0, 2000)):
+            altered = copy.deepcopy(message)
+            for group in altered.resource_spans[changed_resource].scope_spans:
+                for span in group.spans:
+                    span.start_time_unix_nano += shift
+                    span.end_time_unix_nano += shift
+            with self.subTest(resource=changed_resource), self.assertRaisesRegex(ValueError, "serial action intervals"):
+                qualify(report, altered, actions=[expected(), other])
         for key in ("action_id", "scope_id", "cookie", "sequence"):
             changed = dataclasses.replace(other, **{key: getattr(expected(), key)})
             with self.subTest(key=key), self.assertRaises(ValueError):qualify(report, message, actions=[expected(), changed])

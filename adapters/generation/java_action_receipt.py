@@ -153,6 +153,10 @@ def _tree(scope: dict, rows: dict, action: Action) -> dict:
     for key in roles[None]:
         witness.require(all(rows[child][1] == "recursive_target" for child in children[key]),
                         "unexpected selected-method descendant")
+        intervals = sorted((rows[child][0].start_time_unix_nano,
+                            rows[child][0].end_time_unix_nano) for child in children[key])
+        witness.require(all(left[1] <= right[0] for left, right in zip(intervals, intervals[1:])),
+                        "synchronous siblings overlap")
     expected_status = 2 if action.failed else 0
     witness.require(rows[root][0].status.code == rows[target][0].status.code == expected_status,
                     "role exits differ from independently observed application outcome")
@@ -211,6 +215,9 @@ def qualify(report: dict, identity: witness.Identity, actions: list[Action], tar
                     span_id, role = _scoped_span(span, instrumentation, values, current, identity, target)
                     by_scope[scope_id[1]][span_id] = span, role
     observed = [_tree(scopes[action.scope_id], by_scope[action.scope_id], action) for action in actions]
+    roots = [by_scope[action.scope_id][scopes[action.scope_id]["root_span_id"]][0] for action in actions]
+    witness.require(all(left.end_time_unix_nano <= right.start_time_unix_nano
+                        for left, right in zip(roots, roots[1:])), "serial action intervals overlap or reverse")
     scoped = sum(item["spans"] for item in observed)
     return {"decoder": "Java action-v2 with decoded OTLP traces", "pid": identity.pid,
             "runtime_id": identity.runtime_id, "actions": observed,
