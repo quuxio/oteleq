@@ -15,7 +15,9 @@
     "initial_commit": "b40eec61667c8049fe754e773eaf9da18918dfeb",
     "initial_tracked_source_files": 405,
     "script_sha256": "62a3171b163779baaf904b144f1ac2bda685f390c638bd4e874a860bea9dba97",
-    "exact_source_diagnostic_and_empty_stdout_required": true
+    "exact_source_diagnostic_and_empty_stdout_required": true,
+    "commit": "38c817608e328ec55810108bb91c608b27dfb855",
+    "tracked_source_files": 406
   },
   "provider": {
     "repository": "quuxio/otelc",
