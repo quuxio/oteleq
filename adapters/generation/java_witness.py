@@ -245,6 +245,7 @@ def request(path: Path, operation: str, *arguments: str, deadline: float) -> dic
 def read_final(runtime: Path, *, pid: int, identity: Identity) -> dict:
     """Read a stable owned report and bind final evidence to the launched JVM."""
     require(type(pid) is int and pid > 0, "missing actual JVM PID")
+    require(pid == identity.pid, "actual JVM PID differs from frozen producer identity")
     require(runtime == runtime.resolve(strict=True), "runtime is not canonical")
     parent = os.open(runtime, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
     try:

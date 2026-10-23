@@ -233,6 +233,13 @@ class JavaWitnessTests(unittest.TestCase):
             self.assertEqual(len(self.read_final(root, changed)["scopes"]), 2)
             with self.assertRaises(ValueError):self.read_final(root, final_report(), pid=True)
 
+    def test_final_actual_pid_cannot_disagree_with_frozen_producer_identity(self):
+        with tempfile.TemporaryDirectory(dir="/tmp") as temporary:
+            root = Path(temporary).resolve();root.chmod(0o700)
+            contradictory = final_report();contradictory["pid"] = 124
+            with self.assertRaises(ValueError):
+                self.read_final(root, contradictory, pid=124)
+
     def test_final_fifo_symlink_permissions_oversize_duplicate_json_and_no_fd_leak(self):
         with tempfile.TemporaryDirectory(dir="/tmp") as temporary:
             root = Path(temporary).resolve();root.chmod(0o700)
