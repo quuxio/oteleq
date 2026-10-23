@@ -211,11 +211,11 @@ def controls(cli: Path, report: Path, folder: Path) -> None:
         command([cli, "compare-observations", path], folder, name, CONTROL_VERDICTS[name][0])
 
 
-def verify_operations(folder: Path, cli: Path) -> int:
+def verify_operations(folder: Path, cli: Path, *, historical_source_expectation: bool = False) -> int:
     """Require every route's terminal receipt; omissions cannot be a partial pass."""
     required = {"run": 1, "framework": 1, "export": 0, "export-run": 1,
         "export-framework": 1, "shrink": 1, "reduced-framework": 1, "reduced-replay": 1,
-        "changed-source": 2, **{"replay-" + method: int(method == "transient") for method in METHODS},
+        "changed-source": 4, **{"replay-" + method: int(method == "transient") for method in METHODS},
         **{name: expected for name, (expected, _) in CONTROL_VERDICTS.items()}}
     workspace = Path((folder / "cases/plan.stdout").read_text().strip())
     assert workspace.is_relative_to(folder / "cases")
@@ -239,7 +239,8 @@ def verify_operations(folder: Path, cli: Path) -> int:
     assert {path.name.removesuffix(".started.json") for path in folder.glob("*.started.json")} == set(required)
     for name, expected in required.items():
         marker = json.loads((folder / (name + ".started.json")).read_text())
-        assert marker == {"argv": list(map(str, expected_argv[name])), "expected_exit": expected}
+        recorded_expectation = 2 if historical_source_expectation and name == "changed-source" else expected
+        assert marker == {"argv": list(map(str, expected_argv[name])), "expected_exit": recorded_expectation}
         assert (folder / (name + ".exit")).read_text() == str(expected) + "\n"
         for suffix in ("stdout", "stderr"):
             assert (folder / (name + "." + suffix)).is_file()
@@ -384,7 +385,7 @@ def verify_receipts(folder: Path) -> int:
     return checked
 
 
-def retained(folder: Path, cli: Path) -> dict:
+def retained(folder: Path, cli: Path, *, historical_source_expectation: bool = False) -> dict:
     """Recheck every recorded state and source seal without new application runs."""
     reports = sorted(folder.rglob("report.json"))
     assert reports
@@ -415,7 +416,11 @@ def retained(folder: Path, cli: Path) -> dict:
         "matching_cases": len(METHODS) - 1, "intermediate_difference_controls": 1,
         "qualified_reports": len(reports), "retained_observations": observations,
         "recomputed_comparisons": comparisons, "raw_instrumented_receipts": verify_receipts(folder),
-        "actual_application_launches": len(identities), "required_operations": verify_operations(folder, cli),
+        "actual_application_launches": len(identities), "required_operations": verify_operations(folder, cli,
+            historical_source_expectation=historical_source_expectation),
+        "source_control_recorded_expectation": 2 if historical_source_expectation else 4,
+        "source_control_actual_exit": 4,
+        "historical_source_expectation_corrected": historical_source_expectation,
         "evidence_refusals": len(CONTROL_VERDICTS), "source_preserved": True,
         "actual_budget_refusal_launches": refused,
         "scope": "Declared C++ source receivers, call-only schedules, private factories, intermediate standard errors, recursion and aliases. No invocation attribution, shipping artefact or other provider/platform admission."}
@@ -427,7 +432,11 @@ def main() -> None:
     parser.add_argument("--report-dir", type=Path, required=True)
     parser.add_argument("--cli", type=Path, required=True)
     parser.add_argument("--recheck", action="store_true")
+    parser.add_argument("--historical-source-expectation", action="store_true",
+        help="retained-only recovery of the original source control's recorded expectation 2; actual exit must be 4")
     args = parser.parse_args()
+    if args.historical_source_expectation and not args.recheck:
+        parser.error("historical source expectation is only valid with --recheck")
     if sys.flags.optimize:
         parser.error("qualification requires Python assertion checks")
     cli, provider, folder = args.cli.resolve(strict=True), args.otelc_root.resolve(strict=True), args.report_dir.resolve()
@@ -480,10 +489,10 @@ def main() -> None:
         original = path.read_bytes()
         try:
             path.write_bytes(original + b"\n// changed-source refusal\n")
-            command([cli, "replay", "--workspace", workspace, "--case", target["case"]], folder, "changed-source", 2)
+            command([cli, "replay", "--workspace", workspace, "--case", target["case"]], folder, "changed-source", 4)
         finally:
             path.write_bytes(original)
-    result = retained(folder, cli)
+    result = retained(folder, cli, historical_source_expectation=args.historical_source_expectation)
     (folder / "qualification.json").write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps(result), flush=True)
 

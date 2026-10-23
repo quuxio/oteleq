@@ -159,7 +159,7 @@ class CppSequenceQualificationTests(unittest.TestCase):
                 'shrink': (1, [cli, 'shrink', '--workspace', workspace, '--case', 'transient', '--report-dir', folder / 'shrink', '--trials', '1']),
                 'reduced-framework': (1, [sys.executable, reduced / 'tests/test_equivalence.py']),
                 'reduced-replay': (1, [cli, 'replay', '--workspace', reduced, '--case', 'transient']),
-                'changed-source': (2, [cli, 'replay', '--workspace', workspace, '--case', 'transient']),
+                'changed-source': (4, [cli, 'replay', '--workspace', workspace, '--case', 'transient']),
             }
             for method in qualifier.METHODS:
                 operations['replay-' + method] = (int(method == 'transient'), [cli, 'replay', '--workspace', workspace, '--case', method])
@@ -187,6 +187,19 @@ class CppSequenceQualificationTests(unittest.TestCase):
                 (route / 'plan.stdout').write_text(str(selected))
             (folder / 'cases/plan.stdout').write_text(str(workspace))
             self.assertEqual(qualifier.verify_operations(folder, cli), 31)
+            marker_path = folder / 'changed-source.started.json'
+            original_marker = marker_path.read_bytes()
+            marker = json.loads(original_marker)
+            marker['expected_exit'] = 2
+            marker_path.write_text(json.dumps(marker))
+            with self.assertRaises(AssertionError):
+                qualifier.verify_operations(folder, cli)
+            self.assertEqual(qualifier.verify_operations(folder, cli, historical_source_expectation=True), 31)
+            (folder / 'changed-source.exit').write_text('2\n')
+            with self.assertRaises(AssertionError):
+                qualifier.verify_operations(folder, cli, historical_source_expectation=True)
+            (folder / 'changed-source.exit').write_text('4\n')
+            marker_path.write_bytes(original_marker)
             for fault in ('missing', 'exit', 'argv', 'verdict'):
                 path = folder / ('export-framework.exit' if fault in ('missing', 'exit') else
                     'run.started.json' if fault == 'argv' else 'missing-call.stdout')
