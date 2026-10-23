@@ -26,5 +26,6 @@ def undefinitions(code: str, names: Iterable[str] = (), *, preserve: Iterable[st
     """Only explicitly owned observer macros survive the application include."""
     # These spellings are operator tokens in C++, including in directives.
     # C can define real macros with the same names, so its guard must keep them.
-    excluded = set(preserve) | (CPP_OPERATOR_KEYWORDS if cpp else set())
+    # The preprocessor's defined operator cannot be a macro in either language.
+    excluded = set(preserve) | {'defined'} | (CPP_OPERATOR_KEYWORDS if cpp else set())
     return ''.join('#undef ' + name + '\n' for name in sorted(identifiers(code, names) - excluded))

@@ -149,4 +149,4 @@ def sanitise_identifiers(contract: dict) -> str:
     names = [*contract["records"], contract["factory"]["name"], contract["method"]["name"]]
     names.extend(field["name"] for item in contract["records"].values() for field in [*item["fields"], *item["statics"]])
     identifiers.update(native_names.identifiers('', names))
-    return "\n".join("#undef " + name for name in sorted(identifiers)) + "\n"
+    return native_names.undefinitions('', identifiers, cpp=True)

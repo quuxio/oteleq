@@ -8,6 +8,11 @@ from pathlib import Path
 import subprocess
 import sys
 
+ROOT = Path(__file__).resolve().parents[1]
+sys.path[:0] = [str(ROOT / "adapters/generation"), str(ROOT / "examples")]
+import cpp_graph
+import typed_capture
+
 from qualify_cpp_receivers import SOURCE as RECEIVER_SOURCE, check_state, function, node, scalar
 from qualify_project_tests import command
 
@@ -28,6 +33,17 @@ SOURCE = RECEIVER_SOURCE.replace(
     " int instance(Count amount)",
 )
 FUNCTIONS = {function(method): method for method in METHODS}
+BOUND_SOURCE = '''#include <cstdint>
+namespace sample {
+using Count=std::int16_t;
+class Counter {
+ Count value_;Counter* self_;inline static Count total_=0;
+public:
+ explicit Counter(Count seed):value_(seed),self_(this){}
+ Counter& identity(Count amount){value_+=amount;total_+=amount;return *this;}
+};
+}
+'''
 CONTROL_VERDICTS = {
     "missing-call": (3, "inconclusive"),
     "reordered-calls": (3, "inconclusive"),
@@ -38,13 +54,14 @@ CONTROL_VERDICTS = {
 
 
 def prepare(cli: Path, provider: Path, folder: Path, *, steps: int = 2,
-            methods: tuple[str, ...] = METHODS) -> Path:
+            methods: tuple[str, ...] = METHODS, compact: bool = False) -> Path:
     """Freeze independent construction and one, two or thirty-two fixed calls."""
     assert steps in (1, 2, 32)
     folder.mkdir()
     source = folder / "application"
     source.mkdir()
-    (source / "app.cpp").write_text(SOURCE)
+    assert not compact or methods == ("identity",)
+    (source / "app.cpp").write_text(BOUND_SOURCE if compact else SOURCE)
     text = 'schema_version=1\nlanguages=["cpp"]\n[functions]\ninclude='
     text += json.dumps([function(method) for method in methods]) + "\n"
     for method in methods:
@@ -68,8 +85,25 @@ def prepare(cli: Path, provider: Path, folder: Path, *, steps: int = 2,
     return workspace
 
 
+def check_graph(graph: dict, value: int, total: int, argument: int, compact: bool) -> None:
+    """The bounded positive profile has its own complete, smaller source graph."""
+    if not compact:
+        check_state(graph, value, total, argument)
+        return
+    roots = graph["roots"]
+    assert {"receiver", "argument:0", "global:sample::Counter::total_"} <= set(roots)
+    receiver = node(graph, roots["receiver"])
+    fields = receiver["fields"]
+    assert set(fields) == {"location", "field:value_", "field:self_"}
+    scalar(graph, fields["field:value_"], value, short=True)
+    scalar(graph, roots["argument:0"], argument, short=True)
+    scalar(graph, roots["global:sample::Counter::total_"], total, short=True)
+    assert node(graph, fields["field:self_"])["fields"]["value"] == roots["receiver"]
+    assert fields["location"] == node(graph, fields["field:value_"])["fields"]["location"]
+
+
 def check_observation(observed: dict, method: str, amount: int, active: bool,
-                      *, steps: int = 2) -> None:
+                      *, steps: int = 2, compact: bool = False) -> None:
     """Check all fields, scalar bits, aliases, outcomes and intermediate states."""
     assert method in METHODS and type(amount) is int and 0 <= amount <= 7
     assert steps in (1, 2, 32) and not observed["gaps"] and len(observed["steps"]) == steps
@@ -77,16 +111,16 @@ def check_observation(observed: dict, method: str, amount: int, active: bool,
     arguments = [amount] + [2 if steps == 2 else 0] * (steps - 1)
     for index, (step, argument) in enumerate(zip(observed["steps"], arguments)):
         assert (step["id"], step["action"], step["gaps"]) == ("step-" + str(index), "call", [])
-        check_state(step["before"], value, total, argument)
+        check_graph(step["before"], value, total, argument, compact)
         if method == "transient" and argument == 2:
             value, total = 19, 9
         else:
             value += argument + int(method == "transient" and active)
             total += argument
-        check_state(step["after"], value, total, argument)
+        check_graph(step["after"], value, total, argument, compact)
         outcome = step["outcome"]
         graph = outcome["graph"]
-        check_state(graph, value, total, argument)
+        check_graph(graph, value, total, argument, compact)
         error = method == "fail" and argument != 2
         assert outcome["kind"] == ("error" if error else "return")
         if error:
@@ -105,7 +139,7 @@ def check_observation(observed: dict, method: str, amount: int, active: bool,
     assert observed["outcome"] == observed["steps"][-1]["outcome"]
 
 
-def check_report(path: Path, count: int, *, steps: int = 2) -> int:
+def check_report(path: Path, count: int, *, steps: int = 2, compact: bool = False) -> int:
     """Equal but wrong fixtures cannot qualify in either lane or any repeat."""
     report = json.loads(path.read_text())
     assert report["source_preserved"] and not report["blocked"] and len(report["cases"]) == count
@@ -127,7 +161,7 @@ def check_report(path: Path, count: int, *, steps: int = 2) -> int:
             assert len(bundle[lane]) == 2
             for attempt in bundle[lane]:
                 observations += 1
-                check_observation(attempt["observation"], method, case["arguments"][0], lane == "instrumented_on", steps=steps)
+                check_observation(attempt["observation"], method, case["arguments"][0], lane == "instrumented_on", steps=steps, compact=compact)
                 assert all(attempt["execution"]["channels"][name] == [] for name in ("stdout", "stderr"))
                 if lane == "instrumented_on":
                     expected = steps + (int(case["arguments"][0] > 0) + int(steps == 2) if method == "recursive" else 0)
@@ -212,7 +246,7 @@ def verify_operations(folder: Path, cli: Path) -> int:
         if name in CONTROL_VERDICTS:
             assert json.loads((folder / (name + ".stdout")).read_text())["verdict"] == CONTROL_VERDICTS[name][1]
     assert "application source or immutable snapshot changed" in (folder / "changed-source.stderr").read_text()
-    for name in ("cases", "edge-one", "edge-thirty-two"):
+    for name in ("cases", "edge-one", "edge-thirty-two", "edge-rich-thirty-two"):
         route = folder / name
         selected = Path((route / "plan.stdout").read_text().strip())
         assert selected.is_relative_to(route)
@@ -226,12 +260,32 @@ def verify_operations(folder: Path, cli: Path) -> int:
         assert {path.name.removesuffix(".started.json") for path in route.glob("*.started.json")} == set(expected)
         for operation, argv in expected.items():
             marker = json.loads((route / (operation + ".started.json")).read_text())
-            assert marker == {"argv": list(map(str, argv)), "expected_exit": 0}
+            expected_exit = 4 if name == "edge-rich-thirty-two" and operation == "run" else 0
+            assert marker == {"argv": list(map(str, argv)), "expected_exit": expected_exit}
         for operation in ("plan", "generate"):
             assert (folder / name / (operation + ".exit")).read_text() == "0\n"
         if name != "cases":
-            assert (folder / name / "run.exit").read_text() == "0\n"
-    return len(required) + 8
+            assert (folder / name / "run.exit").read_text() == ("4\n" if name == "edge-rich-thirty-two" else "0\n")
+    return len(required) + 11
+
+
+def verify_budget_refusal(folder: Path) -> int:
+    """A valid rich sequence exceeding the shared case budget stays incomplete."""
+    report = json.loads((folder / "comparison/report.json").read_text())
+    assert report["source_preserved"] and not report["blocked"] and len(report["cases"]) == 1
+    case = report["cases"][0]
+    assert case["function"] == function("identity") and case["exit_code"] == 4
+    assert case["error"] == "case observation exceeds comparator channel budget"
+    assert len(case["sequence"]) == 32 and case["arguments"] == [7]
+    commands = list((folder / "comparison").rglob("command.json"))
+    assert len(commands) == 1 and commands[0].parent.name == "baseline-0"
+    raw = (commands[0].parent / "observation").read_bytes()
+    assert 262144 < len(raw) <= 790528
+    entry = next(row for row in report["inventory"] if row.get("otelc_function") == case["function"])
+    observed = cpp_graph.boundaries(raw, entry, typed_capture.native_scalar)
+    observed["gaps"] = []
+    check_observation(observed, "identity", 7, False, steps=32)
+    return 1
 
 
 def verify_routes(folder: Path) -> None:
@@ -335,10 +389,13 @@ def retained(folder: Path, cli: Path) -> dict:
     reports = sorted(folder.rglob("report.json"))
     assert reports
     verify_routes(folder)
+    refused = verify_budget_refusal(folder / "edge-rich-thirty-two")
     observations, comparisons = 0, 0
     for path in reports:
+        if path.is_relative_to(folder / "edge-rich-thirty-two"):
+            continue
         steps = 32 if path.is_relative_to(folder / "edge-thirty-two") else 1 if path.is_relative_to(folder / "edge-one") else 2
-        observations += check_report(path, len(json.loads(path.read_text())["cases"]), steps=steps)
+        observations += check_report(path, len(json.loads(path.read_text())["cases"]), steps=steps, compact=steps == 32)
         for case in json.loads(path.read_text())["cases"]:
             bundle = path.parent / case["case"] / "typed-bundle.json"
             result = subprocess.run([str(cli), "compare-observations", str(bundle)],
@@ -347,7 +404,8 @@ def retained(folder: Path, cli: Path) -> dict:
             comparisons += 1
     raw = [path for path in folder.rglob("command.json") if path.parent.name.startswith(("baseline-", "instrumented_on-"))]
     identities = {hashlib.sha256(path.read_bytes()).hexdigest() for path in raw}
-    assert observations == len(raw) == 152 and len(identities) == 148 and comparisons == 38
+    assert observations == 152 and len(raw) == observations + refused == 153
+    assert len(identities) == 149 and comparisons == 38
     for path in folder.rglob("plan.json"):
         plan = json.loads(path.read_text())
         for name, expected in plan["source_manifest"].items():
@@ -359,6 +417,7 @@ def retained(folder: Path, cli: Path) -> dict:
         "recomputed_comparisons": comparisons, "raw_instrumented_receipts": verify_receipts(folder),
         "actual_application_launches": len(identities), "required_operations": verify_operations(folder, cli),
         "evidence_refusals": len(CONTROL_VERDICTS), "source_preserved": True,
+        "actual_budget_refusal_launches": refused,
         "scope": "Declared C++ source receivers, call-only schedules, private factories, intermediate standard errors, recursion and aliases. No invocation attribution, shipping artefact or other provider/platform admission."}
 
 
@@ -408,11 +467,15 @@ def main() -> None:
         framework(reduced_workspace, folder, "reduced-framework", 1)
         replay = json.loads(command([cli, "replay", "--workspace", reduced_workspace, "--case", target["case"]], folder, "reduced-replay", 1))
         check_report(Path(replay["report"]), 1)
-        for name, steps in (("edge-one", 1), ("edge-thirty-two", 32)):
+        for name, steps, compact, expected in (("edge-one", 1, False, 0),
+                ("edge-rich-thirty-two", 32, False, 4), ("edge-thirty-two", 32, True, 0)):
             edge = folder / name
-            edge_workspace = prepare(cli, provider, edge, steps=steps, methods=("identity",))
-            command([cli, "run", "--workspace", edge_workspace, "--report-dir", edge / "comparison"], edge, "run")
-            check_report(edge / "comparison/report.json", 1, steps=steps)
+            edge_workspace = prepare(cli, provider, edge, steps=steps, methods=("identity",), compact=compact)
+            command([cli, "run", "--workspace", edge_workspace, "--report-dir", edge / "comparison"], edge, "run", expected)
+            if expected:
+                verify_budget_refusal(edge)
+            else:
+                check_report(edge / "comparison/report.json", 1, steps=steps, compact=compact)
         path = source / "app.cpp"
         original = path.read_bytes()
         try:

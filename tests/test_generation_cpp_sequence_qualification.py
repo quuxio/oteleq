@@ -39,20 +39,28 @@ class CppSequenceQualificationTests(unittest.TestCase):
         cls.model = discovery.discover(source, 'cpp', cls.folder, {'clang++': cls.compiler}, execute)
         cls.observations = {method: cls.capture(method) for method in qualifier.METHODS}
         cls.altered = cls.capture('transient', active=True)
+        cls.bounded = cls.capture('identity', compact=True, steps=32)
 
     @classmethod
-    def capture(cls, method, *, active=False):
-        folder = cls.folder / (method + ('-active' if active else ''))
+    def capture(cls, method, *, active=False, compact=False, steps=2):
+        folder = cls.folder / (method + ('-active' if active else '-compact' if compact else ''))
         folder.mkdir()
-        (folder / 'app.cpp').write_text(qualifier.SOURCE)
-        function = next(row for row in cls.model['functions']
+        (folder / 'app.cpp').write_text(qualifier.BOUND_SOURCE if compact else qualifier.SOURCE)
+        model = cls.model
+        if compact:
+            def execute(command, cwd, **kwargs):
+                return subprocess.run(command, cwd=cwd, capture_output=True, check=False,
+                    timeout=30, input=kwargs.get('input_data'))
+            model = discovery.discover(folder / 'app.cpp', 'cpp', folder, {'clang++': cls.compiler}, execute)
+        function = next(row for row in model['functions']
             if row['name'] == 'sample::Counter::' + method and row.get('cpp_function', {}).get('has_body'))
         entry = {**copy.deepcopy(function), 'language': 'cpp', 'path': 'app.cpp',
-            'globals': copy.deepcopy(cls.model['globals']), 'expected_baseline': {'kind': 'return'}}
+            'globals': copy.deepcopy(model['globals']), 'expected_baseline': {'kind': 'return'}}
         factory = 'sample::Counter::create' if method == 'secret' else 'sample::Counter'
-        generation.receiver_fixture(entry, cls.model, {'factory': factory, 'arguments': [10]})
+        generation.receiver_fixture(entry, model, {'factory': factory, 'arguments': [10]})
         assert not entry['reason'], entry['reason']
-        calls = [{'action': 'call', 'arguments': 'case'}, {'action': 'call', 'arguments': [2]}]
+        calls = [{'action': 'call', 'arguments': 'case'},
+            *[{'action': 'call', 'arguments': [2 if steps == 2 else 0]} for _ in range(steps - 1)]]
         if method == 'fail':
             calls[0]['expected_baseline'] = {'kind': 'error', 'category': 'exception',
                 'type': 'cpp.exception.std::runtime_error'}
@@ -76,6 +84,14 @@ class CppSequenceQualificationTests(unittest.TestCase):
         for method, observed in self.observations.items():
             with self.subTest(method=method):
                 qualifier.check_observation(observed, method, 7, False)
+
+    def test_compact_thirty_two_call_profile_checks_every_boundary_and_alias(self):
+        qualifier.check_observation(self.bounded, 'identity', 7, False, steps=32, compact=True)
+        altered = copy.deepcopy(self.bounded)
+        graph = altered['steps'][-1]['after']
+        qualifier.node(graph, graph['roots']['global:sample::Counter::total_'])['fields']['value']['value'] = '999'
+        with self.assertRaises(AssertionError):
+            qualifier.check_observation(altered, 'identity', 7, False, steps=32, compact=True)
 
     def test_restored_final_state_does_not_hide_intermediate_difference(self):
         original = self.observations['transient']
@@ -158,7 +174,7 @@ class CppSequenceQualificationTests(unittest.TestCase):
 
             for name, (expected, argv) in operations.items():
                 receipt(folder, name, expected, argv)
-            for name in ('cases', 'edge-one', 'edge-thirty-two'):
+            for name in ('cases', 'edge-one', 'edge-thirty-two', 'edge-rich-thirty-two'):
                 route = folder / name
                 route.mkdir(exist_ok=True)
                 selected = route / 'workspace'
@@ -166,10 +182,11 @@ class CppSequenceQualificationTests(unittest.TestCase):
                     '--workspace-parent', route, '--config', route / 'equivalence.toml'])
                 receipt(route, 'generate', 0, [cli, 'generate', '--workspace', selected])
                 if name != 'cases':
-                    receipt(route, 'run', 0, [cli, 'run', '--workspace', selected, '--report-dir', route / 'comparison'])
+                    receipt(route, 'run', 4 if name == 'edge-rich-thirty-two' else 0,
+                        [cli, 'run', '--workspace', selected, '--report-dir', route / 'comparison'])
                 (route / 'plan.stdout').write_text(str(selected))
             (folder / 'cases/plan.stdout').write_text(str(workspace))
-            self.assertEqual(qualifier.verify_operations(folder, cli), 28)
+            self.assertEqual(qualifier.verify_operations(folder, cli), 31)
             for fault in ('missing', 'exit', 'argv', 'verdict'):
                 path = folder / ('export-framework.exit' if fault in ('missing', 'exit') else
                     'run.started.json' if fault == 'argv' else 'missing-call.stdout')

@@ -21,6 +21,20 @@ def entry(language, parameters=None, output="int", globals_=None):
 
 
 class NativeScalarTests(unittest.TestCase):
+    def test_preprocessor_defined_identifier_is_a_valid_native_function_and_field(self):
+        source = 'struct Counter {int defined;};int defined(int value){struct Counter item={value};return item.defined+1;}\n'
+        for language in ('c', 'cpp'):
+            with self.subTest(language=language), tempfile.TemporaryDirectory() as temporary:
+                folder = Path(temporary)
+                candidate = entry(language, ['int'])
+                candidate['name'] = 'defined'
+                compiled, binary = self.compile(folder, candidate, source, [3])
+                self.assertEqual(compiled.returncode, 0, compiled.stderr)
+                result = subprocess.run([binary], env={**os.environ, 'OTELEQ_OBSERVATION': str(folder / 'observation')},
+                    capture_output=True, check=False, timeout=10)
+                self.assertEqual((result.returncode, result.stdout, result.stderr), (0, b'', b''))
+                self.assertIn(b'return:int:' + bytes(ctypes.c_int(4)).hex().encode(), (folder / 'observation').read_bytes())
+
     def test_out_of_line_static_keeps_its_compiler_owner_without_an_extra_gap(self):
         with tempfile.TemporaryDirectory() as temporary:
             folder = Path(temporary)
