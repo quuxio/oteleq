@@ -14,6 +14,8 @@ Java [startup schedules](java-metric-controls.md#qualify-startup-schedules) have
 
 Java [runtime archive integration](java-runtime-archives.md) now has an explicit generated project profile, an independent selected-JDK resolver, separate compiler/runtime catalogues, exact launch tooling and independently reproduced helper relocation. Its [260-JVM qualification](qualification/java-archives-2026-10-22.json) covers eleven archive variants, four same-process metric states, detached suites, scalar reduction and refusal controls. General build-system/module integration and shipping artefacts remain open.
 
+Rebuilt [Python metadata negotiation and prepared transport](python-prepared-provider.md) now have explicit selection, frozen installed-input/probe seals and independent request/command checks. The generated profile remains blocked pending public Python capability and actual selected-origin evidence in both lanes. These checks do not complete Python runtime integration or a broader requirement below.
+
 | Requirement | Current evidence and remaining work |
 | --- | --- |
 | Source-wide callable accounting in all eight languages | Syntax inventories exist. [Incomplete directory inspection](input-inspection.md) now refuses unreadable or vanished inputs rather than silently omitting them. Semantic/build inclusion, generic instances, inherited/private access and dependencies need project-aware adapters. |

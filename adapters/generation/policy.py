@@ -17,7 +17,7 @@ import java_project
 import go_project
 import native_project
 import node_source
-import python_project
+import python_provider
 import preconditions
 import return_expectations
 import sequences
@@ -172,7 +172,6 @@ def adapters(value: Any) -> dict[str, Any]:
     if type(backend) is not str or backend not in ("compiler", "llvm"):
         raise ValueError("adapters.rust.backend must be compiler or llvm")
     python = value.get("python", {})
-    keys(python, {"import_roots"}, "adapters.python")
     typed = value.get("typescript", {})
     keys(typed, {"backend"}, "adapters.typescript")
     node = node_source.settings(value["node"]) if "node" in value else None
@@ -186,7 +185,7 @@ def adapters(value: Any) -> dict[str, Any]:
             "rust": {"backend": backend},
             "typescript": {"backend": typescript_provider.backend(typed.get("backend", "source"))},
             "java": {**java_profiles.settings(java), **java_project.settings(java)},
-            "python": {"import_roots": python_project.import_roots(python.get("import_roots", []))},
+            "python": python_provider.settings(python),
             "go": go_project.settings(value.get("go", {}))}
 
 

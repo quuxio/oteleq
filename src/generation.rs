@@ -13,6 +13,18 @@ const ADAPTER_BOOTSTRAP: &str = concat!(
 
 const RESOURCES: &[(&str, &str)] = &[
     (
+        "python_prepared.py",
+        include_str!("../adapters/generation/python_prepared.py"),
+    ),
+    (
+        "python_provider.py",
+        include_str!("../adapters/generation/python_provider.py"),
+    ),
+    (
+        "python_inputs.py",
+        include_str!("../adapters/generation/python_inputs.py"),
+    ),
+    (
         "project_tests.py",
         include_str!("../adapters/generation/project_tests.py"),
     ),
