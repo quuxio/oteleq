@@ -42,6 +42,16 @@ CALLS = [{'action': 'call', 'arguments': 'case'},
 
 
 class CppSequenceTests(unittest.TestCase):
+    def test_transport_budget_includes_trace_roots_and_metric_requests(self):
+        for count in (1, 2, 16, 17, 32):
+            steps = [CALLS[0], *[{'action': 'call', 'arguments': [0]} for _ in range(count - 1)]]
+            entry = self.entry(steps=steps)
+            options = generation.attempt_receiver_options(entry, None)
+            with self.subTest(calls=count):
+                self.assertEqual(options.get('max_requests', 32), max(32, 2 * count))
+                self.assertNotIn('max_bytes', options)
+                self.assertNotIn('allow_chunked', options)
+
     def test_policy_reserves_completed_trace_roots_for_the_whole_bounded_sequence(self):
         for count in (1, 2, 4, 5, 8, 9, 32):
             steps = [CALLS[0], *[{'action': 'call', 'arguments': [0]} for _ in range(count - 1)]]

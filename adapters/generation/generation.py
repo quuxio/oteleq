@@ -1037,6 +1037,10 @@ def attempt_policy(entry, endpoint, service, runtime):
 def attempt_receiver_options(entry, runtime):
     """Only the explicit source provider permits bounded chunked OTLP."""
     options = {"max_requests": java_provider.MAX_TELEMETRY_REQUESTS} if runtime is not None else {}
+    if entry.get("language") == "cpp" and "sequence_configuration" in entry:
+        requests = max(capture.MAX_REQUESTS, 2 * sequences.call_count(entry))
+        if requests > capture.MAX_REQUESTS:
+            options["max_requests"] = requests
     if node_source.enabled(entry):
         options["allow_chunked"] = True
     return options
