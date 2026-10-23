@@ -53,9 +53,9 @@ def policy(language: str, compiler: str) -> str:
     return result
 
 
-def check_attempt(folder: Path, method: str, argument: float, instrumented: bool) -> tuple[str, int]:
+def check_attempt(folder: Path, method: str, argument: float, instrumented: bool, *, result: float = 42) -> tuple[str, int]:
     """Check complete literal application graphs, bytes and actual process receipts."""
-    oracle.check(json.loads((folder / "observation").read_bytes()), method, argument, instrumented)
+    oracle.check(json.loads((folder / "observation").read_bytes()), method, argument, instrumented, result=result)
     if (folder / "stdout").read_bytes() != bytes.fromhex("00ff0a") * 4 or (folder / "stderr").read_bytes() != bytes.fromhex("01ff0a") * 4:
         raise ValueError("live-control application byte channels differ")
     app = json.loads((folder / "node-source-application.json").read_bytes())
@@ -68,7 +68,8 @@ def check_attempt(folder: Path, method: str, argument: float, instrumented: bool
         check_sdk(folder, method, control)
     elif control["sdk_pid"] is not None or control["launch_id"] is not None:
         raise ValueError("plain live-control lane fabricated an SDK")
-    return str(folder.resolve()), app["pid"]
+    request = json.loads((folder / "node-source-request.json").read_bytes())
+    return request["runtime"], app["pid"]
 
 
 def check_sdk(folder: Path, method: str, control: dict) -> None:
@@ -115,7 +116,7 @@ def check_sdk(folder: Path, method: str, control: dict) -> None:
                 raise ValueError("disabled live-control window did not stay silent for one interval")
 
 
-def check_report(path: Path, expected_methods: set[str]) -> set[tuple[str, int]]:
+def check_report(path: Path, expected_methods: set[str], *, result: float = 42) -> set[tuple[str, int]]:
     report = json.loads(path.read_bytes())
     if not report["source_preserved"] or report["blocked"] or len(report["cases"]) != len(expected_methods):
         raise ValueError("live-control report source/inventory scope differs")
@@ -130,16 +131,17 @@ def check_report(path: Path, expected_methods: set[str]) -> set[tuple[str, int]]
         for lane in ("baseline", "instrumented_on"):
             for index in range(2):
                 folder = path.parent / case["case"] / (lane + "-" + str(index))
-                identities.add(check_attempt(folder, method, case["arguments"][0], lane == "instrumented_on"))
+                identities.add(check_attempt(folder, method, case["arguments"][0], lane == "instrumented_on", result=result))
     if methods != expected_methods or len(identities) != len(expected_methods) * 4:
         raise ValueError("live-control method or independent launch count differs")
     return identities
 
 
-def framework(workspace: Path, folder: Path, name: str) -> set[tuple[str, int]]:
+def framework(workspace: Path, folder: Path, name: str, expected_methods: set[str] | None = None) -> set[tuple[str, int]]:
+    expected_methods = set(oracle.METHODS) if expected_methods is None else expected_methods
     text = command([sys.executable, "-I", "-B", workspace / "tests/test_equivalence.py"], folder, name, expected=1)
     rows = [json.loads(line) for line in text.splitlines()]
-    if len(rows) != len(oracle.METHODS):
+    if len(rows) != len(expected_methods):
         raise ValueError("live-control framework case count differs")
     identities = set()
     methods = set()
@@ -151,7 +153,7 @@ def framework(workspace: Path, folder: Path, name: str) -> set[tuple[str, int]]:
             raise ValueError("repeated live-control framework method")
         methods.add(method)
         identities |= check_report(path, {method})
-    if methods != set(oracle.METHODS):
+    if methods != expected_methods:
         raise ValueError("missing live-control framework method")
     return identities
 
@@ -194,8 +196,14 @@ def qualify(cli: Path, provider: Path, folder: Path, language: str, compiler: st
         detached.rename(application)
     if filename.read_text() != original or len(identities) != 64:
         raise ValueError("live-control source preservation or application count differs")
+    from node_controls_routes import retained_routes
+    extended = retained_routes(cli, folder, workspace, filename)
+    if identities & set(map(tuple, extended["application_identities"])):
+        raise ValueError("extended live-control routes reused an earlier application")
+    identities |= set(map(tuple, extended["application_identities"]))
     return {"language": language, "compiler": compiler, "suffix": suffix, "actual_applications": len(identities),
-            "application_identities": sorted(identities), "source_preserved": True, "workspace": str(workspace)}
+            "application_identities": sorted(identities), "source_preserved": True, "workspace": str(workspace),
+            "retained_routes": extended}
 
 
 def main() -> None:

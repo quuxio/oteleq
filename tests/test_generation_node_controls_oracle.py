@@ -10,6 +10,7 @@ from pathlib import Path
 import tempfile
 import tomllib
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / "adapters/generation"), str(ROOT / "examples")]
@@ -19,6 +20,28 @@ import qualify_node_controls as qualification
 
 
 class NodeControlsOracleTests(unittest.TestCase):
+    def test_changed_current_source_requires_its_independent_return_oracle(self):
+        for method in oracle.METHODS:
+            for active in (False, True):
+                observed = oracle.expected(method, 7, active, result=43)
+                oracle.check(observed, method, 7, active, result=43)
+                with self.assertRaises(ValueError):
+                    oracle.check(observed, method, 7, active)
+
+    def test_reduced_framework_requires_exact_selected_method_set(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            report = root / 'report.json'
+            report.write_text(json.dumps({'cases': [{'function': 'controls.Counter.difference'}]}))
+            output = json.dumps({'report': str(report)})
+            with patch.object(qualification, 'command', return_value=output), \
+                    patch.object(qualification, 'check_report', return_value={('actual-runtime', 101)}):
+                self.assertEqual(qualification.framework(root, root, 'reduced', {'difference'}), {('actual-runtime', 101)})
+                with self.assertRaises(ValueError):
+                    qualification.framework(root, root, 'missing-methods')
+                with self.assertRaises(ValueError):
+                    qualification.framework(root, root, 'wrong-method', {'add'})
+
     def test_negative_fixture_uses_actual_launch_arguments_after_sdk_environment_cleanup(self):
         node = os.environ.get("OTELC_NODE") or shutil.which("node")
         with tempfile.TemporaryDirectory() as temporary:

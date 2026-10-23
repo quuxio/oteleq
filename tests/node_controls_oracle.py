@@ -24,7 +24,7 @@ def graph(argument: float, value: float, total: float, delta: int, *, result=MIS
     return {"roots": roots, "nodes": nodes}
 
 
-def expected(method: str, argument: float, instrumented: bool) -> dict:
+def expected(method: str, argument: float, instrumented: bool, *, result: float = 42) -> dict:
     if method not in METHODS:
         raise ValueError("unknown live-control fixture method")
     steps, value, total, delta = [], 10, 0, 0
@@ -38,16 +38,16 @@ def expected(method: str, argument: float, instrumented: bool) -> dict:
             delta = 0
         error = method == "expected" and amount == 3
         outcome = graph(amount, value, total, delta, error=True) if error else graph(
-            amount, value, total, delta, result=number(42))
+            amount, value, total, delta, result=number(result))
         steps.append({"id": "step-" + str(index), "action": "call", "gaps": [], "before": before,
                       "outcome": {"kind": "error" if error else "return", "value": outcome},
                       "after": graph(amount, value, total, delta)})
     return {"before": steps[0]["before"], "outcome": steps[-1]["outcome"], "after": steps[-1]["after"], "steps": steps}
 
 
-def check(value: dict, method: str, argument: float, instrumented: bool) -> None:
+def check(value: dict, method: str, argument: float, instrumented: bool, *, result: float = 42) -> None:
     """Only local reference numbering varies; no descriptor or field is ignored."""
     actual = json.dumps(canonical_observation(value), sort_keys=True)
-    wanted = json.dumps(canonical_observation(expected(method, argument, instrumented)), sort_keys=True)
+    wanted = json.dumps(canonical_observation(expected(method, argument, instrumented, result=result)), sort_keys=True)
     if actual != wanted:
         raise ValueError("complete live-control fixture graph or outcome differs")
