@@ -171,6 +171,26 @@ class JavaLaunchTests(unittest.TestCase):
             context.__enter__()
         self.assertFalse(list(source.iterdir()))
 
+    def test_runtime_archive_failure_keeps_the_primary_execution_error(self):
+        primary = ValueError("primary metric receipt failed")
+        with self.assertRaisesRegex(ValueError, "primary metric receipt failed; SDK runtime archive failed:.*special file") as failure:
+            with launch.runtime(self.entry, self.folder) as runtime:
+                runtime.mkdir(mode=0o700)
+                os.mkfifo(runtime / "fifo")
+                raise primary
+        self.assertIs(failure.exception.__cause__, primary)
+        self.assertFalse(runtime.exists())
+
+    def test_runtime_archive_io_failure_keeps_the_primary_exception_as_cause(self):
+        primary = RuntimeError("application failed")
+        with patch.object(launch, "archive", side_effect=OSError("archive read failed")), \
+             self.assertRaisesRegex(ValueError, "application failed; SDK runtime archive failed: archive read failed") as failure:
+            with launch.runtime(self.entry, self.folder) as runtime:
+                runtime.mkdir(mode=0o700)
+                raise primary
+        self.assertIs(failure.exception.__cause__, primary)
+        self.assertFalse(runtime.exists())
+
     def test_runtime_links_special_files_and_budgets_refuse(self):
         foreign = self.base / "foreign";foreign.write_text("preserve")
         for fault in ("link", "fifo", "bytes", "count"):

@@ -279,11 +279,20 @@ def runtime(entry: dict, folder: Path, *, source_roots: tuple[Path, ...] = ()) -
         path = Path(temporary).resolve() / "r"
         provider.require(len(os.fsencode(path / CONTROL_SOCKET)) <= 100,
                          "runtime socket path exceeds 100 bytes; select a shorter TMPDIR before planning")
+        failure = None
         try:
             yield path
+        except Exception as error:
+            failure = error
+            raise
         finally:
             if path.exists() or path.is_symlink():
-                archive(path, folder)
+                try:
+                    archive(path, folder)
+                except (ValueError, OSError) as archive_error:
+                    if failure is None:
+                        raise
+                    raise ValueError(f"{failure}; SDK runtime archive failed: {archive_error}") from failure
 
 
 def origins(runtime: Path, folder: Path, entry: dict, *, context: dict | None = None) -> None:
