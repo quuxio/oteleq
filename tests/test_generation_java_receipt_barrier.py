@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / 'adapters/generation'), str(ROOT / 'examples')]
 import java_live
 import java_telemetry
+import generation
 from java_live_fixture import metric_body
 from test_generation_java_control_receipt import history, status
 from opentelemetry.proto.collector.metrics.v1.metrics_service_pb2 import ExportMetricsServiceRequest
@@ -20,10 +21,26 @@ OFF = {'collection': False, 'emission': False}
 
 
 class JavaReceiptBarrierTests(unittest.TestCase):
+    def test_execution_binds_the_sdk_method_component_and_actual_service(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary).resolve()
+            sequence = [{'id': 'step-0', 'action': 'call', 'metrics': ON.copy()}]
+            entry = {'language': 'java', 'java_backend': 'prepared',
+                'otelc_function': 'sample.Counter.identity(int)',
+                'sequence_configuration': sequence}
+            bodies = [('/v1/metrics', metric_body(1, method='identity'))]
+            options = generation.execution_options(entry, {'sequence': sequence},
+                'instrumented_on', folder, folder / 'runtime', bodies, {}, service='case')
+            session = options['interaction']
+            self.assertTrue(options['record_process'])
+            self.assertEqual(session.service, 'case')
+            self.assertEqual(session.method, 'identity')
+            self.assertTrue(session.metrics_ready({}, 0, 1))
+
     def session(self, folder: Path, bodies: list) -> java_live.Session:
         sequence = [{'id': 'step-0', 'action': 'call', 'metrics': ON.copy()}]
         return java_live.Session(folder, folder / 'runtime', sequence, bodies,
-            plain=False, service='case', method='Counter.identity')
+            plain=False, service='case', method='identity')
 
     def test_receipt_bindings_are_required_before_checkpoint_creation(self):
         with tempfile.TemporaryDirectory() as temporary:

@@ -113,7 +113,7 @@ class JavaStartupTests(unittest.TestCase):
                 folder = Path(temporary).resolve()
                 entry = controlled_entry([state])
                 session = java_live.Session(folder, folder / 'runtime',
-                    entry['sequence_configuration'], [], plain=False, service="case", method="Counter.identity")
+                    entry['sequence_configuration'], [], plain=False, service="case", method="identity")
                 session.pid = 123
                 wrong = {**state, 'collection': not state['collection']}
                 with patch.object(session, 'transition', return_value=history(wrong, state, 0)), \
@@ -128,7 +128,7 @@ class JavaStartupTests(unittest.TestCase):
             with self.subTest(initial=state), tempfile.TemporaryDirectory() as temporary:
                 folder = Path(temporary).resolve()
                 sequence = controlled_entry([state])['sequence_configuration']
-                session = java_live.Session(folder, folder / 'runtime', sequence, [], plain=False, service="case", method="Counter.identity")
+                session = java_live.Session(folder, folder / 'runtime', sequence, [], plain=False, service="case", method="identity")
                 session.pid = 123
                 with patch.object(session, 'transition', return_value=history(state, state, 0)), \
                      patch.object(session, 'acknowledge') as acknowledge:

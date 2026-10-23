@@ -4,7 +4,7 @@ from opentelemetry.proto.collector.metrics.v1.metrics_service_pb2 import ExportM
 import java_telemetry as telemetry
 
 
-def metric_body(count: int, *, service: str = 'case', method: str = 'Counter.identity') -> bytes:
+def metric_body(count: int, *, service: str = 'case', method: str = 'identity') -> bytes:
     message = ExportMetricsServiceRequest()
     resource = message.resource_metrics.add()
     for key, value in (('service.name', service), ('otelc.language', 'java')):

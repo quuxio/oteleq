@@ -39,7 +39,7 @@ class JavaLiveTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary).resolve();bodies = []
             sequence = [{**step, "id": "step-" + str(index)} for index, step in enumerate(STEPS)]
-            session = java_live.Session(root, root / "runtime", sequence, bodies, plain=False, service="case", method="Counter.identity")
+            session = java_live.Session(root, root / "runtime", sequence, bodies, plain=False, service="case", method="identity")
             session.pid = 123;session.record["pid"] = 123
             state, completed = STATES[0].copy(), 0
             def transition(path, pid, collection, emission, deadline):
@@ -75,7 +75,7 @@ class JavaLiveTests(unittest.TestCase):
     def test_control_metadata_and_status_histories_have_explicit_budgets(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary).resolve()
-            session = java_live.Session(root, root / "runtime", [], [], plain=True, service="case", method="Counter.identity")
+            session = java_live.Session(root, root / "runtime", [], [], plain=True, service="case", method="identity")
             with self.assertRaises(ValueError):
                 session.retain([{}] * (java_live.MAX_STATUSES + 1))
             session.record["extra"] = "x" * java_live.MAX_RECORD_BYTES
@@ -102,7 +102,7 @@ class JavaLiveTests(unittest.TestCase):
             compiled = subprocess.run([JAVAC, "Counter.java", driver], cwd=root, capture_output=True, timeout=30, check=False)
             self.assertEqual(compiled.returncode, 0, compiled.stderr)
             folder = root / "attempt";folder.mkdir()
-            session = java_live.Session(folder, root / "unused-runtime", case["sequence"], [], plain=True, service="case", method="Counter.identity")
+            session = java_live.Session(folder, root / "unused-runtime", case["sequence"], [], plain=True, service="case", method="identity")
             output = folder / "observation"
             environment = {**os.environ, **session.environment(), "OTELEQ_OBSERVATION": str(output)}
             with patch.object(java_control, "request", side_effect=AssertionError("plain lane queried SDK")):
@@ -165,7 +165,7 @@ class JavaLiveTests(unittest.TestCase):
             path.unlink();path.symlink_to(root / "missing")
             with self.assertRaises(OSError):
                 java_live.read_owned(path, 5)
-            session = java_live.Session(root, root / "runtime", [{"id": "step-0", "metrics": STATES[0]}], [], plain=True, service="case", method="Counter.identity")
+            session = java_live.Session(root, root / "runtime", [{"id": "step-0", "metrics": STATES[0]}], [], plain=True, service="case", method="identity")
             process = NS(pid=123)
             with self.assertRaises(ValueError):
                 session.finish(process)

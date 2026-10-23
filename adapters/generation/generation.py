@@ -1106,7 +1106,7 @@ def execution_options(entry, case, lane, folder, runtime, bodies, env, *, servic
         interaction = (node_live.Session(folder, case["sequence"], bodies, language=entry["language"], plain=lane == "baseline")
                        if node_source.enabled(entry)
                        else java_live.Session(folder, runtime, case["sequence"], bodies, plain=lane == "baseline",
-                                              service=service, method=entry["otelc_function"].split("(")[0]))
+                                              service=service, method=entry["otelc_function"].split("(", 1)[0].rsplit(".", 1)[-1]))
         env.update(interaction.environment())
         options["interaction"] = interaction
     return options
