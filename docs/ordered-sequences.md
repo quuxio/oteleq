@@ -58,6 +58,8 @@ The caller rechecks the source class and method before and after each call witho
 
 Component tests cover actual plain workers, one/32-call schedules, exceptions, aliases/statics, restored intermediate differences and malformed evidence. Actual otelc execution, retained/framework routes, scalar reduction, preservation and compatibility qualification are still pending for this new profile. The existing Python receiver publication covers its recorded single-call scope. Release/collection, asynchronous Python actions, arbitrary targets, mutable object arguments and live Python metric controls remain unavailable through this sequence generator.
 
+`make generation-python-sequence-otelc OTELC_ROOT=/absolute/frozen/provider REPORT_DIR=/new/external/evidence` runs the maintained six-method package corpus. Its separate literal oracles specify every raw and typed field, argument, static/global root, alias and expected exception. The corpus requires direct/framework and detached/exported routes, per-case replay, scalar reduction, one/32-call positives, an oversized-observation refusal and altered-evidence/source controls. `tests/qualify_python_sequences.py --recheck` verifies retained evidence without launching applications. Implementation of the qualifier is separate from successful execution and published qualification.
+
 ## Release and collection
 
 `release` clears the harness's strong receiver reference. Returned-receiver graphs contain encoded values, so a captured alias does not intentionally keep that receiver alive. Application globals, class data, caches or closures can still retain the object; the harness does not change them.

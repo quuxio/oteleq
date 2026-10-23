@@ -20,8 +20,9 @@ class QualificationRecipeTests(unittest.TestCase):
             for flag in ("--cli", "--comparator"):
                 if line.startswith("\t") and flag + " " in line:
                     targets[target] = flag
-        self.assertEqual(len(targets), 38)
+        self.assertEqual(len(targets), 39)
         self.assertIn("generation-cpp-sequence-otelc", targets)
+        self.assertIn("generation-python-sequence-otelc", targets)
         self.assertIn("generation-project-tests-otelc", targets)
         self.assertIn("generation-preconditions-otelc", targets)
         self.assertIn("generation-domains-otelc", targets)
@@ -92,6 +93,7 @@ class QualificationRecipeTests(unittest.TestCase):
         self.assertIn("generation-node-source-effects-otelc Qualify source SDK file/HTTP", result.stdout)
         self.assertIn("generation-node-source-channels-otelc Qualify nonempty binary", result.stdout)
         self.assertIn("generation-java-startup-otelc Qualify Java startup flags", result.stdout)
+        self.assertIn("generation-python-sequence-otelc Qualify ordered Python package receivers", result.stdout)
 
     def test_java_startup_recipe_retains_explicit_state_and_profile(self):
         result = subprocess.run(['make', '--no-print-directory', '-n', 'generation-java-startup-otelc',
