@@ -88,9 +88,11 @@ def configure(entry: dict, value: list[dict], coerce: Callable) -> None:
 
 def configure_controls(entry: dict, value: list[dict]) -> None:
     """The live profile needs a positive control before any off-state observation."""
-    if (entry["language"] != "java" or entry.get("java_backend") != "prepared"
+    prepared_java = entry["language"] == "java" and entry.get("java_backend") == "prepared"
+    source_node = entry["language"] in ("javascript", "typescript") and entry.get("node_backend") == "source-v1"
+    if (not (prepared_java or source_node)
             or any(step["action"] != "call" or "metrics" not in step for step in value)):
-        raise ValueError("live metrics require prepared Java calls with an explicit state for every call")
+        raise ValueError("live metrics require prepared Java or source-v1 Node calls with an explicit state for every call")
     if value[0]["metrics"] != {"collection": True, "emission": True}:
         raise ValueError("live metrics require an initial collection-on/emission-on positive control")
 

@@ -51,7 +51,7 @@ Generated tests live in a new private directory outside the application reposito
 
 **Provider compatibility:** the default generated workflows use qualified pre-rebuild otelc APIs, such as the frozen [`d6d03b7` provider](docs/qualification/integrated-provider-2026-10-20.json). Java can explicitly select the replacement SDK's [prepared provider](docs/java-prepared-provider.md) with `[adapters.java] backend = "prepared"`. It verifies the public launch recipe, compiler bindings, loaded class origins, actual JVM PID and direct health/OTLP receipt. Node has the explicit source profile below. Other replacement-SDK adapters require their own consumer integration and qualification. Prepare the matching tools from the recorded provider revision.
 
-The explicit rebuilt-SDK [Node `source-v1` profile](docs/node-source-context.md#rebuilt-sdk-source-profile) has [1,800-launch qualification](docs/qualification/node-source-provider-2026-10-22.json) covering Node 24/26, both TypeScript compilers, declared receivers, bounded collection, binary application output, filesystem/HTTP effects and retained/promoted suites. It checks actual application/SDK processes, source/emission/body-entry evidence and direct health/OTLP. Live Node metric controls, action attribution and general dependency/build integration remain open.
+The explicit rebuilt-SDK [Node `source-v1` profile](docs/node-source-context.md#rebuilt-sdk-source-profile) has [1,800-launch qualification](docs/qualification/node-source-provider-2026-10-22.json) covering Node 24/26, both TypeScript compilers, declared receivers, bounded collection, binary application output, filesystem/HTTP effects and retained/promoted suites. It checks actual application/SDK processes, source/emission/body-entry evidence and direct health/OTLP. [Live Node metric schedules](docs/node-metric-controls.md) have separate [696-launch qualification](docs/qualification/node-metric-controls-2026-10-23.json); startup-off, action attribution and general dependency/build integration remain open.
 
 The [prepared Java qualification](docs/qualification/java-prepared-2026-10-21.json) completes 151 receiver JVM launches through generated/exported suites, replay, shrinking and refusal controls, plus four packaged recursive and eight legacy-compatibility launches. It verifies complete independent state/outcome oracles, actual PID/health/OTLP accounting and removal of owned short runtimes.
 
@@ -72,6 +72,8 @@ Declared [Java source roots and dependencies](docs/java-project-context.md) add 
 Start with [automatic generation](docs/automatic-generation.md), [fixed eight-language workloads](docs/eight-language-capture.md) or [workload comparison](docs/workload-comparison.md). See [usefulness and limits](docs/adoption.md), the [design](docs/design.md) and [roadmap](docs/roadmap.md).
 
 Observers refuse unsupported application formatters and exception accessors. Such capture failures remain incomplete evidence; see the [qualified codec limits](docs/automatic-generation.md#selection-and-inputs).
+
+The explicit [Node live metric schedule](docs/node-metric-controls.md) has [696-launch qualification](docs/qualification/node-metric-controls-2026-10-23.json) on Node 24/26 and both TypeScript compilers. It preserves one application/SDK pair through all four metric states, catches a restored intermediate mutation and refuses 78 altered-evidence controls. The earlier Node source-provider record retains its original scope.
 
 ## Usage
 

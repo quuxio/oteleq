@@ -25,6 +25,8 @@ At least one call uses the concrete case arguments. Other calls can have indepen
 
 Call steps can declare `expected_baseline` using the existing return/error contract. Otherwise a case-argument call inherits the fixture expectation and a fixed-argument call expects a return. Unexpected intermediate baseline errors block the case even if a later call succeeds. The case's outer outcome is its last call outcome. Scalar shrinking preserves the declared construction and action schedule while reducing every use of the case arguments; it does not shrink action order or fixed inputs.
 
+The explicit Node source provider also implements [live metric schedules](node-metric-controls.md), with separate [696-launch qualification](qualification/node-metric-controls-2026-10-23.json) for positive-first calls. These schedules contain only calls, with an explicit collection/emission state for every call. They cannot combine release/collection actions with metric controls.
+
 ## Java call sequences
 
 Use the existing [Java receiver profile](java-receivers.md), including permitted private constructor/factory/method access. Add a call-only schedule to its fixture:

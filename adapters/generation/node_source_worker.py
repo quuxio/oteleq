@@ -67,11 +67,26 @@ def request(path: Path) -> dict[str, Any]:
 
 
 def write(path: Path, value: Any) -> None:
-    """Publish consumer-owned receipts without replacing existing evidence."""
-    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-    with os.fdopen(descriptor, "w") as stream:
-        json.dump(value, stream, sort_keys=True)
-        stream.write("\n")
+    """Publish complete private receipts atomically without replacing evidence."""
+    raw = (json.dumps(value, sort_keys=True, allow_nan=False) + "\n").encode()
+    staged = path.with_name(path.name + ".staging")
+    descriptor = os.open(staged, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    expected = os.fstat(descriptor)
+    try:
+        with os.fdopen(descriptor, "wb", closefd=False) as stream:
+            stream.write(raw)
+        actual = staged.lstat()
+        node_source.require((actual.st_dev, actual.st_ino) == (expected.st_dev, expected.st_ino),
+                            "source receipt staging identity changed")
+        os.link(staged, path, follow_symlinks=False)
+    finally:
+        os.close(descriptor)
+        try:
+            actual = staged.lstat()
+            if (actual.st_dev, actual.st_ino) == (expected.st_dev, expected.st_ino):
+                staged.unlink()
+        except FileNotFoundError:
+            pass
 
 
 def expected_argv(value: dict[str, Any]) -> list[str]:

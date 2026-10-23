@@ -1,0 +1,291 @@
+{
+  "qualification_schema_version": 1,
+  "date": "2026-10-23",
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "scope_status": "qualified recorded positive-first source-v1 Node live metric schedules",
+  "platform": {
+    "os": "macOS",
+    "architecture": "arm64",
+    "node_versions": [
+      "24.21.0",
+      "26.11.0"
+    ],
+    "python": "3.14.8"
+  },
+  "runtime": {
+    "repository": "quuxio/oteleq",
+    "commit": "a295b0e0147e481e7950691589fc17e5f5afb8d2",
+    "source_archive_sha256": "a0b4216413dd58387cdabd592098c116b4eebb83294cf1f087721d1cc613465b",
+    "cli_sha256": "a4ae5102c2678907147f1782496ef7ef2238a5824cca806b38c6bccd092453bd",
+    "source_files_preserved": 390
+  },
+  "provider": {
+    "repository": "quuxio/otelc",
+    "commit": "0f05020bae4553d500cd2e523429dfc006ef478d",
+    "source_archive_sha256": "ba808e34ec0074d1ae3a9a190e2004cf7276d62709b76c1037252da125d5a418",
+    "index_sha256": "c490a60d92dfe01c8ef7b5c00bc75bd81d8f4b06abe77332a29c33fc22a5f2cd",
+    "entries_preserved": 8284,
+    "source_files_preserved": 206,
+    "read_only_directories": 939,
+    "links_preserved": 12,
+    "external_tools": {
+      "/opt/homebrew/Cellar/node@24/24.21.0_2/bin/node": "798d7f9c0d38051608d11ba87a12fbb01e92bfa457cd77ec612b5bad2a73a05e",
+      "/opt/homebrew/Cellar/node/26.11.0_1/bin/node": "849e5785bd5b3ac68516f105d617c4a7ddcc3de1d7a89ba696d5dab271ab0164",
+      "/opt/homebrew/Cellar/python@3.14/3.14.8_1/Frameworks/Python.framework/Versions/3.14/bin/python3.14": "1860df605473e659fb393abbec47ef75a187b07777c0acf4322b9a1a1f057a08"
+    },
+    "protocols": {
+      "schema_version": 1,
+      "kind": "otelc.node.protocols",
+      "source": 5,
+      "execution": 1,
+      "request": 1,
+      "preload": 1,
+      "sdk": 1
+    }
+  },
+  "verifier": {
+    "commit": "a295b0e0147e481e7950691589fc17e5f5afb8d2",
+    "files": {
+      "qualify_node_controls.py": "c5749fd2629c2d5597681130aeacbd3f6a16956c7fde12e3043dfbf59ae78548",
+      "node_controls_oracle.py": "299549bfb6990204d762e0d5b5e262a104a8df843101809a47874731794e58f7",
+      "node_controls_routes.py": "39f5d5a084620e7adf2a6db6753b49fb1fd6b4998620c7a2eef80e0a8df6be92"
+    },
+    "final_audit_sha256": "5257478a10d5739e4f9d829fad71e7ff6256cf736e993a72f800eaab8238a8fe",
+    "audit_script_sha256": "9971d810189feb20c0ef432c469aa13a2ff340da96a85c2147035609652e2b8c",
+    "provider_preservation_sha256": "40c200cf3de9641aa1fee203a0c85c1c667c7a9508f8f1bd85e4e5dbc7880943"
+  },
+  "results": {
+    "actual_applications": 696,
+    "raw_retained_attempts": 720,
+    "copied_attempts_excluded_from_launch_count": 24,
+    "typed_comparisons_recomputed": 180,
+    "actual_evidence_refusals": 78,
+    "new_application_launches_in_final_audit": 0,
+    "corpora": [
+      {
+        "node": "24.21.0",
+        "actual_applications": 348,
+        "raw_retained_attempts": 360,
+        "evidence_refusals": 39,
+        "typed_comparisons_recomputed": 90,
+        "qualification_sha256": "0d64f235dbd868941d9a1cbf4cb291428529e043a0386193bb7adaeb52cdf1f8",
+        "profiles": [
+          {
+            "language": "javascript",
+            "typescript_compiler": null,
+            "suffix": ".cjs",
+            "cases": 4,
+            "actual_applications": 116,
+            "core_retained_routes_applications": 64,
+            "reduction_and_current_source_applications": 52,
+            "evidence_refusals": 13,
+            "reduced_arguments": [
+              1
+            ],
+            "changed_promoted_return": 43,
+            "source_preserved": true
+          },
+          {
+            "language": "typescript",
+            "typescript_compiler": "native",
+            "suffix": ".cts",
+            "cases": 4,
+            "actual_applications": 116,
+            "core_retained_routes_applications": 64,
+            "reduction_and_current_source_applications": 52,
+            "evidence_refusals": 13,
+            "reduced_arguments": [
+              1
+            ],
+            "changed_promoted_return": 43,
+            "source_preserved": true
+          },
+          {
+            "language": "typescript",
+            "typescript_compiler": "api",
+            "suffix": ".mts",
+            "cases": 4,
+            "actual_applications": 116,
+            "core_retained_routes_applications": 64,
+            "reduction_and_current_source_applications": 52,
+            "evidence_refusals": 13,
+            "reduced_arguments": [
+              1
+            ],
+            "changed_promoted_return": 43,
+            "source_preserved": true
+          }
+        ]
+      },
+      {
+        "node": "26.11.0",
+        "actual_applications": 348,
+        "raw_retained_attempts": 360,
+        "evidence_refusals": 39,
+        "typed_comparisons_recomputed": 90,
+        "qualification_sha256": "39e90a628f6e047cb83691b48258615e16eb66d750d52aa4511bb01a3eb156e6",
+        "profiles": [
+          {
+            "language": "javascript",
+            "typescript_compiler": null,
+            "suffix": ".cjs",
+            "cases": 4,
+            "actual_applications": 116,
+            "core_retained_routes_applications": 64,
+            "reduction_and_current_source_applications": 52,
+            "evidence_refusals": 13,
+            "reduced_arguments": [
+              1
+            ],
+            "changed_promoted_return": 43,
+            "source_preserved": true
+          },
+          {
+            "language": "typescript",
+            "typescript_compiler": "native",
+            "suffix": ".cts",
+            "cases": 4,
+            "actual_applications": 116,
+            "core_retained_routes_applications": 64,
+            "reduction_and_current_source_applications": 52,
+            "evidence_refusals": 13,
+            "reduced_arguments": [
+              1
+            ],
+            "changed_promoted_return": 43,
+            "source_preserved": true
+          },
+          {
+            "language": "typescript",
+            "typescript_compiler": "api",
+            "suffix": ".mts",
+            "cases": 4,
+            "actual_applications": 116,
+            "core_retained_routes_applications": 64,
+            "reduction_and_current_source_applications": 52,
+            "evidence_refusals": 13,
+            "reduced_arguments": [
+              1
+            ],
+            "changed_promoted_return": 43,
+            "source_preserved": true
+          }
+        ]
+      }
+    ]
+  },
+  "observations": {
+    "methods": [
+      "synchronous add",
+      "awaited later",
+      "expected TypeError",
+      "same-return static mutation restored before final boundary"
+    ],
+    "states": [
+      {
+        "collection": true,
+        "emission": true
+      },
+      {
+        "collection": false,
+        "emission": true
+      },
+      {
+        "collection": true,
+        "emission": false
+      },
+      {
+        "collection": false,
+        "emission": false
+      }
+    ],
+    "fixed_call_arguments": [
+      7,
+      2,
+      3,
+      4
+    ],
+    "receiver_constructor_arguments": [
+      10
+    ],
+    "ordinary_return": 42,
+    "application_stdout_hex": "00ff0a00ff0a00ff0a00ff0a",
+    "application_stderr_hex": "01ff0a01ff0a01ff0a01ff0a",
+    "trace_roots_per_attempt": 4,
+    "collected_function_measurements_per_attempt": 2,
+    "independent_oracle": "Complete intermediate before/outcome/after graphs, receiver self-cycle, own descriptors and static roots; complete binary channels and actual SDK/control/decoded OTLP receipts.",
+    "control_checks": [
+      "One actual application/SDK process pair and fixed build throughout each schedule",
+      "Independent collection/emission setters and completed-call continuity",
+      "Effective emission-off drain and at least one export interval of silence",
+      "Monotonic export counters, no off-window admissions, final SDK upper bounds",
+      "Complete trace trees for all calls, including collection-off calls",
+      "Positive exported metrics and restored retained collection-only measurements"
+    ]
+  },
+  "routes": [
+    "direct run",
+    "generated unittest",
+    "per-case replay",
+    "detached exported unittest",
+    "scalar shrinking with fresh confirmation",
+    "reduced unittest and replay",
+    "current-source promotion dry-run/apply",
+    "promoted original and actually changed bodies"
+  ],
+  "negative_controls": [
+    "pid",
+    "sdk-pid",
+    "launch",
+    "setter",
+    "call-count",
+    "held-window",
+    "metric-window",
+    "restoration",
+    "missing-trace",
+    "retained-metric",
+    "off-export-admission",
+    "export-counter-rollback",
+    "export-final-bound"
+  ],
+  "regressions": {
+    "runtime_commit": "a295b0e0147e481e7950691589fc17e5f5afb8d2",
+    "distinct_tests": 1015,
+    "python_capture": 165,
+    "python_generation": 745,
+    "rust": 74,
+    "node": 27,
+    "go": 4,
+    "rust_product_line_coverage_percent": 97.38,
+    "component_coverage_floor_percent": 80,
+    "whole_parent_review_files": 33,
+    "counter_fix_review_files": 5,
+    "independent_review_regressions": 49,
+    "remaining_actionable_review_findings": 0
+  },
+  "presentation": {
+    "actual_report_visually_inspected": true,
+    "matching_cases": 3,
+    "deliberate_differences": 1,
+    "incomplete_or_error_entries": 0,
+    "explicit_exclusions": 2,
+    "inventory": 6,
+    "junit_tests": 6,
+    "junit_failures": 1,
+    "junit_errors": 0,
+    "junit_skipped": 2
+  },
+  "delivery": {
+    "pull_request": "https://github.com/quuxio/oteleq/pull/68",
+    "note": "This record qualifies the exact executed runtime above. Published documentation head and merged-main protected checks are separate delivery evidence."
+  },
+  "limits": [
+    "Positive-first serial declared source receiver calls only; startup-off needs separate qualification",
+    "No invocation-cookie or action-scoped attribution",
+    "No arbitrary concurrent, GC/resource, general dependency/build or exporter-fault schedule qualification",
+    "No shipping artefact proof or unrecorded platform/provider/runtime admission",
+    "Trace durations and observer wait times are not equality dimensions",
+    "All 21 broader project completion requirements remain in scope"
+  ]
+}

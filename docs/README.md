@@ -1,6 +1,6 @@
 # oteleq documentation
 
-Updated 22 October 2026, `quux-oteleq compare-workload` runs the Rust comparator, with diagnostic capture integrations for all eight otelc languages. [Automatic scalar test generation](automatic-generation.md) inventories and executes supported functions in private workspaces, emitting shared typed boundary graphs. [Scalar shrinking](counterexample-shrinking.md) reduces qualified differences within explicit independent domains. Semantic/build-aware adapters and richer object/factory codecs remain incomplete.
+Updated 23 October 2026, `quux-oteleq compare-workload` runs the Rust comparator, with diagnostic capture integrations for all eight otelc languages. [Automatic scalar test generation](automatic-generation.md) inventories and executes supported functions in private workspaces, emitting shared typed boundary graphs. [Scalar shrinking](counterexample-shrinking.md) reduces qualified differences within explicit independent domains. Semantic/build-aware adapters and richer object/factory codecs remain incomplete.
 
 | Document | Use it to |
 | --- | --- |
@@ -14,6 +14,7 @@ Updated 22 October 2026, `quux-oteleq compare-workload` runs the Rust comparator
 | [Java runtime archives](java-runtime-archives.md) | Configure the explicit prepared profile and review selected-JDK member evidence |
 | [Prepared Java SDK provider](java-prepared-provider.md) | Select the replacement Java SDK and verify launch, PID, origins and health/OTLP receipt |
 | [Node source SDK provider](node-source-context.md#rebuilt-sdk-source-profile) | Select source5/execution1 and review exact module, receiver, collection, output and effect qualification |
+| [Node live metric controls](node-metric-controls.md) | Configure declared same-process collection/emission states and inspect the Node 24/26 qualification record |
 | [Filesystem effects](filesystem-effects.md) | Seed independent directories and compare declared bytes, kinds and permissions |
 | [HTTP fixtures](http-fixtures.md) | Script a local service and compare bounded requests and offered responses |
 | [Receiver fixtures](receiver-fixtures.md) | Declare independently constructed Python/Node instances and observed state |
