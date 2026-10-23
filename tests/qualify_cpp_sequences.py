@@ -1,11 +1,9 @@
 """Qualify ordered C++ calls against fixed state, alias and telemetry oracles."""
 import argparse
-import copy
 import hashlib
 import json
 import os
 from pathlib import Path
-import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -15,6 +13,8 @@ import typed_capture
 
 from qualify_cpp_receivers import SOURCE as RECEIVER_SOURCE, check_state, function, node, scalar
 from qualify_project_tests import command
+import sequence_qualification as shared
+from sequence_qualification import CONTROL_VERDICTS
 
 METHODS = ("identity", "secret", "transient", "fail", "recursive", "touch")
 SOURCE = RECEIVER_SOURCE.replace(
@@ -44,13 +44,6 @@ public:
 };
 }
 '''
-CONTROL_VERDICTS = {
-    "missing-call": (3, "inconclusive"),
-    "reordered-calls": (3, "inconclusive"),
-    "missing-field": (1, "different_observed"),
-    "missing-method-witness": (3, "inconclusive"),
-    "undeclared-intermediate-error": (2, "blocked"),
-}
 
 
 def prepare(cli: Path, provider: Path, folder: Path, *, steps: int = 2,
@@ -76,13 +69,7 @@ def prepare(cli: Path, provider: Path, folder: Path, *, steps: int = 2,
             text += 'domains=[{kind="integer",minimum=0,maximum=7}]\n'
     config = folder / "equivalence.toml"
     config.write_text(text)
-    workspace = Path(command([cli, "plan", "--source", source, "--otelc-root", provider,
-        "--workspace-parent", folder, "--config", config], folder, "plan"))
-    plan = json.loads((workspace / "plan.json").read_text())
-    assert {row["otelc_function"] for row in plan["inventory"] if row["status"] == "ready"} == {function(method) for method in methods}
-    assert not any(row["status"] == "blocked" for row in plan["inventory"])
-    command([cli, "generate", "--workspace", workspace], folder, "generate")
-    return workspace
+    return shared.plan_generate(cli, provider, folder, source, config, {function(method) for method in methods})
 
 
 def check_graph(graph: dict, value: int, total: int, argument: int, compact: bool) -> None:
@@ -153,122 +140,31 @@ def check_report(path: Path, count: int, *, steps: int = 2, compact: bool = Fals
         assert case["receiver_fixture"]["arguments"] == [10]
         bundle = json.loads((path.parent / case["case"] / "typed-bundle.json").read_text())["cases"][0]
         roots = {"receiver", "argument:0", "global:sample::Counter::total_"}
-        assert set(bundle["contract"]["required_roots"]) == roots
-        assert len(bundle["contract"]["steps"]) == steps
-        for index, step in enumerate(bundle["contract"]["steps"]):
-            assert (step["id"], step["action"], set(step["required_roots"])) == ("step-" + str(index), "call", roots)
+        shared.check_contract(bundle, roots, steps)
         for lane in ("baseline", "instrumented_on"):
             assert len(bundle[lane]) == 2
             for attempt in bundle[lane]:
                 observations += 1
                 check_observation(attempt["observation"], method, case["arguments"][0], lane == "instrumented_on", steps=steps, compact=compact)
-                assert all(attempt["execution"]["channels"][name] == [] for name in ("stdout", "stderr"))
-                if lane == "instrumented_on":
-                    expected = steps + (int(case["arguments"][0] > 0) + int(steps == 2) if method == "recursive" else 0)
-                    witness = attempt["execution"]["witness"]
-                    assert witness["functions"] == {case["function"]: expected} and witness["spans"] == expected
-                    assert not any(witness["losses"].values()) and witness["pending"] == 0
+                expected = steps + (int(case["arguments"][0] > 0) + int(steps == 2) if method == "recursive" else 0)
+                shared.check_execution(attempt, case["function"], expected, active=lane == "instrumented_on")
     return observations
 
 
 def framework(workspace: Path, folder: Path, name: str, count: int = len(METHODS)) -> int:
-    """The deliberate intermediate difference must fail the retained unittest."""
-    output = command([sys.executable, workspace / "tests/test_equivalence.py"], folder, name, 1)
-    reports = [json.loads(line) for line in output.splitlines()]
-    assert len(reports) == count
-    assert "Ran " + str(count) + " test" in (folder / (name + ".stderr")).read_text()
-    return sum(check_report(Path(row["report"]), 1) for row in reports)
+    """Check the retained unittest against this language's independent graph oracle."""
+    return shared.framework(workspace, folder, name, count, check_report)
 
 
 def controls(cli: Path, report: Path, folder: Path) -> None:
-    """Actual retained evidence is altered without counting copies as executions."""
-    cases = {FUNCTIONS[row["function"]]: row for row in json.loads(report.read_text())["cases"]}
-    def bundle(method: str) -> dict:
-        return json.loads((report.parent / cases[method]["case"] / "typed-bundle.json").read_text())
-    original = bundle("identity")
-    variants = {}
-    for name in ("missing-call", "reordered-calls", "missing-field", "missing-method-witness"):
-        changed = copy.deepcopy(original)
-        for lane in (("baseline", "instrumented_on") if name in ("missing-call", "reordered-calls") else ("instrumented_on",)):
-            for attempt in changed["cases"][0][lane]:
-                observed = attempt["observation"]
-                if name == "missing-call":
-                    observed["steps"].pop()
-                elif name == "reordered-calls":
-                    observed["steps"].reverse()
-                elif name == "missing-field":
-                    graph = observed["steps"][0]["after"]
-                    node(graph, graph["roots"]["receiver"])["fields"].pop("field:value_")
-                else:
-                    attempt["execution"]["witness"]["functions"] = {}
-        variants[name] = changed
-    changed = bundle("fail")
-    changed["cases"][0]["contract"]["steps"][0]["expected_baseline"] = {"kind": "return"}
-    variants["undeclared-intermediate-error"] = changed
-    for name, value in variants.items():
-        path = folder / (name + ".json")
-        path.write_text(json.dumps(value))
-        command([cli, "compare-observations", path], folder, name, CONTROL_VERDICTS[name][0])
+    """Alter retained evidence using the declared C++ receiver field."""
+    shared.controls(cli, report, folder, FUNCTIONS, node, 'field:value_')
 
 
 def verify_operations(folder: Path, cli: Path, *, historical_source_expectation: bool = False) -> int:
-    """Require every route's terminal receipt; omissions cannot be a partial pass."""
-    required = {"run": 1, "framework": 1, "export": 0, "export-run": 1,
-        "export-framework": 1, "shrink": 1, "reduced-framework": 1, "reduced-replay": 1,
-        "changed-source": 4, **{"replay-" + method: int(method == "transient") for method in METHODS},
-        **{name: expected for name, (expected, _) in CONTROL_VERDICTS.items()}}
-    workspace = Path((folder / "cases/plan.stdout").read_text().strip())
-    assert workspace.is_relative_to(folder / "cases")
-    provider = Path(json.loads((workspace / "plan.json").read_text())["otelc_root"])
-    cases = {FUNCTIONS[case["function"]]: case["case"]
-             for case in json.loads((folder / "comparison/report.json").read_text())["cases"]}
-    reduced = Path(json.loads((folder / "shrink/shrink.json").read_text())["workspace"])
-    expected_argv = {
-        "run": [cli, "run", "--workspace", workspace, "--report-dir", folder / "comparison"],
-        "framework": [sys.executable, workspace / "tests/test_equivalence.py"],
-        "export": [cli, "export-tests", "--workspace", workspace, "--destination", folder / "exported", "--apply"],
-        "export-run": [cli, "run", "--workspace", folder / "exported", "--report-dir", folder / "export-comparison"],
-        "export-framework": [sys.executable, folder / "exported/tests/test_equivalence.py"],
-        "shrink": [cli, "shrink", "--workspace", workspace, "--case", cases["transient"], "--report-dir", folder / "shrink", "--trials", "1"],
-        "reduced-framework": [sys.executable, reduced / "tests/test_equivalence.py"],
-        "reduced-replay": [cli, "replay", "--workspace", reduced, "--case", cases["transient"]],
-        "changed-source": [cli, "replay", "--workspace", workspace, "--case", cases["transient"]],
-        **{"replay-" + method: [cli, "replay", "--workspace", workspace, "--case", case] for method, case in cases.items()},
-        **{name: [cli, "compare-observations", folder / (name + ".json")] for name in CONTROL_VERDICTS},
-    }
-    assert {path.name.removesuffix(".started.json") for path in folder.glob("*.started.json")} == set(required)
-    for name, expected in required.items():
-        marker = json.loads((folder / (name + ".started.json")).read_text())
-        recorded_expectation = 2 if historical_source_expectation and name == "changed-source" else expected
-        assert marker == {"argv": list(map(str, expected_argv[name])), "expected_exit": recorded_expectation}
-        assert (folder / (name + ".exit")).read_text() == str(expected) + "\n"
-        for suffix in ("stdout", "stderr"):
-            assert (folder / (name + "." + suffix)).is_file()
-        if name in CONTROL_VERDICTS:
-            assert json.loads((folder / (name + ".stdout")).read_text())["verdict"] == CONTROL_VERDICTS[name][1]
-    assert (folder / "changed-source.stderr").read_bytes() == b"oteleq: application source or immutable snapshot changed\n"
-    assert (folder / "changed-source.stdout").read_bytes() == b""
-    for name in ("cases", "edge-one", "edge-thirty-two", "edge-rich-thirty-two"):
-        route = folder / name
-        selected = Path((route / "plan.stdout").read_text().strip())
-        assert selected.is_relative_to(route)
-        expected = {
-            "plan": [cli, "plan", "--source", route / "application", "--otelc-root", provider,
-                "--workspace-parent", route, "--config", route / "equivalence.toml"],
-            "generate": [cli, "generate", "--workspace", selected],
-        }
-        if name != "cases":
-            expected["run"] = [cli, "run", "--workspace", selected, "--report-dir", route / "comparison"]
-        assert {path.name.removesuffix(".started.json") for path in route.glob("*.started.json")} == set(expected)
-        for operation, argv in expected.items():
-            marker = json.loads((route / (operation + ".started.json")).read_text())
-            expected_exit = 4 if name == "edge-rich-thirty-two" and operation == "run" else 0
-            assert marker == {"argv": list(map(str, argv)), "expected_exit": expected_exit}
-        for operation in ("plan", "generate"):
-            assert (folder / name / (operation + ".exit")).read_text() == "0\n"
-        if name != "cases":
-            assert (folder / name / "run.exit").read_text() == ("4\n" if name == "edge-rich-thirty-two" else "0\n")
-    return len(required) + 11
+    """Verify exact terminal receipts for the declared C++ routes."""
+    return shared.verify_operations(folder, cli, METHODS, FUNCTIONS, ("edge-rich-thirty-two",),
+        historical_source_expectation=historical_source_expectation)
 
 
 def verify_budget_refusal(folder: Path) -> int:
@@ -291,43 +187,12 @@ def verify_budget_refusal(folder: Path) -> int:
 
 
 def verify_routes(folder: Path) -> None:
-    """Require each named route's complete methods and independently fixed inputs."""
-    def report(path: Path, count: int, method: str | None = None, amount: int = 7) -> None:
-        assert path.is_relative_to(folder)
-        cases = json.loads(path.read_text())["cases"]
-        assert len(cases) == count and all(case["arguments"] == [amount] for case in cases)
-        if method:
-            assert cases[0]["function"] == function(method)
-        else:
-            assert {case["function"] for case in cases} == set(FUNCTIONS)
-
-    for name in ("comparison", "export-comparison"):
-        report(folder / name / "report.json", len(METHODS))
-    for method in METHODS:
-        summary = json.loads((folder / ("replay-" + method + ".stdout")).read_text())
-        report(Path(summary["report"]), 1, method)
-    for name in ("framework", "export-framework", "reduced-framework"):
-        rows = [json.loads(line) for line in (folder / (name + ".stdout")).read_text().splitlines()]
-        reduced = name == "reduced-framework"
-        assert len(rows) == (1 if reduced else len(METHODS))
-        functions = []
-        for row in rows:
-            path = Path(row["report"])
-            case = json.loads(path.read_text())["cases"][0]
-            method = FUNCTIONS[case["function"]]
-            report(path, 1, "transient" if reduced else method, 0 if reduced else 7)
-            functions.append(method)
-        assert set(functions) == ({"transient"} if reduced else set(METHODS))
-    summary = json.loads((folder / "reduced-replay.stdout").read_text())
-    report(Path(summary["report"]), 1, "transient", 0)
-    for name in ("edge-one", "edge-thirty-two"):
-        report(folder / name / "comparison/report.json", 1, "identity")
+    """Require every language-specific function and fixed input on every retained route."""
+    shared.verify_routes(folder, METHODS, FUNCTIONS, function)
 
 
 def verify_receipts(folder: Path) -> int:
     """Decode actual OTLP independently and require each fixture's exact trees."""
-    from opentelemetry.proto.collector.metrics.v1.metrics_service_pb2 import ExportMetricsServiceRequest
-    from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceRequest
 
     checked = 0
     for path in folder.rglob("instrumented_on-*/command.json"):
@@ -337,41 +202,8 @@ def verify_receipts(folder: Path) -> int:
         amounts = [int(node(step["before"], step["before"]["roots"]["argument:0"])["fields"]["value"]["value"])
                    for step in observed["steps"]]
         expected = [1 + int(method == "recursive" and value > 0) for value in amounts]
-        receipt = json.loads((attempt / "http-capture.json").read_text())
-        assert not receipt["errors"]
-        spans, counters = [], {}
-        for body in receipt["bodies"]:
-            raw = (attempt / body["file"]).read_bytes()
-            if body["path"] == "/v1/traces":
-                decoded = ExportTraceServiceRequest.FromString(raw)
-                spans += [span for resource in decoded.resource_spans for scope in resource.scope_spans for span in scope.spans]
-            else:
-                assert body["path"] == "/v1/metrics"
-                decoded = ExportMetricsServiceRequest.FromString(raw)
-                for resource in decoded.resource_metrics:
-                    for scope in resource.scope_metrics:
-                        for metric in scope.metrics:
-                            kind = metric.WhichOneof("data")
-                            if metric.name in ("otelc.function.calls", "otelc.function.duration"):
-                                assert kind == ("sum" if metric.name.endswith("calls") else "histogram")
-                                counters.setdefault(metric.name, []).extend(
-                                    point.as_int if kind == "sum" else point.count
-                                    for point in getattr(metric, kind).data_points)
-        roots = sorted((span for span in spans if not span.parent_span_id), key=lambda span: span.start_time_unix_nano)
-        assert len(roots) == len(expected) and len(spans) == sum(expected)
-        assert all(span.name == observed["function_id"] for span in spans)
-        identities = {(span.trace_id, span.span_id) for span in spans}
-        assert len(identities) == len(spans)
-        for index, (root, count) in enumerate(zip(roots, expected)):
-            members = [span for span in spans if span.trace_id == root.trace_id]
-            assert len(members) == count and root.start_time_unix_nano > 0
-            assert root.end_time_unix_nano >= root.start_time_unix_nano
-            if index:
-                assert roots[index - 1].start_time_unix_nano < root.start_time_unix_nano
-                assert roots[index - 1].end_time_unix_nano <= root.start_time_unix_nano
-            for child in members:
-                assert child is root or child.parent_span_id == root.span_id
-                assert root.start_time_unix_nano <= child.start_time_unix_nano <= child.end_time_unix_nano <= root.end_time_unix_nano
+        spans, counters = shared.decode_receipt(attempt)
+        shared.check_serial_trees(spans, expected, observed["function_id"])
         assert set(counters) == {"otelc.function.calls", "otelc.function.duration"}
         assert all(values and max(values) == len(spans) for values in counters.values())
         runtime = json.loads((attempt / "runtime.json").read_text())
@@ -392,26 +224,12 @@ def retained(folder: Path, cli: Path, *, historical_source_expectation: bool = F
     assert reports
     verify_routes(folder)
     refused = verify_budget_refusal(folder / "edge-rich-thirty-two")
-    observations, comparisons = 0, 0
-    for path in reports:
-        if path.is_relative_to(folder / "edge-rich-thirty-two"):
-            continue
-        steps = 32 if path.is_relative_to(folder / "edge-thirty-two") else 1 if path.is_relative_to(folder / "edge-one") else 2
-        observations += check_report(path, len(json.loads(path.read_text())["cases"]), steps=steps, compact=steps == 32)
-        for case in json.loads(path.read_text())["cases"]:
-            bundle = path.parent / case["case"] / "typed-bundle.json"
-            result = subprocess.run([str(cli), "compare-observations", str(bundle)],
-                capture_output=True, check=False, timeout=30)
-            assert result.returncode == case["exit_code"] and json.loads(result.stdout) == case["comparison"]
-            comparisons += 1
+    observations, comparisons = shared.compare_reports(folder, reports, cli, check_report, ("edge-rich-thirty-two",))
     raw = [path for path in folder.rglob("command.json") if path.parent.name.startswith(("baseline-", "instrumented_on-"))]
     identities = {hashlib.sha256(path.read_bytes()).hexdigest() for path in raw}
     assert observations == 152 and len(raw) == observations + refused == 153
     assert len(identities) == 149 and comparisons == 38
-    for path in folder.rglob("plan.json"):
-        plan = json.loads(path.read_text())
-        for name, expected in plan["source_manifest"].items():
-            assert hashlib.sha256((Path(plan["source"]) / name).read_bytes()).hexdigest() == expected
+    shared.verify_sources(folder)
     return {"claim": "equivalence over these tests and observations", "artefact_class": "diagnostic",
         "cli_sha256": hashlib.sha256(cli.read_bytes()).hexdigest(), "cases": len(METHODS),
         "matching_cases": len(METHODS) - 1, "intermediate_difference_controls": 1,
@@ -447,36 +265,8 @@ def main() -> None:
         folder.mkdir(mode=0o700)
         os.environ.update(OTELEQ_PYTHON=sys.executable, OTELEQ_CLI=str(cli))
         workspace = prepare(cli, provider, folder / "cases")
-        report_path = folder / "comparison/report.json"
-        command([cli, "run", "--workspace", workspace, "--report-dir", report_path.parent], folder, "run", 1)
-        check_report(report_path, len(METHODS))
-        controls(cli, report_path, folder)
-        report = json.loads(report_path.read_text())
-        for case in report["cases"]:
-            result = json.loads(command([cli, "replay", "--workspace", workspace, "--case", case["case"]],
-                folder, "replay-" + FUNCTIONS[case["function"]], case["exit_code"]))
-            check_report(Path(result["report"]), 1)
-        framework(workspace, folder, "framework")
-        exported = folder / "exported"
-        command([cli, "export-tests", "--workspace", workspace, "--destination", exported, "--apply"], folder, "export")
-        source = Path(json.loads((workspace / "plan.json").read_text())["source"])
-        detached = source.with_name("application-detached")
-        source.rename(detached)
-        try:
-            command([cli, "run", "--workspace", exported, "--report-dir", folder / "export-comparison"], folder, "export-run", 1)
-            check_report(folder / "export-comparison/report.json", len(METHODS))
-            framework(exported, folder, "export-framework")
-        finally:
-            detached.rename(source)
-        target = next(row for row in report["cases"] if FUNCTIONS[row["function"]] == "transient")
-        reduced = folder / "shrink"
-        command([cli, "shrink", "--workspace", workspace, "--case", target["case"], "--report-dir", reduced, "--trials", "1"], folder, "shrink", 1)
-        shrink = json.loads((reduced / "shrink.json").read_text())
-        assert shrink["reduced_arguments"] == [0] and shrink["status"] == "candidate_rule_minimal"
-        reduced_workspace = Path(shrink["workspace"])
-        framework(reduced_workspace, folder, "reduced-framework", 1)
-        replay = json.loads(command([cli, "replay", "--workspace", reduced_workspace, "--case", target["case"]], folder, "reduced-replay", 1))
-        check_report(Path(replay["report"]), 1)
+        source, target = shared.exercise_routes(cli, folder, workspace, METHODS, FUNCTIONS,
+            check_report, controls, framework)
         for name, steps, compact, expected in (("edge-one", 1, False, 0),
                 ("edge-rich-thirty-two", 32, False, 4), ("edge-thirty-two", 32, True, 0)):
             edge = folder / name
