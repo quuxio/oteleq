@@ -8,6 +8,8 @@
 
 ## Current workspace
 
+The [Python call-only sequence profile](ordered-sequences.md#python-call-sequences) retains intermediate receiver graphs and pins source/class/method bindings around each call. Its [150-launch diagnostic qualification](qualification/python-sequences-2026-10-23.json) covers all retained routes, scalar reduction, one/32-call positives and refusal controls; a separate 81-launch corpus checks existing single-call compatibility. Broader asynchronous, release, collection and live-control actions remain unavailable.
+
 [Declared independent scalar domains](domain-generation.md) can generate concrete case values without a literal `cases` list. Planning freezes the requests in the inventory, and retained suites consume those values. Existing explicit case lists keep their values and order. Declared [numeric argument preconditions](numeric-preconditions.md) constrain generation and scalar shrinking, including fixed ordered calls. General application predicates and richer argument/factory generation remain open.
 
 The [exact-revision domain corpus](qualification/domain-generation-2026-10-22.json) checks 30 functions and 82 initial cases through all four direct/framework/detached routes, then frozen replay, reduction and seeded inputs: 1,384 actual launches. Its two deliberate differences per full route remain failures in generated unittest and JUnit output. Fourteen refused domain contracts cannot become passing empty suites.

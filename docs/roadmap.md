@@ -32,6 +32,8 @@ Acceptance requires:
 
 ## Stage 2: Python and actual otelc execution
 
+The [Python call-only profile](ordered-sequences.md#python-call-sequences) has [150-launch diagnostic qualification](qualification/python-sequences-2026-10-23.json) for complete intermediate package-receiver graphs, pinned class/method bindings, expected exceptions, recursion, retained routes and scalar reduction. Separate 81-launch compatibility covers the original single-call fixture. This advances the bounded synchronous profile; broader discovery, asynchronous/resource actions, replacement providers and production evidence below remain open.
+
 Deliver the first complete slice using Rust orchestration, Python semantic discovery, pytest/Hypothesis generation, independent CPython workers and a pinned real otelc launcher. Implement receiver/module-state observers, controlled async/generator fixtures, a bounded OTLP decoder and instrumentation witness.
 
 Acceptance includes plain and telemetry-on execution, declared off controls, same-output/different-mutation detection, generated domain-invalid input handling, private workspace preservation and runnable retained tests. Record unsupported object/scheduler cases. Add at least one exact production-workload comparison alongside the unit harness evidence.

@@ -77,6 +77,8 @@ Observers refuse unsupported application formatters and exception accessors. Suc
 
 The explicit [Node live metric schedule](docs/node-metric-controls.md) has [2,784-launch startup qualification](docs/qualification/node-startup-metric-controls-2026-10-23.json) on Node 24/26 for JavaScript `.cjs`, native TypeScript `.cts` and API TypeScript `.mts`. It starts with either metric flag disabled independently or together, preserves one application/SDK pair through all four states and requires a both-on call somewhere in the schedule. The complete corpus catches a restored intermediate mutation, refuses 336 altered-evidence controls and independently recomputes 720 comparisons. [Prepared Java startup schedules](docs/java-metric-controls.md#qualify-startup-schedules) have separate [2,256-JVM qualification](docs/qualification/java-startup-metric-controls-2026-10-23.json) across all four initial states in three recorded provider profiles, with 168 refusals and 576 recomputed comparisons. Earlier positive-first and source-provider records retain their own scope.
 
+Declared [Python ordered calls](docs/ordered-sequences.md#python-call-sequences) retain every intermediate receiver/global/static graph on one reconstructed instance. Their [150-launch diagnostic record](docs/qualification/python-sequences-2026-10-23.json) covers retained suites, replay, reduction and refusal controls, with separate single-call compatibility. Async, release, collection and live Python controls remain outside this generator profile.
+
 ## Usage
 
 ### Build

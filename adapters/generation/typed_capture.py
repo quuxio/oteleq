@@ -431,6 +431,17 @@ def dynamic_boundaries(capture: dict, entry: dict) -> dict:
 def dynamic_steps(capture: dict, entry: dict) -> list[dict]:
     """Collection retry counts remain raw evidence outside typed equality."""
     require(type(capture) is dict and type(capture.get("steps")) is list and len(capture["steps"]) <= 32, "invalid dynamic sequence")
+    if entry["language"] == "python":
+        expected = entry["sequence_configuration"]
+        require(len(capture["steps"]) == len(expected), "Python sequence call count differs")
+        require(all(type(step) is dict and step.get("id") == "step-" + str(index)
+                    and step.get("action") == expected[index]["action"]
+                    for index, step in enumerate(capture["steps"])), "Python sequence identities differ")
+        require(bool(capture["steps"])
+                and capture["before"] == capture["steps"][0].get("before")
+                and capture["outcome"] == capture["steps"][-1].get("outcome")
+                and capture["after"] == capture["steps"][-1].get("after"),
+                "Python sequence outer boundaries differ")
     result = []
     for step in capture["steps"]:
         require(type(step) is dict, "dynamic action must be an object")
@@ -470,6 +481,7 @@ def observation(raw: bytes, entry: dict, contract: dict) -> dict[str, Any]:
     result = {"observation_schema_version": 1, "case_id": contract["case_id"], "function_id": contract["function_id"],
             "fixture_sha256": contract["fixture_sha256"], "fixture": {"status": "ready"}, "gaps": [],
             **boundaries}
-    if "sequence_configuration" in entry and language in ("javascript", "typescript"):
+    if "sequence_configuration" in entry and language in ("python", "javascript", "typescript"):
         result["steps"] = dynamic_steps(capture, entry) if "steps" in capture else []
+        require(language != "python" or bool(result["steps"]), "missing Python sequence steps")
     return result

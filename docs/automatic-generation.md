@@ -67,6 +67,8 @@ The explicit source Node provider implements [live metric collection/emission sc
 
 Prepared [Java metric schedules](java-metric-controls.md) also derive actual startup flags from the first declared call and require a positive call somewhere in the schedule. Component regressions cover all four initial states and reject a wrong initial status before setters. The separate [2,256-JVM startup qualification](qualification/java-startup-metric-controls-2026-10-23.json) covers all four initial states in three recorded prepared profiles; earlier Java records retain their positive-first scope.
 
+Declared [Python call-only schedules](ordered-sequences.md#python-call-sequences) retain intermediate graphs and pin the original class/method identity. Their [150-launch qualification](qualification/python-sequences-2026-10-23.json) covers the recorded package/provider, with separate 81-launch single-call compatibility; broader actions remain unsupported.
+
 ## Project policy and concrete fixtures
 
 Pass `--config /absolute/path/to/equivalence.toml` to `plan`. The [example policy](../examples/equivalence.toml) is executable. Unknown keys, unsupported schema/language IDs, duplicate selectors/cases and unsafe limits fail validation. A policy is at most 1 MiB. CLI `--language` and `--cases` override the corresponding policy values; CLI exclusions extend the policy exclusions.
