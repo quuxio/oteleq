@@ -45,6 +45,8 @@ import otelc_collection
 import policy as project_policy
 import project_tests
 import python_project
+import python_provider
+import python_inputs
 import shrinking
 import sequences
 import typed_capture
@@ -243,6 +245,8 @@ def discovery_tools(root: Path, language: str, adapters: dict) -> tuple[dict, di
     """Resolve the selected compiler/runtime tools and their provider identities."""
     rust_backend = adapters.get("rust", {}).get("backend", "compiler")
     selected = capture.selected_tools(root, language)
+    if language == "python" and adapters.get("python", {}).get("backend") == "prepared":
+        return selected, python_inputs.artefacts(root, selected)
     if language in node_source.LANGUAGES and adapters.get("node", {}).get("backend") == node_source.SOURCE:
         selected = {name: path.resolve(strict=True) for name, path in selected.items()}
         selected["python-host"] = Path(sys.executable).absolute()
@@ -438,6 +442,8 @@ def configure_entry_context(entry, discovered, configuration, snapshot, excluded
         entry["java_profile"] = adapters.get("java", {}).get("profile", java_profiles.STOCK)
     if language == "go":
         configure_go_context(entry, discovered, configuration)
+    if language == "python" and "backend" in adapters["python"]:
+        entry["python_backend"] = adapters["python"]["backend"]
     if language == "python" and not excluded and adapters["python"]["import_roots"]:
         try:
             entry["python_import"] = python_project.context(snapshot, entry["path"], adapters["python"]["import_roots"])
@@ -495,6 +501,7 @@ def bind_runtime_providers(entry, root, workspace, tools):
         typescript_provider.bind(entry, root, workspace, tools, execute, policy)
     node_source.bind(entry, root, workspace, tools, execute)
     java_provider.bind(entry, root, workspace, tools, execute)
+    python_provider.bind(entry, root, workspace, tools, execute)
 
 
 def inventory_tree(contents, root, snapshot, workspace, args, native_projects=None, java_context=None, *, original_source=None):
@@ -615,6 +622,8 @@ def plan(args):
         data["java_provider_manifest"] = manifest(workspace / java_provider.DIRECTORY)
     if (workspace / node_source.DIRECTORY).exists():
         data["node_provider_manifest"] = manifest(workspace / node_source.DIRECTORY)
+    if (workspace / python_provider.DIRECTORY).exists():
+        data["python_provider_manifest"] = manifest(workspace / python_provider.DIRECTORY)
     write(workspace / PLAN_FILE, data)
     marker = read(workspace / OWNED_MARKER)
     marker["plan_sha256"] = identity(data)
@@ -676,7 +685,8 @@ def generator_identity():
         'node_live.py', 'node_control.py', 'node_control_receipt.py', 'node_checkpoint.mjs',
         'native_profile.py', 'native_project.py', 'native_dependencies.py', 'native_frontend.py',
         'native_discover.cpp', 'native_context.py', 'native_workers.py', 'native_workspace.py',
-        'owned_workspace.py', 'preconditions.py', 'project_tests.py', 'project_runner.py')})
+        'owned_workspace.py', 'preconditions.py', 'project_tests.py', 'project_runner.py',
+        'python_provider.py', 'python_inputs.py', 'python_prepared.py')})
     files["host-python"] = capture.file_digest(Path(sys.executable))
     files["observer:otelc_capture.py"] = capture.file_digest(Path(capture.__file__))
     files["host-version"] = sys.version
@@ -709,6 +719,7 @@ def load_workspace(path, generated=False):
     java_project.verify(workspace, data, originals="original_source" not in data)
     java_provider.verify_probes(sys.modules[__name__], workspace, data)
     node_source.verify_probes(sys.modules[__name__], workspace, data)
+    python_provider.verify_probes(sys.modules[__name__], workspace, data)
     if generated and manifest(workspace / "tests") != read(workspace / GENERATED_MANIFEST):
         raise ValueError("generated suite or corpus changed; create a new plan")
     return workspace, data
@@ -787,6 +798,8 @@ if __name__=="__main__":unittest.main()
 
 
 def policy(entry, endpoint, *, service="oteleq-generation"):
+    if python_provider.enabled(entry):
+        return python_provider.policy(entry, endpoint, service)
     if node_source.enabled(entry):
         return node_source.policy(entry, endpoint, service)
     if java_provider.prepared(entry):
@@ -1008,7 +1021,9 @@ def qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, 
 
 def provider_stable(root, language, tools, expected, entry):
     """Re-enumerate the selected provider without changing its frozen API."""
-    if java_provider.prepared(entry):
+    if python_provider.enabled(entry):
+        python_provider.require(python_inputs.artefacts(root, tools) == expected, "SDK or selected Python inputs changed")
+    elif java_provider.prepared(entry):
         java_provider.require(java_provider.artefacts(root, tools, entry.get("java_profile", java_profiles.STOCK)) == expected, "SDK or selected tools changed")
     elif node_source.enabled(entry):
         node_source.require(node_source.artefacts(root, tools) == expected, "SDK or selected Node tools changed")
@@ -1017,6 +1032,7 @@ def provider_stable(root, language, tools, expected, entry):
 
 
 def attempt(workspace, data, entry, case, lane, folder, decoder, *, http_fixtures=None):
+    python_provider.refuse_unbound(entry)
     http_fixtures = http_fixtures or []
     if [item.settings for item in http_fixtures] != http_effects.selected(data["configuration"]):
         raise ValueError("HTTP effects require the frozen case fixture context before application execution")
@@ -1288,7 +1304,8 @@ def retained_provider_directories(data):
     providers = ((data.get('native_projects'), native_profile.DIRECTORY),
                  (data.get('java_context'), java_project.DIRECTORY),
                  ('java_provider_manifest' in data, java_provider.DIRECTORY),
-                 ('node_provider_manifest' in data, node_source.DIRECTORY))
+                 ('node_provider_manifest' in data, node_source.DIRECTORY),
+                 ('python_provider_manifest' in data, python_provider.DIRECTORY))
     return [directory for present, directory in providers if present]
 
 

@@ -81,6 +81,8 @@ Declared [Python ordered calls](docs/ordered-sequences.md#python-call-sequences)
 
 ## Usage
 
+Rebuilt Python [provider negotiation and prepared-transport checks](docs/python-prepared-provider.md) are available for integration work. Selecting `adapters.python.backend = "prepared"` currently retains explicit blockers; generated Python execution continues to require its qualified legacy provider.
+
 ### Build
 
 With Git and Rust 1.98.1 or newer installed:
