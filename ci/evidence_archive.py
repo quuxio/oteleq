@@ -31,7 +31,7 @@ def _guard(root: Path, store: Path) -> None:
                     and not root.is_relative_to(store), "archive storage must be separate from the corpus")
 
 
-def _write(path: Path, content: bytes, mode: int = 0o444) -> None:
+def _write(path: Path, content: bytes, mode: int = 0o400) -> None:
     descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
     try:
         with os.fdopen(descriptor, "wb", closefd=False) as stream:
@@ -70,16 +70,16 @@ def pack(root: Path, selection: Path, store: Path) -> dict:
     with _locked(store):
         with (store / ARCHIVE).open("xb") as output:
             os.chmod(store / ARCHIVE, 0o600)
-            with gzip.GzipFile(filename="", mode="wb", fileobj=output, mtime=0) as compressed:
-                with tarfile.open(fileobj=compressed, mode="w|", format=tarfile.PAX_FORMAT) as archive:
-                    for name in names:
-                        item, content, _ = files.read(root, name)
-                        entries.append(item)
-                        total += item["size"]
-                        records.require(total <= records.MAX_TOTAL_BYTES, "selected byte budget exceeded")
-                        member = tarfile.TarInfo(name)
-                        member.size, member.mode = len(content), 0o600
-                        archive.addfile(member, io.BytesIO(content))
+            with gzip.GzipFile(filename="", mode="wb", fileobj=output, mtime=0) as compressed, \
+                 tarfile.open(fileobj=compressed, mode="w|", format=tarfile.PAX_FORMAT) as archive:
+                for name in names:
+                    item, content, _ = files.read(root, name)
+                    entries.append(item)
+                    total += item["size"]
+                    records.require(total <= records.MAX_TOTAL_BYTES, "selected byte budget exceeded")
+                    member = tarfile.TarInfo(name)
+                    member.size, member.mode = len(content), 0o600
+                    archive.addfile(member, io.BytesIO(content))
             output.flush()
             os.fsync(output.fileno())
         with (store / ARCHIVE).open("rb") as stream:
@@ -89,15 +89,15 @@ def pack(root: Path, selection: Path, store: Path) -> dict:
         payload["seal_sha256"] = records.digest(records.canonical(payload))
         content = records.canonical(payload) + b"\n"
         _write(store / INDEX, content)
-        os.chmod(store / ARCHIVE, 0o444)
+        os.chmod(store / ARCHIVE, 0o400)
         directory = os.open(store, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
         try:
             os.fsync(directory)
         finally:
             os.close(directory)
         index_sha256 = records.digest(content)
-        with _verified(root, store, index_sha256):
-            pass
+        with _verified(root, store, index_sha256) as (verified, _):
+            records.require(len(verified["files"]) == len(entries), "verified file count differs")
         for item in entries:
             files.check(root, item)
     return {"index_sha256": index_sha256, "archive_sha256": archive_sha256,

@@ -144,8 +144,9 @@ class EvidenceArchiveTests(unittest.TestCase):
         changed = self.index(); changed["seal_sha256"] = "0" * 64
         path = self.store / archive.INDEX
         path.chmod(0o600); path.write_bytes(records.canonical(changed)); path.chmod(0o444)
+        anchor = records.digest(path.read_bytes())
         with self.assertRaisesRegex(records.ArchiveError, "seal"):
-            archive.verify(self.root, self.store, records.digest(path.read_bytes()))
+            archive.verify(self.root, self.store, anchor)
 
     def test_invalid_index_entries_are_rejected_even_with_recomputed_seal(self):
         self.pack()
@@ -221,7 +222,8 @@ class EvidenceArchiveTests(unittest.TestCase):
         # macOS may clear set-ID bits on this test volume; exercise the guard
         # with an explicit stat result rather than depending on that policy.
         value = list(path.stat()); value[0] |= 0o4000
-        with self.assertRaises(records.ArchiveError): files._metadata(os.stat_result(value))
+        unsafe = os.stat_result(value)
+        with self.assertRaises(records.ArchiveError): files._metadata(unsafe)
         path.parent.chmod(0o777)
         with self.assertRaisesRegex(records.ArchiveError, "directory"):
             files.read(self.root, self.names[0])
@@ -354,6 +356,18 @@ class EvidenceArchiveTests(unittest.TestCase):
         self.assertEqual(list((self.root/self.names[0]).parent.glob(".oteleq-restore-*")),[])
         with mock.patch.object(files.sys,"platform","unsupported"):
             with self.assertRaises(records.ArchiveError): files.install(self.root,item,content)
+
+    def test_missing_native_rename_symbol_refuses_and_linux_flags_are_explicit(self):
+        function = mock.Mock(return_value=0)
+        library = mock.Mock(renameat2=function)
+        with mock.patch.object(files.sys, "platform", "linux"), \
+             mock.patch.object(files.ctypes, "CDLL", return_value=library):
+            files._rename(7, "private", "target")
+            function.assert_called_once_with(7, b"private", 7, b"target", 1)
+        with mock.patch.object(files.sys, "platform", "linux"), \
+             mock.patch.object(files.ctypes, "CDLL", return_value=object()):
+            with self.assertRaises(records.ArchiveError):
+                files._rename(7, "private", "target")
 
     def test_cli_operations_and_refusals_return_reviewable_json(self):
         common=["--root",str(self.root),"--store",str(self.store)]

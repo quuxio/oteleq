@@ -12,7 +12,7 @@ import sys
 from typing import Iterator
 import uuid
 
-from ci.evidence_index import MAX_FILE_BYTES, require
+from ci.evidence_index import ArchiveError, MAX_FILE_BYTES, require
 from ci import evidence_attributes as attributes
 
 
@@ -90,12 +90,16 @@ def check(root: Path, item: dict) -> tuple:
 
 def _rename(directory: int, temporary: str, destination: str) -> None:
     # Apple sys/stdio.h RENAME_EXCL; Linux renameat2 RENAME_NOREPLACE.
-    function_name, flags = (("renameatx_np", 4) if sys.platform == "darwin"
-                            else ("renameat2", 1) if sys.platform.startswith("linux")
-                            else ("", 0))
+    if sys.platform == "darwin":
+        function_name, flags = "renameatx_np", 4
+    elif sys.platform.startswith("linux"):
+        function_name, flags = "renameat2", 1
+    else:
+        raise ArchiveError("atomic no-replace restoration is unsupported")
     library = ctypes.CDLL(None, use_errno=True)
-    function = getattr(library, function_name, None) if function_name else None
-    require(function is not None, "atomic no-replace restoration is unsupported")
+    function = getattr(library, function_name, None)
+    if function is None:
+        raise ArchiveError("atomic no-replace restoration is unsupported")
     function.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int,
                          ctypes.c_char_p, ctypes.c_uint]
     function.restype = ctypes.c_int
