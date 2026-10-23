@@ -101,6 +101,7 @@ class QualificationRecipeTests(unittest.TestCase):
     def test_help_names_the_http_qualification_target(self):
         result = subprocess.run(["make", "help"], cwd=ROOT, capture_output=True, text=True, check=True)
         self.assertIn("generation-http-otelc Qualify scripted HTTP", result.stdout)
+        self.assertIn("generation-java-handles-otelc Qualify generated private-handle", result.stdout)
         self.assertIn("generation-project-tests-otelc Qualify current-source suites", result.stdout)
         self.assertIn("generation-preconditions-otelc Qualify numeric relations", result.stdout)
         self.assertIn("generation-native-project-otelc Qualify explicit C/C++ targets", result.stdout)
@@ -111,6 +112,14 @@ class QualificationRecipeTests(unittest.TestCase):
         self.assertIn("generation-node-source-channels-otelc Qualify nonempty binary", result.stdout)
         self.assertIn("generation-java-startup-otelc Qualify Java startup flags", result.stdout)
         self.assertIn("generation-python-sequence-otelc Qualify ordered Python package receivers", result.stdout)
+
+    def test_handle_binding_recipe_uses_the_prebuilt_sdk_without_building_a_cli(self):
+        result = subprocess.run(['make', '--no-print-directory', '-n', 'generation-java-handles-otelc',
+            'OTELC_ROOT=/tmp/provider', 'REPORT_DIR=/tmp/evidence', 'PYTHON=/selected/python'],
+            cwd=ROOT, capture_output=True, text=True, check=True)
+        self.assertIn('/selected/python tests/qualify_java_handle_bindings.py', result.stdout)
+        self.assertIn('--otelc-root "/tmp/provider" --report-dir "/tmp/evidence"', result.stdout)
+        self.assertNotIn('cargo build', result.stdout)
 
     def test_java_startup_recipe_retains_explicit_state_and_profile(self):
         result = subprocess.run(['make', '--no-print-directory', '-n', 'generation-java-startup-otelc',
