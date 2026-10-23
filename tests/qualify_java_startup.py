@@ -161,7 +161,42 @@ def recheck(root: Path, cli: Path, states: MetricStates, *, java_profile: str = 
         'launches': launches, 'builds': builds, 'prepared': prepared, 'source_preserved': True}
 
 
-def retained_workspace(root: Path, provider: Path, profile: str) -> Path:
+def route_operations(folder: Path, workspace: Path, cli: Path) -> dict[str, dict]:
+    """Derive all required route commands independently of their completion records."""
+    plan = read(workspace / 'plan.json')
+    application = folder / 'cases/application'
+    assert plan['source'] == str(application)
+    cases = {controls.FUNCTIONS[entry['otelc_function']]: entry['id'] + '-0'
+        for entry in plan['inventory'] if entry['status'] == 'ready'}
+    assert len(cases) == 6 and len(set(cases.values())) == 6
+    exported, reduced, promoted = folder / 'exported', folder / 'shrink/workspace', folder / 'project-tests'
+    target = cases['transient_value']
+    operations = {}
+
+    def add(name: str, arguments: list, expected: int = 0) -> None:
+        operations[name] = {'argv': list(map(str, arguments)), 'expected_exit': expected}
+
+    add('run', [cli, 'run', '--workspace', workspace, '--report-dir', folder / 'comparison'], 1)
+    for method, case in cases.items():
+        add('replay-' + method, [cli, 'replay', '--workspace', workspace, '--case', case],
+            int(method in ('transient_value', 'withheld')))
+    export = [cli, 'export-tests', '--workspace', workspace, '--destination', exported]
+    add('export-plan', export);add('export-apply', [*export, '--apply'])
+    add('export-run', [cli, 'run', '--workspace', exported, '--report-dir', folder / 'export-comparison'], 1)
+    add('shrink', [cli, 'shrink', '--workspace', workspace, '--case', target,
+        '--report-dir', folder / 'shrink', '--trials', '1'], 1)
+    add('reduced-replay', [cli, 'replay', '--workspace', reduced, '--case', target], 1)
+    promote = [cli, 'promote', '--workspace', workspace, '--source', application, '--destination', promoted]
+    add('promote-plan', promote);add('promote-apply', [*promote, '--apply'])
+    for name, suite in (('framework', workspace / 'tests'), ('export-framework', exported / 'tests'),
+                        ('reduced-framework', reduced / 'tests'), ('promoted-original', promoted),
+                        ('promoted-changed', promoted)):
+        add(name, [sys.executable, '-I', '-B', suite / 'test_equivalence.py'], 1)
+    assert len(operations) == 19
+    return operations
+
+
+def retained_workspace(root: Path, provider: Path, profile: str, cli: Path) -> Path:
     """Only the original complete corpus and requested frozen profile can be reused."""
     paths = list((root / 'corpus/cases').glob('oteleq-run-*/plan.json'))
     assert len(paths) == 1
@@ -170,12 +205,17 @@ def retained_workspace(root: Path, provider: Path, profile: str) -> Path:
     ready = [entry for entry in plan['inventory'] if entry['status'] == 'ready']
     assert len(ready) == 6 and {entry['otelc_function'] for entry in ready} == set(controls.FUNCTIONS)
     assert all(entry.get('java_profile', 'stock-methods-v1') == profile for entry in ready)
-    markers = list((root / 'corpus').rglob('*.started.json'))
-    assert markers
-    for marker in markers:
-        result = marker.with_name(marker.name.removesuffix('.started.json') + '.exit')
-        assert result.is_file() and not result.is_symlink()
-        assert result.read_text().strip() == str(read(marker)['expected_exit'])
+    folder, workspace = root / 'corpus', paths[0].parent
+    operations = route_operations(folder, workspace, cli)
+    assert {path.name for path in folder.glob('*.started.json')} == {
+        name + '.started.json' for name in operations}
+    for name, expected in operations.items():
+        for suffix in ('.started.json', '.exit', '.stdout', '.stderr'):
+            path = folder / (name + suffix)
+            assert path.is_file() and not path.is_symlink()
+        recorded = read(folder / (name + '.started.json'))
+        assert type(recorded.get('expected_exit')) is int and recorded == expected
+        assert (folder / (name + '.exit')).read_text().strip() == str(expected['expected_exit'])
     return paths[0].parent
 
 
@@ -195,7 +235,7 @@ def main() -> None:
     states = startup_states(args.startup_state)
     os.environ.update(OTELEQ_PYTHON=sys.executable, OTELEQ_CLI=str(cli))
     if args.recheck:
-        workspace = retained_workspace(root, provider, args.java_profile)
+        workspace = retained_workspace(root, provider, args.java_profile, cli)
         destination = Path(tempfile.mkdtemp(prefix='offline-recheck-', dir=root))
         negatives = java_startup_receipts.recheck(root / 'evidence-controls', workspace, states)
     else:

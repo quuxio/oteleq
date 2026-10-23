@@ -100,7 +100,7 @@ make generation-java-startup-otelc \
 
 `JAVA_CONTROL_STARTUP` also accepts `both-on` (the default), `collection-off` and `emission-off`. Each run rotates the complete four-state schedule. `JAVA_STARTUP_PROFILE` defaults to `safe-methods-v1`; `stock-methods-v1` and `archive-methods-v1` require their own matching frozen provider. The script accepts the same values through `--startup-state` and `--java-profile`. Startup corpus cases explicitly allow 60 seconds per attempt; earlier positive-first corpus budgets remain unchanged.
 
-The script's explicit `--recheck` option audits a complete retained corpus without launching an application. It checks the original profile, completed operation records, all observations, standalone or archive-context compiler bindings, actual receipts and alteration controls. It writes fresh comparisons and a new qualification result under `offline-recheck-*`, preserving the original controller result and any failure. Missing or unfinished routes are refused.
+The script's explicit `--recheck` option audits a complete retained corpus without launching an application. It checks the original profile, all 19 required route commands and their contract-known exit codes, retained command output, all observations, standalone or archive-context compiler bindings, actual receipts and alteration controls. It writes fresh comparisons and a new qualification result under `offline-recheck-*`, preserving the original controller result and any failure. Missing or unfinished routes, whole-record omissions and substituted commands are refused. Optional historical comparison records do not supply route-completion evidence.
 
 ## Published qualification
 

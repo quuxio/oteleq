@@ -99,7 +99,7 @@ class JavaStartupQualificationTests(unittest.TestCase):
             self.assertEqual(original.read_text(), 'preserve original result')
             self.assertEqual(json.loads((Path(result['audit_directory']) / 'QUALIFICATION.json').read_text()), result)
             routes.assert_not_called();execute_controls.assert_not_called()
-            workspace.assert_called_once_with(folder, provider, 'archive-methods-v1')
+            workspace.assert_called_once_with(folder, provider, 'archive-methods-v1', cli)
             self.assertEqual(audit.call_args.kwargs['java_profile'], 'archive-methods-v1')
             self.assertEqual(audit.call_args.kwargs['comparison_directory'], Path(result['audit_directory']) / 'comparisons')
             existing_controls.assert_called_once_with(folder / 'evidence-controls', folder / 'workspace', qualifier.startup_states('both-off'))
@@ -109,17 +109,49 @@ class JavaStartupQualificationTests(unittest.TestCase):
             root = Path(temporary).resolve();provider = root / 'provider';provider.mkdir()
             workspace = root / 'corpus/cases/oteleq-run-fixture';workspace.mkdir(parents=True)
             plan = {'otelc_root': str(provider), 'inventory': [
-                {'status': 'ready', 'otelc_function': name, 'java_profile': 'archive-methods-v1'} for name in controls.FUNCTIONS]}
+                {'id': str(index), 'status': 'ready', 'otelc_function': name, 'java_profile': 'archive-methods-v1'}
+                for index, name in enumerate(controls.FUNCTIONS)], 'source': str(root / 'corpus/cases/application')}
             (workspace / 'plan.json').write_text(json.dumps(plan))
-            marker = root / 'corpus/run.started.json';marker.write_text(json.dumps({'expected_exit': 1}))
-            with self.assertRaises(AssertionError):qualifier.retained_workspace(root, provider, 'archive-methods-v1')
+            cli = root / 'cli'
+            operations = qualifier.route_operations(root / 'corpus', workspace, cli)
+            for name, expected in operations.items():
+                for suffix in ('.stdout', '.stderr'):(root / 'corpus' / (name + suffix)).touch()
+                (root / 'corpus' / (name + '.started.json')).write_text(json.dumps(expected))
+                (root / 'corpus' / (name + '.exit')).write_text(str(expected['expected_exit']) + '\n')
+            check = lambda: qualifier.retained_workspace(root, provider, 'archive-methods-v1', cli)
+            self.assertEqual(check(), workspace)
+            marker = root / 'corpus/run.started.json'
             (root / 'corpus/run.exit').write_text('0\n')
-            with self.assertRaises(AssertionError):qualifier.retained_workspace(root, provider, 'archive-methods-v1')
+            with self.assertRaises(AssertionError):check()
             (root / 'corpus/run.exit').write_text('1\n')
-            self.assertEqual(qualifier.retained_workspace(root, provider, 'archive-methods-v1'), workspace)
-            with self.assertRaises(AssertionError):qualifier.retained_workspace(root, provider, 'stock-methods-v1')
+            self.assertEqual(check(), workspace)
+            with self.assertRaises(AssertionError):qualifier.retained_workspace(root, provider, 'stock-methods-v1', cli)
             foreign = root / 'foreign';foreign.mkdir()
-            with self.assertRaises(AssertionError):qualifier.retained_workspace(root, foreign, 'archive-methods-v1')
+            with self.assertRaises(AssertionError):qualifier.retained_workspace(root, foreign, 'archive-methods-v1', cli)
+            for name in operations:
+                with self.subTest(missing=name):
+                    selected = root / 'corpus' / (name + '.started.json')
+                    original = selected.read_bytes();selected.unlink()
+                    exit_path = root / 'corpus' / (name + '.exit')
+                    exit_bytes = exit_path.read_bytes();exit_path.unlink()
+                    with self.assertRaises(AssertionError):check()
+                    selected.write_bytes(original);exit_path.write_bytes(exit_bytes)
+            for change in ('argv', 'exit', 'bool', 'extra'):
+                record = copy.deepcopy(operations['run'])
+                if change == 'argv':record['argv'][1] = 'clean'
+                elif change == 'extra':record['foreign'] = True
+                else:record['expected_exit'] = True if change == 'bool' else 0
+                marker.write_text(json.dumps(record))
+                with self.subTest(substitution=change), self.assertRaises(AssertionError):check()
+            marker.write_text(json.dumps(operations['run']))
+            for suffix in ('.stdout', '.stderr'):
+                selected = root / 'corpus' / ('export-run' + suffix);selected.unlink()
+                with self.subTest(missing=suffix), self.assertRaises(AssertionError):check()
+                selected.touch()
+            # Optional historical comparator records do not supply route evidence.
+            optional = root / 'corpus/comparison/startup-recomparison.started.json'
+            optional.parent.mkdir();optional.write_text('{}')
+            self.assertEqual(check(), workspace)
 
     def test_rotations_are_complete_immutable_and_unknown_names_refuse(self):
         for offset, name in enumerate(qualifier.STARTS):
