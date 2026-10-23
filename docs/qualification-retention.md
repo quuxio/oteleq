@@ -77,7 +77,7 @@ Run the existing frozen retained verifier only after restoration succeeds. It co
 ## Validation
 
 ```sh
-python3 -m unittest discover -s tests -p test_generation_archives.py -v
+python3 -m unittest discover -s tests -p 'test_generation_archive*.py' -v
 make check
 ```
 
