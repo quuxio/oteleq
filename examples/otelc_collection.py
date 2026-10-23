@@ -94,6 +94,42 @@ def sequence_functions(spans: Sequence[Any], target: str, calls: int, creator: s
                 raise ValueError("receiver construction invoked the selected sequence method")
 
 
+def serial_call_trees(spans: Sequence[Any], target: str, calls: int) -> None:
+    """Require complete synchronous trees with an unambiguous serial root order."""
+    if type(calls) is not int or not 1 <= calls <= 32 or type(target) is not str or not target.strip():
+        raise ValueError("serial sequence requires 1 to 32 named calls")
+    nodes = {(span.trace_id, span.span_id): span for span in spans}
+    roots = [span for span in spans if not span.parent_span_id]
+    if len(nodes) != len(spans) or len(roots) != calls or any(span.name != target for span in spans):
+        raise ValueError("serial sequence has foreign, duplicate or missing call trees")
+    for span in spans:
+        start, end = span.start_time_unix_nano, span.end_time_unix_nano
+        if type(start) is not int or type(end) is not int or start <= 0 or end < start:
+            raise ValueError("serial sequence has invalid call intervals")
+    for span in spans:
+        start, end = span.start_time_unix_nano, span.end_time_unix_nano
+        if span.parent_span_id:
+            parent = nodes.get((span.trace_id, span.parent_span_id))
+            if parent is None or not parent.start_time_unix_nano <= start <= end <= parent.end_time_unix_nano:
+                raise ValueError("serial sequence child is outside its selected parent")
+    ordered = sorted(roots, key=lambda span: span.start_time_unix_nano)
+    for before, after in zip(ordered, ordered[1:]):
+        if (after.start_time_unix_nano <= before.start_time_unix_nano
+                or after.start_time_unix_nano < before.end_time_unix_nano):
+            raise ValueError("serial sequence call roots overlap or have ambiguous order")
+    completed = set()
+    for span in spans:
+        path, current = set(), span
+        while (key := (current.trace_id, current.span_id)) not in completed:
+            if key in path:
+                raise ValueError("serial sequence has a cyclic parent tree")
+            path.add(key)
+            if not current.parent_span_id:
+                break
+            current = nodes[(current.trace_id, current.parent_span_id)]
+        completed.update(path)
+
+
 def linked_creator(span: Any, creators: Mapping[tuple[bytes, bytes], Any], required: bool) -> Any:
     """Resolve the one actual source-factory link before checking the lifetime root."""
     if not required:

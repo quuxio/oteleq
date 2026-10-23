@@ -737,9 +737,10 @@ def native_materialise(project: Path, entry: dict, args: list) -> Path:
         original = source.read_bytes().decode("utf-8")
         source.write_text(cpp_receivers.private_source(original, entry["cpp_receiver"]["records"]))
         (project / "_oteleq_generated/cpp_observe.hpp").write_bytes(Path(__file__).with_name("cpp_observe.hpp").read_bytes())
+        sequence = sequences.concrete(entry, args, concrete_arguments) if "sequence_configuration" in entry else None
         driver.write_text('#include "_oteleq_generated/cpp_observe.hpp"\n#include <stdio.h>\n' + native_abi()
                           + '#define main __oteleq_original_main\n#include ' + json.dumps(entry["path"])
-                          + '\n#undef main\n' + cpp_worker.Worker(entry, args, literal).source())
+                          + '\n#undef main\n' + cpp_worker.Worker(entry, args, literal, sequence=sequence).source())
     else:
         driver.write_text(native_driver(entry, args))
     return driver

@@ -71,10 +71,12 @@ def collection(step: dict) -> dict:
 
 def configure(entry: dict, value: list[dict], coerce: Callable) -> None:
     """Requested unavailable adapters remain named inventory blockers."""
-    if entry["language"] not in ("javascript", "typescript", "java") or "receiver_fixture" not in entry:
-        raise ValueError("sequences require a declared Java/JavaScript/TypeScript receiver fixture")
-    if entry["language"] == "java" and any(step["action"] != "call" for step in value):
-        raise ValueError("Java receiver sequences currently support call actions only")
+    language = entry["language"]
+    receiver = "cpp_receiver" if language == "cpp" else "receiver_fixture"
+    if language not in ("javascript", "typescript", "java", "cpp") or receiver not in entry:
+        raise ValueError("sequences require a declared C++/Java/JavaScript/TypeScript receiver fixture")
+    if language in ("java", "cpp") and any(step["action"] != "call" for step in value):
+        raise ValueError(("C++" if language == "cpp" else "Java") + " receiver sequences currently support call actions only")
     if any("metrics" in step for step in value):
         configure_controls(entry, value)
     if (entry["language"] == "typescript" and any(step["action"] == "collect" for step in value)

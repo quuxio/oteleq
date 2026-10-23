@@ -17,13 +17,16 @@ def quoted(value: str) -> str:
 class Worker:
     """Each frozen type has one checked writer; fields retain their own slots."""
 
-    def __init__(self, entry: dict, arguments: list, literal) -> None:
+    def __init__(self, entry: dict, arguments: list, literal, *, sequence: list[dict] | None = None) -> None:
         self.entry = entry
         self.contract = entry["cpp_receiver"]
         self.models = self.contract["types"]
         self.ids = {name: index for index, name in enumerate(sorted(self.models))}
         self.arguments = arguments
         self.literal = literal
+        self.sequence = sequence
+        if ("sequence_configuration" in entry) != (sequence is not None):
+            raise ValueError("C++ sequence worker requires its concrete frozen calls")
 
     def type_name(self, name: str) -> str:
         """Source records always resolve globally, never to an observer helper."""
@@ -103,31 +106,89 @@ class Worker:
             roots.append(("global:" + item["name"], item["type"], address))
         return "\n".join("g.field(" + quoted(name) + ");" + self.view(type_, address) for name, type_, address in roots)
 
-    def source(self) -> str:
-        """Construct independently and retain the returned value through all boundaries."""
-        aliases = "\n".join("using type_" + str(index) + "=" + self.type_name(name) + ";" for name, index in self.ids.items())
-        forwards = "\n".join("static void write_" + str(index) + "(Graph&,const void*,unsigned);" for index in self.ids.values())
-        access = "\n".join(self.access(name, record) for name, record in self.contract["records"].items())
-        writers = "\n".join(self.writer(name, model) for name, model in self.models.items())
+    def argument_declarations(self, values: list) -> str:
+        """Every call has independent scalar slots with its exact declared inputs."""
+        parameters = self.contract['method']['parameters']
+        if len(values) != len(parameters):
+            raise ValueError("C++ call argument count differs from its source method")
+        return "\n".join(self.type_name(type_) + " argument_" + str(index) + "=" + self.literal(value, type_, "cpp") + ";"
+            for index, (type_, value) in enumerate(zip(parameters, values)))
+
+    def invocation(self) -> str:
+        """Retain each result or supported error while its source storage is live."""
         owner, method = self.contract["owner"], self.contract["method"]
-        arguments = "\n".join(self.type_name(type_) + " argument_" + str(index) + "=" + self.literal(value, type_, "cpp") + ";"
-                              for index, (type_, value) in enumerate(zip(method["parameters"], self.arguments)))
         target = "static_cast<::" + owner + "&&>(receiver)" if "&&" in method["qualifiers"].split() else "receiver"
-        call = "(" + target + ".*access<::" + owner + ">::target())(" + ",".join("argument_" + str(i) for i in range(len(self.arguments))) + ")"
+        call = "(" + target + ".*access<::" + owner + ">::target())(" + ",".join("argument_" + str(i) for i in range(len(method['parameters']))) + ")"
         invocation = call + ";" if method["output"] == "void" else "decltype(auto) result=" + call + ";"
         result = "g.unit();" if method["output"] == "void" else self.view(method["output"], "__builtin_addressof(result)")
         # Save roots before adding the result so the field delimiter state is local.
         roots = self.roots()
-        invocation = ("try{" + invocation + "Graph& g=outcome;g.begin();" + roots + 'g.field("\\\"result\\\"");' + result
+        return ("try{" + invocation + "Graph& g=outcome;g.begin();" + roots + 'g.field("\\\"result\\\"");' + result
                       + "g.finish();{Graph& g=after;g.begin();" + roots + "g.finish();}}"
                       + "catch(const std::exception& error){error_outcome=true;Graph& g=outcome;g.begin();" + roots
                       + 'g.field("\\\"error\\\"");g.error(error);g.finish();{Graph& g=after;g.begin();' + roots + "g.finish();}}")
+
+    def creation(self) -> str:
+        """Construct at the final receiver address without an extra ABI copy."""
         fixture = self.contract["factory"]
         inputs = ",".join(self.literal(value, type_, "cpp") for value, type_ in zip(fixture["arguments"], fixture["parameters"]))
         # Construct inside the friend. Returning a small trivial source object
         # through another helper can introduce ABI copies and dangling self pointers.
-        creation = self.type_name(owner) + " receiver=::" + fixture["name"] + "(" + inputs + ");"
-        main = ("int access<::" + owner + ">::run(){Graph before,outcome,after;bool error_outcome=false;" + creation
+        return self.type_name(self.contract['owner']) + " receiver=::" + fixture["name"] + "(" + inputs + ");"
+
+    @staticmethod
+    def outcome_write() -> str:
+        """Both the step and its outer summary use the same retained graph bytes."""
+        return r'''std::fputs(error_outcome?",\"outcome\":{\"kind\":\"error\",\"value\":":",\"outcome\":{\"kind\":\"return\",\"value\":",output)>=0
+ && outcome.write(output) && std::fputs("}",output)>=0'''
+
+    def sequence_main(self) -> str:
+        """Stream bounded steps without retaining a graph arena for every call."""
+        if not self.sequence or len(self.sequence) > 32:
+            raise ValueError("C++ receiver sequences require 1 to 32 calls")
+        body = 'int access<::' + self.contract['owner'] + '>::run(){' + self.creation() + r'''
+std::FILE* output=std::fopen(std::getenv("OTELEQ_OBSERVATION"),"wb");if(!output)return 90;
+__oteleq_abi(output);bool ok=true;
+'''
+        roots = self.roots()
+        for index, step in enumerate(self.sequence):
+            if (step.get('action') != 'call' or step.get('id') != 'step-' + str(index)
+                    or set(step) - {'id', 'action', 'arguments', 'expected_baseline'}):
+                raise ValueError("C++ sequence worker requires only frozen call actions")
+            body += '{Graph before,outcome,after;bool error_outcome=false;' + self.argument_declarations(step['arguments'])
+            body += '{Graph& g=before;g.begin();' + roots + 'g.finish();}' + self.invocation()
+            if index == 0:
+                body += r'''ok=ok && std::fputs("{\"cpp_receiver_schema_version\":2,\"before\":",output)>=0
+ && before.write(output) && std::fputs(",\"steps\":[",output)>=0;'''
+            else:
+                body += 'ok=ok && std::fputs(",",output)>=0;'
+            prefix = json.dumps({'id': step['id'], 'action': 'call'}, separators=(',', ':'))[:-1] + ',"before":'
+            body += 'ok=ok && std::fputs(' + json.dumps(prefix) + ',output)>=0 && before.write(output) && '
+            body += self.outcome_write() + r''' && std::fputs(",\"after\":",output)>=0
+ && after.write(output) && std::fputs("}",output)>=0;'''
+            if index == len(self.sequence) - 1:
+                body += 'ok=ok && std::fputs("]",output)>=0 && ' + self.outcome_write()
+                body += r''' && std::fputs(",\"after\":",output)>=0 && after.write(output);'''
+            body += r'''
+if(!ok){std::fclose(output);return 92;}
+long captured=std::ftell(output);
+if(captured<0){std::fclose(output);return 92;}
+// Reserve the final object terminator and newline within the case budget.
+if(captured>790526){std::fclose(output);throw capture_failure{"sequence capture budget exceeded"};}
+}
+'''
+        return body + r'''ok=std::fputs("}\n",output)>=0 && ok;return std::fclose(output)==0 && ok?0:92;}
+'''
+
+    def source(self) -> str:
+        """Construct independently and retain results through complete boundaries."""
+        aliases = "\n".join("using type_" + str(index) + "=" + self.type_name(name) + ";" for name, index in self.ids.items())
+        forwards = "\n".join("static void write_" + str(index) + "(Graph&,const void*,unsigned);" for index in self.ids.values())
+        access = "\n".join(self.access(name, record) for name, record in self.contract["records"].items())
+        writers = "\n".join(self.writer(name, model) for name, model in self.models.items())
+        owner = self.contract['owner']
+        arguments, roots, invocation = self.argument_declarations(self.arguments), self.roots(), self.invocation()
+        main = ("int access<::" + owner + ">::run(){Graph before,outcome,after;bool error_outcome=false;" + self.creation()
                 + arguments + "{Graph& g=before;g.begin();" + roots + "g.finish();}" + invocation + r'''
 std::FILE* output=std::fopen(std::getenv("OTELEQ_OBSERVATION"),"wb");if(!output)return 90;
 __oteleq_abi(output);
@@ -136,6 +197,8 @@ bool ok=std::fputs("{\"cpp_receiver_schema_version\":1,\"before\":",output)>=0 &
  && outcome.write(output) && std::fputs("},\"after\":",output)>=0 && after.write(output) && std::fputs("}\n",output)>=0;
 return std::fclose(output)==0 && ok?0:92;}
 ''')
+        if self.sequence is not None:
+            main = self.sequence_main()
         generated = "namespace __oteleq_cpp {\n" + aliases + forwards + access + writers + main + "}\n"
         clean = cpp_receivers.sanitise_identifiers(self.contract) + native_names.undefinitions(generated)
         return clean + generated + '\nint main(){try{return __oteleq_cpp::access<::' + owner + '>::run();}\n' + '''

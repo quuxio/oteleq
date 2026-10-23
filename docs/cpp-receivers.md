@@ -42,6 +42,25 @@ Constructor fixtures create the receiver at its final address inside the friend 
 
 The inventory and build share C++17, optimisation and threading flags. The selected LLVM compiler's sibling `llvm-cxxfilt` supplies the actual instrumentation identity. For example, a `short` alias resolves to `sample::Counter::add(short)`, and a const method retains its `const` qualifier. Mach-O linkage prefixes are removed before resolution so C-linkage names preserve the application's own underscores. Exact typed member pointers bind overloaded methods; inventory accounts for declarations and excluded functions separately.
 
+## Ordered calls
+
+The same declared receiver can execute 1 through 32 ordered calls to its selected method. Add a schedule to the existing fixture:
+
+```toml
+sequence = [
+  { action = "call", arguments = "case" },
+  { action = "call", arguments = [2] },
+]
+```
+
+The constructor or fixed factory runs once per worker. Each call records complete before/result-or-error/after graphs for its own scalar inputs, receiver and declared globals/statics. Supported returned references and cycles retain their aliases within each graph. Calls can declare their own `expected_baseline`, including a supported exception; later calls still execute after that declared error. Scalar shrinking preserves the construction and schedule while reducing uses of the case arguments.
+
+Version-two receiver observations require every step in order. Their outer `before` equals the first step's starting graph, and their outer outcome/final graph equal the last step. A mutation restored by a later call therefore remains visible. The worker streams completed steps and reuses bounded graph arenas; the whole observation, including every step and outer summary, has a 790,528-byte limit. Exceeding it stops the worker with incomplete evidence rather than a successful partial sequence.
+
+Decoded instrumentation must contain the declared number of selected call roots, with an unambiguous serial order and complete descendants inside their parent intervals. Recursive selected calls remain in their root tree. This is a named serial-tree witness; it does not implement invocation-scoped attribution. Release, collection, live metric controls, other method targets, asynchronous and resource actions remain unsupported in this C++ profile.
+
+Component tests cover real compiled callers, intermediate exceptions, aliases, restored differences, 32-call bounds and malformed observations. Actual-provider qualification for ordered C++ calls is pending; the existing record below retains its single-call scope.
+
 ## Storage and capture limits
 
 The closed registry supports native booleans and integers up to 64 bits, IEEE float/double storage, named physical source classes/structs, fixed arrays, const storage, pointers and lvalue references. Every field has a typed slot. Separate location nodes preserve equal starting addresses across typed views, including an interior pointer and a reference returned to the receiver. Scalar bytes preserve signed zero and NaN payloads; structure padding is never compared. Graphs are rebuilt at each boundary and do not establish allocation identity across destruction or address reuse.

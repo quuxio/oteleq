@@ -116,10 +116,31 @@ def boundaries(raw: bytes, entry: dict, scalar) -> dict:
     metadata, separator, payload = raw.partition(b"\n")
     require(bool(separator) and metadata.startswith(b"abi:"), "missing actual compiler ABI")
     abi, capture = strict_json(metadata[4:]), strict_json(payload)
-    require(type(abi) is dict and type(capture) is dict
-            and set(capture) == {"cpp_receiver_schema_version", "before", "outcome", "after"}
-            and type(capture["cpp_receiver_schema_version"]) is int and capture["cpp_receiver_schema_version"] == 1,
+    ordered = "sequence_configuration" in entry
+    fields = {"cpp_receiver_schema_version", "before", "outcome", "after"} | ({"steps"} if ordered else set())
+    require(type(abi) is dict and type(capture) is dict and set(capture) == fields
+            and type(capture["cpp_receiver_schema_version"]) is int
+            and capture["cpp_receiver_schema_version"] == (2 if ordered else 1),
             "unsupported receiver envelope")
+    if ordered:
+        observed, declared = capture['steps'], entry['sequence_configuration']
+        require(type(observed) is list and 1 <= len(observed) == len(declared) <= 32, "incomplete receiver sequence")
+        for index, (step, action) in enumerate(zip(observed, declared)):
+            require(type(step) is dict and set(step) == {'id', 'action', 'before', 'outcome', 'after'}
+                    and step['id'] == 'step-' + str(index) and step['action'] == action['action'] == 'call',
+                    "invalid receiver action")
+        require(capture['before'] == observed[0]['before']
+                and all(capture[name] == observed[-1][name] for name in ('outcome', 'after')),
+                "receiver sequence contradicts its outer boundaries")
+    result = boundary(capture, entry, abi, scalar)
+    if ordered:
+        result['steps'] = [{'id': step['id'], 'action': 'call', 'gaps': [],
+            **boundary(step, entry, abi, scalar)} for step in observed]
+    return result
+
+
+def boundary(capture: dict, entry: dict, abi: dict, scalar) -> dict:
+    """Decode each complete source-bound snapshot through the same closed codec."""
     outcome = capture["outcome"]
     require(type(outcome) is dict and set(outcome) == {"kind", "value"}
             and outcome["kind"] in ("return", "error"), "invalid outcome")

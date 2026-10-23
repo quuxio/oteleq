@@ -840,6 +840,8 @@ def sequence_telemetry(bodies, report, entry, service, decoder, names, roots, er
     spans = [span for path, body in bodies if path == capture.TRACE_PATH
              for span in capture.service_spans(decoder.FromString(body), service)]
     otelc_collection.sequence_functions(spans, target, calls, creator)
+    if entry["language"] == "cpp":
+        otelc_collection.serial_call_trees(spans, target, calls)
     allowed = {target} | ({creator} if creator is not None else set())
     spec = {"functions": names, "trees": roots, "errors": errors}
     if sequences.collects(entry):
