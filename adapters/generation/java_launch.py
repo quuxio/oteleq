@@ -128,7 +128,9 @@ def expected_argv(root: Path, java: Path, classes: Path, main: str, runtime: Pat
 
 def plan_values(runtime: Path, data: dict, selection: dict) -> dict:
     """Verify policy-owned controls, hashes and shutdown budget independently."""
-    return {"control.socket": str(runtime / CONTROL_SOCKET), "metrics.collection": "true", "metrics.emission": "true",
+    return {"control.socket": str(runtime / CONTROL_SOCKET),
+            "metrics.collection": str(data["metrics"]["collection"]).lower(),
+            "metrics.emission": str(data["metrics"]["emission"]).lower(),
             "metrics.buckets": ",".join(map(str, data["metrics"]["histogram_boundaries_seconds"])),
             "health.report": str(runtime / "health.json"), "health.policy-sha256": provider.digest(data),
             "health.selection-sha256": provider.digest(selection),

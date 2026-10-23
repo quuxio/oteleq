@@ -199,8 +199,7 @@ class NodeLiveTests(unittest.TestCase):
         java = {'language': 'java', 'java_backend': 'prepared', 'receiver_fixture': {}}
         steps = sequences.validate([{**step, 'metrics': state.copy()}
                                     for step, state in zip(STEPS, STATES[1:] + STATES[:1])], policy.expected_baseline)
-        with self.assertRaisesRegex(ValueError, 'initial'):
-            sequences.configure_controls(java, steps)
+        sequences.configure_controls(java, steps)
 
     def test_wrong_actual_startup_state_cannot_be_hidden_by_the_first_setters(self):
         with tempfile.TemporaryDirectory() as temporary:

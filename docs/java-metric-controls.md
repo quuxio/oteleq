@@ -36,7 +36,9 @@ sequence = [
 ]
 ```
 
-Use the normal `plan --config`, `generate`, `run`, `replay`, `shrink` and `export-tests` commands. The first call must provide a collection-on/emission-on positive control. Every call in a live schedule must declare both booleans. Fixed arguments, construction inputs, required roots and states remain frozen through generated suites, export and scalar shrinking. Other provider/language profiles remain explicit blockers.
+Use the normal `plan --config`, `generate`, `run`, `replay`, `shrink` and `export-tests` commands. A call in the schedule must provide a collection-on/emission-on positive control. Every call in a live schedule must declare both booleans. The first call's flags set the SDK's actual startup state in both the common policy and independently checked launch properties. The first status must already match those flags; later setters cannot repair an incorrect initial state. Fixed arguments, construction inputs, required roots and states remain frozen through generated suites, export and scalar shrinking. Other provider/language profiles remain explicit blockers.
+
+The published qualifications below cover positive-first schedules. Starting with collection, emission or both disabled is implemented with component regressions, but still needs its own actual-provider qualification. It is outside those existing records.
 
 | Requested state | Selected function measurements | Metric export | Tracing |
 | --- | --- | --- | --- |

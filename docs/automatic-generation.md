@@ -65,6 +65,8 @@ The explicit prepared [runtime archive profile](java-runtime-archives.md) additi
 
 The explicit source Node provider implements [live metric collection/emission schedules](node-metric-controls.md) for declared serial receiver calls. Its [696-launch qualification](qualification/node-metric-controls-2026-10-23.json) covers positive-first schedules on Node 24/26 and both TypeScript compilers, including retained suites, replay, scalar reduction and changed current-source bodies. Startup-off schedules fix SDK creation flags to the first call and require a both-on call somewhere in the schedule. They remain under separate qualification; earlier source-provider records keep their original scope.
 
+Prepared [Java metric schedules](java-metric-controls.md) also derive actual startup flags from the first declared call and require a positive call somewhere in the schedule. Component regressions cover all four initial states and reject a wrong initial status before setters. Startup-off still needs separate actual-provider qualification; existing Java records retain their positive-first scope.
+
 ## Project policy and concrete fixtures
 
 Pass `--config /absolute/path/to/equivalence.toml` to `plan`. The [example policy](../examples/equivalence.toml) is executable. Unknown keys, unsupported schema/language IDs, duplicate selectors/cases and unsafe limits fail validation. A policy is at most 1 MiB. CLI `--language` and `--cases` override the corresponding policy values; CLI exclusions extend the policy exclusions.

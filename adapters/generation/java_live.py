@@ -114,6 +114,9 @@ class Session:
         requested = self.sequence[index]["metrics"]
         history = self.transition(requested, deadline)
         if history:
+            if index == 0:
+                control.require(all(history[0]["status"][key] == value for key, value in requested.items()),
+                                "initial metric state differs from the declared startup state")
             previous = self.record["steps"][-1]["after"]["settled"] if index else {"completed": 0}
             control.require(history[0]["status"]["completed"] == previous["completed"],
                             "selected calls ran outside declared checkpoints")
