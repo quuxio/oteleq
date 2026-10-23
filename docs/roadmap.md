@@ -54,6 +54,8 @@ Acceptance includes typed buffers/aliasing, observable globals, internal-linkage
 
 ## Stage 5: Java
 
+[Prepared Java startup qualification](qualification/java-startup-metric-controls-2026-10-23.json) covers all four initial states in the recorded stock, safe and archive profiles: 2,256 distinct JVMs, 168 evidence refusals and 576 recomputed comparisons. Original failed archive audits remain recorded separately from corrected retained-only verification. Broader Java acceptance below remains open.
+
 Deliver classpath/module-aware inventory, private JUnit/jqwik test project, receiver/static graph codecs, independent JVM workers and pinned otelc bytecode-agent integration.
 
 Acceptance includes factories/interfaces, constructor/exception identity, module encapsulation diagnostics, executor/completion fixtures and loaded-class/agent provenance. Extra reflection/open-module flags remain visible harness/diagnostic deltas.
