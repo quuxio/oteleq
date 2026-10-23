@@ -261,6 +261,10 @@ const RESOURCES: &[(&str, &str)] = &[
         include_str!("../adapters/generation/java_action_receipt.py"),
     ),
     (
+        "java_action_bindings.py",
+        include_str!("../adapters/generation/java_action_bindings.py"),
+    ),
+    (
         "OteleqRendezvous.java",
         include_str!("../adapters/generation/OteleqRendezvous.java"),
     ),

@@ -88,6 +88,14 @@ class QualificationRecipeTests(unittest.TestCase):
             cwd=ROOT, capture_output=True, text=True, check=True)
         self.assertIn('/selected/python tests/qualify_python_provider_runtime.py', result.stdout)
         self.assertIn('--otelc-root "/tmp/provider" --report-dir "/tmp/evidence"', result.stdout)
+
+    def test_java_binding_recipe_runs_only_the_explicit_offline_qualification(self):
+        result = subprocess.run(['make', '--no-print-directory', '-n', 'generation-java-bindings-otelc',
+            'OTELC_ROOT=/tmp/provider', 'REPORT_DIR=/tmp/evidence', 'PYTHON=/selected/python'],
+            cwd=ROOT, capture_output=True, text=True, check=True)
+        self.assertIn('/selected/python tests/qualify_java_action_bindings.py', result.stdout)
+        self.assertIn('--otelc-root "/tmp/provider" --report-dir "/tmp/evidence"', result.stdout)
+        self.assertNotIn('cargo build', result.stdout)
         self.assertNotIn('cargo build', result.stdout)
 
     def test_help_names_the_http_qualification_target(self):

@@ -1,0 +1,192 @@
+"""Independent frozen Java action-v2 declarations and offline compiler outputs.
+
+The public SDK compiler reads original class bytes without starting the
+application. Successful bindings alone do not admit generated execution.
+"""
+
+from collections.abc import Callable
+import hashlib
+import json
+from pathlib import Path
+import sys
+
+import java_build
+import java_launch
+import java_profiles
+import java_provider
+import java_witness as witness
+import otelc_capture as capture
+
+ROLES = ("envelope", "rendezvous", "wrapper", "target")
+DECLARATION_FIELDS = {"owner", "name", "descriptor"}
+BINDING_FIELDS = DECLARATION_FIELDS | {"class_sha256", "method_sha256", "probe_id"}
+MAX_BINDINGS = 1024 * 1024
+MAX_TEXT = 65535
+COMPILER = """import json, os, sys
+from pathlib import Path
+os.umask(0o077)
+sys.path.insert(0, sys.argv[1])
+from otelc.prepared_java import PreparedApplication
+from otelc.witness import compile_bindings
+application = PreparedApplication.load(Path(sys.argv[2]))
+declarations = json.loads(Path(sys.argv[3]).read_text())
+result = compile_bindings(application, declarations, Path(sys.argv[4]))
+print(json.dumps(result, sort_keys=True))
+"""
+
+
+def _text(value: object) -> bool:
+    return (type(value) is str and bool(value) and len(value.encode("utf-8")) <= MAX_TEXT
+            and not any(ord(char) < 32 or ord(char) == 127 for char in value))
+
+
+def _owner(value: object) -> bool:
+    return (_text(value) and all(value.split("/"))
+            and not any(char in value for char in ".;[\\"))
+
+
+def _field(text: str, start: int) -> tuple[int, int] | None:
+    dimensions = 0
+    while start < len(text) and text[start] == "[":
+        dimensions += 1;start += 1
+    if dimensions > 255 or start == len(text):
+        return None
+    kind = text[start]
+    if kind in "BCDFIJSZ":
+        return start + 1, 1 if dimensions or kind not in "JD" else 2
+    if kind == "L":
+        end = text.find(";", start + 1)
+        if end > start + 1 and _owner(text[start + 1:end]):
+            return end + 1, 1
+    return None
+
+
+def descriptor(value: object) -> bool:
+    """Recognise bounded ordinary JVM method descriptors, including slot limits."""
+    if not _text(value) or not value.startswith("("):
+        return False
+    position, slots = 1, 0
+    while position < len(value) and value[position] != ")":
+        item = _field(value, position)
+        if item is None:
+            return False
+        position, width = item;slots += width
+        if slots > 255:
+            return False
+    if position >= len(value) - 1:
+        return False
+    position += 1
+    if value[position:] == "V":
+        return True
+    result = _field(value, position)
+    return result is not None and result[0] == len(value)
+
+
+def declarations(value: object) -> dict:
+    """Freeze exactly four distinct caller-owned declarations, without coercion."""
+    witness.require(type(value) is dict and set(value) == set(ROLES), "missing explicit action declarations")
+    for role in ROLES:
+        item = value[role]
+        witness.require(type(item) is dict and set(item) == DECLARATION_FIELDS
+                        and _owner(item["owner"]) and _text(item["name"])
+                        and not any(char in item["name"] for char in ".;/[<>")
+                        and descriptor(item["descriptor"]), "invalid action declaration: " + role)
+    witness.require(value["rendezvous"]["descriptor"] == "()V"
+                    and len({tuple(value[role][key] for key in ("owner", "name", "descriptor"))
+                             for role in ROLES}) == 4, "action roles must be distinct with a ()V rendezvous")
+    raw = json.dumps(value, sort_keys=True).encode()
+    witness.require(len(raw) <= MAX_BINDINGS, "action declarations exceed their byte budget")
+    return capture.strict_json(raw)
+
+
+def verify(value: object, expected: dict, application: dict, classes: Path) -> dict:
+    """Bind every compiler probe to independent declarations and class products."""
+    expected = declarations(expected)
+    witness.require(type(application) is dict and type(application.get("bindings")) is dict,
+                    "missing compiler-owned application bindings")
+    witness.require(type(value) is dict and set(value) == {"schema_version", "kind", "profile", "bindings"}
+                    and type(value["schema_version"]) is int and value["schema_version"] == 2
+                    and value["kind"] == "otelc.java-witness-bindings" and value["profile"] == witness.PROFILE,
+                    "unsupported action binding document")
+    bindings = value["bindings"]
+    witness.require(type(bindings) is dict and set(bindings) == set(ROLES), "missing compiled action roles")
+    for role in ROLES:
+        item, declaration = bindings[role], expected[role]
+        witness.require(type(item) is dict and set(item) == BINDING_FIELDS
+                        and all(type(item[key]) is str for key in BINDING_FIELDS)
+                        and all(item[key] == requested for key, requested in declaration.items()),
+                        "compiler changed an action declaration")
+        owner = declaration["owner"].replace("/", ".")
+        witness.require(owner in application["bindings"], "action owner has no compiler source binding")
+        original = application["bindings"][owner]
+        actual = classes / (declaration["owner"] + ".class")
+        witness.require(type(original) is dict and witness.hex_id(original.get("class_sha256"), 64)
+                        and witness.hex_id(item["class_sha256"], 64)
+                        and item["class_sha256"] == original["class_sha256"] == java_build.digest(actual)
+                        and witness.hex_id(item["method_sha256"], 64), "action class or method identity differs")
+        fields = [witness.PROFILE, role, *(declaration[key] for key in ("owner", "name", "descriptor")),
+                  item["class_sha256"], item["method_sha256"]]
+        witness.require(item["probe_id"] == hashlib.sha256("\n".join(fields).encode()).hexdigest(),
+                        "action compiler probe differs")
+    return value
+
+
+def inputs(root: Path, tools: dict) -> dict:
+    """Include the offline helper as well as the fixed safe runtime/tooling scope."""
+    value = java_provider.artefacts(root, tools, java_profiles.SAFE)
+    helper = root / java_provider.HELPER
+    witness.require(helper.is_file() and not helper.is_symlink(), "missing regular offline binding compiler")
+    value[java_provider.HELPER] = capture.file_digest(helper)
+    value["tool:python"] = capture.file_digest(Path(sys.executable))
+    value["tool:jdk-modules"] = capture.file_digest(java_build.module_image(tools["java"]))
+    return value
+
+
+def _audit(root: Path, project: Path, build: Path, classes: Path, tools: dict,
+           before: dict, request: Path, request_identity: dict) -> None:
+    java_build.verify(project, classes, build)
+    witness.require(before == inputs(root, tools) and request_identity == java_launch.identity(request),
+                    "offline compiler inputs changed")
+
+
+def compile(root: Path, project: Path, build: Path, folder: Path, tools: dict,
+            expected: dict, environment: dict, execute: Callable) -> dict:
+    """Run the fixed public offline SDK API in a new private external directory."""
+    frozen = declarations(expected)
+    witness.require(folder.is_absolute() and folder.parent == folder.parent.resolve(strict=True)
+                    and not folder.is_relative_to(project.resolve(strict=True))
+                    and not folder.is_relative_to(root.resolve(strict=True)), "binding outputs must be new and external")
+    classes = build / java_launch.CLASSES
+    java_build.verify(project, classes, build)
+    application = capture.strict_json((build / java_launch.APPLICATION_FILE).read_bytes())
+    before = inputs(root, tools)
+    folder.mkdir(mode=0o700)
+    request, output = folder / "declarations.json", folder / "bindings.json"
+    with request.open("x") as stream:
+        request.chmod(0o600)
+        stream.write(json.dumps(frozen, sort_keys=True) + "\n")
+    request_identity = java_launch.identity(request)
+    command = [sys.executable, "-I", "-S", "-B", "-c", COMPILER, str(root),
+               str(build / java_launch.APPLICATION_FILE), str(request), str(output)]
+    tool_environment = java_provider.environment(root, tools, folder, environment)
+    tool_environment["OTELC_JAVA"] = str(tools["java"].resolve(strict=True))
+    try:
+        result = execute(command, root, tool_environment, folder / "compiler",
+                         max_output_bytes=MAX_BINDINGS)
+    except BaseException as error:
+        try:
+            _audit(root, project, build, classes, tools, before, request, request_identity)
+        except (OSError, ValueError) as audit_error:
+            error.add_note("Offline input audit also failed: " + str(audit_error))
+        raise
+    _audit(root, project, build, classes, tools, before, request, request_identity)
+    witness.require(result.returncode == 0, "offline binding compilation failed; inspect compiler/stderr")
+    value = witness.read_private(folder, "bindings.json", MAX_BINDINGS)
+    witness.require(capture.strict_json(result.stdout) == value, "offline compiler response differs from retained bindings")
+    verify(value, frozen, application, classes)
+    record = {"schema_version": 1, "profile": witness.PROFILE, "argv": command, "cwd": str(root),
+              "sdk_inputs_sha256": before, "declarations": request_identity,
+              "application_sha256": capture.file_digest(build / java_launch.APPLICATION_FILE),
+              "bindings_sha256": capture.file_digest(output)}
+    (folder / "compiler-inputs.json").write_text(json.dumps(record, indent=2) + "\n")
+    return value
