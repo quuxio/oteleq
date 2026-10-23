@@ -1032,10 +1032,10 @@ def provider_stable(root, language, tools, expected, entry):
 
 
 def attempt(workspace, data, entry, case, lane, folder, decoder, *, http_fixtures=None):
-    python_provider.refuse_unbound(entry)
     http_fixtures = http_fixtures or []
     if [item.settings for item in http_fixtures] != http_effects.selected(data["configuration"]):
         raise ValueError("HTTP effects require the frozen case fixture context before application execution")
+    python_provider.refuse_unbound(entry)
     folder.mkdir(parents=True)
     roots = (Path(data["source"]), Path(data["otelc_root"]), workspace)
     with java_launch.runtime(entry, folder, source_roots=roots) as runtime:

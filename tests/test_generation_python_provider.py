@@ -183,7 +183,7 @@ class PythonProviderTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary, patch.object(generation.java_launch, "runtime") as launch:
             folder = Path(temporary) / "attempt"
             with self.assertRaisesRegex(ValueError, "origin bindings"):
-                generation.attempt(Path(temporary), {}, entry(), {}, "baseline", folder, None)
+                generation.attempt(Path(temporary), {"configuration": policy.validate({})}, entry(), {}, "baseline", folder, None)
             launch.assert_not_called()
             self.assertFalse(folder.exists())
         self.assertEqual(generation.retained_provider_directories({"python_provider_manifest": {}}), [provider.DIRECTORY])
