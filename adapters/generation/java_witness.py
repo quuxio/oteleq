@@ -246,31 +246,52 @@ def read_final(runtime: Path, *, pid: int, identity: Identity) -> dict:
     """Read a stable owned report and bind final evidence to the launched JVM."""
     require(type(pid) is int and pid > 0, "missing actual JVM PID")
     require(pid == identity.pid, "actual JVM PID differs from frozen producer identity")
+    return final_report(read_private(runtime, "witness-health.json", MAX_FINAL), pid=pid, identity=identity)
+
+
+@dataclass(frozen=True)
+class PrivateSnapshot:
+    """One bounded opened file's bytes and stable filesystem identity."""
+
+    raw: bytes
+    identity: tuple[int, ...]
+
+
+def read_private(runtime: Path, name: str, maximum: int) -> object:
+    """Decode bounded owned JSON from a coherent opened-file snapshot."""
+    return strict_json(private_snapshot(runtime, name, maximum).raw)
+
+
+def private_snapshot(runtime: Path, name: str, maximum: int) -> PrivateSnapshot:
+    """Keep the same bytes and identity available for subsequent publication."""
+    require(type(name) is str and name not in ("", ".", "..") and Path(name).name == name
+            and "\x00" not in name, "invalid private witness filename")
+    require(type(maximum) is int and 0 < maximum <= MAX_FINAL, "invalid private witness byte budget")
     require(runtime == runtime.resolve(strict=True), "runtime is not canonical")
     parent = os.open(runtime, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
     try:
         directory = os.fstat(parent)
         require(directory.st_uid == os.getuid() and stat.S_IMODE(directory.st_mode) == 0o700,
-                "unsafe final report directory")
-        fd = os.open("witness-health.json", os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=parent)
+                "unsafe witness directory")
+        fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=parent)
         try:
             before = os.fstat(fd)
             require(stat.S_ISREG(before.st_mode) and before.st_uid == os.getuid()
-                    and stat.S_IMODE(before.st_mode) == 0o600 and before.st_size <= MAX_FINAL,
-                    "unsafe or oversized final report")
+                    and stat.S_IMODE(before.st_mode) == 0o600 and before.st_nlink == 1 and before.st_size <= maximum,
+                    "unsafe or oversized witness file")
             with os.fdopen(fd, "rb", closefd=False) as stream:
-                raw = stream.read(MAX_FINAL + 1)
+                raw = stream.read(maximum + 1)
             after = os.fstat(fd)
-            linked = os.stat("witness-health.json", dir_fd=parent, follow_symlinks=False)
+            linked = os.stat(name, dir_fd=parent, follow_symlinks=False)
         finally:
             os.close(fd)
     finally:
         os.close(parent)
     signature = lambda info: (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns,
-                              info.st_ctime_ns, info.st_mode, info.st_uid)
-    require(len(raw) == before.st_size <= MAX_FINAL and signature(before) == signature(after) == signature(linked),
-            "final report changed while reading")
-    return final_report(strict_json(raw), pid=pid, identity=identity)
+                              info.st_ctime_ns, info.st_mode, info.st_uid, info.st_nlink)
+    require(len(raw) == before.st_size <= maximum and signature(before) == signature(after) == signature(linked),
+            "witness file changed while reading")
+    return PrivateSnapshot(raw, signature(before))
 
 
 def final_report(value: object, *, pid: int, identity: Identity) -> dict:

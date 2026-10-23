@@ -2,7 +2,7 @@
 
 ## Status
 
-The independent `java-sync-action-v2` control/final and decoded-trace readers and ordinary JDK private harness channel are implemented components. Generated prepared-Java action scopes are not yet available: public build/probe binding, actual SDK control integration and qualification with a real frozen v2 producer remain required. Existing generated workers retain their documented name-only witness. These components do not establish equivalence of a shipping artefact.
+The independent `java-sync-action-v2` control/final and decoded-trace readers, offline binding bridge and ordinary JDK private harness channel are implemented components. Generated prepared-Java action scopes are not yet available: generated caller wiring, actual SDK control integration and complete qualification with a real frozen producer remain required. Existing generated workers retain their documented name-only witness. These components do not establish equivalence of a shipping artefact.
 
 The [shared witness design](action-witness.md) remains the acceptance boundary. A producer acknowledgement cannot replace actual receiver evidence, and successful framing cannot qualify invocation attribution.
 
@@ -13,6 +13,22 @@ The [shared witness design](action-witness.md) remains the acceptance boundary. 
 The parent freezes a case ID, attempt ID and ordered distinct action IDs. Each readiness frame contains those identities, a fresh private token, the actual JVM PID and `Thread.currentThread().threadId()`. The parent checks the PID against the launched process. It releases only the connection which supplied that validated readiness. Partial, duplicate, oversized, reordered and foreign-process frames refuse. The executor retains responsibility for application output, time/resource budgets and process cleanup.
 
 The selected producer context must match that independently reported Java thread ID before arming. The consumer also binds its opaque cookie and freshness sequence to the runtime instance and frozen compiler/build/probe identities. Another envelope becoming ready first cannot be treated as the intended action. A concurrent action can cause refusal under the initial one-active-action profile; it must not cause false attribution. Virtual threads and asynchronous migration require separate support and remain unavailable.
+
+## Offline compiler bindings
+
+`java_action_bindings.py` freezes four distinct caller-declared envelope, rendezvous, wrapper and target methods. It calls the public offline SDK compiler from a fixed isolated Python process, pins the selected JDK, and rechecks the application sources, compiler records, class products, SDK inputs and declarations after success, failure or cancellation. Cancellation keeps its original exception; a failed input audit remains an attached diagnostic. Application classes are read without initialising them.
+
+The independent reader requires the explicit v2 schema/profile, closed fields, exact owner/name/descriptor declarations, matching compiler-owned class bytes and recomputed role probe IDs. Method-code digests and harness shape are checked by the frozen offline SDK compiler; they still need actual runtime capture and receipt before invocation admission. Neither metadata acceptance nor the presence of this module enables a generated worker. The v2 direct-call restriction remains in force: reflected wrappers and undeclared handle profiles cannot silently use it.
+
+Bindings and final JSON use one stable private-file reader: canonical owned mode-0700 parent, one owned mode-0600 regular file link, no-follow/nonblocking open, bounded read and descriptor/path identity checks. Binding declarations/output each have a 1 MiB budget. SDK stdout must agree with the retained bindings. The output hash comes from the same opened snapshot as the verified data, and a final snapshot must match its bytes and file identity before publication. Compiler channels, fixed argv and input/output hashes remain available for review.
+
+With the matching prebuilt SDK and a selected full JDK, qualify the offline API in a new directory outside both repositories:
+
+```sh
+make generation-java-bindings-otelc OTELC_ROOT=/path/to/otelc REPORT_DIR=/path/to/new-report
+```
+
+The retained qualification compiles a source fixture whose class initialiser leaves a sentinel if executed. It accepts the direct private target, refuses a wrong target descriptor and a reflected wrapper, and requires that sentinel to remain absent. No application is launched. This contributor command qualifies offline metadata only; generated invocation execution and shipping qualification remain open.
 
 ## Explicit versioned reader
 

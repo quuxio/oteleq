@@ -14,7 +14,7 @@ MARKDOWNLINT ?= ./ci/markdownlint/node_modules/.bin/markdownlint
 .PHONY: python-provider-metadata-otelc
 .PHONY: python-provider-runtime-otelc
 .PHONY: generation-node-source-collection-otelc generation-node-source-effects-otelc generation-node-source-channels-otelc
-.PHONY: generation-node-controls-otelc generation-java-startup-otelc generation-cpp-sequence-otelc generation-python-sequence-otelc
+.PHONY: generation-node-controls-otelc generation-java-startup-otelc generation-cpp-sequence-otelc generation-python-sequence-otelc generation-java-bindings-otelc
 
 .PHONY: help setup lint examples docs-check observer-check generation-check effect-qualification-check node-observer-check node-sequence-check java-observer-check go-observer-check cpp-observer-check generation-cpp-receiver-otelc generation-go-receiver-otelc generation-java-receiver-otelc generation-otelc generation-policy-otelc generation-rust-otelc rust-semantic-otelc generation-native-otelc generation-shrink-otelc generation-python-project-otelc generation-receiver-otelc generation-node-receiver-otelc generation-go-build-otelc generation-go-project-otelc generation-sequence-otelc generation-typescript-sequence-otelc generation-filesystem-otelc generation-http-otelc resource-otelc capture-otelc report core-check coverage check
 
@@ -35,6 +35,7 @@ help:
 	@printf '%s\n' 'generation-java-archive-otelc Qualify the explicit JDK21 runtime archive project profile'
 	@printf '%s\n' 'generation-java-controls-otelc Qualify same-PID Java metric states (JAVA_PROFILE, GETTER_EXPECTATION, optional LEGACY_OTELC_ROOT)'
 	@printf '%s\n' 'generation-java-startup-otelc Qualify Java startup flags and retained routes (JAVA_CONTROL_STARTUP, JAVA_STARTUP_PROFILE)'
+	@printf '%s\n' 'generation-java-bindings-otelc Qualify offline action bindings without starting the application'
 	@printf '%s\n' 'generation-java-sequence-otelc Qualify Java call sequences and recursive telemetry (JAVA_BACKEND)'
 	@printf '%s\n' 'generation-cpp-sequence-otelc Qualify ordered C++ state, errors, aliases and recursive telemetry'
 	@printf '%s\n' 'generation-python-sequence-otelc Qualify ordered Python package receivers and complete raw/typed graphs'
@@ -167,6 +168,7 @@ generation-check: node-observer-check node-sequence-check node-source-context-ch
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_witness.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_action.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_action_receipt.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_action_bindings.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_provider.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_profiles.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_launch.py' --fail-under=80
@@ -289,6 +291,10 @@ generation-java-controls-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
 	$(PYTHON) tests/qualify_java_controls.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" --getter-expectation "$(GETTER_EXPECTATION)" --java-profile "$(JAVA_PROFILE)" $(if $(LEGACY_OTELC_ROOT),--legacy-root "$(LEGACY_OTELC_ROOT)",)
+
+generation-java-bindings-otelc:
+	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
+	$(PYTHON) tests/qualify_java_action_bindings.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)"
 
 generation-java-startup-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
