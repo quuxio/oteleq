@@ -122,6 +122,22 @@ class JavaHandleBindingTests(unittest.TestCase):
         self.assertEqual(record["argv"][7], PROFILE)
         self.assertEqual(record["bindings_sha256"], hashlib.sha256((self.root / "bindings/bindings.json").read_bytes()).hexdigest())
 
+    def test_compiler_stdout_must_preserve_the_retained_route_scalar_types(self):
+        for index, (key, replacement) in enumerate((("site_instruction", False), ("site_instruction", 0.0),
+                                                   ("reference_kind", 5.0))):
+            folder = self.root / ("stdout-type-" + str(index))
+            changed = copy.deepcopy(self.value)
+            changed["route"][key] = replacement
+            self.assertEqual(changed, self.value)
+            def changed_response(request, target, result):
+                result.stdout = json.dumps(changed).encode()
+                return result
+            with self.subTest(field=key, type=type(replacement).__name__):
+                with self.assertRaisesRegex(ValueError, "response differs from retained bindings"):
+                    direct.JavaActionBindingsTests.compile(self, changed_response, folder=folder,
+                                                            profile=PROFILE, route=self.route)
+                self.assertFalse((folder / "compiler-inputs.json").exists())
+
 
 if __name__ == "__main__":
     unittest.main()

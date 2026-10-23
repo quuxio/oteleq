@@ -243,7 +243,10 @@ def compile(root: Path, project: Path, build: Path, folder: Path, tools: dict,
     witness.require(result.returncode == 0, "offline binding compilation failed; inspect compiler/stderr")
     snapshot = witness.private_snapshot(folder, "bindings.json", MAX_BINDINGS)
     value = capture.strict_json(snapshot.raw)
-    witness.require(capture.strict_json(result.stdout) == value, "offline compiler response differs from retained bindings")
+    # Canonical JSON keeps bool/int/float distinct; Python container equality does not.
+    response = capture.strict_json(result.stdout)
+    witness.require(json.dumps(response, sort_keys=True) == json.dumps(value, sort_keys=True),
+                    "offline compiler response differs from retained bindings")
     verify(value, frozen, application, classes, profile=profile, route=route)
     witness.require(witness.private_snapshot(folder, "bindings.json", MAX_BINDINGS) == snapshot,
                     "offline bindings output changed after validation")

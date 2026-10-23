@@ -177,6 +177,15 @@ class JavaActionBindingsTests(unittest.TestCase):
                         self.compile(folder=folder)
                     self.assertFalse((folder / "compiler-inputs.json").exists())
 
+    def test_compiler_stdout_cannot_replace_the_schema_integer_with_a_float(self):
+        changed = {**self.value, "schema_version": 2.0}
+        def changed_response(request, target, result):
+            result.stdout = json.dumps(changed).encode()
+            return result
+        with self.assertRaisesRegex(ValueError, "response differs from retained bindings"):
+            self.compile(changed_response)
+        self.assertFalse((self.root / "bindings/compiler-inputs.json").exists())
+
     def test_outputs_cannot_enter_application_or_provider_sources(self):
         for folder in (self.project / "bindings", self.sdk / "bindings"):
             with self.assertRaises(ValueError):self.compile(folder=folder, audits=0)
