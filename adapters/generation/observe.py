@@ -79,13 +79,13 @@ def construct_receiver(module: ModuleType, cls: type, fixture: dict, expected: C
 
 
 def bound_method(module: ModuleType, owner: str, name: str, instance: object,
-                 expected: CodeType) -> MethodType:
+                 expected: CodeType, expected_class: type) -> MethodType:
     """Recheck an existing source receiver without reconstructing or invoking lookup hooks."""
     if type(module) is not ModuleType:
         raise ValueError("receiver requires an ordinary source module")
     namespace = vars(module)
     cls = namespace.get(owner)
-    if (type(cls) is not type or type(instance) is not cls
+    if (cls is not expected_class or type(cls) is not type or type(instance) is not cls
             or type.__dict__["__mro__"].__get__(cls) != (cls, object)):
         raise ValueError("receiver class binding differs from its frozen source identity")
     _, origin, qualified = runtime_type(instance)

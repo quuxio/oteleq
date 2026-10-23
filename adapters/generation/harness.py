@@ -433,7 +433,7 @@ def python_execution(entry: dict, arguments: list) -> str:
     if "sequence_configuration" in entry:
         schedule = sequences.concrete(entry, arguments, concrete_arguments)
         binding = (f"bound_method(module, {entry['python_receiver_class']!r}, "
-                   f"{entry['name'].rsplit('.', 1)[-1]!r}, receiver, expected_code)")
+                   f"{entry['name'].rsplit('.', 1)[-1]!r}, receiver, expected_code, receiver_class)")
         return f'''observations = []
 for step in {schedule!r}:
     arguments = step["arguments"]

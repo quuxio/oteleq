@@ -8,6 +8,7 @@ from pathlib import Path
 import sys
 
 from qualify_generation import command
+from python_receiver_oracle import check_observation
 
 
 ACTIVE = '"quux.otelc" in tuple(sys.monitoring.get_tool(index) for index in range(6))'
@@ -95,9 +96,11 @@ def check_report(path: Path, expected_cases: int) -> int:
         assert 'receiver' in bundle['contract']['required_roots']
         for lane in ('baseline','instrumented_on'):
             assert len(bundle[lane]) == 2
-            for attempt in bundle[lane]:
+            for index, attempt in enumerate(bundle[lane]):
                 launches += 1
                 observed = attempt['observation']
+                raw = json.loads((path.parent/case['case']/(lane+'-'+str(index))/'observation').read_text())
+                check_observation(observed, raw, method, case['arguments'][0], lane == 'instrumented_on')
                 assert not observed['gaps']
                 assert receiver_value(observed['before']) == 10
                 assert observed['before']['roots']['static:Counter.total']['value'] == '0'

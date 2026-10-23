@@ -184,6 +184,7 @@ class PythonSequenceTests(unittest.TestCase):
             'self.__class__=type("Other",(),{})',
             'globals()["Counter"]=object',
             'Counter.step.__code__=(lambda self,amount:99).__code__',
+            'globals()["Counter"]=type("Counter",(),{key:value for key,value in vars(Counter).items() if key not in ("__dict__","__weakref__")});self.__class__=Counter',
         ]
         for replacement in replacements:
             source = SOURCE.replace('  return self\n', '  ' + replacement + '\n  return self\n')
@@ -201,17 +202,18 @@ class PythonSequenceTests(unittest.TestCase):
                 module = ModuleType('fixture')
                 exec(SOURCE, vars(module))
                 receiver = module.Counter(10)
+                expected_class = module.Counter
                 expected = module.Counter.step.__code__
                 fault(module)
                 with self.assertRaises(ValueError):
-                    observe.bound_method(module, 'Counter', 'step', receiver, expected)
+                    observe.bound_method(module, 'Counter', 'step', receiver, expected, expected_class)
         with self.assertRaises(ValueError):
-            observe.bound_method(object(), 'Counter', 'step', receiver, expected)
+            observe.bound_method(object(), 'Counter', 'step', receiver, expected, expected_class)
         module = ModuleType('fixture')
         exec(SOURCE.replace('class Counter:', 'class Base: pass\nclass Counter(Base):'), vars(module))
         receiver = module.Counter(10)
         with self.assertRaises(ValueError):
-            observe.bound_method(module, 'Counter', 'step', receiver, module.Counter.step.__code__)
+            observe.bound_method(module, 'Counter', 'step', receiver, module.Counter.step.__code__, module.Counter)
 
     def test_nonstring_instance_keys_do_not_invoke_comparison_hooks(self):
         class Key:
@@ -226,7 +228,7 @@ class PythonSequenceTests(unittest.TestCase):
         receiver = module.Counter(10)
         receiver.__dict__[Key()] = 1
         with self.assertRaisesRegex(ValueError, 'instance storage'):
-            observe.bound_method(module, 'Counter', 'step', receiver, module.Counter.step.__code__)
+            observe.bound_method(module, 'Counter', 'step', receiver, module.Counter.step.__code__, module.Counter)
 
     def test_missing_steps_and_inconsistent_outer_boundaries_are_refused(self):
         with tempfile.TemporaryDirectory() as temporary:

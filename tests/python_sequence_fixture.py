@@ -61,6 +61,11 @@ COMPACT_SOURCE = '''class Counter:
   return self.value
 '''
 BUDGET_SOURCE = SOURCE.replace('  self._token=99', '  self._token=99\n  self.padding=[0]*128')
+REBOUND_SOURCE = SOURCE.replace('  return self\n',
+    '  members={key:value for key,value in vars(Counter).items() if key not in ("__dict__","__weakref__")}\n'
+    '  globals()["Counter"]=type("Counter",(),members)\n'
+    '  self.__class__=Counter\n'
+    '  return self\n')
 
 
 def function(method: str) -> str:

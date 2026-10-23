@@ -10,7 +10,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / "adapters/generation"), str(ROOT / "examples")]
-from python_sequence_fixture import (BUDGET_SOURCE, COMPACT_SOURCE, FUNCTIONS, METHODS,
+from python_sequence_fixture import (BUDGET_SOURCE, COMPACT_SOURCE, FUNCTIONS, METHODS, REBOUND_SOURCE,
                                      SOURCE, check_observation, function, node, raw_observation)
 from qualify_project_tests import command
 
@@ -25,16 +25,17 @@ CONTROL_VERDICTS = {
 
 def prepare(cli: Path, provider: Path, folder: Path, *, steps: int = 2,
             methods: tuple[str, ...] = METHODS, compact: bool = False,
-            padding: bool = False) -> Path:
+            padding: bool = False, rebound: bool = False) -> Path:
     """Freeze real package imports, independent construction and concrete calls."""
-    assert steps in (1, 2, 32) and not (compact and padding)
+    assert steps in (1, 2, 32) and sum((compact, padding, rebound)) <= 1
     folder.mkdir()
     source = folder / "application"
     package = source / "src/pkg"
     package.mkdir(parents=True)
     (package / "__init__.py").write_text("")
     assert not compact or methods == ("identity",)
-    (package / "state.py").write_text(COMPACT_SOURCE if compact else BUDGET_SOURCE if padding else SOURCE)
+    text = COMPACT_SOURCE if compact else BUDGET_SOURCE if padding else REBOUND_SOURCE if rebound else SOURCE
+    (package / "state.py").write_text(text)
     text = 'schema_version=1\nlanguages=["python"]\n[adapters.python]\nimport_roots=["src"]\n[functions]\ninclude='
     text += json.dumps([function(method) for method in methods]) + "\n"
     for method in methods:
@@ -175,7 +176,7 @@ def verify_operations(folder: Path, cli: Path) -> int:
             assert json.loads((folder / (name + ".stdout")).read_text())["verdict"] == CONTROL_VERDICTS[name][1]
     assert (folder / "changed-source.stderr").read_bytes() == b"oteleq: application source or immutable snapshot changed\n"
     assert (folder / "changed-source.stdout").read_bytes() == b""
-    for name in ("cases", "edge-one", "edge-thirty-two", "edge-rich-thirty-two"):
+    for name in ("cases", "edge-one", "edge-thirty-two", "edge-rich-thirty-two", "rebound-class"):
         route = folder / name
         selected = Path((route / "plan.stdout").read_text().strip())
         assert selected.is_relative_to(route)
@@ -189,13 +190,13 @@ def verify_operations(folder: Path, cli: Path) -> int:
         assert {path.name.removesuffix(".started.json") for path in route.glob("*.started.json")} == set(expected)
         for operation, argv in expected.items():
             marker = json.loads((route / (operation + ".started.json")).read_text())
-            expected_exit = 4 if name == "edge-rich-thirty-two" and operation == "run" else 0
+            expected_exit = 4 if name in ("edge-rich-thirty-two", "rebound-class") and operation == "run" else 0
             assert marker == {"argv": list(map(str, argv)), "expected_exit": expected_exit}
         for operation in ("plan", "generate"):
             assert (folder / name / (operation + ".exit")).read_text() == "0\n"
         if name != "cases":
-            assert (folder / name / "run.exit").read_text() == ("4\n" if name == "edge-rich-thirty-two" else "0\n")
-    return len(required) + 11
+            assert (folder / name / "run.exit").read_text() == ("4\n" if name in ("edge-rich-thirty-two", "rebound-class") else "0\n")
+    return len(required) + 14
 
 
 def verify_budget_refusal(folder: Path) -> int:
@@ -211,6 +212,24 @@ def verify_budget_refusal(folder: Path) -> int:
     raw = (commands[0].parent / "observation").read_bytes()
     assert 262144 < len(raw) <= 1048576
     assert json.loads(raw) == raw_observation("identity", 7, False, steps=32, padding=True)
+    return 1
+
+
+def verify_class_refusal(folder: Path) -> int:
+    """Coordinated module/instance rebinding cannot retain a passing old class view."""
+    report = json.loads((folder / "comparison/report.json").read_text())
+    assert report["source_preserved"] and not report["blocked"] and len(report["cases"]) == 1
+    case = report["cases"][0]
+    assert case["function"] == function("identity") and case["arguments"] == [7]
+    assert case["exit_code"] == 4 and len(case["sequence"]) == 2
+    assert case["error"] == "application exit or OTLP capture failed; inspect retained stdout/stderr"
+    commands = list((folder / "comparison").rglob("command.json"))
+    assert len(commands) == 1 and commands[0].parent.name == "baseline-0"
+    attempt = commands[0].parent
+    assert not (attempt / "observation").exists() and not (attempt / "typed-observation.json").exists()
+    assert (attempt / "stdout").read_bytes() == b""
+    assert (attempt / "stderr").read_bytes().endswith(
+        b"ValueError: receiver class binding differs from its frozen source identity\n")
     return 1
 
 
@@ -317,9 +336,10 @@ def retained(folder: Path, cli: Path) -> dict:
     assert reports
     verify_routes(folder)
     refused = verify_budget_refusal(folder / "edge-rich-thirty-two")
+    class_refused = verify_class_refusal(folder / "rebound-class")
     observations, comparisons = 0, 0
     for path in reports:
-        if path.is_relative_to(folder / "edge-rich-thirty-two"):
+        if path.is_relative_to(folder / "edge-rich-thirty-two") or path.is_relative_to(folder / "rebound-class"):
             continue
         steps = 32 if path.is_relative_to(folder / "edge-thirty-two") else 1 if path.is_relative_to(folder / "edge-one") else 2
         observations += check_report(path, len(json.loads(path.read_text())["cases"]), steps=steps, compact=steps == 32)
@@ -331,8 +351,8 @@ def retained(folder: Path, cli: Path) -> dict:
             comparisons += 1
     raw = [path for path in folder.rglob("command.json") if path.parent.name.startswith(("baseline-", "instrumented_on-"))]
     identities = {hashlib.sha256(path.read_bytes()).hexdigest() for path in raw}
-    assert observations == 152 and len(raw) == observations + refused == 153
-    assert len(identities) == 149 and comparisons == 38
+    assert observations == 152 and len(raw) == observations + refused + class_refused == 154
+    assert len(identities) == 150 and comparisons == 38
     for path in folder.rglob("plan.json"):
         plan = json.loads(path.read_text())
         for name, expected in plan["source_manifest"].items():
@@ -346,6 +366,7 @@ def retained(folder: Path, cli: Path) -> dict:
         "source_control_actual_exit": 4,
         "evidence_refusals": len(CONTROL_VERDICTS), "source_preserved": True,
         "actual_budget_refusal_launches": refused,
+        "actual_class_refusal_launches": class_refused,
         "scope": "Declared plain Python package receivers, call-only schedules, source factories, intermediate exceptions, recursion and complete raw/typed graph oracles. No invocation attribution, shipping artefact or other provider/platform admission."}
 
 
@@ -404,6 +425,10 @@ def main() -> None:
                 verify_budget_refusal(edge)
             else:
                 check_report(edge / "comparison/report.json", 1, steps=steps, compact=compact)
+        rebound = folder / "rebound-class"
+        rebound_workspace = prepare(cli, provider, rebound, methods=("identity",), rebound=True)
+        command([cli, "run", "--workspace", rebound_workspace, "--report-dir", rebound / "comparison"], rebound, "run", 4)
+        verify_class_refusal(rebound)
         path = source / "src/pkg/state.py"
         original = path.read_bytes()
         try:

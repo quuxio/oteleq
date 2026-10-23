@@ -33,13 +33,13 @@ class PythonSequenceQualificationTests(unittest.TestCase):
         cls.budget = cls.capture('identity', padding=True, steps=32)
 
     @classmethod
-    def capture(cls, method, *, active=False, compact=False, padding=False, steps=2):
-        suffix = '-active' if active else '-compact' if compact else '-padding' if padding else ''
+    def capture(cls, method, *, active=False, compact=False, padding=False, rebound=False, steps=2):
+        suffix = '-active' if active else '-compact' if compact else '-padding' if padding else '-rebound' if rebound else ''
         folder = cls.folder / (method + suffix)
         package = folder / 'src/pkg'
         package.mkdir(parents=True)
         (package / '__init__.py').write_text('')
-        text = fixture.COMPACT_SOURCE if compact else fixture.BUDGET_SOURCE if padding else fixture.SOURCE
+        text = fixture.COMPACT_SOURCE if compact else fixture.BUDGET_SOURCE if padding else fixture.REBOUND_SOURCE if rebound else fixture.SOURCE
         if active:
             # A separately labelled plain component fixture, without a fake SDK.
             text = text.replace(fixture.ACTIVE, 'True')
@@ -68,6 +68,10 @@ class PythonSequenceQualificationTests(unittest.TestCase):
         result = subprocess.run([sys.executable, '-B', driver], cwd=folder,
             env={**os.environ, 'OTELEQ_OBSERVATION': str(output)},
             capture_output=True, check=False, timeout=30)
+        if rebound:
+            assert result.returncode != 0 and result.stdout == b'' and not output.exists()
+            assert b'receiver class binding differs from its frozen source identity' in result.stderr
+            return None
         assert (result.returncode, result.stdout, result.stderr) == (0, b'', b''), result.stderr
         raw = output.read_bytes()
         assert json.loads(raw) == fixture.raw_observation(method, 7, active, steps=steps,
@@ -100,6 +104,37 @@ class PythonSequenceQualificationTests(unittest.TestCase):
         fixture.check_observation(self.altered, 'transient', 7, True)
         with self.assertRaises(AssertionError):
             fixture.check_observation(self.altered, 'transient', 7, False)
+
+    def test_fixture_rebinding_both_module_and_instance_class_refuses_before_capture(self):
+        self.assertIsNone(self.capture('identity', rebound=True))
+
+    def test_refusal_verifier_requires_binding_failure_and_no_captured_observation(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            comparison = folder / 'comparison'
+            attempt = comparison / 'case/baseline-0'
+            attempt.mkdir(parents=True)
+            case = {'function': fixture.function('identity'), 'arguments': [7],
+                    'exit_code': 4, 'sequence': [{}, {}],
+                    'error': 'application exit or OTLP capture failed; inspect retained stdout/stderr'}
+            (comparison / 'report.json').write_text(json.dumps(
+                {'source_preserved': True, 'blocked': [], 'cases': [case]}))
+            (attempt / 'command.json').write_text('[]')
+            (attempt / 'stdout').write_bytes(b'')
+            diagnostic = b'ValueError: receiver class binding differs from its frozen source identity\n'
+            (attempt / 'stderr').write_bytes(diagnostic)
+            self.assertEqual(qualifier.verify_class_refusal(folder), 1)
+            for filename, data in [('observation', b'{}'), ('typed-observation.json', b'{}'),
+                                   ('stdout', b'unexpected output'), ('stderr', b'unrelated error\n')]:
+                path = attempt / filename
+                previous = path.read_bytes() if path.exists() else None
+                path.write_bytes(data)
+                with self.subTest(filename=filename), self.assertRaises(AssertionError):
+                    qualifier.verify_class_refusal(folder)
+                if previous is None:
+                    path.unlink()
+                else:
+                    path.write_bytes(previous)
 
     def test_each_observed_field_argument_global_static_and_alias_is_required(self):
         for boundary in ('before', 'after', 'outcome'):
@@ -179,7 +214,7 @@ class PythonSequenceQualificationTests(unittest.TestCase):
 
             for name, (expected, argv) in operations.items():
                 receipt(folder, name, expected, argv)
-            for name in ('cases', 'edge-one', 'edge-thirty-two', 'edge-rich-thirty-two'):
+            for name in ('cases', 'edge-one', 'edge-thirty-two', 'edge-rich-thirty-two', 'rebound-class'):
                 route = folder / name
                 route.mkdir(exist_ok=True)
                 selected = route / 'workspace'
@@ -187,11 +222,11 @@ class PythonSequenceQualificationTests(unittest.TestCase):
                     '--workspace-parent', route, '--config', route / 'equivalence.toml'])
                 receipt(route, 'generate', 0, [cli, 'generate', '--workspace', selected])
                 if name != 'cases':
-                    receipt(route, 'run', 4 if name == 'edge-rich-thirty-two' else 0,
+                    receipt(route, 'run', 4 if name in ('edge-rich-thirty-two', 'rebound-class') else 0,
                         [cli, 'run', '--workspace', selected, '--report-dir', route / 'comparison'])
                 (route / 'plan.stdout').write_text(str(selected))
             (folder / 'cases/plan.stdout').write_text(str(workspace))
-            self.assertEqual(qualifier.verify_operations(folder, cli), 31)
+            self.assertEqual(qualifier.verify_operations(folder, cli), 34)
             marker_path = folder / 'changed-source.started.json'
             original_marker = marker_path.read_bytes()
             marker = json.loads(original_marker)
@@ -200,7 +235,7 @@ class PythonSequenceQualificationTests(unittest.TestCase):
             with self.assertRaises(AssertionError):
                 qualifier.verify_operations(folder, cli)
             marker_path.write_bytes(original_marker)
-            self.assertEqual(qualifier.verify_operations(folder, cli), 31)
+            self.assertEqual(qualifier.verify_operations(folder, cli), 34)
             for suffix, additions in (('stderr', ('prefix', 'suffix')), ('stdout', ('output',))):
                 path = folder / ('changed-source.' + suffix)
                 original = path.read_bytes()
