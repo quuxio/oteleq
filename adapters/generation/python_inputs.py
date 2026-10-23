@@ -39,6 +39,16 @@ def walk_error(error: OSError) -> None:
     raise error
 
 
+def builder_inputs(root: Path) -> list[Path]:
+    """Freeze the fixed builder and its optional maintained encoder dependency.
+
+    This inventories input bytes only. Presence of the helper does not select
+    an execution profile or establish native/source-origin qualification.
+    """
+    encoder = root / "ci/native_encoder.py"
+    return [root / "ci/build_python_inputs.py", *([encoder] if encoder.exists() or encoder.is_symlink() else [])]
+
+
 def files(root: Path, *, suffixes: set[str] | None = None) -> list[Path]:
     """Bytecode caches are outside the declared scope; linked trees are refused."""
     require(root.is_dir() and not root.is_symlink(), "missing or linked directory: " + str(root))
@@ -85,8 +95,8 @@ def artefacts(root: Path, tools: dict[str, Path]) -> dict[str, str]:
     require(root.is_dir() and not root.is_symlink(), "provider root must be a real directory")
     python = tools["python"]
     roots = dependency_roots(python)
-    selected = [root / name for name in ("bin/quux-otelc", "requirements.txt", "requirements-dev.txt",
-                                        "ci/build_python_inputs.py")]
+    selected = [root / name for name in ("bin/quux-otelc", "requirements.txt", "requirements-dev.txt")]
+    selected += builder_inputs(root)
     selected += files(root / "otelc", suffixes={".py"})
     selected += files(root / "native/python", suffixes={".c", ".h"})
     products = files(root / "build/tools/python-inputs")

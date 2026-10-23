@@ -686,7 +686,8 @@ def generator_identity():
         'native_profile.py', 'native_project.py', 'native_dependencies.py', 'native_frontend.py',
         'native_discover.cpp', 'native_context.py', 'native_workers.py', 'native_workspace.py',
         'owned_workspace.py', 'preconditions.py', 'project_tests.py', 'project_runner.py',
-        'python_provider.py', 'python_inputs.py', 'python_prepared.py')})
+        'python_provider.py', 'python_inputs.py', 'python_prepared.py', 'python_journal.py',
+        'python_code.py', 'python_execution.py', 'python_health.py', 'python_telemetry.py')})
     files["host-python"] = capture.file_digest(Path(sys.executable))
     files["observer:otelc_capture.py"] = capture.file_digest(Path(capture.__file__))
     files["host-version"] = sys.version

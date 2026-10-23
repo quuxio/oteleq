@@ -82,6 +82,14 @@ class QualificationRecipeTests(unittest.TestCase):
             cwd=ROOT, capture_output=True, text=True, check=True)
         self.assertIn('--startup-state "both-off"', result.stdout)
 
+    def test_python_runtime_recipe_checks_owned_roots_without_building_a_cli(self):
+        result = subprocess.run(['make', '--no-print-directory', '-n', 'python-provider-runtime-otelc',
+            'OTELC_ROOT=/tmp/provider', 'REPORT_DIR=/tmp/evidence', 'PYTHON=/selected/python'],
+            cwd=ROOT, capture_output=True, text=True, check=True)
+        self.assertIn('/selected/python tests/qualify_python_provider_runtime.py', result.stdout)
+        self.assertIn('--otelc-root "/tmp/provider" --report-dir "/tmp/evidence"', result.stdout)
+        self.assertNotIn('cargo build', result.stdout)
+
     def test_help_names_the_http_qualification_target(self):
         result = subprocess.run(["make", "help"], cwd=ROOT, capture_output=True, text=True, check=True)
         self.assertIn("generation-http-otelc Qualify scripted HTTP", result.stdout)

@@ -81,7 +81,7 @@ Declared [Python ordered calls](docs/ordered-sequences.md#python-call-sequences)
 
 ## Usage
 
-Rebuilt Python [provider negotiation and prepared-transport checks](docs/python-prepared-provider.md) are available for integration work. Selecting `adapters.python.backend = "prepared"` currently retains explicit blockers; generated Python execution continues to require its qualified legacy provider.
+Rebuilt Python [provider negotiation and prepared-runtime readers](docs/python-prepared-provider.md) are available for integration work, including a separate fixed-workload process/health/OTLP qualification command. Selecting `adapters.python.backend = "prepared"` currently retains explicit source-origin blockers; generated Python execution continues to require its qualified legacy provider.
 
 ### Build
 

@@ -14,6 +14,7 @@ import stat
 from typing import Any
 
 import otelc_capture as capture
+import python_inputs
 import python_provider as provider
 
 MAX_METADATA = 64 * 1024 * 1024
@@ -72,16 +73,18 @@ def file_identity(path: Path) -> dict:
     return value
 
 
-def read(path: Path) -> tuple[dict, bytes]:
-    """Read completed owned regular metadata without following links or FIFOs."""
+def read_bytes(path: Path, maximum: int | None = None) -> bytes:
+    """Snapshot completed owned bytes without following links or blocking on I/O."""
+    maximum = MAX_METADATA if maximum is None else maximum
+    provider.require(type(maximum) is int and 0 < maximum <= MAX_METADATA, "invalid private metadata byte budget")
     descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     try:
         before = os.fstat(descriptor)
         provider.require(stat.S_ISREG(before.st_mode) and before.st_uid == os.getuid()
                          and stat.S_IMODE(before.st_mode) == 0o600 and before.st_nlink == 1
-                         and before.st_size <= MAX_METADATA, "invalid completed private Python metadata")
+                         and before.st_size <= maximum, "invalid completed private Python metadata")
         with os.fdopen(descriptor, "rb", closefd=False) as stream:
-            raw = stream.read(MAX_METADATA + 1)
+            raw = stream.read(maximum + 1)
         def signature(info):
             return (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns,
                     info.st_mode, info.st_uid, info.st_gid, info.st_nlink)
@@ -90,6 +93,12 @@ def read(path: Path) -> tuple[dict, bytes]:
                          "private Python metadata changed while reading")
     finally:
         os.close(descriptor)
+    return raw
+
+
+def read(path: Path) -> tuple[dict, bytes]:
+    """Decode bounded JSON without duplicate fields or non-finite values."""
+    raw = read_bytes(path)
     value = capture.strict_json(raw)
     provider.require(type(value) is dict, "private Python metadata must be an object")
     encoded(value)  # Refuse non-finite numbers accepted by the shared JSON reader.
@@ -175,7 +184,7 @@ def verify(value: Any, intent: Intent, catalogue: dict) -> None:
     verify_products(prepared, intent, catalogue)
     root = intent.provider_root
     maintained = [root / "bin/quux-otelc", *sorted((root / "otelc").glob("*.py")),
-                  root / "ci/build_python_inputs.py", root / "requirements.txt", root / "requirements-dev.txt"]
+                  *python_inputs.builder_inputs(root), root / "requirements.txt", root / "requirements-dev.txt"]
     expected = {"schema_version": 1, "kind": "otelc.python.prepared",
                 "request_sha256": digest(original), "plan_sha256": digest(plan),
                 "driver": prepared["driver"], "build_manifest": prepared["build_manifest"],
