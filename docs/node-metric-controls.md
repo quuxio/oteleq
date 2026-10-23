@@ -2,7 +2,7 @@
 
 <!-- markdownlint-disable MD013 -->
 
-The explicit `source-v1` JavaScript/TypeScript provider implements metric collection and emission schedules around declared receiver calls. **Exact-revision qualification is in progress.** The earlier [1,800-launch source-provider record](qualification/node-source-provider-2026-10-22.json) does not qualify this new capability.
+The explicit `source-v1` JavaScript/TypeScript provider implements metric collection and emission schedules around declared receiver calls. The [23 October qualification](qualification/node-metric-controls-2026-10-23.json) records 696 actual application launches on Node 24/26 and both TypeScript compilers. The earlier [1,800-launch source-provider record](qualification/node-source-provider-2026-10-22.json) does not qualify this new capability.
 
 ## Declare a schedule
 
@@ -54,7 +54,7 @@ The pinned SDK's own processed-span and queue metrics remain separate from funct
 
 The maintained corpus contains synchronous, awaited asynchronous and expected-error calls, plus a same-return static mutation which is restored before the final boundary. Complete independent graphs include every intermediate field, descriptor and alias. Nonempty binary stdout/stderr, real control acknowledgements and decoded OTLP are checked through direct execution, generated suites, replay and detached export. It also exercises scalar reduction and its retained suite/replay, followed by current-source promotion before and after a real return-value change. Actual process identities prevent copied reduction evidence from inflating launch counts.
 
-Thirteen alterations to copied actual control/OTLP evidence check process identities, flag independence, completion counts, disabled windows, restoration, missing traces, withheld retained metrics, off-state export admissions, counter rollback and final SDK bounds. The product verifier must refuse every alteration for its intended reason and still accept the preserved original. These checks add no application launches.
+The published positive-first record uses thirteen alterations to copied actual control/OTLP evidence check process identities, flag independence, completion counts, disabled windows, restoration, missing traces, withheld retained metrics, off-state export admissions, counter rollback and final SDK bounds. The product verifier must refuse every alteration for its intended reason and still accept the preserved original. These checks add no application launches.
 
 ```sh
 make generation-node-controls-otelc \
@@ -67,4 +67,4 @@ Select the Node executable with `OTELC_NODE` before invoking the recipe. Qualify
 
 Use `NODE_CONTROL_STARTUP=collection-off`, `emission-off` or `both-off` to rotate the complete schedule so that the SDK starts in that state; the default is `both-on`. The direct script accepts the same names through `--startup-state`. Each run retains the selected initial flags through all three language/compiler profiles, generated/detached suites, replay, reduction and current-source promotion. Error metric expectations follow collection state at the actual throwing call. Fourteen alterations include a wrong initial status which later setters would otherwise hide. These new runs need their own completed records and do not inherit the earlier positive-first qualification.
 
-This is diagnostic **equivalence over these tests and observations**. Serial named trace trees do not establish invocation-cookie attribution. Startup-off schedules, arbitrary concurrent schedules, other action targets, general Node dependency/build integration, combined GC/resource schedules, exporter faults and shipping artefacts still require separate qualification. The maintained positive-first routes above remain under exact-runtime qualification until their completed records are published. Trace duration and observer waiting time are not equality dimensions.
+This is diagnostic **equivalence over these tests and observations**. Serial named trace trees do not establish invocation-cookie attribution. Startup-off profiles, arbitrary concurrent schedules, other action targets, general Node dependency/build integration, combined GC/resource schedules, exporter faults and shipping artefacts still require separate qualification. The published record covers the positive-first routes above: 348 distinct applications per Node runtime, 78 altered-evidence refusals in total and 180 recomputed typed comparisons. The 720 raw attempt folders include 24 copied attempts which are excluded from launch counts. All provider/source/tool identities remain unchanged; the exact runtime passes 1,015 distinct regressions with 97.38% Rust product line coverage. Trace duration and observer waiting time are not equality dimensions.
