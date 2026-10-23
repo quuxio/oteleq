@@ -6,7 +6,7 @@ The explicit `source-v1` JavaScript/TypeScript provider implements metric collec
 
 ## Declare a schedule
 
-Use an existing source constructor or factory through the [receiver fixture](receiver-fixtures.md). Every step must call the selected method and declare both booleans. The first step enables both as a positive control.
+Use an existing source constructor or factory through the [receiver fixture](receiver-fixtures.md). Every step must call the selected method and declare both booleans. The first step fixes the actual SDK startup flags. At least one call must enable both as a positive control.
 
 ```toml
 schema_version = 1
@@ -36,6 +36,8 @@ sequence = [
 
 Generate and run this policy with the ordinary [automatic-generation commands](automatic-generation.md). TypeScript can select its explicit `native` or `api` compiler. Legacy Node providers, mixed declared/undeclared states and release/collection actions in a live metric schedule remain blockers.
 
+To start with metrics disabled, set the first call's collection and emission flags to `false` and include a later call with both `true`. Either flag can also start disabled independently. The common policy carries these flags into SDK creation, before the first call. The first actual status must already match that policy; changing the flags at the first checkpoint cannot qualify an incorrect startup state. Startup-off schedules remain under separate actual-provider qualification. Prepared Java retains its initial both-on requirement.
+
 ## What the runner verifies
 
 One application process, its independent SDK process and the same prepared source/build remain in use throughout the schedule. Only generated private callers contain checkpoints; application and dependency sources need no coding changes. The caller yields its event loop while the external host changes the actual authenticated SDK endpoint.
@@ -63,4 +65,4 @@ make generation-node-controls-otelc \
 
 Select the Node executable with `OTELC_NODE` before invoking the recipe. Qualify each recorded runtime separately. Completed corpus records, source/tool preservation, negative controls, review and protected checks are required before this profile is admitted.
 
-This is diagnostic **equivalence over these tests and observations**. Serial named trace trees do not establish invocation-cookie attribution. Startup-off profiles, arbitrary concurrent schedules, other action targets, general Node dependency/build integration, combined GC/resource schedules, exporter faults and shipping artefacts still require separate qualification. The maintained routes above remain under exact-runtime qualification until their completed records are published. Trace duration and observer waiting time are not equality dimensions.
+This is diagnostic **equivalence over these tests and observations**. Serial named trace trees do not establish invocation-cookie attribution. Startup-off schedules, arbitrary concurrent schedules, other action targets, general Node dependency/build integration, combined GC/resource schedules, exporter faults and shipping artefacts still require separate qualification. The maintained positive-first routes above remain under exact-runtime qualification until their completed records are published. Trace duration and observer waiting time are not equality dimensions.

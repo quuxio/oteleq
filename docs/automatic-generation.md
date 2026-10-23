@@ -63,7 +63,7 @@ Java can explicitly declare [source roots and dependency classpaths](java-projec
 
 The explicit prepared [runtime archive profile](java-runtime-archives.md) additionally resolves multi-release layouts through the selected JDK. It preserves separate physical, compiler-read and runtime-selected member identities, with fresh probes and exact launch/tooling checks. Use its matching provider and qualification record; original prepared profiles retain their existing recipes.
 
-The explicit source Node provider implements [live metric collection/emission schedules](node-metric-controls.md) for declared serial receiver calls. This capability is under separate qualification; earlier source-provider records keep their original scope.
+The explicit source Node provider implements [live metric collection/emission schedules](node-metric-controls.md) for declared serial receiver calls. The first call fixes the SDK startup flags, including disabled states; a both-on positive call is required somewhere in the schedule. Startup-off and positive-first schedules require their own exact-revision qualification; earlier source-provider records keep their original scope.
 
 ## Project policy and concrete fixtures
 

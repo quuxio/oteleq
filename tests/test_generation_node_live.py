@@ -186,6 +186,35 @@ class NodeLiveTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 sequences.configure(base, schedule, harness.concrete_arguments)
 
+    def test_node_schedules_can_start_in_every_state_with_a_later_positive_control(self):
+        for language in ('javascript', 'typescript'):
+            for offset in range(4):
+                states = STATES[offset:] + STATES[:offset]
+                requested = [{**step, 'metrics': state.copy()} for step, state in zip(STEPS, states)]
+                steps = sequences.validate(requested, policy.expected_baseline)
+                entry = {'language': language, 'node_backend': 'source-v1', 'receiver_fixture': {},
+                         'parameters': ['number'], 'expected_baseline': {'kind': 'return'}}
+                sequences.configure(entry, steps, harness.concrete_arguments)
+                self.assertEqual(entry['sequence_configuration'][0]['metrics'], states[0])
+        java = {'language': 'java', 'java_backend': 'prepared', 'receiver_fixture': {}}
+        steps = sequences.validate([{**step, 'metrics': state.copy()}
+                                    for step, state in zip(STEPS, STATES[1:] + STATES[:1])], policy.expected_baseline)
+        with self.assertRaisesRegex(ValueError, 'initial'):
+            sequences.configure_controls(java, steps)
+
+    def test_wrong_actual_startup_state_cannot_be_hidden_by_the_first_setters(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary).resolve()
+            sequence = [{'id': 'step-0', 'action': 'call', 'metrics': STATES[-1]}]
+            session = node_live.Session(folder, sequence, [], language='javascript', plain=False)
+            deadline = time.monotonic() + 1
+            replies = [{'status': status()}]
+            with patch.object(session, 'transition', return_value=replies), \
+                    self.assertRaisesRegex(ValueError, 'initial Node metric state'):
+                session.before(0, deadline)
+            self.assertEqual(session.position, 0)
+            self.assertEqual(session.record['steps'], [])
+
     def test_generator_identity_binds_the_execution_journal_verifier_and_new_controls(self):
         original = generation.generator_identity()
         digest = generation.capture.file_digest

@@ -64,6 +64,16 @@ def fixture():
 
 
 class NodeControlReceiptTests(unittest.TestCase):
+    def test_first_status_requires_the_requested_actual_startup_state(self):
+        _, record, _, _ = fixture()
+        for requested in STATES:
+            rows = history(0, requested, requested)
+            self.assertEqual(receipt.history(rows, record, requested, 0), 3)
+            wrong = {**requested, 'collection': not requested['collection']}
+            altered = history(0, wrong, requested)
+            with self.assertRaisesRegex(ValueError, 'initial metric state'):
+                receipt.history(altered, record, requested, 0)
+
     def test_drained_emission_off_forbids_new_admission_even_without_raw_metric_receipt(self):
         _, record, bodies, spans = fixture()
         for name in ('status', 'flush', 'settled'):

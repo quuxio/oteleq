@@ -73,7 +73,7 @@ Start with [automatic generation](docs/automatic-generation.md), [fixed eight-la
 
 Observers refuse unsupported application formatters and exception accessors. Such capture failures remain incomplete evidence; see the [qualified codec limits](docs/automatic-generation.md#selection-and-inputs).
 
-An explicit [Node live metric schedule](docs/node-metric-controls.md) now implements independent collection/emission states in one application/SDK pair. Its exact-revision qualification is in progress; the earlier Node source-provider record retains its original scope.
+An explicit [Node live metric schedule](docs/node-metric-controls.md) now implements independent collection/emission states in one application/SDK pair, including disabled startup flags followed by a both-on positive call. Positive-first and startup-off schedules remain under their own exact-revision qualification; the earlier Node source-provider record retains its original scope.
 
 ## Usage
 

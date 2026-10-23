@@ -158,6 +158,25 @@ class NodeSourceTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             provider.configuration(legacy, "endpoint", "service")
 
+    def test_live_schedule_freezes_requested_startup_flags_in_the_common_policy(self) -> None:
+        for language in ("javascript", "typescript"):
+            for collection in (False, True):
+                for emission in (False, True):
+                    with self.subTest(language=language, collection=collection, emission=emission):
+                        initial = {"collection": collection, "emission": emission}
+                        value = {**entry(language), "sequence_configuration": [
+                            {"action": "call", "metrics": initial.copy()},
+                            {"action": "call", "metrics": {"collection": True, "emission": True}},
+                        ]}
+                        requested = provider.configuration(value, "endpoint", "service")
+                        self.assertEqual({key: requested["metrics"][key] for key in initial}, initial)
+                        self.assertEqual(tomllib.loads(provider.policy(value, "endpoint", "service")), requested)
+                        requested["metrics"]["collection"] = not collection
+                        self.assertEqual(value["sequence_configuration"][0]["metrics"], initial)
+            ordinary = provider.configuration(entry(language), "endpoint", "service")
+            self.assertTrue(ordinary["metrics"]["collection"])
+            self.assertTrue(ordinary["metrics"]["emission"])
+
     def test_candidate_response_is_preserved_without_promoting_other_languages(self) -> None:
         requested = provider.configuration(entry(), "endpoint", "service")
         value = response(requested)
