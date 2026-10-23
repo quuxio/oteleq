@@ -100,6 +100,8 @@ make generation-java-startup-otelc \
 
 `JAVA_CONTROL_STARTUP` also accepts `both-on` (the default), `collection-off` and `emission-off`. Each run rotates the complete four-state schedule. `JAVA_STARTUP_PROFILE` defaults to `safe-methods-v1`; `stock-methods-v1` and `archive-methods-v1` require their own matching frozen provider. The script accepts the same values through `--startup-state` and `--java-profile`. Startup corpus cases explicitly allow 60 seconds per attempt; earlier positive-first corpus budgets remain unchanged.
 
+The script's explicit `--recheck` option audits a complete retained corpus without launching an application. It checks the original profile, completed operation records, all observations, standalone or archive-context compiler bindings, actual receipts and alteration controls. It writes fresh comparisons and a new qualification result under `offline-recheck-*`, preserving the original controller result and any failure. Missing or unfinished routes are refused.
+
 ## Published qualification
 
 The [21 October record](qualification/java-metric-controls-2026-10-21.json) qualifies runtime `0288559` with frozen prepared SDK `f3279fd` and legacy provider `d6d03b7`: 164 actual JVM launches, including 140 through the six-method live corpus, eight getter-regression launches and eight ordinary calls per backend. The main corpus has four matching methods and two deliberately different methods. Complete intermediate receiver/static/error graphs, private factories, recursion, stdout/stderr and all four live states are checked through generated suites, replay, detached export and scalar shrinking from seven to zero. Four copied original shrink attempts remain retained once in the 168 observations and do not inflate actual launches.

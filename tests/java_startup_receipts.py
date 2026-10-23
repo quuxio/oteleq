@@ -73,6 +73,37 @@ def verify(attempt: Path, entry: dict) -> None:
         policy['resource']['service_name'], ExportTraceServiceRequest)
 
 
+def refusal_reason(name: str, error: ValueError) -> str:
+    reason = str(error)
+    if name.startswith('initial-') and 'initial metric state' not in reason:
+        raise ValueError('Initial-state control failed for an unrelated reason') from error
+    if name == 'setter' and 'independent state' not in reason:
+        raise ValueError('Independent-setter control failed for an unrelated reason') from error
+    return reason
+
+
+def recheck(destination: Path, workspace: Path, states: tuple[tuple[bool, bool], ...]) -> dict:
+    """Revalidate existing alterations without changing them or starting a JVM."""
+    recorded = read(destination / 'QUALIFICATION.json')
+    expected = set(receipt_edits(states)) | {'missing-trace', 'retained-metric',
+        'sdk-pid', 'sdk-policy', 'sdk-loss', 'sdk-drain'}
+    assert recorded['actual_applications'] == 0 and recorded['copied_attempts'] == 15
+    assert recorded['evidence_refusals'] == len(recorded['controls']) == 14
+    assert {row['name'] for row in recorded['controls']} == expected
+    entry = next(entry for entry in read(workspace / 'plan.json')['inventory']
+        if entry.get('otelc_function') == 'Counter.identity(int)')
+    verify(destination / 'positive', entry)
+    for row in recorded['controls']:
+        assert row['refused'] is True
+        try:
+            verify(destination / ('altered-' + row['name']), entry)
+        except ValueError as error:
+            assert refusal_reason(row['name'], error) == row['reason']
+        else:
+            raise AssertionError('Previously refused Java startup evidence was accepted')
+    return recorded
+
+
 def qualify(profile: Path, workspace: Path, destination: Path, states: tuple[tuple[bool, bool], ...]) -> dict:
     """Copies are alteration controls, never additional JVM launches."""
     destination.mkdir(mode=0o700)
@@ -104,11 +135,7 @@ def qualify(profile: Path, workspace: Path, destination: Path, states: tuple[tup
         try:
             verify(attempt, entry)
         except ValueError as error:
-            if name.startswith('initial-') and 'initial metric state' not in str(error):
-                raise ValueError('Initial-state control failed for an unrelated reason') from error
-            if name == 'setter' and 'independent state' not in str(error):
-                raise ValueError('Independent-setter control failed for an unrelated reason') from error
-            reasons.append({'name': name, 'refused': True, 'reason': str(error)})
+            reasons.append({'name': name, 'refused': True, 'reason': refusal_reason(name, error)})
         else:
             raise ValueError('Altered Java startup evidence was accepted: ' + name)
     verify(positive, entry)

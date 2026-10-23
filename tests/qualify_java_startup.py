@@ -6,8 +6,10 @@ import json
 import os
 from pathlib import Path
 import sys
+import tempfile
 
 import java_startup_receipts
+import java_startup_builds
 import qualify_java_controls as controls
 from qualify_project_tests import command
 from qualify_sequences import source_control
@@ -124,7 +126,8 @@ def routes(cli: Path, provider: Path, root: Path, profile: str, states: MetricSt
     return workspace
 
 
-def recheck(root: Path, cli: Path, states: MetricStates) -> dict:
+def recheck(root: Path, cli: Path, states: MetricStates, *, java_profile: str = 'safe-methods-v1',
+            comparison_directory: Path | None = None) -> dict:
     folder = root / 'corpus'
     changed = {Path(row['report']) for row in
         map(json.loads, (folder / 'promoted-changed.stdout').read_text().splitlines()) if 'report' in row}
@@ -135,12 +138,16 @@ def recheck(root: Path, cli: Path, states: MetricStates) -> dict:
         check_report(path, states, console_prefix='changed-' if path in changed else '')
     launches = controls.verify_launches(folder, 188)
     assert launches['raw_attempt_folders'] == 192
-    builds = controls.verify_builds(folder)
+    builds = java_startup_builds.verify(folder, java_profile)
     prepared = controls.verify_prepared(folder, lambda *args: controls.verify_receipt(*args, states=states))
     assert prepared['unique_processes'] == 188
     comparisons = 0
     for path in folder.rglob('typed-bundle.json'):
-        actual = json.loads(command([cli, 'compare-observations', path], path.parent,
+        destination = path.parent
+        if comparison_directory is not None:
+            destination = comparison_directory / hashlib.sha256(str(path.resolve()).encode()).hexdigest()[:24]
+            destination.mkdir(parents=True)
+        actual = json.loads(command([cli, 'compare-observations', path], destination,
             'startup-recomparison', 1 if read(path.parent / 'comparison.json')['verdict'] == 'different_observed' else 0))
         assert actual == read(path.parent / 'comparison.json')
         comparisons += 1
@@ -154,6 +161,24 @@ def recheck(root: Path, cli: Path, states: MetricStates) -> dict:
         'launches': launches, 'builds': builds, 'prepared': prepared, 'source_preserved': True}
 
 
+def retained_workspace(root: Path, provider: Path, profile: str) -> Path:
+    """Only the original complete corpus and requested frozen profile can be reused."""
+    paths = list((root / 'corpus/cases').glob('oteleq-run-*/plan.json'))
+    assert len(paths) == 1
+    plan = read(paths[0])
+    assert Path(plan['otelc_root']).resolve(strict=True) == provider
+    ready = [entry for entry in plan['inventory'] if entry['status'] == 'ready']
+    assert len(ready) == 6 and {entry['otelc_function'] for entry in ready} == set(controls.FUNCTIONS)
+    assert all(entry.get('java_profile', 'stock-methods-v1') == profile for entry in ready)
+    markers = list((root / 'corpus').rglob('*.started.json'))
+    assert markers
+    for marker in markers:
+        result = marker.with_name(marker.name.removesuffix('.started.json') + '.exit')
+        assert result.is_file() and not result.is_symlink()
+        assert result.read_text().strip() == str(read(marker)['expected_exit'])
+    return paths[0].parent
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--cli', type=Path, required=True)
@@ -161,22 +186,32 @@ def main() -> None:
     parser.add_argument('--report-dir', type=Path, required=True)
     parser.add_argument('--startup-state', choices=STARTS, default='both-on')
     parser.add_argument('--java-profile', choices=('stock-methods-v1', 'safe-methods-v1', 'archive-methods-v1'), default='safe-methods-v1')
+    parser.add_argument('--recheck', action='store_true')
     args = parser.parse_args()
     cli, provider = args.cli.resolve(strict=True), args.otelc_root.resolve(strict=True)
     root = args.report_dir.resolve()
     if root.is_relative_to(provider) or root.is_relative_to(Path(__file__).resolve().parents[1]):
         parser.error('qualification output must be new and outside the consumer/provider sources')
-    root.mkdir(mode=0o700)
     states = startup_states(args.startup_state)
     os.environ.update(OTELEQ_PYTHON=sys.executable, OTELEQ_CLI=str(cli))
-    workspace = routes(cli, provider, root, args.java_profile, states)
-    negatives = java_startup_receipts.qualify(root / 'corpus', workspace, root / 'evidence-controls', states)
-    result = recheck(root, cli, states)
+    if args.recheck:
+        workspace = retained_workspace(root, provider, args.java_profile)
+        destination = Path(tempfile.mkdtemp(prefix='offline-recheck-', dir=root))
+        negatives = java_startup_receipts.recheck(root / 'evidence-controls', workspace, states)
+    else:
+        root.mkdir(mode=0o700)
+        destination = root
+        workspace = routes(cli, provider, root, args.java_profile, states)
+        negatives = java_startup_receipts.qualify(root / 'corpus', workspace, root / 'evidence-controls', states)
+    result = recheck(root, cli, states, java_profile=args.java_profile,
+        comparison_directory=destination / 'comparisons' if args.recheck else None)
     result.update(claim='equivalence over these tests and observations', java_profile=args.java_profile,
         initial_metric_state={'collection': states[0][0], 'emission': states[0][1]},
         cli_sha256=hashlib.sha256(cli.read_bytes()).hexdigest(), evidence_controls=negatives,
         scope='Six declared synchronous/private/recursive receiver methods, one declared initial state and all four live states, retained suites and changed current-source console behaviour. No shipping, invocation-cookie or general build integration admission.')
-    (root / 'QUALIFICATION.json').write_text(json.dumps(result, indent=2) + '\n')
+    if args.recheck:
+        result.update(mode='retained_recheck', new_application_launches=0, audit_directory=str(destination))
+    (destination / 'QUALIFICATION.json').write_text(json.dumps(result, indent=2) + '\n')
     print(json.dumps(result), flush=True)
 
 

@@ -1,7 +1,10 @@
 """The independent startup qualifier must keep all four states and call roots."""
 
 import copy
+from contextlib import redirect_stdout
+import io
 import json
+import os
 from pathlib import Path
 import sys
 import tempfile
@@ -46,6 +49,78 @@ def populate_rotated(folder, states):
 
 
 class JavaStartupQualificationTests(unittest.TestCase):
+    def test_retained_alteration_recheck_keeps_names_reasons_and_zero_launches(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary);workspace = root / 'workspace';workspace.mkdir()
+            destination = root / 'controls';destination.mkdir()
+            (workspace / 'plan.json').write_text(json.dumps({'inventory': [{'otelc_function': 'Counter.identity(int)'}]}))
+            states = qualifier.startup_states('both-off')
+            names = [*alterations.receipt_edits(states), 'missing-trace', 'retained-metric',
+                'sdk-pid', 'sdk-policy', 'sdk-loss', 'sdk-drain']
+            rows = [{'name': name, 'refused': True, 'reason':
+                'initial metric state differs' if name.startswith('initial-') else
+                'independent state differs' if name == 'setter' else 'refused-' + name} for name in names]
+            record = {'actual_applications': 0, 'copied_attempts': 15, 'evidence_refusals': 14, 'controls': rows}
+            path = destination / 'QUALIFICATION.json';path.write_text(json.dumps(record));original = path.read_bytes()
+            with patch.object(alterations, 'verify', side_effect=[None, *[ValueError(row['reason']) for row in rows]]) as verify, \
+                 patch.object(alterations.shutil, 'copytree') as copytree:
+                self.assertEqual(alterations.recheck(destination, workspace, states), record)
+            self.assertEqual(verify.call_count, 15);copytree.assert_not_called()
+            self.assertEqual(path.read_bytes(), original)
+            with patch.object(alterations, 'verify', return_value=None), self.assertRaises(AssertionError):
+                alterations.recheck(destination, workspace, states)
+            changed = copy.deepcopy(record);changed['controls'][0]['name'] = 'foreign'
+            path.write_text(json.dumps(changed))
+            with self.assertRaises(AssertionError):alterations.recheck(destination, workspace, states)
+            for name in ('initial-collection', 'initial-emission', 'setter'):
+                with self.assertRaisesRegex(ValueError, 'unrelated'):
+                    alterations.refusal_reason(name, ValueError('unrelated SDK failure'))
+
+    def test_explicit_recheck_never_runs_routes_or_overwrites_the_original_result(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            folder = root / 'evidence';folder.mkdir()
+            original = folder / 'QUALIFICATION.json';original.write_text('preserve original result')
+            provider = root / 'provider';provider.mkdir()
+            cli = root / 'cli';cli.touch()
+            arguments = ['qualifier', '--cli', str(cli), '--otelc-root', str(provider),
+                '--report-dir', str(folder), '--java-profile', 'archive-methods-v1', '--startup-state', 'both-off', '--recheck']
+            output = io.StringIO()
+            with patch.object(sys, 'argv', arguments), patch.dict(os.environ), redirect_stdout(output), \
+                 patch.object(qualifier, 'retained_workspace', return_value=folder / 'workspace') as workspace, \
+                 patch.object(qualifier, 'routes') as routes, \
+                 patch.object(alterations, 'qualify') as execute_controls, \
+                 patch.object(alterations, 'recheck', return_value={'evidence_refusals': 14}) as existing_controls, \
+                 patch.object(qualifier, 'recheck', return_value={'actual_jvm_launches': 188}) as audit:
+                qualifier.main()
+            result = json.loads(output.getvalue())
+            self.assertEqual(result['new_application_launches'], 0)
+            self.assertEqual(result['mode'], 'retained_recheck')
+            self.assertEqual(original.read_text(), 'preserve original result')
+            self.assertEqual(json.loads((Path(result['audit_directory']) / 'QUALIFICATION.json').read_text()), result)
+            routes.assert_not_called();execute_controls.assert_not_called()
+            workspace.assert_called_once_with(folder, provider, 'archive-methods-v1')
+            self.assertEqual(audit.call_args.kwargs['java_profile'], 'archive-methods-v1')
+            self.assertEqual(audit.call_args.kwargs['comparison_directory'], Path(result['audit_directory']) / 'comparisons')
+            existing_controls.assert_called_once_with(folder / 'evidence-controls', folder / 'workspace', qualifier.startup_states('both-off'))
+
+    def test_retained_workspace_refuses_unfinished_operations_and_profile_substitution(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve();provider = root / 'provider';provider.mkdir()
+            workspace = root / 'corpus/cases/oteleq-run-fixture';workspace.mkdir(parents=True)
+            plan = {'otelc_root': str(provider), 'inventory': [
+                {'status': 'ready', 'otelc_function': name, 'java_profile': 'archive-methods-v1'} for name in controls.FUNCTIONS]}
+            (workspace / 'plan.json').write_text(json.dumps(plan))
+            marker = root / 'corpus/run.started.json';marker.write_text(json.dumps({'expected_exit': 1}))
+            with self.assertRaises(AssertionError):qualifier.retained_workspace(root, provider, 'archive-methods-v1')
+            (root / 'corpus/run.exit').write_text('0\n')
+            with self.assertRaises(AssertionError):qualifier.retained_workspace(root, provider, 'archive-methods-v1')
+            (root / 'corpus/run.exit').write_text('1\n')
+            self.assertEqual(qualifier.retained_workspace(root, provider, 'archive-methods-v1'), workspace)
+            with self.assertRaises(AssertionError):qualifier.retained_workspace(root, provider, 'stock-methods-v1')
+            foreign = root / 'foreign';foreign.mkdir()
+            with self.assertRaises(AssertionError):qualifier.retained_workspace(root, foreign, 'archive-methods-v1')
+
     def test_rotations_are_complete_immutable_and_unknown_names_refuse(self):
         for offset, name in enumerate(qualifier.STARTS):
             states = qualifier.startup_states(name)
