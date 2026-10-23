@@ -29,7 +29,7 @@ The explicit Node source provider also implements [live metric schedules](node-m
 
 ## C++ call sequences
 
-The [C++ source receiver profile](cpp-receivers.md#ordered-calls) accepts call-only schedules on one independently constructed receiver. Its version-two native envelope retains every intermediate source-bound graph and requires consistent outer boundaries. The worker streams steps within the shared capture budget. Actual decoded telemetry must retain the declared number of serial selected root trees, including complete recursive descendants. Component checks pass; actual-provider qualification remains pending. Release, collection, metric controls and broader resource/concurrent actions remain unavailable.
+The [C++ source receiver profile](cpp-receivers.md#ordered-calls) accepts call-only schedules on one independently constructed receiver. Its version-two native envelope retains every intermediate source-bound graph and requires consistent outer boundaries. The worker streams steps within the shared capture budget. Actual decoded telemetry must retain the declared number of serial selected root trees, including complete recursive descendants. The [149-launch recorded corpus](qualification/cpp-sequences-2026-10-23.json) qualifies this diagnostic profile on the pinned provider/toolchain. Release, collection, metric controls and broader resource/concurrent actions remain unavailable.
 
 ## Java call sequences
 
@@ -62,7 +62,7 @@ For JavaScript/TypeScript, the provider selects the exact declared class for col
 
 ## Current boundaries
 
-Java supports the call-only profile above. Node call/release sequences use the existing ordinary JavaScript/TypeScript receiver bindings and codecs. Collection additionally requires a separately qualified lifetime-capable provider. [TypeScript collection](typescript-collection.md) freezes the source/native emitter and requires the provider's explicit public capability response before application execution. Explicit CommonJS `.cjs`/`.cts` receiver callers use the real module wrapper and require an unshadowed `require` binding. General Node package/build contexts remain open.
+C++ and Java support their call-only profiles above. Node call/release sequences use the existing ordinary JavaScript/TypeScript receiver bindings and codecs. Collection additionally requires a separately qualified lifetime-capable provider. [TypeScript collection](typescript-collection.md) freezes the source/native emitter and requires the provider's explicit public capability response before application execution. Explicit CommonJS `.cjs`/`.cts` receiver callers use the real module wrapper and require an unshadowed `require` binding. General Node package/build contexts remain open.
 
 The bounded sequence has 1 through 32 steps: calls first, then Node-only release and optional final collection. Other method targets, scheduler/yield/iteration actions, resource-close actions, arbitrary object arguments, unsupported inherited/private/native receiver state and the remaining language runners require further adapter work. The common ordered typed protocol is shared across all language IDs; unavailable requested generators remain named blockers.
 

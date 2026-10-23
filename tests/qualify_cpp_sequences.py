@@ -246,7 +246,8 @@ def verify_operations(folder: Path, cli: Path, *, historical_source_expectation:
             assert (folder / (name + "." + suffix)).is_file()
         if name in CONTROL_VERDICTS:
             assert json.loads((folder / (name + ".stdout")).read_text())["verdict"] == CONTROL_VERDICTS[name][1]
-    assert "application source or immutable snapshot changed" in (folder / "changed-source.stderr").read_text()
+    assert (folder / "changed-source.stderr").read_bytes() == b"oteleq: application source or immutable snapshot changed\n"
+    assert (folder / "changed-source.stdout").read_bytes() == b""
     for name in ("cases", "edge-one", "edge-thirty-two", "edge-rich-thirty-two"):
         route = folder / name
         selected = Path((route / "plan.stdout").read_text().strip())

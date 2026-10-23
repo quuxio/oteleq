@@ -170,7 +170,7 @@ class CppSequenceQualificationTests(unittest.TestCase):
                 (base / (name + '.started.json')).write_text(json.dumps({'expected_exit': expected, 'argv': list(map(str, argv))}))
                 (base / (name + '.exit')).write_text(str(expected) + '\n')
                 (base / (name + '.stdout')).write_text(json.dumps({'verdict': qualifier.CONTROL_VERDICTS[name][1]}) if name in qualifier.CONTROL_VERDICTS else '')
-                (base / (name + '.stderr')).write_text('application source or immutable snapshot changed' if name == 'changed-source' else '')
+                (base / (name + '.stderr')).write_text('oteleq: application source or immutable snapshot changed\n' if name == 'changed-source' else '')
 
             for name, (expected, argv) in operations.items():
                 receipt(folder, name, expected, argv)
@@ -195,6 +195,16 @@ class CppSequenceQualificationTests(unittest.TestCase):
             with self.assertRaises(AssertionError):
                 qualifier.verify_operations(folder, cli)
             self.assertEqual(qualifier.verify_operations(folder, cli, historical_source_expectation=True), 31)
+            for suffix, additions in (('stderr', ('prefix', 'suffix')), ('stdout', ('output',))):
+                path = folder / ('changed-source.' + suffix)
+                original = path.read_bytes()
+                for addition in additions:
+                    changed = (b'unrelated diagnostic\n' + original if addition == 'prefix' else
+                        original + b'unrelated diagnostic\n' if addition == 'suffix' else b'application output\n')
+                    path.write_bytes(changed)
+                    with self.subTest(addition=addition), self.assertRaises(AssertionError):
+                        qualifier.verify_operations(folder, cli, historical_source_expectation=True)
+                    path.write_bytes(original)
             (folder / 'changed-source.exit').write_text('2\n')
             with self.assertRaises(AssertionError):
                 qualifier.verify_operations(folder, cli, historical_source_expectation=True)
