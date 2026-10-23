@@ -26,7 +26,7 @@ def source(language: str) -> str:
         result += "this.value+=value;Counter.total+=value;"
         result += "process.stdout.write(Buffer.from([0,255,10]));process.stderr.write(Buffer.from([1,255,10]));"
         if method == "difference":
-            result += "if(value===2&&process.env.OTELC_NODE_PLAN?.endsWith('/node-plan.json'))Counter.delta=1;if(value===3)Counter.delta=0;"
+            result += "if(value===2&&process.execArgv.some(argument=>argument.endsWith('/node-bootstrap.cjs')))Counter.delta=1;if(value===3)Counter.delta=0;"
         if method == "expected":
             result += "if(value===3)throw new TypeError('expected');"
         result += "return 42;}\n"

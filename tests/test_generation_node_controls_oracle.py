@@ -1,8 +1,13 @@
 """The live-control oracle must reject changes anywhere in its complete graphs."""
 
 import copy
+import json
+import os
+import shutil
+import subprocess
 import sys
 from pathlib import Path
+import tempfile
 import tomllib
 import unittest
 
@@ -14,6 +19,28 @@ import qualify_node_controls as qualification
 
 
 class NodeControlsOracleTests(unittest.TestCase):
+    def test_negative_fixture_uses_actual_launch_arguments_after_sdk_environment_cleanup(self):
+        node = os.environ.get("OTELC_NODE") or shutil.which("node")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            script = root / "controls.cjs"
+            script.write_text(qualification.source("javascript")
+                              + '\nconst counter=new Counter(10),states=[];for(const value of [7,2,3,4]){counter.difference(value);states.push(Counter.delta);}'
+                              + 'require("node:fs").writeFileSync(process.env.OTELEQ_OBSERVATION,JSON.stringify(states));\n')
+            output = root / "observed.json"
+            for bootstrap, active in ((None, False), ("node-plain-bootstrap.cjs", False), ("node-bootstrap.cjs", True)):
+                arguments = []
+                if bootstrap:
+                    filename = root / bootstrap;filename.write_text('// Controlled argv fixture; no SDK is installed here.\n')
+                    arguments = ["--require", str(filename)]
+                environment = {**os.environ, "OTELEQ_OBSERVATION": str(output)}
+                environment.pop("OTELC_NODE_PLAN", None)
+                result = subprocess.run([node, *arguments, script], env=environment, capture_output=True, timeout=10)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(json.loads(output.read_bytes()), [0, int(active), 0, 0])
+                self.assertEqual(result.stdout, bytes.fromhex("00ff0a") * 4)
+                self.assertEqual(result.stderr, bytes.fromhex("01ff0a") * 4)
+
     def test_literal_graphs_include_every_intermediate_state_and_expected_error(self):
         for method in oracle.METHODS:
             for active in (False, True):
