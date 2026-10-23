@@ -94,6 +94,8 @@ cargo build --locked
 
 `cargo install --path . --locked` installs `quux-oteleq` locally. The CLI embeds its generation workers. Generation and capture additionally require Python 3.12+, otelc's locked OTLP decoder environment and the qualified tools/adapters for the selected languages; see [setup and capabilities](docs/automatic-generation.md). Contributor tooling and CI coverage instructions are in [repository quality](docs/quality.md).
 
+Maintainers can use the checkout's [cold receipt archive/restore commands](docs/qualification-retention.md) to reduce completed qualification storage. Archived raw paths must be restored before existing retained verifiers run.
+
 ### Generate and run tests
 
 Build otelc's qualified adapters first. Use its locked Python environment, then create an external plan and use the workspace path printed by `plan`:
