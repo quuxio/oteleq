@@ -13,6 +13,24 @@ from qualify_generation import command
 STATES = ({"collection": True, "emission": True}, {"collection": False, "emission": True},
           {"collection": True, "emission": False}, {"collection": False, "emission": False})
 
+STARTUP_OFFSETS = {"both-on": 0, "collection-off": 1, "emission-off": 2, "both-off": 3}
+
+
+def startup_states(name: str) -> tuple[dict, ...]:
+    """Keep the complete four-state schedule while fixing its startup flags."""
+    if name not in STARTUP_OFFSETS:
+        raise ValueError("unknown Node startup metric state")
+    offset = STARTUP_OFFSETS[name]
+    return tuple(state.copy() for state in STATES[offset:] + STATES[:offset])
+
+
+def expected_metrics(method: str, states: tuple[dict, ...]) -> dict[str, int]:
+    """The third call throws only in the expected-error method."""
+    result = {"otelc.function.calls": 2, "otelc.function.duration": 2}
+    if method == "expected" and states[2]["collection"]:
+        result["otelc.function.unwinds"] = 1
+    return result
+
 
 def source(language: str) -> str:
     annotation = ":number" if language == "typescript" else ""
@@ -33,7 +51,7 @@ def source(language: str) -> str:
     return result + "}\n"
 
 
-def policy(language: str, compiler: str) -> str:
+def policy(language: str, compiler: str, *, states: tuple[dict, ...] = STATES) -> str:
     result = ('schema_version=1\nlanguages=' + json.dumps([language]) + '\n[functions]\ninclude='
               + json.dumps(["controls.Counter." + name for name in oracle.METHODS]) + '\n'
               '[adapters.node]\nbackend="source-v1"\ntypescript_compiler=' + json.dumps(compiler)
@@ -42,7 +60,7 @@ def policy(language: str, compiler: str) -> str:
         result += ('\n[[fixtures]]\nfunction="controls.Counter.' + method
                    + '"\ncases=[[7]]\ndomains=[{kind="integer",minimum=1,maximum=7}]\n'
                    'receiver={factory="Counter",arguments=[10]}\nsequence=[\n')
-        for index, flags in enumerate(STATES):
+        for index, flags in enumerate(states):
             arguments = '"case"' if index == 0 else json.dumps([index + 1])
             expectation = ('{kind="error",category="exception",type="ecmascript.TypeError.prototype:TypeError"}'
                            if method == "expected" and index == 2 else '{kind="return"}')
@@ -53,7 +71,7 @@ def policy(language: str, compiler: str) -> str:
     return result
 
 
-def check_attempt(folder: Path, method: str, argument: float, instrumented: bool, *, result: float = 42) -> tuple[str, int]:
+def check_attempt(folder: Path, method: str, argument: float, instrumented: bool, *, result: float = 42, states: tuple[dict, ...] = STATES) -> tuple[str, int]:
     """Check complete literal application graphs, bytes and actual process receipts."""
     oracle.check(json.loads((folder / "observation").read_bytes()), method, argument, instrumented, result=result)
     if (folder / "stdout").read_bytes() != bytes.fromhex("00ff0a") * 4 or (folder / "stderr").read_bytes() != bytes.fromhex("01ff0a") * 4:
@@ -62,17 +80,17 @@ def check_attempt(folder: Path, method: str, argument: float, instrumented: bool
     control = json.loads((folder / "node-controls.json").read_bytes())
     if control["pid"] != app["pid"] or control["supervisor_pid"] != app["supervisor_pid"] or control["plain"] is not (not instrumented):
         raise ValueError("live-control actual process identity differs")
-    if len(control["steps"]) != 4 or json.dumps([step["requested"] for step in control["steps"]], sort_keys=True) != json.dumps(STATES, sort_keys=True):
+    if len(control["steps"]) != 4 or json.dumps([step["requested"] for step in control["steps"]], sort_keys=True) != json.dumps(states, sort_keys=True):
         raise ValueError("live-control four-state schedule differs")
     if instrumented:
-        check_sdk(folder, method, control)
+        check_sdk(folder, method, control, states=states)
     elif control["sdk_pid"] is not None or control["launch_id"] is not None:
         raise ValueError("plain live-control lane fabricated an SDK")
     request = json.loads((folder / "node-source-request.json").read_bytes())
     return request["runtime"], app["pid"]
 
 
-def check_sdk(folder: Path, method: str, control: dict) -> None:
+def check_sdk(folder: Path, method: str, control: dict, *, states: tuple[dict, ...] = STATES) -> None:
     """Four actual traced calls yield exactly two collected function measurements."""
     from opentelemetry.proto.collector.metrics.v1.metrics_service_pb2 import ExportMetricsServiceRequest
     from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceRequest
@@ -102,9 +120,7 @@ def check_sdk(folder: Path, method: str, control: dict) -> None:
             raise ValueError("unrequested live-control telemetry route")
     if len(spans) != 4 or any(span.name != "controls.Counter." + method or span.parent_span_id for span in spans):
         raise ValueError("live-control traces did not retain every independent call")
-    expected = {"otelc.function.calls": 2, "otelc.function.duration": 2}
-    if method == "expected":
-        expected["otelc.function.unwinds"] = 1
+    expected = expected_metrics(method, states)
     if {key: value[1] for key, value in final.items()} != expected:
         raise ValueError("live-control decoded totals include suppressed calls or lose retained measurements")
     for step in control["steps"]:
@@ -116,7 +132,7 @@ def check_sdk(folder: Path, method: str, control: dict) -> None:
                 raise ValueError("disabled live-control window did not stay silent for one interval")
 
 
-def check_report(path: Path, expected_methods: set[str], *, result: float = 42) -> set[tuple[str, int]]:
+def check_report(path: Path, expected_methods: set[str], *, result: float = 42, states: tuple[dict, ...] = STATES) -> set[tuple[str, int]]:
     report = json.loads(path.read_bytes())
     if not report["source_preserved"] or report["blocked"] or len(report["cases"]) != len(expected_methods):
         raise ValueError("live-control report source/inventory scope differs")
@@ -131,13 +147,13 @@ def check_report(path: Path, expected_methods: set[str], *, result: float = 42) 
         for lane in ("baseline", "instrumented_on"):
             for index in range(2):
                 folder = path.parent / case["case"] / (lane + "-" + str(index))
-                identities.add(check_attempt(folder, method, case["arguments"][0], lane == "instrumented_on", result=result))
+                identities.add(check_attempt(folder, method, case["arguments"][0], lane == "instrumented_on", result=result, states=states))
     if methods != expected_methods or len(identities) != len(expected_methods) * 4:
         raise ValueError("live-control method or independent launch count differs")
     return identities
 
 
-def framework(workspace: Path, folder: Path, name: str, expected_methods: set[str] | None = None) -> set[tuple[str, int]]:
+def framework(workspace: Path, folder: Path, name: str, expected_methods: set[str] | None = None, *, states: tuple[dict, ...] = STATES) -> set[tuple[str, int]]:
     expected_methods = set(oracle.METHODS) if expected_methods is None else expected_methods
     text = command([sys.executable, "-I", "-B", workspace / "tests/test_equivalence.py"], folder, name, expected=1)
     rows = [json.loads(line) for line in text.splitlines()]
@@ -152,18 +168,18 @@ def framework(workspace: Path, folder: Path, name: str, expected_methods: set[st
         if method in methods:
             raise ValueError("repeated live-control framework method")
         methods.add(method)
-        identities |= check_report(path, {method})
+        identities |= check_report(path, {method}, states=states)
     if methods != expected_methods:
         raise ValueError("missing live-control framework method")
     return identities
 
 
-def qualify(cli: Path, provider: Path, folder: Path, language: str, compiler: str, suffix: str) -> dict:
+def qualify(cli: Path, provider: Path, folder: Path, language: str, compiler: str, suffix: str, *, states: tuple[dict, ...] = STATES) -> dict:
     folder.mkdir(mode=0o700)
     application = folder / "application";application.mkdir()
     filename = application / ("controls" + suffix)
     original = source(language);filename.write_text(original)
-    config = folder / "equivalence.toml";config.write_text(policy(language, compiler))
+    config = folder / "equivalence.toml";config.write_text(policy(language, compiler, states=states))
     stages = []
 
     def run(stage, arguments, expected=0):
@@ -177,13 +193,13 @@ def qualify(cli: Path, provider: Path, folder: Path, language: str, compiler: st
     workspace = Path(run("plan", ["plan", "--source", application, "--otelc-root", provider, "--workspace-parent", folder, "--config", config]))
     run("generate", ["generate", "--workspace", workspace])
     run("run", ["run", "--workspace", workspace, "--report-dir", folder / "comparison"], 1)
-    identities = check_report(folder / "comparison/report.json", set(oracle.METHODS))
-    identities |= framework(workspace, folder, "framework")
+    identities = check_report(folder / "comparison/report.json", set(oracle.METHODS), states=states)
+    identities |= framework(workspace, folder, "framework", states=states)
     inventory = {entry["id"]: entry for entry in json.loads((workspace / "plan.json").read_bytes())["inventory"]}
     for case in json.loads((workspace / "tests/corpus.json").read_bytes()):
         method = inventory[case["function_id"]]["otelc_function"].rsplit('.', 1)[-1]
         replay = json.loads(run("replay-" + method, ["replay", "--workspace", workspace, "--case", case["id"]], int(method == "difference")))
-        identities |= check_report(Path(replay["report"]), {method})
+        identities |= check_report(Path(replay["report"]), {method}, states=states)
     exported = folder / "exported"
     run("export-plan", ["export-tests", "--workspace", workspace, "--destination", exported])
     if exported.exists():
@@ -191,17 +207,18 @@ def qualify(cli: Path, provider: Path, folder: Path, language: str, compiler: st
     run("export-apply", ["export-tests", "--workspace", workspace, "--destination", exported, "--apply"])
     detached = folder / "detached-application";application.rename(detached)
     try:
-        identities |= framework(exported, folder, "detached-framework")
+        identities |= framework(exported, folder, "detached-framework", states=states)
     finally:
         detached.rename(application)
     if filename.read_text() != original or len(identities) != 64:
         raise ValueError("live-control source preservation or application count differs")
     from node_controls_routes import retained_routes
-    extended = retained_routes(cli, folder, workspace, filename)
+    extended = retained_routes(cli, folder, workspace, filename, states=states)
     if identities & set(map(tuple, extended["application_identities"])):
         raise ValueError("extended live-control routes reused an earlier application")
     identities |= set(map(tuple, extended["application_identities"]))
-    return {"language": language, "compiler": compiler, "suffix": suffix, "actual_applications": len(identities),
+    return {"language": language, "compiler": compiler, "suffix": suffix, "initial_metric_state": states[0].copy(),
+            "actual_applications": len(identities),
             "application_identities": sorted(identities), "source_preserved": True, "workspace": str(workspace),
             "retained_routes": extended}
 
@@ -211,7 +228,9 @@ def main() -> None:
     parser.add_argument("--cli", type=Path, required=True)
     parser.add_argument("--otelc-root", type=Path, required=True)
     parser.add_argument("--report-dir", type=Path, required=True)
+    parser.add_argument("--startup-state", choices=tuple(STARTUP_OFFSETS), default="both-on")
     args = parser.parse_args()
+    states = startup_states(args.startup_state)
     cli, provider, root = args.cli.resolve(strict=True), args.otelc_root.resolve(strict=True), args.report_dir.resolve()
     if root.is_relative_to(provider) or root.is_relative_to(Path(__file__).resolve().parents[1]):
         parser.error("qualification outputs must be new and outside consumer/provider sources")
@@ -219,9 +238,9 @@ def main() -> None:
     os.environ.update(OTELEQ_PYTHON=sys.executable, OTELEQ_CLI=str(cli))
     rows = []
     for language, compiler, suffix in (("javascript", "native", ".cjs"), ("typescript", "native", ".cts"), ("typescript", "api", ".mts")):
-        rows.append(qualify(cli, provider, root / (language + "-" + compiler), language, compiler, suffix))
+        rows.append(qualify(cli, provider, root / (language + "-" + compiler), language, compiler, suffix, states=states))
         (root / "progress.json").write_text(json.dumps(rows, indent=2) + "\n")
-    result = {"claim": "equivalence over these tests and observations", "profiles": rows,
+    result = {"claim": "equivalence over these tests and observations", "initial_metric_state": states[0], "profiles": rows,
               "actual_applications": sum(row["actual_applications"] for row in rows),
               "cli_sha256": hashlib.sha256(cli.read_bytes()).hexdigest(),
               "scope": "Declared serial receiver calls, four metric states and actual local telemetry receipt; no shipping or invocation-cookie proof."}

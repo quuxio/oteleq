@@ -67,6 +67,14 @@ class QualificationRecipeTests(unittest.TestCase):
                         self.assertEqual(result.returncode, 0, result.stderr)
                         arguments = json.loads(record.read_text())
                         self.assertEqual(arguments[arguments.index(flag) + 1], expected)
+                        if name == 'generation-node-controls-otelc':
+                            self.assertEqual(arguments[arguments.index('--startup-state') + 1], 'both-on')
+
+    def test_node_control_recipe_retains_the_explicit_startup_state(self):
+        result = subprocess.run(['make', '--no-print-directory', '-n', 'generation-node-controls-otelc',
+            'OTELC_ROOT=/tmp/provider', 'REPORT_DIR=/tmp/evidence', 'NODE_CONTROL_STARTUP=both-off'],
+            cwd=ROOT, capture_output=True, text=True, check=True)
+        self.assertIn('--startup-state "both-off"', result.stdout)
 
     def test_help_names_the_http_qualification_target(self):
         result = subprocess.run(["make", "help"], cwd=ROOT, capture_output=True, text=True, check=True)

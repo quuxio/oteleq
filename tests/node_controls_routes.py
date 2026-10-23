@@ -65,7 +65,33 @@ def alter_exports(attempt: Path, name: str) -> None:
     path.write_text(json.dumps(record))
 
 
-def receipt_controls(profile: Path, workspace: Path, folder: Path) -> int:
+def receipt_edits(states: tuple[dict, ...]) -> dict:
+    """Every schedule alters a disabled window and an actually independent flag."""
+    disabled = next(index for index, state in enumerate(states) if not all(state.values()))
+
+    def initial_state(record):
+        current = record['steps'][0]['before']['history'][0]['status']
+        current['collection'] = not current['collection']
+
+    def independent_flag(record):
+        current = record['steps'][1]['before']['history'][1]['status']
+        current['emission'] = not current['emission']
+        current['effective_emission_off'] = not current['emission'] and current['in_flight_exports'] == 0
+
+    return {
+        'pid': lambda record: record.update(pid=record['pid'] + 1),
+        'sdk-pid': lambda record: record.update(sdk_pid=record['sdk_pid'] + 1),
+        'launch': lambda record: record.update(launch_id='0' * 32),
+        'initial-state': initial_state,
+        'setter': independent_flag,
+        'call-count': lambda record: record['steps'][2]['after']['settled'].update(function_completions=4),
+        'held-window': lambda record: record['steps'][disabled]['after'].update(held_ns=0),
+        'metric-window': lambda record: record['steps'][disabled]['after'].update(metric_bodies=[0]),
+        'restoration': lambda record: record['restored'].update(cursor=record['steps'][-1]['after']['cursor']),
+    }
+
+
+def receipt_controls(profile: Path, workspace: Path, folder: Path, *, states: tuple[dict, ...] = controls.STATES) -> int:
     """Actual retained control and OTLP alterations must fail the product verifier."""
     root = Path(__file__).resolve().parents[1]
     sys.path[:0] = [str(root / 'adapters/generation'), str(root / 'examples')]
@@ -87,16 +113,7 @@ def receipt_controls(profile: Path, workspace: Path, folder: Path) -> int:
         node_telemetry.witness(attempt, entry, bodies, policy['resource']['service_name'], ExportTraceServiceRequest)
 
     verify(original)
-    edits = {
-        'pid': lambda record: record.update(pid=record['pid'] + 1),
-        'sdk-pid': lambda record: record.update(sdk_pid=record['sdk_pid'] + 1),
-        'launch': lambda record: record.update(launch_id='0' * 32),
-        'setter': lambda record: record['steps'][1]['before']['history'][1]['status'].update(emission=False),
-        'call-count': lambda record: record['steps'][2]['after']['settled'].update(function_completions=4),
-        'held-window': lambda record: record['steps'][1]['after'].update(held_ns=0),
-        'metric-window': lambda record: record['steps'][1]['after'].update(metric_bodies=[0]),
-        'restoration': lambda record: record['restored'].update(cursor=record['steps'][-1]['after']['cursor']),
-    }
+    edits = receipt_edits(states)
     export_errors = {'off-export-admission': 'drained emission-off window',
                      'export-counter-rollback': 'moved backwards',
                      'export-final-bound': 'exceed the final SDK report'}
@@ -114,8 +131,10 @@ def receipt_controls(profile: Path, workspace: Path, folder: Path) -> int:
         try:
             verify(attempt)
         except ValueError as error:
-            if name in export_errors and export_errors[name] not in str(error):
-                raise ValueError('export counter control failed for an unrelated reason: ' + name) from error
+            expected_error = {'initial-state': 'initial metric state', 'setter': 'independent flag',
+                              **export_errors}.get(name)
+            if expected_error is not None and expected_error not in str(error):
+                raise ValueError('live control failed for an unrelated reason: ' + name) from error
             (folder / (name + '.refusal.json')).write_text(json.dumps({'refused': True, 'reason': str(error)}) + '\n')
         else:
             raise ValueError('altered actual live-control evidence was accepted: ' + name)
@@ -123,7 +142,8 @@ def receipt_controls(profile: Path, workspace: Path, folder: Path) -> int:
     return len(edits) + 2 + len(export_errors)
 
 
-def current_suite(bundle: Path, application: Path, folder: Path, name: str, *, result: float) -> set[tuple[str, int]]:
+def current_suite(bundle: Path, application: Path, folder: Path, name: str, *, result: float,
+                  states: tuple[dict, ...] = controls.STATES) -> set[tuple[str, int]]:
     """Check the fresh snapshot and complete observations after a real body change."""
     output = project_command([sys.executable, "-I", "-B", bundle / "test_equivalence.py"],
         folder, name, 1, {"OTELEQ_SOURCE": str(application), "OTELEQ_WORKSPACE_PARENT": str(folder)})
@@ -143,17 +163,17 @@ def current_suite(bundle: Path, application: Path, folder: Path, name: str, *, r
         if method in methods:
             raise ValueError("promoted live-control suite repeated a method")
         methods.add(method)
-        identities |= controls.check_report(path, {method}, result=result)
+        identities |= controls.check_report(path, {method}, result=result, states=states)
     if methods != set(oracle.METHODS) or len(identities) != 16:
         raise ValueError("promoted live-control suite did not execute every method independently")
     return identities
 
 
-def retained_routes(cli: Path, profile: Path, workspace: Path, filename: Path) -> dict:
+def retained_routes(cli: Path, profile: Path, workspace: Path, filename: Path, *, states: tuple[dict, ...] = controls.STATES) -> dict:
     """Preserve all four states through reduction, replay and current-source promotion."""
     folder = profile / "retained-routes"
     folder.mkdir(mode=0o700)
-    refusals = receipt_controls(profile, workspace, folder)
+    refusals = receipt_controls(profile, workspace, folder, states=states)
     report = json.loads((profile / "comparison/report.json").read_bytes())
     target = next(case for case in report["cases"] if case["function"].endswith('.difference'))
     reduced = folder / "shrink"
@@ -166,12 +186,12 @@ def retained_routes(cli: Path, profile: Path, workspace: Path, filename: Path) -
     identities = set()
     for path in [reduced / "original/report.json", reduced / "confirmation/report.json",
                  *[Path(trial["report"]) for trial in shrink["trials"]]]:
-        identities |= controls.check_report(path, {"difference"})
+        identities |= controls.check_report(path, {"difference"}, states=states)
     replay = Path(shrink["workspace"])
-    identities |= controls.framework(replay, folder, "reduced-framework", {"difference"})
+    identities |= controls.framework(replay, folder, "reduced-framework", {"difference"}, states=states)
     output = json.loads(command([cli, "replay", "--workspace", replay, "--case", target["case"]],
                                 folder, "reduced-replay", expected=1))
-    identities |= controls.check_report(Path(output["report"]), {"difference"})
+    identities |= controls.check_report(Path(output["report"]), {"difference"}, states=states)
     if len(identities) != 20:
         raise ValueError("live-control reduction/replay launch count differs")
     bundle = folder / "project-tests"
@@ -181,13 +201,13 @@ def retained_routes(cli: Path, profile: Path, workspace: Path, filename: Path) -
     if dry["mode"] != "dry-run" or len(dry["files"]) != 6 or bundle.exists():
         raise ValueError("live-control promotion dry-run changed files")
     command([*arguments, "--apply"], folder, "promote-apply")
-    identities |= current_suite(bundle, application, folder, "promoted-original", result=42)
+    identities |= current_suite(bundle, application, folder, "promoted-original", result=42, states=states)
     original = filename.read_text()
     if original.count('return 42;') != 4:
         raise ValueError("live-control body-change fixture differs")
     try:
         filename.write_text(original.replace('return 42;', 'return 43;'))
-        identities |= current_suite(bundle, application, folder, "promoted-changed", result=43)
+        identities |= current_suite(bundle, application, folder, "promoted-changed", result=43, states=states)
     finally:
         filename.write_text(original)
     if len(identities) != 52:
