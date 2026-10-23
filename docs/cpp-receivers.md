@@ -61,6 +61,8 @@ Decoded instrumentation must contain the declared number of selected call roots,
 
 Component tests cover real compiled callers, intermediate exceptions, aliases, restored differences, 32-call bounds and malformed observations. Actual-provider qualification for ordered C++ calls is pending; the existing record below retains its single-call scope.
 
+`make generation-cpp-sequence-otelc OTELC_ROOT=/absolute/path/to/qualified/otelc REPORT_DIR=/new/external/evidence` runs the maintained ordered-call corpus. It requires all six fixed methods through direct execution, generated suites, detached exports, per-case replay and scalar reduction, with separate one-call and 32-call boundaries. Retained verification independently checks field values, aliases, decoded telemetry trees, metrics, terminal route receipts and altered-evidence refusals. Use `tests/qualify_cpp_sequences.py --recheck` with the same three path arguments to recheck completed evidence without new application runs. A failed or interrupted corpus is retained for investigation; it is not restarted in place.
+
 ## Storage and capture limits
 
 The closed registry supports native booleans and integers up to 64 bits, IEEE float/double storage, named physical source classes/structs, fixed arrays, const storage, pointers and lvalue references. Every field has a typed slot. Separate location nodes preserve equal starting addresses across typed views, including an interior pointer and a reference returned to the receiver. Scalar bytes preserve signed zero and NaN payloads; structure padding is never compared. Graphs are rebuilt at each boundary and do not establish allocation identity across destruction or address reuse.
