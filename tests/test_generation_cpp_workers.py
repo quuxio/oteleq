@@ -20,6 +20,12 @@ from test_generation_cpp_models import SOURCE
 
 
 class CppWorkerTests(unittest.TestCase):
+    def test_preprocessor_defined_spelling_can_name_a_private_source_field(self):
+        _, capture, _, _ = self.captured(SOURCE.replace('value_', 'defined'))
+        for graph, expected in ((capture['before'], '10'), (capture['after'], '13')):
+            value = self.field(graph, graph['roots']['receiver'], 'defined')
+            self.assertEqual(value['fields']['value']['value'], expected)
+
     def test_unicode_field_macro_cannot_invoke_an_application_getter(self):
         source = '''class Counter {
  int value_;

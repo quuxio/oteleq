@@ -1,0 +1,167 @@
+{
+  "qualification_schema_version": 1,
+  "date": "2026-10-23",
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "runtime": {
+    "commit": "50f01a76be3f965e73dc8c93251aaff98add1cbc",
+    "cli_sha256": "f0d6e7d017b39f3adc657d7d7b387035e51b591efe61f715219caba1a2a0e205",
+    "tracked_source_files": 405
+  },
+  "verifier": {
+    "script": "tests/qualify_cpp_sequences.py --recheck --historical-source-expectation",
+    "new_application_launches": 0,
+    "runtime_source_files_byte_identical": 103,
+    "initial_commit": "b40eec61667c8049fe754e773eaf9da18918dfeb",
+    "initial_tracked_source_files": 405,
+    "script_sha256": "62a3171b163779baaf904b144f1ac2bda685f390c638bd4e874a860bea9dba97",
+    "exact_source_diagnostic_and_empty_stdout_required": true,
+    "commit": "38c817608e328ec55810108bb91c608b27dfb855",
+    "tracked_source_files": 406
+  },
+  "provider": {
+    "repository": "quuxio/otelc",
+    "commit": "d6d03b72026cde8962b11ce3cc184ff3ebcb60d4",
+    "manifest_sha256": "2a8dbf239c6444c0fb536dff049993beade7eaed6578c9654c1e2d7233e9431f",
+    "preserved_records": {
+      "sources": 413,
+      "products": 586,
+      "dependencies": 6361
+    },
+    "selected_tool_roles_rehashed": 3,
+    "preserved_record_total": 7360
+  },
+  "platform": {
+    "system": "Darwin",
+    "machine": "arm64",
+    "macos_version": "27.0.1"
+  },
+  "selected_tools": {
+    "clang": {
+      "path": "/opt/homebrew/opt/llvm@22/bin/clang",
+      "resolved": "/opt/homebrew/Cellar/llvm@22/22.1.8/bin/clang-22",
+      "sha256": "68bb87f784f09da01b7aea0f70952fb23f606242cdc4f6ff3cc26c372af0706f",
+      "version_stdout": "Homebrew clang version 22.1.8\nTarget: arm64-apple-darwin27.0.0\nThread model: posix\nInstalledDir: /opt/homebrew/Cellar/llvm@22/22.1.8/bin\nConfiguration file: /opt/homebrew/Cellar/llvm@22/22.1.8/etc/clang/arm64-apple-darwin27.cfg\n",
+      "version_stderr": ""
+    },
+    "clang++": {
+      "path": "/opt/homebrew/opt/llvm@22/bin/clang++",
+      "resolved": "/opt/homebrew/Cellar/llvm@22/22.1.8/bin/clang-22",
+      "sha256": "68bb87f784f09da01b7aea0f70952fb23f606242cdc4f6ff3cc26c372af0706f",
+      "version_stdout": "Homebrew clang version 22.1.8\nTarget: arm64-apple-darwin27.0.0\nThread model: posix\nInstalledDir: /opt/homebrew/Cellar/llvm@22/22.1.8/bin\nConfiguration file: /opt/homebrew/Cellar/llvm@22/22.1.8/etc/clang/arm64-apple-darwin27.cfg\n",
+      "version_stderr": ""
+    },
+    "python": {
+      "path": "/Users/sclarke/github/otelc-qualification/2026-10-20/integrated-provider/d6d03b7/provider/.venv/bin/python",
+      "resolved": "/opt/homebrew/Cellar/python@3.12/3.12.15/Frameworks/Python.framework/Versions/3.12/bin/python3.12",
+      "sha256": "c4e9f06cb179ae4b3728c748990fbbef7f30580ea42c0eb9c702ebc7c7861c89",
+      "version_stdout": "Python 3.12.15\n",
+      "version_stderr": ""
+    }
+  },
+  "results": {
+    "fixed_methods": 6,
+    "matching_methods": 5,
+    "deliberate_intermediate_difference_methods": 1,
+    "actual_application_launches": 149,
+    "raw_attempt_folders": 153,
+    "copied_attempts_excluded": 4,
+    "reports": 29,
+    "typed_observations": 152,
+    "comparisons_recomputed": 38,
+    "raw_instrumented_receipts": 76,
+    "required_route_commands": 31,
+    "altered_evidence_refusals": 5,
+    "prelaunch_source_refusals": 1,
+    "actual_budget_refusal_launches": 1,
+    "one_call_positive": true,
+    "compact_32_call_positive": true,
+    "rich_32_call_budget_refused": true,
+    "detached_export": true,
+    "generated_unittest": true,
+    "per_case_replay": true,
+    "scalar_reduction": {
+      "original": [
+        7
+      ],
+      "reduced": [
+        0
+      ],
+      "schedule_preserved": true
+    }
+  },
+  "burst_control": {
+    "claim": "equivalence over these tests and observations",
+    "actual_application_launches": 4,
+    "calls_per_application": 32,
+    "raw_instrumented_receipts": 2,
+    "completed_roots_per_instrumented_process": 32,
+    "decoded_spans_per_instrumented_process": 32,
+    "completed_root_queue": 64,
+    "losses": 0,
+    "scope": "one compact diagnostic receiver burst; not the full corpus or shipping artifact"
+  },
+  "single_call_compatibility": {
+    "executed_commit": "70cbdbc75cae2cba53d715a4ac7f2b0a2bea081f",
+    "cli_sha256": "a116edfccd9b4a8f2a2a4c253aa380d574fa4ec685cfcbdec42f445cf35bc9bd",
+    "actual_application_launches": 331,
+    "raw_attempt_folders": 335,
+    "copied_attempts_excluded": 4,
+    "reports": 63,
+    "comparisons_recomputed": 83,
+    "typed_observations": 332,
+    "refusal_controls": 13,
+    "later_candidate": "50f01a76be3f965e73dc8c93251aaff98add1cbc",
+    "ready_entries_with_identical_policies_and_receiver_options": 43,
+    "plans_checked": 20,
+    "identical_worker_modules": 9,
+    "new_application_launches_for_input_comparison": 0
+  },
+  "retention": {
+    "ordered_records": 3417,
+    "ordered_raw_manifest_sha256": "8746ffcc012a219a09a9f2c86b9ef4b13530dddc5dd4d0b11c852220cdb3eda3",
+    "single_call_records": 6989,
+    "single_call_raw_manifest_sha256": "52930474a1e789ed9f39c4929647399eb0ca2dfabb17b2339895e1a8c0663362",
+    "original_ordered_files_unchanged_after_recheck": 3416
+  },
+  "independent_runtime_review": {
+    "commit": "50f01a76be3f965e73dc8c93251aaff98add1cbc",
+    "review_sha256": "dc6872b86ce2a27a54cdfcbdf49e784a1525a29b563a28f00fbcf3d68915a30f",
+    "focused_tests": 22,
+    "retained_burst_observations": 4,
+    "retained_instrumented_receipts": 2
+  },
+  "original_failures_preserved": [
+    {
+      "runtime": "1502c22744366ed54337bd5674fe3fb26d3d31a7",
+      "finding": "The initial qualifier expected a rich 32-call receiver to pass despite exceeding the shared 262144-byte case budget. It is now a required refusal beside a separate compact positive."
+    },
+    {
+      "runtime": "70cbdbc75cae2cba53d715a4ac7f2b0a2bea081f",
+      "finding": "A compact 32-call burst lost 23 completed trace roots from the default queue of eight roots. Missing roots remained an incomplete result."
+    },
+    {
+      "runtime": "7b3205cb9afe8c01068592e5eb31294268fe6356",
+      "finding": "All 32 roots completed butone export failed. Later retained HTTP evidence identified the local limit of 32 requests; this was not proof of outbound queue saturation."
+    },
+    {
+      "runtime": "c3854ddd305a6cf6523bc62abc6800998fda6279",
+      "finding": "All 32 roots completed but the collector rejected the 33rd request after 32 trace bodies. The scoped collector budget now allows 64 requests without changing its 32 MiB byte limit."
+    },
+    {
+      "runtime": "50f01a76be3f965e73dc8c93251aaff98add1cbc",
+      "finding": "All 149 applications completed; the final source-identity refusal correctly returned 4 while the controller expected 2. The original failed controller and expected 2/actual 4 receipt are unchanged. Explicit retained-only recovery requires that exact historical mismatch; default verification requires expected4/actual 4."
+    }
+  ],
+  "limits": [
+    "Recorded macOS ARM64 and frozen LLVM22/provider only.",
+    "Declared existing source receivers/factories with fixed scalar construction; one selected synchronous method.",
+    "Source-field/private access helpers change the diagnostic build; this is not shipping artefact evidence.",
+    "All intermediate graphs are bounded; large valid schedules can exceed the shared case budget.",
+    "Queue/request headroom is for the recorded diagnostic corpus, not arbitrary metric rates or export latency.",
+    "Selected named serial trees are checked; invocation-scoped action attribution is not implemented.",
+    "No C++ release, object collection, live metric toggles, mutable object arguments, other method targets, resource or concurrent actions.",
+    "Aliases are local to each boundary; cross-boundary allocation identity and unobserved fields remain outside the claim.",
+    "Other providers, build graphs, compiler/sysroot/library closure and platforms require separate qualification."
+  ]
+}

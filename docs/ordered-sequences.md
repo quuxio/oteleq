@@ -1,6 +1,6 @@
 # Ordered receiver and collection observations
 
-Declared Java, JavaScript and TypeScript receiver fixtures can execute an ordered sequence of calls to the selected method. Node receivers additionally support release and optional collection. Each case reconstructs its receiver independently in each process. The typed contract records every requested action and its required roots; missing, reordered or unobserved actions cannot become passing skips.
+Declared C++, Java, JavaScript and TypeScript receiver fixtures can execute an ordered sequence of calls to the selected method. Node receivers additionally support release and optional collection. Each case reconstructs its receiver independently in each process. The typed contract records every requested action and its required roots; missing, reordered or unobserved actions cannot become passing skips.
 
 ```toml
 schema_version = 1
@@ -26,6 +26,10 @@ At least one call uses the concrete case arguments. Other calls can have indepen
 Call steps can declare `expected_baseline` using the existing return/error contract. Otherwise a case-argument call inherits the fixture expectation and a fixed-argument call expects a return. Unexpected intermediate baseline errors block the case even if a later call succeeds. The case's outer outcome is its last call outcome. Scalar shrinking preserves the declared construction and action schedule while reducing every use of the case arguments; it does not shrink action order or fixed inputs.
 
 The explicit Node source provider also implements [live metric schedules](node-metric-controls.md), with separate [696-launch qualification](qualification/node-metric-controls-2026-10-23.json) for positive-first calls. These schedules contain only calls, with an explicit collection/emission state for every call. They cannot combine release/collection actions with metric controls.
+
+## C++ call sequences
+
+The [C++ source receiver profile](cpp-receivers.md#ordered-calls) accepts call-only schedules on one independently constructed receiver. Its version-two native envelope retains every intermediate source-bound graph and requires consistent outer boundaries. The worker streams steps within the shared capture budget. Actual decoded telemetry must retain the declared number of serial selected root trees, including complete recursive descendants. The [149-launch recorded corpus](qualification/cpp-sequences-2026-10-23.json) qualifies this diagnostic profile on the pinned provider/toolchain. Release, collection, metric controls and broader resource/concurrent actions remain unavailable.
 
 ## Java call sequences
 
@@ -58,7 +62,7 @@ For JavaScript/TypeScript, the provider selects the exact declared class for col
 
 ## Current boundaries
 
-Java supports the call-only profile above. Node call/release sequences use the existing ordinary JavaScript/TypeScript receiver bindings and codecs. Collection additionally requires a separately qualified lifetime-capable provider. [TypeScript collection](typescript-collection.md) freezes the source/native emitter and requires the provider's explicit public capability response before application execution. Explicit CommonJS `.cjs`/`.cts` receiver callers use the real module wrapper and require an unshadowed `require` binding. General Node package/build contexts remain open.
+C++ and Java support their call-only profiles above. Node call/release sequences use the existing ordinary JavaScript/TypeScript receiver bindings and codecs. Collection additionally requires a separately qualified lifetime-capable provider. [TypeScript collection](typescript-collection.md) freezes the source/native emitter and requires the provider's explicit public capability response before application execution. Explicit CommonJS `.cjs`/`.cts` receiver callers use the real module wrapper and require an unshadowed `require` binding. General Node package/build contexts remain open.
 
 The bounded sequence has 1 through 32 steps: calls first, then Node-only release and optional final collection. Other method targets, scheduler/yield/iteration actions, resource-close actions, arbitrary object arguments, unsupported inherited/private/native receiver state and the remaining language runners require further adapter work. The common ordered typed protocol is shared across all language IDs; unavailable requested generators remain named blockers.
 

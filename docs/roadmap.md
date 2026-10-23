@@ -52,6 +52,8 @@ The opt-in [native project profile](native-project-context.md) consumes explicit
 
 Acceptance includes typed buffers/aliasing, observable globals, internal-linkage access limits, exceptions, constructor/resource sequences, distinct C++ overload/template instances and no padding/uninitialised-memory comparison. Validate production artefact identity separately from helper/fuzz/sanitised builds. Publish exact ABI, compiler and platform qualification.
 
+[C++ ordered calls](cpp-receivers.md#ordered-calls) have [149-launch diagnostic qualification](qualification/cpp-sequences-2026-10-23.json) for source-bound graphs, private factories, intermediate errors, recursion, aliases, restored differences, retained routes and bounded one/32-call profiles. The 331-launch single-call corpus has separate compatibility verification. Broader native acceptance above still applies.
+
 ## Stage 5: Java
 
 [Prepared Java startup qualification](qualification/java-startup-metric-controls-2026-10-23.json) covers all four initial states in the recorded stock, safe and archive profiles: 2,256 distinct JVMs, 168 evidence refusals and 576 recomputed comparisons. Original failed archive audits remain recorded separately from corrected retained-only verification. Broader Java acceptance below remains open.

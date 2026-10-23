@@ -3,6 +3,12 @@ from collections.abc import Iterable
 import re
 
 
+CPP_OPERATOR_KEYWORDS = frozenset({
+    'and', 'and_eq', 'bitand', 'bitor', 'compl', 'not', 'not_eq',
+    'or', 'or_eq', 'xor', 'xor_eq',
+})
+
+
 def identifiers(code: str, names: Iterable[str] = ()) -> set[str]:
     """Combine own-code tokens with exact compiler-declared identifier spellings."""
     result = set(re.findall(r"[A-Za-z_]\w*", code, re.ASCII))
@@ -15,6 +21,11 @@ def identifiers(code: str, names: Iterable[str] = ()) -> set[str]:
     return result
 
 
-def undefinitions(code: str, names: Iterable[str] = (), *, preserve: Iterable[str] = ()) -> str:
+def undefinitions(code: str, names: Iterable[str] = (), *, preserve: Iterable[str] = (),
+                  cpp: bool = False) -> str:
     """Only explicitly owned observer macros survive the application include."""
-    return ''.join('#undef ' + name + '\n' for name in sorted(identifiers(code, names) - set(preserve)))
+    # These spellings are operator tokens in C++, including in directives.
+    # C can define real macros with the same names, so its guard must keep them.
+    # The preprocessor's defined operator cannot be a macro in either language.
+    excluded = set(preserve) | {'defined'} | (CPP_OPERATOR_KEYWORDS if cpp else set())
+    return ''.join('#undef ' + name + '\n' for name in sorted(identifiers(code, names) - excluded))

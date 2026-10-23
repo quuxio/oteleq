@@ -100,7 +100,7 @@ def application_helpers(entry: dict, args: list, key: str) -> str:
     code = ''.join(functions)
     names = [entry['name'], *(item['expression'] for item in entry['globals']),
              *entry['parameters'], entry['output'], *(item['type'] for item in entry['globals'])]
-    return '\n' + native_names.undefinitions(code, names) + code
+    return '\n' + native_names.undefinitions(code, names, cpp=language == 'cpp') + code
 
 
 def driver(entry: dict) -> str:

@@ -811,6 +811,12 @@ max_spans_per_trace = 256
 endpoint = {json.dumps(endpoint)}
 interval_ms = 50
 '''
+    if language == "cpp" and "sequence_configuration" in entry:
+        capacity = max(8, 2 * sequences.call_count(entry))
+        if capacity > 8:
+            # The native provider shares this bound with completed root trees.
+            # Reserve both root and metric batches before the first drain.
+            text += 'max_queued_batches = ' + str(capacity) + '\n'
     if language == "go":
         text += '[adapters.go]\nbackend = "compile"\n'
     if language == "rust":
@@ -840,6 +846,8 @@ def sequence_telemetry(bodies, report, entry, service, decoder, names, roots, er
     spans = [span for path, body in bodies if path == capture.TRACE_PATH
              for span in capture.service_spans(decoder.FromString(body), service)]
     otelc_collection.sequence_functions(spans, target, calls, creator)
+    if entry["language"] == "cpp":
+        otelc_collection.serial_call_trees(spans, target, calls)
     allowed = {target} | ({creator} if creator is not None else set())
     spec = {"functions": names, "trees": roots, "errors": errors}
     if sequences.collects(entry):
@@ -1029,6 +1037,10 @@ def attempt_policy(entry, endpoint, service, runtime):
 def attempt_receiver_options(entry, runtime):
     """Only the explicit source provider permits bounded chunked OTLP."""
     options = {"max_requests": java_provider.MAX_TELEMETRY_REQUESTS} if runtime is not None else {}
+    if entry.get("language") == "cpp" and "sequence_configuration" in entry:
+        requests = max(capture.MAX_REQUESTS, 2 * sequences.call_count(entry))
+        if requests > capture.MAX_REQUESTS:
+            options["max_requests"] = requests
     if node_source.enabled(entry):
         options["allow_chunked"] = True
     return options
