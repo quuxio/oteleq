@@ -216,8 +216,9 @@ class PythonTelemetryTests(unittest.TestCase):
             self.decode(metric=message)
 
     def test_cumulative_arrival_order_duplicates_resets_conflicts_and_regressions(self) -> None:
-        sample = (1, 2, 1, (0, 1), .1, (.1, .1))
-        later = (1, 3, 2, (0, 2), .2, (.1, .1))
+        bucket = lambda count: tuple(count if index == 5 else 0 for index in range(8))
+        sample = (1, 2, 1, bucket(1), .1, (.1, .1))
+        later = (1, 3, 2, bucket(2), .2, (.1, .1))
         self.assertEqual(telemetry.cumulative({"stream": [later, sample, sample]}), {"stream": 2})
         for changed in ((2, 3, 2, (0, 2), .2, (.1, .1)), (1, 2, 2, (0, 2), .2, (.1, .1)),
                          (1, 3, 0, (0, 1), .1, (.1, .1)), (1, 3, 2, (1, 0), .2, (.1, .1)),
@@ -271,6 +272,14 @@ class PythonTelemetryTests(unittest.TestCase):
         point.count = 0
         with self.assertRaisesRegex(ValueError, "count"):
             telemetry.histogram_range(point)
+        point.count, point.min, point.max, point.sum = 1, .1, .1, math.nextafter(.1, math.inf)
+        point.bucket_counts[:] = [0, 0, 0, 0, 0, 1, 0, 0]
+        with self.assertRaisesRegex(ValueError, "sum"):
+            telemetry.histogram_range(point)
+        point.count, point.min, point.max, point.sum = 2, 0., 0., math.ulp(0.)
+        point.bucket_counts[:] = [2, 0, 0, 0, 0, 0, 0, 0]
+        with self.assertRaisesRegex(ValueError, "sum"):
+            telemetry.histogram_range(point)
 
     def test_histogram_bounds_accept_independently_aggregated_finite_samples(self) -> None:
         rng = random.Random(841)
@@ -287,3 +296,27 @@ class PythonTelemetryTests(unittest.TestCase):
             point.bucket_counts[:] = buckets
             with self.subTest(size=size):
                 telemetry.histogram_range(point)
+
+    def test_cumulative_added_sum_cannot_replace_previously_recorded_values(self) -> None:
+        bucket = lambda count: tuple(count if index == 6 else 0 for index in range(8))
+        previous = (1, 2, 100, bucket(100), 20.6, (.2, .8))
+        impossible = (1, 3, 101, bucket(101), 80.2, (.2, .8))
+        with self.assertRaisesRegex(ValueError, "added bucket"):
+            telemetry.cumulative({"duration": [previous, impossible]})
+        later = (1, 3, 101, bucket(101), 21.4, (.2, .8))
+        self.assertEqual(telemetry.cumulative({"duration": [previous, later]}), {"duration": 101})
+        expanded = (1, 3, 101, bucket(101), 21.5, (.2, .9))
+        self.assertEqual(telemetry.cumulative({"duration": [previous, expanded]}), {"duration": 101})
+
+    def test_cumulative_histograms_accept_independent_real_prefix_aggregates(self) -> None:
+        rng = random.Random(551)
+        samples, observed = [], []
+        for count in range(1, 50):
+            samples.append(rng.choice([0., math.ulp(0.), 1e-7, 1e-6, .1, .2, .8, 1., 10., 1e300]))
+            buckets = [0] * 8
+            for value in samples:
+                index = next((index for index, bound in enumerate(telemetry.BOUNDS) if value <= bound), 7)
+                buckets[index] += 1
+            observed.append((1, count + 1, count, tuple(buckets), sum(samples), (min(samples), max(samples))))
+            with self.subTest(count=count):
+                self.assertEqual(telemetry.cumulative({"duration": observed}), {"duration": count})
