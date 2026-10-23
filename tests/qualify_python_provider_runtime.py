@@ -5,6 +5,7 @@ builds that copy before freezing its native products and installed inputs.
 """
 
 import argparse
+from bisect import bisect_left
 import copy
 from dataclasses import replace
 import hashlib
@@ -103,6 +104,35 @@ def expect_refusal(callback, label: str, refused: list) -> None:
         raise ValueError("altered actual Python evidence passed: " + label)
 
 
+def duration_point(message):
+    """Find an actual selected duration point without manufacturing a fixture."""
+    for group in message.resource_metrics:
+        for scope in group.scope_metrics:
+            for metric in scope.metrics:
+                if metric.name == python_telemetry.DURATION and metric.histogram.data_points:
+                    return metric.histogram.data_points[0]
+    raise ValueError("actual duration histogram is unavailable for refusal control")
+
+
+def altered_histogram(bodies: list, name: str) -> list:
+    """Retain both signals but falsify one actual histogram's internal facts."""
+    altered, changed = [], False
+    for route, body in bodies:
+        if route == "/v1/metrics" and not changed:
+            message = ExportMetricsServiceRequest.FromString(body)
+            point = duration_point(message)
+            if name == "impossible-duration-sum":
+                point.sum = point.max * point.count * 1e6 + 1
+            else:
+                index = (bisect_left(python_telemetry.BOUNDS, point.min) + 1) % len(point.bucket_counts)
+                point.bucket_counts[:] = [point.count if position == index else 0 for position in range(len(point.bucket_counts))]
+            changed = True
+            body = message.SerializeToString()
+        altered.append((route, body))
+    python_provider.require(changed, "actual duration histogram is unavailable for refusal control")
+    return altered
+
+
 def controls(intent, launch, owner, catalogue, execution, bodies, service, receipt) -> list:
     """Falsify independent identity, public health and actual protobuf receipt."""
     refused = []
@@ -131,6 +161,10 @@ def controls(intent, launch, owner, catalogue, execution, bodies, service, recei
         altered.append((route, body))
     expect_refusal(lambda: python_telemetry.decode(altered, execution, service, {1: "entry.workload"},
                                                   ExportTraceServiceRequest, ExportMetricsServiceRequest), "foreign-otlp-pid", refused)
+    for name in ("impossible-duration-sum", "impossible-duration-bucket"):
+        altered = altered_histogram(bodies, name)
+        expect_refusal(lambda: python_telemetry.decode(altered, execution, service, {1: "entry.workload"},
+                       ExportTraceServiceRequest, ExportMetricsServiceRequest), name, refused)
     return refused
 
 

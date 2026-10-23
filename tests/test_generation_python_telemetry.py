@@ -1,7 +1,9 @@
 """Both decoded signals bind actual process/code IDs and complete accounting."""
 
 from dataclasses import replace
+import math
 from pathlib import Path
+import random
 import sys
 import tempfile
 import unittest
@@ -214,10 +216,74 @@ class PythonTelemetryTests(unittest.TestCase):
             self.decode(metric=message)
 
     def test_cumulative_arrival_order_duplicates_resets_conflicts_and_regressions(self) -> None:
-        sample = (1, 2, 1, (0, 1), .1)
-        later = (1, 3, 2, (0, 2), .2)
+        sample = (1, 2, 1, (0, 1), .1, (.1, .1))
+        later = (1, 3, 2, (0, 2), .2, (.1, .1))
         self.assertEqual(telemetry.cumulative({"stream": [later, sample, sample]}), {"stream": 2})
-        for changed in ((2, 3, 2, (0, 2), .2), (1, 2, 2, (0, 2), .2), (1, 3, 0, (0, 1), .1),
-                         (1, 3, 2, (1, 0), .2), (1, 3, 2, (0, 2), .01)):
+        for changed in ((2, 3, 2, (0, 2), .2, (.1, .1)), (1, 2, 2, (0, 2), .2, (.1, .1)),
+                         (1, 3, 0, (0, 1), .1, (.1, .1)), (1, 3, 2, (1, 0), .2, (.1, .1)),
+                         (1, 3, 2, (0, 2), .01, (.1, .1)), (1, 3, 1, (0, 1), .2, (.1, .2)),
+                         (1, 3, 2, (0, 2), .2, (.2, .2)), (1, 3, 2, (0, 2), .2, (.01, .09))):
             with self.subTest(changed=changed), self.assertRaises(ValueError):
                 telemetry.cumulative({"stream": [sample, changed]})
+
+    def test_impossible_sums_and_populated_buckets_cannot_pass_complete_decode(self) -> None:
+        for wrong_sum in (10., 0.):
+            message = metrics()
+            message.resource_metrics[0].scope_metrics[0].metrics[1].histogram.data_points[0].sum = wrong_sum
+            with self.subTest(sum=wrong_sum), self.assertRaisesRegex(ValueError, "histogram sum"):
+                self.decode(metric=message)
+        message = metrics()
+        point = message.resource_metrics[0].scope_metrics[0].metrics[1].histogram.data_points[0]
+        point.bucket_counts[:] = [1, 0, 0, 0, 0, 0, 0, 0]
+        with self.assertRaisesRegex(ValueError, "extrema"):
+            self.decode(metric=message)
+
+    def test_histogram_boundaries_use_the_lower_open_upper_closed_interval(self) -> None:
+        for index, boundary in enumerate(telemetry.BOUNDS):
+            for value, expected in ((boundary, index), (math.nextafter(boundary, math.inf), index + 1)):
+                message = metrics()
+                point = message.resource_metrics[0].scope_metrics[0].metrics[1].histogram.data_points[0]
+                point.min = point.max = point.sum = value
+                point.bucket_counts[:] = [int(position == expected) for position in range(8)]
+                telemetry.histogram_range(point)
+                point.bucket_counts[:] = [int(position == (expected + 1) % 8) for position in range(8)]
+                with self.subTest(value=value, bucket=expected), self.assertRaises(ValueError):
+                    telemetry.histogram_range(point)
+
+    def test_histogram_sum_bounds_allow_real_rounding_and_require_actual_extrema(self) -> None:
+        message = metrics()
+        point = message.resource_metrics[0].scope_metrics[0].metrics[1].histogram.data_points[0]
+        point.count, point.min, point.max, point.sum = 3, .1, .1, .1 + .1 + .1
+        point.bucket_counts[:] = [0, 0, 0, 0, 0, 3, 0, 0]
+        telemetry.histogram_range(point)
+        point.count = 1
+        point.min, point.max, point.sum = .01, .1, .1
+        point.bucket_counts[:] = [0, 0, 0, 0, 0, 1, 0, 0]
+        with self.assertRaises(ValueError):
+            telemetry.histogram_range(point)
+        point.count, point.min, point.max = 10, 1e-7, .2
+        point.bucket_counts[:] = [9, 0, 0, 0, 0, 0, 1, 0]
+        point.sum = .2 + 9e-7
+        telemetry.histogram_range(point)
+        point.sum = 1.
+        with self.assertRaisesRegex(ValueError, "sum"):
+            telemetry.histogram_range(point)
+        point.count = 0
+        with self.assertRaisesRegex(ValueError, "count"):
+            telemetry.histogram_range(point)
+
+    def test_histogram_bounds_accept_independently_aggregated_finite_samples(self) -> None:
+        rng = random.Random(841)
+        values = [0., math.ulp(0.), 1e-7, 1e-6, math.nextafter(1e-6, math.inf), .1, 1., 10., 1e300]
+        message = metrics()
+        point = message.resource_metrics[0].scope_metrics[0].metrics[1].histogram.data_points[0]
+        for size in range(1, 40):
+            samples = [rng.choice(values) for _ in range(size)]
+            point.count, point.min, point.max, point.sum = size, min(samples), max(samples), sum(samples)
+            buckets = [0] * 8
+            for value in samples:
+                index = next((index for index, bound in enumerate(telemetry.BOUNDS) if value <= bound), 7)
+                buckets[index] += 1
+            point.bucket_counts[:] = buckets
+            with self.subTest(size=size):
+                telemetry.histogram_range(point)

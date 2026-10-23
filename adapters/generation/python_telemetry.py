@@ -1,6 +1,8 @@
 """Independent process/code-ID OTLP accounting; source origin remains separate."""
 
+from bisect import bisect_left
 from collections import Counter
+from fractions import Fraction
 import math
 
 from google.protobuf.message import DecodeError
@@ -84,15 +86,54 @@ def metric_point(metric, point, functions: dict) -> tuple:
         require(list(point.explicit_bounds) == BOUNDS and len(point.bucket_counts) == len(BOUNDS) + 1
                 and sum(point.bucket_counts) == point.count and math.isfinite(point.sum) and point.sum >= 0,
                 "invalid Python duration histogram")
-        require(point.HasField("min") and point.HasField("max") and math.isfinite(point.min)
+        require(point.HasField("sum") and point.HasField("min") and point.HasField("max") and math.isfinite(point.min)
                 and math.isfinite(point.max) and 0 <= point.min <= point.max,
                 "unavailable or invalid Python histogram range")
+        histogram_range(point)
         count, buckets, total = point.count, tuple(point.bucket_counts), point.sum
     else:
         require(metric.sum.is_monotonic and point.WhichOneof("value") == "as_int" and point.as_int >= 0,
                 "Python function counter lacks a monotonic integer value")
         count, buckets, total = point.as_int, (), 0
-    return code, (point.start_time_unix_nano, point.time_unix_nano, count, buckets, total)
+    limits = (point.min, point.max) if metric.name == DURATION else ()
+    return code, (point.start_time_unix_nano, point.time_unix_nano, count, buckets, total, limits)
+
+
+def histogram_range(point) -> None:
+    """Bound the sum using actual extrema and inclusive-upper bucket semantics.
+
+    Fractions avoid overflow and rounding while constructing feasible bounds.
+    The final comparison allows binary64 summation error and subnormal rounding.
+    Counts above this error model cannot fit the bounded local trace receipt.
+    """
+    count, minimum, maximum = point.count, point.min, point.max
+    require(0 < count < 2 ** 52, "Python histogram count exceeds the summation bound")
+    lower = upper = Fraction(0)
+    remaining = list(point.bucket_counts)
+    smallest, largest = bisect_left(BOUNDS, minimum), bisect_left(BOUNDS, maximum)
+    # The reported extrema must each be an actual observation, not merely
+    # arbitrary limits intersecting one of the populated buckets.
+    extrema = ((smallest, minimum), (largest, maximum)) if minimum != maximum else ((smallest, minimum),)
+    for index, value in extrema:
+        remaining[index] -= 1
+        require(remaining[index] >= 0, "Python histogram extrema have no observations")
+        lower += Fraction(value)
+        upper += Fraction(value)
+    for index, amount in enumerate(remaining):
+        if not amount:
+            continue
+        low = minimum if index == 0 else max(minimum, math.nextafter(BOUNDS[index - 1], math.inf))
+        high = maximum if index == len(BOUNDS) else min(maximum, BOUNDS[index])
+        require(low <= high, "Python histogram populated bucket contradicts its extrema")
+        lower += Fraction(low) * amount
+        upper += Fraction(high) * amount
+    # For nonnegative binary64 additions, gamma_n bounds relative rounding;
+    # n half-minimum-subnormal units additionally bound absolute underflow.
+    gamma = Fraction(count, 2 ** 53 - count)
+    underflow = Fraction(count, 2 ** 1075) * (1 + gamma)
+    total = Fraction(point.sum)
+    require(lower * (1 - gamma) - underflow <= total <= upper * (1 + gamma) + underflow,
+            "Python histogram sum contradicts its range or populated buckets")
 
 
 def metric_group(group, execution: python_execution.Execution, service: str, functions: dict,
@@ -132,6 +173,9 @@ def cumulative(observed: dict) -> dict:
                          sample[2] >= previous[2] and sample[4] >= previous[4]
                          and all(current >= old for current, old in zip(sample[3], previous[3], strict=True))),
                     "Python cumulative metric reset, conflict or regression")
+            require(sample[2:] == previous[2:] if sample[2] == previous[2] else
+                    not sample[5] or sample[5][0] <= previous[5][0] and sample[5][1] >= previous[5][1],
+                    "Python cumulative histogram range changed without matching observations")
             previous = sample
         result[key] = previous[2]
     return result
