@@ -149,6 +149,35 @@ class JavaActionSessionTests(unittest.TestCase):
                     session.poll(process, 100.)
                 self.assertEqual(session.harness.position, 1)
 
+    def test_transient_end_still_requires_the_exact_pending_context(self):
+        edits = (('scope', None), ('scope.thread_id', '42'), ('scope.cookie', '0' * 32),
+                 ('scope.sequence', '2'), ('scope.scope_id', '0' * 32),
+                 ('scope.case_id', '0' * 64), ('scope.attempt_id', '0' * 64))
+        for profile in (witness.PROFILE, witness.HANDLE_PROFILE):
+            for error in ('root_active', 'incomplete'):
+                for key, value in edits:
+                    session, producer, process = self.make(profile=profile)
+                    producer.waits = [error]
+                    with self.subTest(profile=profile, error=error, field=key), \
+                            patch.object(witness, 'request', side_effect=producer.request):
+                        session.poll(process, 100.)
+                        producer.edits = {'end': {key: value}}
+                        with self.assertRaises(ValueError):
+                            session.poll(process, 100.)
+                        self.assertEqual(session.harness.position, 1)
+                        self.assertEqual(session.completed, [])
+
+    def test_transient_end_cannot_also_claim_a_completed_action(self):
+        for error in ('root_active', 'incomplete'):
+            session, producer, process = self.make()
+            with self.subTest(error=error), patch.object(witness, 'request', side_effect=producer.request):
+                session.poll(process, 100.)
+                producer.edits = {'end': {'error': error}}
+                with self.assertRaisesRegex(ValueError, 'retry contradicted'):
+                    session.poll(process, 100.)
+                self.assertEqual(session.harness.position, 1)
+                self.assertEqual(session.completed, [])
+
     def test_plan_changes_missing_readiness_and_early_exit_remain_incomplete(self):
         session, producer, process = self.make()
         session.harness.available = False
@@ -168,6 +197,16 @@ class JavaActionSessionTests(unittest.TestCase):
         for invalid in (None, [], [False], [0, True], (False, True)):
             with self.subTest(outcomes=invalid), self.assertRaises(ValueError):
                 session.receipt_actions(invalid)
+
+    def test_control_reply_budgets_refuse_before_releasing_an_unarmed_call(self):
+        for name, value in (('MAX_REPLIES', 1), ('MAX_REPLY_BYTES', 1)):
+            session, producer, process = self.make()
+            with self.subTest(budget=name), patch.object(subject, name, value), \
+                    patch.object(witness, 'request', side_effect=producer.request):
+                with self.assertRaisesRegex(ValueError, 'reply (count|bytes) exceeded'):
+                    session.poll(process, 100.)
+                self.assertEqual(session.harness.position, 0)
+                self.assertEqual(session.completed, [])
 
     def test_invalid_profile_and_independent_input_shapes_refuse_before_control_io(self):
         harness = Harness()

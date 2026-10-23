@@ -5,11 +5,15 @@ Application observations, final SDK health and decoded receipts remain separate.
 """
 
 import copy
+import json
 from pathlib import Path
 
 import java_action
 import java_action_receipt as receipt
 import java_witness as witness
+
+MAX_REPLIES = 4096
+MAX_REPLY_BYTES = 32 * 1024 * 1024
 
 
 class Session:
@@ -31,6 +35,7 @@ class Session:
         self.case_id, self.attempt_id, self.actions = harness.case_id, harness.attempt_id, tuple(harness.actions)
         self.identity, self.pending, self.terminal = None, None, None
         self.armed, self.completed, self.controls = [], [], []
+        self.reply_bytes = 0
 
     def environment(self) -> dict[str, str]:
         """Use the same ordinary JDK rendezvous in baseline and instrumented lanes."""
@@ -38,9 +43,13 @@ class Session:
 
     def query(self, operation: str, *arguments: str, deadline: float) -> dict:
         """Retain every actual reply before interpreting it."""
+        witness.require(len(self.controls) < MAX_REPLIES, "action control reply count exceeded")
         value = witness.request(self.runtime / 'witness.sock', operation, *arguments,
                                 deadline=deadline, profile=self.profile)
+        size = len(json.dumps(value, separators=(',', ':')).encode())
+        witness.require(size <= MAX_REPLY_BYTES - self.reply_bytes, "action control reply bytes exceeded")
         self.controls.append({'operation': operation, 'arguments': list(arguments), 'reply': copy.deepcopy(value)})
+        self.reply_bytes += size
         return value
 
     def _end(self, deadline: float) -> bool:
@@ -49,12 +58,17 @@ class Session:
             return True
         value = self.query('end', self.identity.runtime_id, self.pending['scope_id'], deadline=deadline)
         self.identity.check(value)
-        if value['error'] in ('root_active', 'incomplete'):
-            return False
-        scope = witness.context(value, self.identity, thread_id=self.pending['thread_id'],
+        retry = value['error'] in ('root_active', 'incomplete')
+        # A retry permits waiting, never a foreign context. Clear only the known
+        # transient error in a copy used for binding; retain the actual reply.
+        binding = {**value, 'error': None} if retry else value
+        scope = witness.context(binding, self.identity, thread_id=self.pending['thread_id'],
                                 cookie=self.pending['cookie'], sequence=self.pending['sequence'],
                                 case_id=self.case_id, attempt_id=self.attempt_id,
                                 scope_id=self.pending['scope_id'])
+        if retry:
+            witness.require(not scope['producer_complete'], "retry contradicted completed action evidence")
+            return False
         witness.require(scope['producer_complete'], "end did not complete the intended action")
         self.completed.append(copy.deepcopy(value))
         self.pending = None
