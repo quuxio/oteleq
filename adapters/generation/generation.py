@@ -812,11 +812,11 @@ endpoint = {json.dumps(endpoint)}
 interval_ms = 50
 '''
     if language == "cpp" and "sequence_configuration" in entry:
-        calls = sequences.call_count(entry)
-        if calls > 8:
+        capacity = max(8, 2 * sequences.call_count(entry))
+        if capacity > 8:
             # The native provider shares this bound with completed root trees.
-            # A fast synchronous sequence can finish before its first drain.
-            text += 'max_queued_batches = ' + str(calls) + '\n'
+            # Reserve both root and metric batches before the first drain.
+            text += 'max_queued_batches = ' + str(capacity) + '\n'
     if language == "go":
         text += '[adapters.go]\nbackend = "compile"\n'
     if language == "rust":

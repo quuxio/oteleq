@@ -43,13 +43,13 @@ CALLS = [{'action': 'call', 'arguments': 'case'},
 
 class CppSequenceTests(unittest.TestCase):
     def test_policy_reserves_completed_trace_roots_for_the_whole_bounded_sequence(self):
-        for count in (1, 2, 8, 9, 32):
+        for count in (1, 2, 4, 5, 8, 9, 32):
             steps = [CALLS[0], *[{'action': 'call', 'arguments': [0]} for _ in range(count - 1)]]
             entry = self.entry(steps=steps)
             entry['otelc_function'] = 'Counter::step(int)'
             config = tomllib.loads(generation.policy(entry, 'http://127.0.0.1:1234'))
             with self.subTest(calls=count):
-                self.assertEqual(config['export'].get('max_queued_batches', 8), max(8, count))
+                self.assertEqual(config['export'].get('max_queued_batches', 8), max(8, 2 * count))
 
     @classmethod
     def setUpClass(cls):

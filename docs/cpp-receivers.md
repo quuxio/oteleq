@@ -59,7 +59,7 @@ Version-two receiver observations require every step in order. Their outer `befo
 
 Decoded instrumentation must contain the declared number of selected call roots, with an unambiguous serial order and complete descendants inside their parent intervals. Recursive selected calls remain in their root tree. This is a named serial-tree witness; it does not implement invocation-scoped attribution. Release, collection, live metric controls, other method targets, asynchronous and resource actions remain unsupported in this C++ profile.
 
-For more than eight calls, the generated diagnostic SDK policy sets `export.max_queued_batches` to the declared call count, at most 32. The qualified native provider also uses that setting for completed trace roots. Reserving the complete bounded sequence prevents a fast burst from overflowing the default eight-root queue before its first drain. Missing roots and any reported loss still refuse qualification.
+For more than four calls, the generated diagnostic SDK policy sets `export.max_queued_batches` to twice the declared call count, at most 64. The qualified native provider shares that setting between completed trace roots and its separate outbound queue. Reserving root and metric batch headroom prevents a fast bounded burst from overflowing the default eight-slot queues before their first drain. Missing roots and any reported loss still refuse qualification.
 
 Component tests cover real compiled callers, intermediate exceptions, aliases, restored differences, 32-call bounds and malformed observations. Actual-provider qualification for ordered C++ calls is pending; the existing record below retains its single-call scope.
 
