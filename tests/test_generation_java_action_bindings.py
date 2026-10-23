@@ -158,6 +158,22 @@ class JavaActionBindingsTests(unittest.TestCase):
                 self.compile(callback, folder=self.root / str(index))
         with self.assertRaises(ValueError):self.compile(source_inputs=[{"source": "a"}, {"source": "b"}])
 
+    def test_replaced_output_cannot_publish_a_hash_for_another_snapshot(self):
+        original_verify = bindings.verify
+        for name, different in (("different", True), ("identical", False)):
+            folder = self.root / name
+            def replace_after_validation(*arguments):
+                value = original_verify(*arguments)
+                path = folder / "bindings.json"
+                raw = b'{"changed":true}' if different else path.read_bytes()
+                path.unlink();path.write_bytes(raw);path.chmod(0o600)
+                return value
+            with patch.object(bindings, "verify", side_effect=replace_after_validation):
+                with self.subTest(name=name):
+                    with self.assertRaisesRegex(ValueError, "output changed after validation"):
+                        self.compile(folder=folder)
+                    self.assertFalse((folder / "compiler-inputs.json").exists())
+
     def test_outputs_cannot_enter_application_or_provider_sources(self):
         for folder in (self.project / "bindings", self.sdk / "bindings"):
             with self.assertRaises(ValueError):self.compile(folder=folder, audits=0)

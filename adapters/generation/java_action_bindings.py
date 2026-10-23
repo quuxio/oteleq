@@ -181,12 +181,15 @@ def compile(root: Path, project: Path, build: Path, folder: Path, tools: dict,
         raise
     _audit(root, project, build, classes, tools, before, request, request_identity)
     witness.require(result.returncode == 0, "offline binding compilation failed; inspect compiler/stderr")
-    value = witness.read_private(folder, "bindings.json", MAX_BINDINGS)
+    snapshot = witness.private_snapshot(folder, "bindings.json", MAX_BINDINGS)
+    value = capture.strict_json(snapshot.raw)
     witness.require(capture.strict_json(result.stdout) == value, "offline compiler response differs from retained bindings")
     verify(value, frozen, application, classes)
+    witness.require(witness.private_snapshot(folder, "bindings.json", MAX_BINDINGS) == snapshot,
+                    "offline bindings output changed after validation")
     record = {"schema_version": 1, "profile": witness.PROFILE, "argv": command, "cwd": str(root),
               "sdk_inputs_sha256": before, "declarations": request_identity,
               "application_sha256": capture.file_digest(build / java_launch.APPLICATION_FILE),
-              "bindings_sha256": capture.file_digest(output)}
+              "bindings_sha256": hashlib.sha256(snapshot.raw).hexdigest()}
     (folder / "compiler-inputs.json").write_text(json.dumps(record, indent=2) + "\n")
     return value

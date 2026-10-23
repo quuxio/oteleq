@@ -249,8 +249,21 @@ def read_final(runtime: Path, *, pid: int, identity: Identity) -> dict:
     return final_report(read_private(runtime, "witness-health.json", MAX_FINAL), pid=pid, identity=identity)
 
 
+@dataclass(frozen=True)
+class PrivateSnapshot:
+    """One bounded opened file's bytes and stable filesystem identity."""
+
+    raw: bytes
+    identity: tuple[int, ...]
+
+
 def read_private(runtime: Path, name: str, maximum: int) -> object:
-    """Snapshot bounded owned JSON from one named file in a private directory."""
+    """Decode bounded owned JSON from a coherent opened-file snapshot."""
+    return strict_json(private_snapshot(runtime, name, maximum).raw)
+
+
+def private_snapshot(runtime: Path, name: str, maximum: int) -> PrivateSnapshot:
+    """Keep the same bytes and identity available for subsequent publication."""
     require(type(name) is str and name not in ("", ".", "..") and Path(name).name == name
             and "\x00" not in name, "invalid private witness filename")
     require(type(maximum) is int and 0 < maximum <= MAX_FINAL, "invalid private witness byte budget")
@@ -278,7 +291,7 @@ def read_private(runtime: Path, name: str, maximum: int) -> object:
                               info.st_ctime_ns, info.st_mode, info.st_uid, info.st_nlink)
     require(len(raw) == before.st_size <= maximum and signature(before) == signature(after) == signature(linked),
             "witness file changed while reading")
-    return strict_json(raw)
+    return PrivateSnapshot(raw, signature(before))
 
 
 def final_report(value: object, *, pid: int, identity: Identity) -> dict:

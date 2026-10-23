@@ -20,7 +20,7 @@ The selected producer context must match that independently reported Java thread
 
 The independent reader requires the explicit v2 schema/profile, closed fields, exact owner/name/descriptor declarations, matching compiler-owned class bytes and recomputed role probe IDs. Method-code digests and harness shape are checked by the frozen offline SDK compiler; they still need actual runtime capture and receipt before invocation admission. Neither metadata acceptance nor the presence of this module enables a generated worker. The v2 direct-call restriction remains in force: reflected wrappers and undeclared handle profiles cannot silently use it.
 
-Bindings and final JSON use one stable private-file reader: canonical owned mode-0700 parent, one owned mode-0600 regular file link, no-follow/nonblocking open, bounded read and descriptor/path identity checks. Binding declarations/output each have a 1 MiB budget. SDK stdout must agree with the retained bindings; compiler channels, fixed argv and input/output hashes remain available for review.
+Bindings and final JSON use one stable private-file reader: canonical owned mode-0700 parent, one owned mode-0600 regular file link, no-follow/nonblocking open, bounded read and descriptor/path identity checks. Binding declarations/output each have a 1 MiB budget. SDK stdout must agree with the retained bindings. The output hash comes from the same opened snapshot as the verified data, and a final snapshot must match its bytes and file identity before publication. Compiler channels, fixed argv and input/output hashes remain available for review.
 
 With the matching prebuilt SDK and a selected full JDK, qualify the offline API in a new directory outside both repositories:
 
