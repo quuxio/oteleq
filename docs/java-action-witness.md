@@ -2,7 +2,7 @@
 
 ## Status
 
-The independent `java-sync-action-v2` control/final reader and ordinary JDK private harness channel are implemented components. Generated prepared-Java action scopes are not yet available: public build/probe binding, actual SDK control integration and independent decoded OTLP qualification remain required. Existing generated workers retain their documented name-only witness. These components do not establish equivalence of a shipping artefact.
+The independent `java-sync-action-v2` control/final and decoded-trace readers and ordinary JDK private harness channel are implemented components. Generated prepared-Java action scopes are not yet available: public build/probe binding, actual SDK control integration and qualification with a real frozen v2 producer remain required. Existing generated workers retain their documented name-only witness. These components do not establish equivalence of a shipping artefact.
 
 The [shared witness design](action-witness.md) remains the acceptance boundary. A producer acknowledgement cannot replace actual receiver evidence, and successful framing cannot qualify invocation attribution.
 
@@ -22,6 +22,14 @@ An incomplete or refused scope remains data. A producer completion claim require
 
 Final reports must be bounded owned mode-0600 regular files inside the canonical owned mode-0700 runtime. The reader uses nonblocking, no-follow opens, a bounded read and opened/path identity checks. The caller's actual JVM PID, frozen producer identity, outer report and producer header must all identify the same JVM. It also checks the frozen runtime/build/probe identity. Duplicate or reordered contexts refuse. Unavailable queue evidence remains unavailable.
 
+## Independent decoded action trees
+
+`java_action_receipt.py` compares actual decoded trace records with separately retained harness/arm identities captured before release and independently captured application outcome kinds. Final producer fields cannot supply those expectations. Every declared action must match its actual PID/runtime, case/attempt, logical thread, context cookie, sequence and scope ID. Final supported drain and zero observed queue loss are required. Resource and instrumentation-scope attributes also require zero drops and unique typed entries.
+
+The synchronous diagnostic contract selects one source-bound method and its recursion. Each action needs its own fresh trace, one wrapper root and the exact target probe directly beneath that root. Every target or recursive-target probe needs its selected-method child, with the declared namespace/method and pinned instrumentation scope. The complete decoded span-ID set must equal the producer's started, ended and exported sets. Parent edges, intervals, exception status, compiler probe IDs and all nine action/build identity attributes are checked independently. Synchronous recursive siblings must not overlap, regardless of arrival order; equal end/start boundaries are permitted. Missing methods cannot be hidden by reducing both the producer count and the decoded receipt. Unattributed spans inside an action trace, duplicate spans, unknown scopes, unsupported links and dropped observations refuse.
+
+Serial action root intervals must also follow the declared action order without overlap; equal end/start boundaries are permitted. Background spans remain retained outside the action counts. Metric bodies also remain retained; this component does not decode or qualify them. Final global SDK pipeline health, metric accounting, source/build binding, typed application observations and independent repeats remain separate requirements before generated admission. The decoder accepts at most 4,096 bodies, 32 MiB of raw data and 65,536 decoded spans; exceeding a budget refuses. Its retained receipt digest includes route and body lengths, preserving batch order and boundaries.
+
 ## Component checks
 
 Run the maintained contributor gates with the documented toolchain:
@@ -30,6 +38,6 @@ Run the maintained contributor gates with the documented toolchain:
 make generation-check
 ```
 
-Python readers and the private harness session each have an independent 80% line floor. Real JDK regression workers check private method calls, serial readiness/release, actual Java thread IDs, binary application channels, virtual-thread refusal and wrong-release refusal. The compiled helper has a separate 80% JaCoCo line floor. JaCoCo applies only to these regression probes; it is not part of application or SDK qualification.
+Python readers and the private harness session each have an independent 80% line floor. Synthetic protobuf controls cover action trees, recursion/errors, cross-batch ordering, every identity attribute, missing/duplicate spans, altered producer counts, malformed graphs and explicit decode budgets. They do not count as real producer qualification. Real JDK regression workers check private method calls, serial readiness/release, actual Java thread IDs, binary application channels, virtual-thread refusal and wrong-release refusal. The compiled helper has a separate 80% JaCoCo line floor. JaCoCo applies only to these regression probes; it is not part of application or SDK qualification.
 
 These checks leave the full [completion checklist](completion.md) open. The result remains **equivalence over these tests and observations**.

@@ -270,7 +270,13 @@ def read_final(runtime: Path, *, pid: int, identity: Identity) -> dict:
                               info.st_ctime_ns, info.st_mode, info.st_uid)
     require(len(raw) == before.st_size <= MAX_FINAL and signature(before) == signature(after) == signature(linked),
             "final report changed while reading")
-    value = strict_json(raw)
+    return final_report(strict_json(raw), pid=pid, identity=identity)
+
+
+def final_report(value: object, *, pid: int, identity: Identity) -> dict:
+    """Revalidate retained final data without treating it as receiver evidence."""
+    require(type(pid) is int and pid > 0, "missing actual JVM PID")
+    require(pid == identity.pid, "actual JVM PID differs from frozen producer identity")
     require(type(value) is dict and set(value) == FINAL_FIELDS
             and type(value["schema_version"]) is int and value["schema_version"] == VERSION
             and value["kind"] == "otelc.java-witness-final" and value["phase"] == "final"
