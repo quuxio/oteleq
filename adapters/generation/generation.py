@@ -28,6 +28,8 @@ import java_live
 import java_control_receipt
 import java_provider
 import java_profiles
+import java_actions
+import java_action_bindings
 import java_project
 import java_archive_context
 import java_telemetry
@@ -440,6 +442,8 @@ def configure_entry_context(entry, discovered, configuration, snapshot, excluded
     if language == "java":
         entry["java_backend"] = adapters.get("java", {}).get("backend", "legacy")
         entry["java_profile"] = adapters.get("java", {}).get("profile", java_profiles.STOCK)
+        if "witness_profile" in adapters.get("java", {}):
+            entry[java_actions.FIELD] = adapters["java"]["witness_profile"]
     if language == "go":
         configure_go_context(entry, discovered, configuration)
     if language == "python" and "backend" in adapters["python"]:
@@ -681,7 +685,7 @@ def generator_identity():
     files.update({name: capture.file_digest(here / name) for name in (
         'java_project.py', 'java_classpath.py', 'java_archives.py', 'java_archive_context.py',
         'java_helper_binding.py', 'OteleqArchives.java',
-        'java_witness.py', 'java_action.py', 'java_action_session.py', 'java_action_receipt.py', 'java_action_bindings.py', 'java_handle_callers.py', 'OteleqRendezvous.java',
+        'java_witness.py', 'java_action.py', 'java_action_session.py', 'java_action_receipt.py', 'java_action_bindings.py', 'java_handle_callers.py', 'java_actions.py', 'OteleqRendezvous.java',
         'node_project.py', 'node_context.mjs', 'node_source_context.mjs', 'node_source_context.py', 'node_source.py', 'node_source_worker.py', 'node_launch.py', 'node_inputs.py', 'node_execution.py', 'node_telemetry.py',
         'node_live.py', 'node_control.py', 'node_control_receipt.py', 'node_checkpoint.mjs',
         'native_profile.py', 'native_project.py', 'native_dependencies.py', 'native_frontend.py',
@@ -933,10 +937,19 @@ def java_command(root, project, entry, driver, config, tools, env, folder, scrat
     classes = scratch / "classes"
     main = (entry["package"] + "." if entry["package"] else "") + "OteleqDriver"
     options = {"context": context} if context is not None else {}
-    java_build.build(project, [project / entry["path"], driver], main, tools["java"],
+    sources = [project / entry["path"], driver]
+    if java_actions.enabled(entry):
+        sources.append(driver.with_name("OteleqRendezvous.java"))
+    java_build.build(project, sources, main, tools["java"],
                      classes, folder, env, execute, **options)
     if java_provider.prepared(entry):
         java_provider.require(prepared_runtime is not None, "missing owned runtime context")
+        if java_actions.enabled(entry):
+            application = read(folder / java_launch.APPLICATION_FILE)
+            owner, _ = java_launch.target(entry, application, project)
+            declared, route = java_actions.declarations(entry, owner, list(application["bindings"]))
+            java_action_bindings.compile(root, project, folder, folder / "action-bindings", tools,
+                declared, env, execute, profile=entry[java_actions.FIELD], route=route)
         return java_launch.prepare(root, project, folder, tools, prepared_runtime, entry,
                                    tomllib.loads(config.read_text()), lane == "baseline", env, execute, **options)
     paths = os.pathsep.join(map(str, java_project.runtime_classpath(classes, context)))

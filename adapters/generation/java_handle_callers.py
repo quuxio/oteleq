@@ -29,7 +29,7 @@ def source_name(value: object) -> bool:
     return type(value) is str and all(identifier(part) for part in value.split("."))
 
 
-def type_name(value: str, *, output: bool = False) -> tuple[str, str]:
+def type_name(value: str, *, output: bool = False, references: dict[str, str] | None = None) -> tuple[str, str]:
     """Keep source types and JVM descriptors exact without adapting arguments."""
     witness.require(type(value) is str, "caller type must be explicit")
     dimensions = 0
@@ -41,8 +41,15 @@ def type_name(value: str, *, output: bool = False) -> tuple[str, str]:
         name, descriptor = value, PRIMITIVES[value]
     else:
         short = value.removeprefix("java.lang.")
-        witness.require(short in REFERENCES and value in (short, REFERENCES[short]), "unsupported caller reference type")
-        name = REFERENCES[short];descriptor = "L" + name.replace(".", "/") + ";"
+        if type(references) is dict and value in references:
+            witness.require(source_name(value), "invalid declared caller source type")
+            owner = references[value]
+            witness.require(type(owner) is str and bindings.descriptor("()L" + owner + ";"),
+                            "invalid declared caller reference")
+            name, descriptor = value, "L" + owner + ";"
+        else:
+            witness.require(short in REFERENCES and value in (short, REFERENCES[short]), "unsupported caller reference type")
+            name = REFERENCES[short];descriptor = "L" + name.replace(".", "/") + ";"
     return name + "[]" * dimensions, "[" * dimensions + descriptor
 
 
@@ -53,7 +60,7 @@ def helper_source(package: str) -> str:
 
 
 def members(source_owner: str, binary_owner: str, method: str, parameters: list[str], output: str,
-            *, caller_owner: str, instance: bool) -> tuple[str, dict, bindings.HandleRoute]:
+            *, caller_owner: str, instance: bool, references: dict[str, str] | None = None) -> tuple[str, dict, bindings.HandleRoute]:
     """Return SDK-free members plus independent role declarations and intent.
 
     Source and binary owner names are separate compiler identities. The caller
@@ -62,8 +69,8 @@ def members(source_owner: str, binary_owner: str, method: str, parameters: list[
     witness.require(source_name(source_owner) and identifier(method) and type(instance) is bool
                     and type(binary_owner) is str and type(caller_owner) is str
                     and type(parameters) is list and len(parameters) <= 254, "invalid typed caller declaration")
-    arguments = [type_name(value) for value in parameters]
-    returned, result_descriptor = type_name(output, output=True)
+    arguments = [type_name(value, references=references) for value in parameters]
+    returned, result_descriptor = type_name(output, output=True, references=references)
     target_descriptor = "(" + "".join(item[1] for item in arguments) + ")" + result_descriptor
     invocation = "(L" + binary_owner + ";" + target_descriptor[1:] if instance else target_descriptor
     expected = {"target": {"owner": binary_owner, "name": method, "descriptor": target_descriptor}}

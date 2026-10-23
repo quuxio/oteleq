@@ -7,6 +7,7 @@ from pathlib import Path
 import sys
 
 import java_profiles
+import java_actions
 import otelc_capture as capture
 
 AGENT = "build/tools/opentelemetry-javaagent-2.32.0.jar"
@@ -76,7 +77,7 @@ def configuration(entry: dict, endpoint: str, service: str) -> dict:
     sequence = entry.get("sequence_configuration", [])
     if sequence and "metrics" in sequence[0]:
         result["metrics"].update(sequence[0]["metrics"])
-    if entry.get("java_profile") == java_profiles.ARCHIVES:
+    if entry.get("java_profile") == java_profiles.ARCHIVES or java_actions.enabled(entry):
         result["context"] = {"tasks": False, "http": False}
     return result
 

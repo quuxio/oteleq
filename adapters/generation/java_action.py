@@ -22,7 +22,7 @@ class Harness:
 
     def __init__(self, root: Path, case_id: str, attempt_id: str, actions: list[str]):
         witness.require(witness.hex_id(case_id, 64) and witness.hex_id(attempt_id, 64)
-                        and type(actions) is list and 0 < len(actions) <= 64
+                        and type(actions) is list and 0 < len(actions) <= 65
                         and all(witness.hex_id(action, 64) for action in actions)
                         and len(set(actions)) == len(actions), "invalid private harness plan")
         witness.require(root.is_absolute() and root.parent == root.parent.resolve(strict=True),

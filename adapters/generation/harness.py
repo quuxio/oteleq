@@ -17,6 +17,7 @@ import native_names
 import node_receivers
 import node_project
 import java_receivers
+import java_actions
 import python_project
 import preconditions
 import sequences
@@ -710,10 +711,16 @@ def java_driver(entry, args):
         return java_receivers.driver(entry, args, java_literal, sequence)
     package = "package " + entry["package"] + ";\n" if entry["package"] else ""
     call = entry["name"] + "(" + ",".join(literal(v, t, "java") for v, t in zip(args, entry["parameters"])) + ")"
+    helper, finish, thrown, unsupported = "", "", "java.lang.Exception", ""
+    if java_actions.enabled(entry):
+        helper = java_actions.members(entry)[0]
+        call = "oteleqEnvelope(" + ",".join(literal(v, t, "java") for v, t in zip(args, entry["parameters"])) + ")"
+        finish, thrown = java_actions.FINISH, "java.lang.Throwable"
+        unsupported = 'catch(java.lang.Throwable failure){throw new java.lang.AssertionError("target throwable requires another codec");}'
     invoked = call + ';s.append("return:void\\n");' if entry["output"] == "void" else 'java.lang.Object result=' + call + ';s.append("return:").append(value(result)).append("\\n");'
     state = "\n".join('s.append(' + json.dumps(g["name"] + ':') + ').append(value(' + g["name"] + ')).append("\\n");' for g in entry["globals"])
     return package + '''class OteleqDriver {
-static java.lang.String value(java.lang.Object v){
+''' + helper + '''static java.lang.String value(java.lang.Object v){
  if(v==null)return "null";
  if(v instanceof java.lang.Double x)return "double:"+java.lang.Long.toHexString(java.lang.Double.doubleToRawLongBits(x));
  if(v instanceof java.lang.Float x)return "float:"+java.lang.Integer.toHexString(java.lang.Float.floatToRawIntBits(x));
@@ -735,9 +742,9 @@ static java.lang.String message(java.lang.Exception error){
   throw new java.lang.AssertionError("exception message requires a fixture");
  return error.getMessage();
 }
-public static void main(java.lang.String[] args) throws java.lang.Exception {
+public static void main(java.lang.String[] args) throws ''' + thrown + ''' {
 java.lang.StringBuilder s=new java.lang.StringBuilder("before\\n");
-''' + state + '\ntry{' + invoked + '}catch(java.lang.Exception e){s.append("error:").append(e.getClass().getName()).append(":").append(value(message(e))).append("\\n");}\ns.append("after\\n");\n' + state + '\njava.nio.file.Files.writeString(java.nio.file.Path.of(java.lang.System.getenv("OTELEQ_OBSERVATION")),s.toString());\n}}\n'
+''' + state + '\ntry{' + invoked + '}catch(java.lang.Exception e){s.append("error:").append(e.getClass().getName()).append(":").append(value(message(e))).append("\\n");}' + unsupported + '\ns.append("after\\n");\n' + state + '\njava.nio.file.Files.writeString(java.nio.file.Path.of(java.lang.System.getenv("OTELEQ_OBSERVATION")),s.toString());\n' + finish + '\n}}\n'
 
 
 def go_materialise(project, entry, args, original):
@@ -795,7 +802,12 @@ def materialise(project, entry, args):
         driver = source.parent / "OteleqDriver.java"
         if driver.exists():
             raise ValueError("generated Java driver would overwrite an application file")
+        helper = source.parent / "OteleqRendezvous.java"
+        if java_actions.enabled(entry) and (helper.exists() or helper.is_symlink()):
+            raise ValueError("generated Java rendezvous would overwrite an application file")
         driver.write_text(java_driver(entry, args))
+        if java_actions.enabled(entry):
+            helper.write_text(java_actions.callers.helper_source(entry["package"]))
     elif language == "go" and "go_context" in entry:
         driver = go_materialise(project, entry, args, original)
     else:
