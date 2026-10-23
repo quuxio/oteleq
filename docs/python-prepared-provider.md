@@ -1,6 +1,6 @@
 # Rebuilt Python provider integration
 
-Status: metadata negotiation, prepared-transport validation and independent execution/journal/health/OTLP readers are implemented. A separate fixed-workload qualification command exercises the runtime readers. Generated execution through the rebuilt Python provider remains blocked. The default Python backend retains its existing qualified legacy behaviour.
+Status: metadata negotiation, prepared-transport validation and independent execution/journal/health/OTLP readers are implemented. An explicit journal-2 component validates declared source-origin relations as retained data. A separate fixed-workload qualification command exercises the journal-1 runtime readers. Generated execution through the rebuilt Python provider remains blocked. The default Python backend retains its existing qualified legacy behaviour.
 
 ## Explicit selection
 
@@ -40,9 +40,21 @@ The health-2 reader reconstructs the public view from the separately retained SD
 
 ## Remaining admission requirements
 
+### Explicit origin-journal reader
+
+`python_origin.decode(data, actual_application_pid)` independently reads only journal 2 (`OTLCPY2\0`), with closed kinds 1-7. The existing runtime reader selects journal 1 and refuses journal 2; metadata negotiation and generated execution do not switch formats implicitly. `python_origin.read(path, pid)` additionally requires an owned, bounded, non-followed mode-0600 regular file after its owning process has stopped.
+
+The reader checks consecutive records, exact terminal counts and data-byte totals, actual PID and consistent descriptor/interpreter/filesystem profiles. Each compiler root must reference an earlier source read, with unique root/transaction/read-token identities and a supported entry or ordinary `.py` loader route. Each first-execution identity follows a bounded sequence of direct code-valued `co_consts` edges. Paths and bytecode offsets must agree with that member. Aliased paths cannot give the same root/member a second execution identity.
+
+An SDK join references earlier execution and code records with a one-to-one pairing. Independent subgraph matching preserves exact primitive/float bits, metadata, ordered slots and aliases; frozenset order is ignored. Backtracking retains later outer constraints, so an equal unordered constant cannot hide a contradictory alias. A shared 1,000,000-step allowance bounds every join in one journal; exhaustion refuses the journal. Descriptors remain data: the consumer never compiles, unmarshals or executes retained code.
+
+These checks validate the declared relations' consistency. They do not prove that the producer observed a genuine read, compiler return or selected VM execution. `capture_complete` reports only finalisation and raw loss counters; an empty journal or missing selected join cannot establish selection coverage. Synthetic wire fixtures and exhaustive small-graph permutation oracles test the component, separately from authentic producer qualification.
+
+### Runtime admission
+
 An actual qualified source profile requires selected-source origin evidence in **both baseline and instrumented lanes**, from the same SDK-independent observer. The plain lane must have no SDK telemetry. Exact input/read transactions, compiler or loader return objects, selected descendants and instrumented VM/telemetry code IDs need independent binding. Equal code descriptors alone cannot establish source origin.
 
-The new versioned origin observer, independent native recipe qualification, both-lane selected-source binding and generated execution qualification remain in progress. Journal-2 components are separate; the journal-1 reader refuses that format. Missing origin, loss, truncation, unsupported loaders or unavailable per-action attribution must stay visible. The full [completion checklist](completion.md) remains in scope.
+The new versioned origin observer, independent native recipe qualification, both-lane selected-source binding and generated execution qualification remain in progress. The journal-2 reader does not clear those blockers. Missing origin, loss, truncation, unsupported loaders or unavailable per-action attribution must stay visible. The full [completion checklist](completion.md) remains in scope.
 
 ## Reproduce metadata qualification
 

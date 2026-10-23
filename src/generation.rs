@@ -21,6 +21,14 @@ const RESOURCES: &[(&str, &str)] = &[
         include_str!("../adapters/generation/python_code.py"),
     ),
     (
+        "python_code_match.py",
+        include_str!("../adapters/generation/python_code_match.py"),
+    ),
+    (
+        "python_origin.py",
+        include_str!("../adapters/generation/python_origin.py"),
+    ),
+    (
         "python_execution.py",
         include_str!("../adapters/generation/python_execution.py"),
     ),
