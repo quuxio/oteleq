@@ -50,7 +50,9 @@ The pinned SDK's own processed-span and queue metrics remain separate from funct
 
 ## Qualification and limits
 
-The maintained corpus contains synchronous, awaited asynchronous and expected-error calls, plus a same-return static mutation which is restored before the final boundary. Complete independent graphs include every intermediate field, descriptor and alias. Nonempty binary stdout/stderr, real control acknowledgements and decoded OTLP are checked through direct execution, generated suites, replay and detached export.
+The maintained corpus contains synchronous, awaited asynchronous and expected-error calls, plus a same-return static mutation which is restored before the final boundary. Complete independent graphs include every intermediate field, descriptor and alias. Nonempty binary stdout/stderr, real control acknowledgements and decoded OTLP are checked through direct execution, generated suites, replay and detached export. It also exercises scalar reduction and its retained suite/replay, followed by current-source promotion before and after a real return-value change. Actual process identities prevent copied reduction evidence from inflating launch counts.
+
+Ten alterations to copied actual control/OTLP evidence check process identities, flag independence, completion counts, disabled windows, restoration, missing traces and withheld retained metrics. The product verifier must refuse every alteration and still accept the preserved original. These checks add no application launches.
 
 ```sh
 make generation-node-controls-otelc \
@@ -61,4 +63,4 @@ make generation-node-controls-otelc \
 
 Select the Node executable with `OTELC_NODE` before invoking the recipe. Qualify each recorded runtime separately. Completed corpus records, source/tool preservation, negative controls, review and protected checks are required before this profile is admitted.
 
-This is diagnostic **equivalence over these tests and observations**. Serial named trace trees do not establish invocation-cookie attribution. Startup-off profiles, arbitrary concurrent schedules, other action targets, general Node dependency/build integration, combined GC/resource schedules, exporter faults, scalar reduction/current-source promotion with live controls, and shipping artefacts still require separate qualification. Trace duration and observer waiting time are not equality dimensions.
+This is diagnostic **equivalence over these tests and observations**. Serial named trace trees do not establish invocation-cookie attribution. Startup-off profiles, arbitrary concurrent schedules, other action targets, general Node dependency/build integration, combined GC/resource schedules, exporter faults and shipping artefacts still require separate qualification. The maintained routes above remain under exact-runtime qualification until their completed records are published. Trace duration and observer waiting time are not equality dimensions.

@@ -3,12 +3,93 @@
 import hashlib
 import json
 from pathlib import Path
+import shutil
 import sys
+import tomllib
 
 import node_controls_oracle as oracle
 from qualify_generation import command
 from qualify_project_tests import command as project_command
 import qualify_node_controls as controls
+
+
+def alter_otlp(attempt: Path, name: str) -> None:
+    """Remove actual trace receipt or retained cumulative call measurements."""
+    from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceRequest
+    from opentelemetry.proto.collector.metrics.v1.metrics_service_pb2 import ExportMetricsServiceRequest
+    http = json.loads((attempt / 'http-capture.json').read_bytes())
+    for row in http['bodies']:
+        path = attempt / row['file']
+        if name == 'missing-trace' and row['path'] == '/v1/traces':
+            message = ExportTraceServiceRequest.FromString(path.read_bytes())
+            message.ClearField('resource_spans')
+            path.write_bytes(message.SerializeToString())
+            return
+        if name == 'retained-metric' and row['path'] == '/v1/metrics':
+            message = ExportMetricsServiceRequest.FromString(path.read_bytes())
+            suppress_calls(message)
+            path.write_bytes(message.SerializeToString())
+
+
+def suppress_calls(message) -> None:
+    """Keep valid metric framing while withholding the second collected call."""
+    for resource in message.resource_metrics:
+        for scope in resource.scope_metrics:
+            for metric in scope.metrics:
+                if metric.name == 'otelc.function.calls':
+                    for point in metric.sum.data_points:
+                        point.as_int = 1
+
+
+def receipt_controls(profile: Path, workspace: Path, folder: Path) -> int:
+    """Actual retained control and OTLP alterations must fail the product verifier."""
+    root = Path(__file__).resolve().parents[1]
+    sys.path[:0] = [str(root / 'adapters/generation'), str(root / 'examples')]
+    import node_telemetry
+    from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceRequest
+
+    report = json.loads((profile / 'comparison/report.json').read_bytes())
+    case = next(case for case in report['cases'] if case['function'].endswith('.difference'))
+    plan = json.loads((workspace / 'plan.json').read_bytes())
+    entry = next(entry for entry in plan['inventory'] if entry['otelc_function'] == case['function'])
+    original = profile / 'comparison' / case['case'] / 'instrumented_on-0'
+
+    def verify(attempt):
+        http = json.loads((attempt / 'http-capture.json').read_bytes())
+        if http['errors']:
+            raise ValueError('altered control fixture has incomplete capture')
+        bodies = [(row['path'], (attempt / row['file']).read_bytes()) for row in http['bodies']]
+        policy = tomllib.loads((attempt / 'policy.toml').read_text())
+        node_telemetry.witness(attempt, entry, bodies, policy['resource']['service_name'], ExportTraceServiceRequest)
+
+    verify(original)
+    edits = {
+        'pid': lambda record: record.update(pid=record['pid'] + 1),
+        'sdk-pid': lambda record: record.update(sdk_pid=record['sdk_pid'] + 1),
+        'launch': lambda record: record.update(launch_id='0' * 32),
+        'setter': lambda record: record['steps'][1]['before']['history'][1]['status'].update(emission=False),
+        'call-count': lambda record: record['steps'][2]['after']['settled'].update(function_completions=4),
+        'held-window': lambda record: record['steps'][1]['after'].update(held_ns=0),
+        'metric-window': lambda record: record['steps'][1]['after'].update(metric_bodies=[0]),
+        'restoration': lambda record: record['restored'].update(cursor=record['steps'][-1]['after']['cursor']),
+    }
+    for name in (*edits, 'missing-trace', 'retained-metric'):
+        attempt = folder / ('altered-' + name)
+        shutil.copytree(original, attempt)
+        if name in edits:
+            path = attempt / 'node-controls.json'
+            record = json.loads(path.read_bytes());edits[name](record)
+            path.write_text(json.dumps(record))
+        else:
+            alter_otlp(attempt, name)
+        try:
+            verify(attempt)
+        except ValueError as error:
+            (folder / (name + '.refusal.json')).write_text(json.dumps({'refused': True, 'reason': str(error)}) + '\n')
+        else:
+            raise ValueError('altered actual live-control evidence was accepted: ' + name)
+    verify(original)
+    return len(edits) + 2
 
 
 def current_suite(bundle: Path, application: Path, folder: Path, name: str, *, result: float) -> set[tuple[str, int]]:
@@ -41,6 +122,7 @@ def retained_routes(cli: Path, profile: Path, workspace: Path, filename: Path) -
     """Preserve all four states through reduction, replay and current-source promotion."""
     folder = profile / "retained-routes"
     folder.mkdir(mode=0o700)
+    refusals = receipt_controls(profile, workspace, folder)
     report = json.loads((profile / "comparison/report.json").read_bytes())
     target = next(case for case in report["cases"] if case["function"].endswith('.difference'))
     reduced = folder / "shrink"
@@ -81,6 +163,6 @@ def retained_routes(cli: Path, profile: Path, workspace: Path, filename: Path) -
         raise ValueError("live-control retained routes reused an application")
     record = {"actual_applications": len(identities), "application_identities": sorted(identities),
               "reduced_arguments": shrink["reduced_arguments"], "changed_return": 43,
-              "source_preserved": filename.read_text() == original}
+              "source_preserved": filename.read_text() == original, "evidence_refusals": refusals}
     (folder / "QUALIFICATION.json").write_text(json.dumps(record, indent=2) + '\n')
     return record

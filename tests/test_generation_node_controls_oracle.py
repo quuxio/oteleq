@@ -15,11 +15,37 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / "adapters/generation"), str(ROOT / "examples")]
 import node_controls_oracle as oracle
+import node_controls_routes as routes
 import policy
 import qualify_node_controls as qualification
 
 
 class NodeControlsOracleTests(unittest.TestCase):
+    def test_retained_negative_controls_change_only_the_requested_raw_signal(self):
+        from opentelemetry.proto.collector.metrics.v1.metrics_service_pb2 import ExportMetricsServiceRequest
+        from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceRequest
+        from test_generation_node_telemetry import metrics, traces
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            trace = traces().SerializeToString()
+            metric = metrics()
+            calls = metric.resource_metrics[0].scope_metrics[0].metrics[0]
+            self.assertEqual(calls.name, 'otelc.function.calls')
+            calls.sum.data_points[0].as_int = 2
+            (folder / 'trace.protobuf').write_bytes(trace)
+            (folder / 'metrics.protobuf').write_bytes(metric.SerializeToString())
+            (folder / 'http-capture.json').write_text(json.dumps({'errors': [], 'bodies': [
+                {'path': '/v1/traces', 'file': 'trace.protobuf'},
+                {'path': '/v1/metrics', 'file': 'metrics.protobuf'}]}))
+            routes.alter_otlp(folder, 'retained-metric')
+            changed = ExportMetricsServiceRequest.FromString((folder / 'metrics.protobuf').read_bytes())
+            self.assertEqual(changed.resource_metrics[0].scope_metrics[0].metrics[0].sum.data_points[0].as_int, 1)
+            self.assertEqual((folder / 'trace.protobuf').read_bytes(), trace)
+            preserved = (folder / 'metrics.protobuf').read_bytes()
+            routes.alter_otlp(folder, 'missing-trace')
+            self.assertEqual(len(ExportTraceServiceRequest.FromString((folder / 'trace.protobuf').read_bytes()).resource_spans), 0)
+            self.assertEqual((folder / 'metrics.protobuf').read_bytes(), preserved)
+
     def test_changed_current_source_requires_its_independent_return_oracle(self):
         for method in oracle.METHODS:
             for active in (False, True):
