@@ -40,6 +40,8 @@ Use the normal `plan --config`, `generate`, `run`, `replay`, `shrink` and `expor
 
 The published qualifications below cover positive-first schedules. Starting with collection, emission or both disabled is implemented with component regressions, but still needs its own actual-provider qualification. It is outside those existing records.
 
+Positive and restored checkpoints keep the application paused until the collector receives both cumulative function series with the required service, method and completed-call totals. A flush acknowledgement alone cannot close those windows. New bodies are decoded once; waiting does not repeat setters or control commands. Existing process, output, time and capture budgets remain enforced. Missing or partial series cannot become a successful checkpoint. Actual qualification of this receipt barrier is pending; earlier records retain their own runtime identities.
+
 | Requested state | Selected function measurements | Metric export | Tracing |
 | --- | --- | --- | --- |
 | Collection on, emission on | Recorded | Exported | Remains active |
