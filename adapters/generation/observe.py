@@ -78,6 +78,26 @@ def construct_receiver(module: ModuleType, cls: type, fixture: dict, expected: C
     return cls(*fixture["arguments"])
 
 
+def bound_method(module: ModuleType, owner: str, name: str, instance: object,
+                 expected: CodeType) -> MethodType:
+    """Recheck an existing source receiver without reconstructing or invoking lookup hooks."""
+    if type(module) is not ModuleType:
+        raise ValueError("receiver requires an ordinary source module")
+    namespace = vars(module)
+    cls = namespace.get(owner)
+    if (type(cls) is not type or type(instance) is not cls
+            or type.__dict__["__mro__"].__get__(cls) != (cls, object)):
+        raise ValueError("receiver class binding differs from its frozen source identity")
+    _, origin, qualified = runtime_type(instance)
+    if type(namespace.get("__name__")) is not str or origin != namespace["__name__"] or qualified != owner:
+        raise ValueError("receiver class identity differs from its source declaration")
+    state = instance_state(instance)
+    if any(type(key) is not str for key in state) or name in state:
+        raise ValueError("receiver method is shadowed by instance storage")
+    target = checked_function(class_members(cls).get(name), namespace, expected)
+    return MethodType(target, instance)
+
+
 def scalar(item):
     if item is MISSING:
         return {"type": "unbound"}

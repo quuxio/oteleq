@@ -50,6 +50,14 @@ Prepared Java calls can declare [live metric collection/emission states](java-me
 
 Run `make generation-java-sequence-otelc JAVA_BACKEND=prepared OTELC_ROOT=/absolute/frozen/sdk REPORT_DIR=/new/external/evidence` for the maintained actual-provider corpus. Select `JAVA_BACKEND=legacy` with the matching earlier provider for compatibility qualification. The corpus checks complete independently expected intermediate graphs, private factories, expected intermediate errors, recursive trees and a state difference restored before the final boundary. It exercises generated/detached-exported suites, per-case replay, scalar shrinking and altered-evidence refusals. Implementation tests alone do not qualify another provider or platform.
 
+## Python calls under qualification
+
+Declared plain Python receivers can generate 1 through 32 call-only steps on one independently constructed instance. Each step retains its own concrete scalar arguments, before/outcome/after graphs, receiver aliases, declared module globals and own-static roots. An explicitly expected supported exception does not prevent the later calls from running. The whole-case boundaries must equal the first step's before and the final step's outcome/after; missing, reordered or substituted steps fail capture.
+
+The caller rechecks the source class and method before and after each call without application attribute lookup. Rebound classes or method bodies, instance method shadows and unsupported storage refuse capture. Single-call callers keep their existing execution recipe. Serial telemetry must retain the declared independent root trees, complete drain and zero loss; bounded queue/request headroom does not waive the existing byte/time budgets.
+
+Component tests cover actual plain workers, one/32-call schedules, exceptions, aliases/statics, restored intermediate differences and malformed evidence. Actual otelc execution, retained/framework routes, scalar reduction, preservation and compatibility qualification are still pending for this new profile. The existing Python receiver publication covers its recorded single-call scope. Release/collection, asynchronous Python actions, arbitrary targets, mutable object arguments and live Python metric controls remain unavailable through this sequence generator.
+
 ## Release and collection
 
 `release` clears the harness's strong receiver reference. Returned-receiver graphs contain encoded values, so a captured alias does not intentionally keep that receiver alive. Application globals, class data, caches or closures can still retain the object; the harness does not change them.
