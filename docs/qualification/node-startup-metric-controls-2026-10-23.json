@@ -1,0 +1,805 @@
+{
+  "qualification_schema_version": 1,
+  "date": "2026-10-23",
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "scope_status": "qualified recorded source-v1 Node serial metric schedules across all four initial states",
+  "platform": {
+    "os": "macOS",
+    "architecture": "arm64",
+    "node_versions": [
+      "24.21.0",
+      "26.11.0"
+    ],
+    "python": "3.14.8"
+  },
+  "runtime": {
+    "repository": "quuxio/oteleq",
+    "commit": "88ca22d0853ea173c1f5974933333caaf1f3ba42",
+    "source_archive_sha256": "c5fa577423dabdf9aac8e394e7e535165454c2951e9873b8b55c9c81761ee5a6",
+    "cli_sha256": "a1c7f718b81f89208505f615efd91014edac76be62439736b2cbec068fffc351",
+    "source_files_preserved": 390
+  },
+  "provider": {
+    "repository": "quuxio/otelc",
+    "commit": "0f05020bae4553d500cd2e523429dfc006ef478d",
+    "source_archive_sha256": "ba808e34ec0074d1ae3a9a190e2004cf7276d62709b76c1037252da125d5a418",
+    "index_sha256": "c490a60d92dfe01c8ef7b5c00bc75bd81d8f4b06abe77332a29c33fc22a5f2cd",
+    "entries_preserved": 8284,
+    "source_files_preserved": 206,
+    "read_only_directories": 939,
+    "links_preserved": 12,
+    "external_tools": {
+      "/opt/homebrew/Cellar/node@24/24.21.0_2/bin/node": "798d7f9c0d38051608d11ba87a12fbb01e92bfa457cd77ec612b5bad2a73a05e",
+      "/opt/homebrew/Cellar/node/26.11.0_1/bin/node": "849e5785bd5b3ac68516f105d617c4a7ddcc3de1d7a89ba696d5dab271ab0164",
+      "/opt/homebrew/Cellar/python@3.14/3.14.8_1/Frameworks/Python.framework/Versions/3.14/bin/python3.14": "1860df605473e659fb393abbec47ef75a187b07777c0acf4322b9a1a1f057a08"
+    },
+    "protocols": {
+      "schema_version": 1,
+      "kind": "otelc.node.protocols",
+      "source": 5,
+      "execution": 1,
+      "request": 1,
+      "preload": 1,
+      "sdk": 1
+    }
+  },
+  "verifier": {
+    "commit": "c9fef1fa5ab446a628a52647266e8774fdb48da8",
+    "source_archive_sha256": "5fd2697ae04b395df9d94c9174ffcfdddd84da3846b4554b4b66951e0ec9fd11",
+    "source_files_preserved": 391,
+    "files": {
+      "qualify_node_controls.py": "5b4a0a3b05b8dacda2d6b95abeeb077c15342934de6271fbfb454509f668fcf1",
+      "node_controls_oracle.py": "299549bfb6990204d762e0d5b5e262a104a8df843101809a47874731794e58f7",
+      "node_controls_routes.py": "e55e52725558c616f5ffa392b2d7820df9d327b9df66845e5594de8ca61b353e"
+    },
+    "final_audit_sha256": "920b22896dd5fb641fad16f439bc69cdb181a910f44316be645f999b50ee4a19",
+    "audit_script_sha256": "d50d954fc86f49d3260ef7b5f25c2a182236d00b5df7d8ca9ccfaeb816392eed",
+    "provider_preservation_sha256": "7c0b132c3a8c184bbb93db043a1c8551b18c2fd39bc56a9578283e9788364a3c",
+    "runtime_relationship": "All src/adapters/examples bytes equal the separately executed88ca runtime; verifier and executor commit identities are not interchangeable."
+  },
+  "results": {
+    "actual_applications": 2784,
+    "raw_retained_attempts": 2880,
+    "copied_attempts_excluded_from_launch_count": 96,
+    "typed_comparisons_recomputed": 720,
+    "actual_evidence_refusals": 336,
+    "completed_profiles": 24,
+    "completed_runtime_startup_corpora": 8,
+    "new_application_launches_in_final_audit": 0,
+    "corpora": [
+      {
+        "node": "24.21.0",
+        "startup": "both-on",
+        "initial_metric_state": {
+          "collection": true,
+          "emission": true
+        },
+        "actual_applications": 348,
+        "raw_retained_attempts": 360,
+        "copied_attempts_excluded": 12,
+        "evidence_refusals": 42,
+        "typed_comparisons_recomputed": 90,
+        "qualification_sha256": "f85471a1c42ede9cf62b169beda01c06c4064d40d5eff09921ea7ff76a98cb92",
+        "profiles": [
+          {
+            "language": "javascript",
+            "typescript_compiler": null,
+            "suffix": ".cjs",
+            "initial_metric_state": {
+              "collection": true,
+              "emission": true
+            },
+            "cases": 4,
+            "actual_applications": 116,
+            "core_retained_routes_applications": 64,
+            "reduction_and_current_source_applications": 52,
+            "evidence_refusals": 14,
+            "reduced_arguments": [
+              1.0
+            ],
+            "changed_promoted_return": 43,
+            "source_preserved": true
+          },
+          {
+            "language": "typescript",
+            "typescript_compiler": "native",
+            "suffix": ".cts",
+            "initial_metric_state": {
+              "collection": true,
+              "emission": true
+            },
+            "cases": 4,
+            "actual_applications": 116,
+            "core_retained_routes_applications": 64,
+            "reduction_and_current_source_applications": 52,
+            "evidence_refusals": 14,
+            "reduced_arguments": [
+              1.0
+            ],
+            "changed_promoted_return": 43,
+            "source_preserved": true
+          },
+          {
+            "language": "typescript",
+            "typescript_compiler": "api",
+            "suffix": ".mts",
+            "initial_metric_state": {
+              "collection": true,
+              "emission": true
+            },
+            "cases": 4,
+            "actual_applications": 116,
+            "core_retained_routes_applications": 64,
+            "reduction_and_current_source_applications": 52,
+            "evidence_refusals": 14,
+            "reduced_arguments": [
+              1.0
+            ],
+            "changed_promoted_return": 43,
+            "source_preserved": true
+          }
+        ]
+      },
+      {
+        "node": "24.21.0",
+        "startup": "collection-off",
+        "initial_metric_state": {
+          "collection": false,
+          "emission": true
+        },
+        "actual_applications": 348,
+        "raw_retained_attempts": 360,
+        "copied_attempts_excluded": 12,
+        "evidence_refusals": 42,
+        "typed_comparisons_recomputed": 90,
+        "qualification_sha256": "5eb81c6c3526aa7289cd6cb15912da6590d7b8c123823fb86eac900882b6d2d9",
+        "profiles": [
+          {
+            "language": "javascript",
+            "typescript_compiler": null,
+            "suffix": ".cjs",
+            "initial_metric_state": {
+              "collection": false,
+              "emission": true
+            },
+            "cases": 4,
+            "actual_applications": 116,
+            "core_retained_routes_applications": 64,
+            "reduction_and_current_source_applications": 52,
+            "evidence_refusals": 14,
+            "reduced_arguments": [
+              1.0
+            ],
+            "changed_promoted_return": 43,
+            "source_preserved": true
+          },
+          {
+            "language": "typescript",
+            "typescript_compiler": "native",
+            "suffix": ".cts",
+            "initial_metric_state": {
+              "collection": false,
+              "emission": true
+            },
+            "cases": 4,
+            "actual_applications": 116,
+            "core_retained_routes_applications": 64,
+            "reduction_and_current_source_applications": 52,
+            "evidence_refusals": 14,
+            "reduced_arguments": [
+              1.0
+            ],
+            "changed_promoted_return": 43,
+            "source_preserved": true
+          },
+          {
+            "language": "typescript",
+            "typescript_compiler": "api",
+            "suffix": ".mts",
+            "initial_metric_state": {
+              "collection": false,
+              "emission": true
+            },
+            "cases": 4,
+            "actual_applications": 116,
+            "core_retained_routes_applications": 64,
+            "reduction_and_current_source_applications": 52,
+            "evidence_refusals": 14,
+            "reduced_arguments": [
+              1.0
+            ],
+            "changed_promoted_return": 43,
+            "source_preserved": true
+          }
+        ]
+      },
+      {
+        "node": "24.21.0",
+        "startup": "emission-off",
+        "initial_metric_state": {
+          "collection": true,
+          "emission": false
+        },
+        "actual_applications": 348,
+        "raw_retained_attempts": 360,
+        "copied_attempts_excluded": 12,
+        "evidence_refusals": 42,
+        "typed_comparisons_recomputed": 90,
+        "qualification_sha256": "4051463628cddde939429a144f352f29241b9758bb82f56703181fd0172cafd6",
+        "profiles": [
+          {
+            "language": "javascript",
+            "typescript_compiler": null,
+            "suffix": ".cjs",
+            "initial_metric_state": {
+              "collection": true,
+              "emission": false
+            },
+            "cases": 4,
+            "actual_applications": 116,
+            "core_retained_routes_applications": 64,
+            "reduction_and_current_source_applications": 52,
+            "evidence_refusals": 14,
+            "reduced_arguments": [
+              1.0
+            ],
+            "changed_promoted_return": 43,
+            "source_preserved": true
+          },
+          {
+            "language": "typescript",
+            "typescript_compiler": "native",
+            "suffix": ".cts",
+            "initial_metric_state": {
+              "collection": true,
+              "emission": false
+            },
+            "cases": 4,
+            "actual_applications": 116,
+            "core_retained_routes_applications": 64,
+            "reduction_and_current_source_applications": 52,
+            "evidence_refusals": 14,
+            "reduced_arguments": [
+              1.0
+            ],
+            "changed_promoted_return": 43,
+            "source_preserved": true
+          },
+          {
+            "language": "typescript",
+            "typescript_compiler": "api",
+            "suffix": ".mts",
+            "initial_metric_state": {
+              "collection": true,
+              "emission": false
+            },
+            "cases": 4,
+            "actual_applications": 116,
+            "core_retained_routes_applications": 64,
+            "reduction_and_current_source_applications": 52,
+            "evidence_refusals": 14,
+            "reduced_arguments": [
+              1.0
+            ],
+            "changed_promoted_return": 43,
+            "source_preserved": true
+          }
+        ]
+      },
+      {
+        "node": "24.21.0",
+        "startup": "both-off",
+        "initial_metric_state": {
+          "collection": false,
+          "emission": false
+        },
+        "actual_applications": 348,
+        "raw_retained_attempts": 360,
+        "copied_attempts_excluded": 12,
+        "evidence_refusals": 42,
+        "typed_comparisons_recomputed": 90,
+        "qualification_sha256": "f28ad45a2a96fccd3de4c0bad3458208375aa1cf1bd08fb7e0b9d103de1a6cff",
+        "profiles": [
+          {
+            "language": "javascript",
+            "typescript_compiler": null,
+            "suffix": ".cjs",
+            "initial_metric_state": {
+              "collection": false,
+              "emission": false
+            },
+            "cases": 4,
+            "actual_applications": 116,
+            "core_retained_routes_applications": 64,
+            "reduction_and_current_source_applications": 52,
+            "evidence_refusals": 14,
+            "reduced_arguments": [
+              1.0
+            ],
+            "changed_promoted_return": 43,
+            "source_preserved": true
+          },
+          {
+            "language": "typescript",
+            "typescript_compiler": "native",
+            "suffix": ".cts",
+            "initial_metric_state": {
+              "collection": false,
+              "emission": false
+            },
+            "cases": 4,
+            "actual_applications": 116,
+            "core_retained_routes_applications": 64,
+            "reduction_and_current_source_applications": 52,
+            "evidence_refusals": 14,
+            "reduced_arguments": [
+              1.0
+            ],
+            "changed_promoted_return": 43,
+            "source_preserved": true
+          },
+          {
+            "language": "typescript",
+            "typescript_compiler": "api",
+            "suffix": ".mts",
+            "initial_metric_state": {
+              "collection": false,
+              "emission": false
+            },
+            "cases": 4,
+            "actual_applications": 116,
+            "core_retained_routes_applications": 64,
+            "reduction_and_current_source_applications": 52,
+            "evidence_refusals": 14,
+            "reduced_arguments": [
+              1.0
+            ],
+            "changed_promoted_return": 43,
+            "source_preserved": true
+          }
+        ]
+      },
+      {
+        "node": "26.11.0",
+        "startup": "both-on",
+        "initial_metric_state": {
+          "collection": true,
+          "emission": true
+        },
+        "actual_applications": 348,
+        "raw_retained_attempts": 360,
+        "copied_attempts_excluded": 12,
+        "evidence_refusals": 42,
+        "typed_comparisons_recomputed": 90,
+        "qualification_sha256": "7cc26b9ab737db11fd27856b6cbce581b118ec844a3cae2e7bddc6c2cd92894b",
+        "profiles": [
+          {
+            "language": "javascript",
+            "typescript_compiler": null,
+            "suffix": ".cjs",
+            "initial_metric_state": {
+              "collection": true,
+              "emission": true
+            },
+            "cases": 4,
+            "actual_applications": 116,
+            "core_retained_routes_applications": 64,
+            "reduction_and_current_source_applications": 52,
+            "evidence_refusals": 14,
+            "reduced_arguments": [
+              1.0
+            ],
+            "changed_promoted_return": 43,
+            "source_preserved": true
+          },
+          {
+            "language": "typescript",
+            "typescript_compiler": "native",
+            "suffix": ".cts",
+            "initial_metric_state": {
+              "collection": true,
+              "emission": true
+            },
+            "cases": 4,
+            "actual_applications": 116,
+            "core_retained_routes_applications": 64,
+            "reduction_and_current_source_applications": 52,
+            "evidence_refusals": 14,
+            "reduced_arguments": [
+              1.0
+            ],
+            "changed_promoted_return": 43,
+            "source_preserved": true
+          },
+          {
+            "language": "typescript",
+            "typescript_compiler": "api",
+            "suffix": ".mts",
+            "initial_metric_state": {
+              "collection": true,
+              "emission": true
+            },
+            "cases": 4,
+            "actual_applications": 116,
+            "core_retained_routes_applications": 64,
+            "reduction_and_current_source_applications": 52,
+            "evidence_refusals": 14,
+            "reduced_arguments": [
+              1.0
+            ],
+            "changed_promoted_return": 43,
+            "source_preserved": true
+          }
+        ]
+      },
+      {
+        "node": "26.11.0",
+        "startup": "collection-off",
+        "initial_metric_state": {
+          "collection": false,
+          "emission": true
+        },
+        "actual_applications": 348,
+        "raw_retained_attempts": 360,
+        "copied_attempts_excluded": 12,
+        "evidence_refusals": 42,
+        "typed_comparisons_recomputed": 90,
+        "qualification_sha256": "12d90a0be8c5ad104a6fba0eedc2475cbcdcdd7f627b9c6af2f1c2961a6a2d42",
+        "profiles": [
+          {
+            "language": "javascript",
+            "typescript_compiler": null,
+            "suffix": ".cjs",
+            "initial_metric_state": {
+              "collection": false,
+              "emission": true
+            },
+            "cases": 4,
+            "actual_applications": 116,
+            "core_retained_routes_applications": 64,
+            "reduction_and_current_source_applications": 52,
+            "evidence_refusals": 14,
+            "reduced_arguments": [
+              1.0
+            ],
+            "changed_promoted_return": 43,
+            "source_preserved": true
+          },
+          {
+            "language": "typescript",
+            "typescript_compiler": "native",
+            "suffix": ".cts",
+            "initial_metric_state": {
+              "collection": false,
+              "emission": true
+            },
+            "cases": 4,
+            "actual_applications": 116,
+            "core_retained_routes_applications": 64,
+            "reduction_and_current_source_applications": 52,
+            "evidence_refusals": 14,
+            "reduced_arguments": [
+              1.0
+            ],
+            "changed_promoted_return": 43,
+            "source_preserved": true
+          },
+          {
+            "language": "typescript",
+            "typescript_compiler": "api",
+            "suffix": ".mts",
+            "initial_metric_state": {
+              "collection": false,
+              "emission": true
+            },
+            "cases": 4,
+            "actual_applications": 116,
+            "core_retained_routes_applications": 64,
+            "reduction_and_current_source_applications": 52,
+            "evidence_refusals": 14,
+            "reduced_arguments": [
+              1.0
+            ],
+            "changed_promoted_return": 43,
+            "source_preserved": true
+          }
+        ]
+      },
+      {
+        "node": "26.11.0",
+        "startup": "emission-off",
+        "initial_metric_state": {
+          "collection": true,
+          "emission": false
+        },
+        "actual_applications": 348,
+        "raw_retained_attempts": 360,
+        "copied_attempts_excluded": 12,
+        "evidence_refusals": 42,
+        "typed_comparisons_recomputed": 90,
+        "qualification_sha256": "c3454b58ab38bf2e07aebbce053952927061b2a8be74a122855a8f6ac1b0ae69",
+        "profiles": [
+          {
+            "language": "javascript",
+            "typescript_compiler": null,
+            "suffix": ".cjs",
+            "initial_metric_state": {
+              "collection": true,
+              "emission": false
+            },
+            "cases": 4,
+            "actual_applications": 116,
+            "core_retained_routes_applications": 64,
+            "reduction_and_current_source_applications": 52,
+            "evidence_refusals": 14,
+            "reduced_arguments": [
+              1.0
+            ],
+            "changed_promoted_return": 43,
+            "source_preserved": true
+          },
+          {
+            "language": "typescript",
+            "typescript_compiler": "native",
+            "suffix": ".cts",
+            "initial_metric_state": {
+              "collection": true,
+              "emission": false
+            },
+            "cases": 4,
+            "actual_applications": 116,
+            "core_retained_routes_applications": 64,
+            "reduction_and_current_source_applications": 52,
+            "evidence_refusals": 14,
+            "reduced_arguments": [
+              1.0
+            ],
+            "changed_promoted_return": 43,
+            "source_preserved": true
+          },
+          {
+            "language": "typescript",
+            "typescript_compiler": "api",
+            "suffix": ".mts",
+            "initial_metric_state": {
+              "collection": true,
+              "emission": false
+            },
+            "cases": 4,
+            "actual_applications": 116,
+            "core_retained_routes_applications": 64,
+            "reduction_and_current_source_applications": 52,
+            "evidence_refusals": 14,
+            "reduced_arguments": [
+              1.0
+            ],
+            "changed_promoted_return": 43,
+            "source_preserved": true
+          }
+        ]
+      },
+      {
+        "node": "26.11.0",
+        "startup": "both-off",
+        "initial_metric_state": {
+          "collection": false,
+          "emission": false
+        },
+        "actual_applications": 348,
+        "raw_retained_attempts": 360,
+        "copied_attempts_excluded": 12,
+        "evidence_refusals": 42,
+        "typed_comparisons_recomputed": 90,
+        "qualification_sha256": "7283ea77bb0f2cafd74fd6234b49a9c2311d300aafd2f993c2fc8fd547bb7173",
+        "profiles": [
+          {
+            "language": "javascript",
+            "typescript_compiler": null,
+            "suffix": ".cjs",
+            "initial_metric_state": {
+              "collection": false,
+              "emission": false
+            },
+            "cases": 4,
+            "actual_applications": 116,
+            "core_retained_routes_applications": 64,
+            "reduction_and_current_source_applications": 52,
+            "evidence_refusals": 14,
+            "reduced_arguments": [
+              1.0
+            ],
+            "changed_promoted_return": 43,
+            "source_preserved": true
+          },
+          {
+            "language": "typescript",
+            "typescript_compiler": "native",
+            "suffix": ".cts",
+            "initial_metric_state": {
+              "collection": false,
+              "emission": false
+            },
+            "cases": 4,
+            "actual_applications": 116,
+            "core_retained_routes_applications": 64,
+            "reduction_and_current_source_applications": 52,
+            "evidence_refusals": 14,
+            "reduced_arguments": [
+              1.0
+            ],
+            "changed_promoted_return": 43,
+            "source_preserved": true
+          },
+          {
+            "language": "typescript",
+            "typescript_compiler": "api",
+            "suffix": ".mts",
+            "initial_metric_state": {
+              "collection": false,
+              "emission": false
+            },
+            "cases": 4,
+            "actual_applications": 116,
+            "core_retained_routes_applications": 64,
+            "reduction_and_current_source_applications": 52,
+            "evidence_refusals": 14,
+            "reduced_arguments": [
+              1.0
+            ],
+            "changed_promoted_return": 43,
+            "source_preserved": true
+          }
+        ]
+      }
+    ]
+  },
+  "observations": {
+    "methods": [
+      "synchronous add",
+      "awaited later",
+      "expected TypeError",
+      "same-return static mutation restored before final boundary"
+    ],
+    "states": [
+      {
+        "collection": true,
+        "emission": true
+      },
+      {
+        "collection": false,
+        "emission": true
+      },
+      {
+        "collection": true,
+        "emission": false
+      },
+      {
+        "collection": false,
+        "emission": false
+      }
+    ],
+    "fixed_call_arguments": [
+      7,
+      2,
+      3,
+      4
+    ],
+    "receiver_constructor_arguments": [
+      10
+    ],
+    "ordinary_return": 42,
+    "application_stdout_hex": "00ff0a00ff0a00ff0a00ff0a",
+    "application_stderr_hex": "01ff0a01ff0a01ff0a01ff0a",
+    "trace_roots_per_attempt": 4,
+    "collected_function_measurements_per_attempt": 2,
+    "independent_oracle": "Complete intermediate before/outcome/after graphs, receiver self-cycle, own descriptors and static roots; complete binary channels and actual SDK/control/decoded OTLP receipts.",
+    "control_checks": [
+      "SDK creation flags match the first requested state; the actual first status must match before independent setters run",
+      "One actual application/SDK process pair and fixed build throughout each schedule",
+      "Independent collection/emission setters and completed-call continuity",
+      "Effective emission-off drain and at least one export interval of silence",
+      "Monotonic export counters, no off-window admissions, final SDK upper bounds",
+      "Complete trace trees for all calls, including collection-off calls",
+      "Positive exported metrics and restored retained collection-only measurements"
+    ],
+    "initial_states": [
+      {
+        "name": "both-on",
+        "collection": true,
+        "emission": true
+      },
+      {
+        "name": "collection-off",
+        "collection": false,
+        "emission": true
+      },
+      {
+        "name": "emission-off",
+        "collection": true,
+        "emission": false
+      },
+      {
+        "name": "both-off",
+        "collection": false,
+        "emission": false
+      }
+    ],
+    "expected_error_metric": "The third call throws; an unwind measurement is required only when collection is enabled at that call."
+  },
+  "routes": [
+    "direct run",
+    "generated unittest",
+    "per-case replay",
+    "detached exported unittest",
+    "scalar shrinking with fresh confirmation",
+    "reduced unittest and replay",
+    "current-source promotion dry-run/apply",
+    "promoted original and actually changed bodies"
+  ],
+  "negative_controls": [
+    "pid",
+    "sdk-pid",
+    "launch",
+    "initial-state",
+    "setter",
+    "call-count",
+    "held-window",
+    "metric-window",
+    "restoration",
+    "missing-trace",
+    "retained-metric",
+    "off-export-admission",
+    "export-counter-rollback",
+    "export-final-bound"
+  ],
+  "regressions": {
+    "runtime_commit": "88ca22d0853ea173c1f5974933333caaf1f3ba42",
+    "runtime_distinct_tests": 1019,
+    "runtime_python_capture": 165,
+    "runtime_python_generation": 749,
+    "verifier_commit": "c9fef1fa5ab446a628a52647266e8774fdb48da8",
+    "verifier_distinct_tests": 1023,
+    "verifier_python_capture": 165,
+    "verifier_python_generation": 753,
+    "rust": 74,
+    "node": 27,
+    "go": 4,
+    "rust_product_line_coverage_percent": 97.38,
+    "component_coverage_floor_percent": 80,
+    "runtime_review_files": 10,
+    "runtime_independent_node_regressions": 145,
+    "whole_verifier_review_files": 15,
+    "verifier_independent_node_regressions": 148,
+    "verifier_independent_recipe_tests": 3,
+    "remaining_actionable_review_findings": 0
+  },
+  "presentation": {
+    "actual_report_visually_inspected": true,
+    "matching_cases": 3,
+    "deliberate_differences": 1,
+    "incomplete_or_error_entries": 0,
+    "explicit_exclusions": 2,
+    "inventory": 6,
+    "junit_tests": 6,
+    "junit_failures": 1,
+    "junit_errors": 0,
+    "junit_skipped": 2,
+    "scope": "One completed Node24 JavaScript both-off direct report, including expanded intermediate difference and all four actual requested states.",
+    "html_sha256": "2f824da5ddcacf755d9e1705df35159a2fdf42cc827bcd8e46f4169ed1b81096",
+    "junit_sha256": "8f79b3e570d47186df64090324af6ad7d1cadcd3ef1b7a41447d3372eac4383f",
+    "review_receipt_sha256": "6d326b5b42515b0812c1e55058cb1a672175efacf813dfdf561a6b7c9b8dc9ab"
+  },
+  "delivery": {
+    "pull_request": "https://github.com/quuxio/oteleq/pull/69",
+    "note": "This record qualifies the separately identified executed runtime and verifier. Publication-head and merged-main protected checks are separate delivery evidence."
+  },
+  "limits": [
+    "Declared serial JavaScript.cjs/TypeScript.cts native and TypeScript.mts API receiver calls on recorded Node24/26 tools and frozen provider only",
+    "No invocation-cookie or action-scoped attribution",
+    "No arbitrary concurrent, GC/resource, general dependency/build or exporter-fault schedule qualification",
+    "No shipping artefact proof or unrecorded platform/provider/runtime admission",
+    "Trace durations and observer wait times are not equality dimensions",
+    "All 21 broader project completion requirements remain in scope"
+  ]
+}
