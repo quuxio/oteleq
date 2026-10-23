@@ -46,6 +46,13 @@ def require(condition: bool, reason: str) -> None:
         raise ValueError("Java action witness: " + reason)
 
 
+def closed_fields(value: object, fields: set[str], reason: str) -> dict:
+    """Return an ordinary closed JSON object before any field is indexed."""
+    if type(value) is not dict or set(value) != fields:
+        raise ValueError("Java action witness: " + reason)
+    return value
+
+
 def profile_version(profile: str) -> int:
     """Select a closed protocol explicitly, never from producer data."""
     require(type(profile) is str and profile in (PROFILE, HANDLE_PROFILE), "unsupported expected profile")
@@ -131,8 +138,8 @@ def span_sets(scope: dict) -> tuple[set[str], set[str], set[str]]:
 def read_scope(scope: object, *, profile: str = PROFILE) -> dict:
     """Validate incomplete data as incomplete, preserving recoverable flush history."""
     handle = profile_version(profile) == 3
-    require(type(scope) is dict and set(scope) == SCOPE_FIELDS | ({"route_verified"} if handle else set()),
-            "unsupported scope fields")
+    scope = closed_fields(scope, SCOPE_FIELDS | ({"route_verified"} if handle else set()),
+                          "unsupported scope fields")
     if handle:
         require(type(scope["route_verified"]) is bool, "invalid route verification flag")
     require(hex_id(scope["cookie"], 32) and type(scope["phase"]) is str and scope["phase"] in PHASES
@@ -174,8 +181,7 @@ def reply(value: object, request_id: str | None, *, profile: str = PROFILE) -> d
     version = profile_version(profile)
     fields = hash_fields(profile)
     require(request_id is None or hex_id(request_id, 32), "invalid expected request identity")
-    require(type(value) is dict and set(value) == REPLY_FIELDS | (set(fields) - set(HASH_FIELDS)),
-            "unsupported reply fields")
+    value = closed_fields(value, REPLY_FIELDS | (set(fields) - set(HASH_FIELDS)), "unsupported reply fields")
     require(type(value["schema_version"]) is int and value["schema_version"] == version
             and value["profile"] == profile and value["request_id"] == request_id
             and hex_id(value["runtime_id"], 32)
@@ -325,8 +331,8 @@ def final_report(value: object, *, pid: int, identity: Identity) -> dict:
     """Revalidate retained final data without treating it as receiver evidence."""
     require(type(pid) is int and pid > 0, "missing actual JVM PID")
     require(pid == identity.pid, "actual JVM PID differs from frozen producer identity")
-    require(type(value) is dict and set(value) == FINAL_FIELDS
-            and type(value["schema_version"]) is int and value["schema_version"] == profile_version(identity.profile)
+    value = closed_fields(value, FINAL_FIELDS, "unsupported final report identity")
+    require(type(value["schema_version"]) is int and value["schema_version"] == profile_version(identity.profile)
             and value["kind"] == "otelc.java-witness-final" and value["phase"] == "final"
             and type(value["pid"]) is int and value["pid"] == pid
             and value["queue_evidence"] in ("derived_after_shutdown", "unavailable")

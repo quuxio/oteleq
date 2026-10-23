@@ -47,7 +47,8 @@ class JavaHandleWitnessTests(unittest.TestCase):
             with self.subTest(profile=invalid), self.assertRaises(ValueError):
                 witness.reply(value, "a" * 32, profile=invalid)
         with self.assertRaises(ValueError):witness.reply(value, "a" * 32)
-        with self.assertRaises(ValueError):witness.reply(direct.reply(), "a" * 32, profile=PROFILE)
+        ordinary = direct.reply()
+        with self.assertRaises(ValueError):witness.reply(ordinary, "a" * 32, profile=PROFILE)
         for key in value:
             changed = value.copy();del changed[key]
             with self.subTest(missing=key), self.assertRaises(ValueError):
@@ -66,7 +67,8 @@ class JavaHandleWitnessTests(unittest.TestCase):
         incomplete["route_verified"] = False
         self.assertFalse(witness.read_scope(incomplete, profile=PROFILE)["producer_complete"])
         with self.assertRaises(ValueError):witness.read_scope(value)
-        with self.assertRaises(ValueError):witness.read_scope(direct.scope(), profile=PROFILE)
+        ordinary = direct.scope()
+        with self.assertRaises(ValueError):witness.read_scope(ordinary, profile=PROFILE)
 
     def test_frozen_identity_requires_the_independent_route_and_exact_profile(self):
         value = reply();bound = identity(value)
@@ -109,7 +111,8 @@ class JavaHandleWitnessTests(unittest.TestCase):
         with self.assertRaises(ValueError):witness.final_report(changed, pid=123, identity=bound)
         changed = copy.deepcopy(value);changed["scopes"][0]["route_verified"] = False
         with self.assertRaises(ValueError):witness.final_report(changed, pid=123, identity=bound)
-        with self.assertRaises(ValueError):witness.final_report(value, pid=123, identity=direct.identity())
+        ordinary = direct.identity()
+        with self.assertRaises(ValueError):witness.final_report(value, pid=123, identity=ordinary)
 
     def test_private_socket_keeps_the_explicit_request_and_reply_profile(self):
         with tempfile.TemporaryDirectory(dir="/tmp") as temporary:
@@ -117,7 +120,7 @@ class JavaHandleWitnessTests(unittest.TestCase):
             path = root / "witness.sock"
             with socket.socket(socket.AF_UNIX) as server:
                 server.bind(str(path));path.chmod(0o600);server.listen(1);server.settimeout(3)
-                errors = []
+                errors, received = [], []
                 def respond():
                     try:
                         channel, _ = server.accept()
@@ -125,10 +128,11 @@ class JavaHandleWitnessTests(unittest.TestCase):
                             channel.settimeout(3);wire = bytearray()
                             while not wire.endswith(b"\n"):
                                 part = channel.recv(1024)
-                                self.assertTrue(part)
-                                wire.extend(part);self.assertLessEqual(len(wire), 1024)
+                                if not part or len(wire) + len(part) > 1024:
+                                    raise ValueError("incomplete or oversized test request")
+                                wire.extend(part)
                             words = wire.decode().strip().split(" ")
-                            self.assertEqual((words[0], words[2]), ("3", "status"))
+                            received.append((words[0], words[2]))
                             channel.sendall(json.dumps(reply(words[1])).encode() + b"\n")
                     except BaseException as error:errors.append(error)
                 worker = threading.Thread(target=respond, daemon=True);worker.start()
@@ -139,6 +143,7 @@ class JavaHandleWitnessTests(unittest.TestCase):
                     worker.join(timeout=4)
                 self.assertFalse(worker.is_alive())
                 self.assertEqual(errors, [])
+                self.assertEqual(received, [("3", "status")])
 
     def test_decoded_handle_receipt_keeps_route_and_complete_tree_obligations(self):
         for recursive in (False, True):
@@ -153,7 +158,8 @@ class JavaHandleWitnessTests(unittest.TestCase):
                 self.assertIn(PROFILE, result["decoder"])
                 self.assertEqual(result["scoped_spans"], 5 if recursive else 3)
                 report["scopes"][0]["route_verified"] = False
-                with self.assertRaises(ValueError):receipt.qualify(report, identity(), *arguments, **options)
+                bound = identity()
+                with self.assertRaises(ValueError):receipt.qualify(report, bound, *arguments, **options)
 
 
 if __name__ == "__main__":
