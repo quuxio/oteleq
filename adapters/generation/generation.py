@@ -681,7 +681,7 @@ def generator_identity():
     files.update({name: capture.file_digest(here / name) for name in (
         'java_project.py', 'java_classpath.py', 'java_archives.py', 'java_archive_context.py',
         'java_helper_binding.py', 'OteleqArchives.java',
-        'java_witness.py', 'java_action.py', 'java_action_receipt.py', 'java_action_bindings.py', 'OteleqRendezvous.java',
+        'java_witness.py', 'java_action.py', 'java_action_receipt.py', 'java_action_bindings.py', 'java_handle_callers.py', 'OteleqRendezvous.java',
         'node_project.py', 'node_context.mjs', 'node_source_context.mjs', 'node_source_context.py', 'node_source.py', 'node_source_worker.py', 'node_launch.py', 'node_inputs.py', 'node_execution.py', 'node_telemetry.py',
         'node_live.py', 'node_control.py', 'node_control_receipt.py', 'node_checkpoint.mjs',
         'native_profile.py', 'native_project.py', 'native_dependencies.py', 'native_frontend.py',

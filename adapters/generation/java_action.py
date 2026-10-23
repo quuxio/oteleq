@@ -50,7 +50,8 @@ class Harness:
     def environment(self) -> dict:
         """Only the frozen JDK helper consumes these harness-owned settings."""
         return {"OTELEQ_ACTION_SOCKET": str(self.path), "OTELEQ_ACTION_TOKEN": self.token,
-                "OTELEQ_ACTION_CASE": self.case_id, "OTELEQ_ACTION_ATTEMPT": self.attempt_id}
+                "OTELEQ_ACTION_CASE": self.case_id, "OTELEQ_ACTION_ATTEMPT": self.attempt_id,
+                "OTELEQ_ACTION_IDS": ",".join(self.actions)}
 
     def _check_endpoint(self) -> None:
         root, info = self.root.lstat(), self.path.lstat()

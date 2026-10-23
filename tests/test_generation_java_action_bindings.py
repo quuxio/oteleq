@@ -23,14 +23,14 @@ def declarations():
             for role in bindings.ROLES}
 
 
-def document(expected, class_sha):
+def document(expected, class_sha, *, profile=java_witness.PROFILE):
     rows = {}
     for index, (role, value) in enumerate(expected.items(), 1):
         method_sha = str(index) * 64
-        fields = [java_witness.PROFILE, role, *(value[key] for key in ("owner", "name", "descriptor")), class_sha, method_sha]
+        fields = [profile, role, *(value[key] for key in ("owner", "name", "descriptor")), class_sha, method_sha]
         rows[role] = {**value, "class_sha256": class_sha, "method_sha256": method_sha,
                       "probe_id": hashlib.sha256("\n".join(fields).encode()).hexdigest()}
-    return {"schema_version": 2, "kind": "otelc.java-witness-bindings", "profile": java_witness.PROFILE, "bindings": rows}
+    return {"schema_version": java_witness.profile_version(profile), "kind": "otelc.java-witness-bindings", "profile": profile, "bindings": rows}
 
 
 class JavaActionBindingsTests(unittest.TestCase):
@@ -120,10 +120,12 @@ class JavaActionBindingsTests(unittest.TestCase):
         other.unlink();path.chmod(0o644)
         with self.assertRaises(ValueError):java_witness.read_private(self.root, path.name, 100)
 
-    def compile(self, callback=None, *, source_inputs=None, folder=None, audits=2):
+    def compile(self, callback=None, *, source_inputs=None, folder=None, audits=2,
+                profile=java_witness.PROFILE, route=None):
         destination = folder or self.root / "bindings"
         def execute(command, cwd, environment, output, **options):
             self.assertEqual(command[:7], [sys.executable, "-I", "-S", "-B", "-c", bindings.COMPILER, str(self.sdk)])
+            self.assertEqual(command[7], profile)
             self.assertEqual(cwd, self.sdk)
             self.assertEqual(options, {"max_output_bytes": bindings.MAX_BINDINGS})
             self.assertEqual(environment["OTELC_JAVA"], str(self.tools["java"].resolve(strict=True)))
@@ -136,7 +138,8 @@ class JavaActionBindingsTests(unittest.TestCase):
                 patch.object(bindings, "inputs", side_effect=source_inputs or [{"source": "a"}, {"source": "a"}]):
             try:
                 return bindings.compile(self.sdk, self.project, self.build, destination, self.tools,
-                                        self.expected, {"PYTHONDONTWRITEBYTECODE": "1"}, execute)
+                                        self.expected, {"PYTHONDONTWRITEBYTECODE": "1"}, execute,
+                                        profile=profile, route=route)
             finally:
                 self.assertEqual(verify_build.call_args_list,
                                  [unittest.mock.call(self.project, self.classes, self.build)] * audits)
@@ -162,8 +165,8 @@ class JavaActionBindingsTests(unittest.TestCase):
         original_verify = bindings.verify
         for name, different in (("different", True), ("identical", False)):
             folder = self.root / name
-            def replace_after_validation(*arguments):
-                value = original_verify(*arguments)
+            def replace_after_validation(*arguments, **options):
+                value = original_verify(*arguments, **options)
                 path = folder / "bindings.json"
                 raw = b'{"changed":true}' if different else path.read_bytes()
                 path.unlink();path.write_bytes(raw);path.chmod(0o600)
@@ -173,6 +176,15 @@ class JavaActionBindingsTests(unittest.TestCase):
                     with self.assertRaisesRegex(ValueError, "output changed after validation"):
                         self.compile(folder=folder)
                     self.assertFalse((folder / "compiler-inputs.json").exists())
+
+    def test_compiler_stdout_cannot_replace_the_schema_integer_with_a_float(self):
+        changed = {**self.value, "schema_version": 2.0}
+        def changed_response(request, target, result):
+            result.stdout = json.dumps(changed).encode()
+            return result
+        with self.assertRaisesRegex(ValueError, "response differs from retained bindings"):
+            self.compile(changed_response)
+        self.assertFalse((self.root / "bindings/compiler-inputs.json").exists())
 
     def test_outputs_cannot_enter_application_or_provider_sources(self):
         for folder in (self.project / "bindings", self.sdk / "bindings"):

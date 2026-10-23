@@ -18,7 +18,7 @@ The selected producer context must match that independently reported Java thread
 
 `java_action_bindings.py` freezes four distinct caller-declared envelope, rendezvous, wrapper and target methods. It calls the public offline SDK compiler from a fixed isolated Python process, pins the selected JDK, and rechecks the application sources, compiler records, class products, SDK inputs and declarations after success, failure or cancellation. Cancellation keeps its original exception; a failed input audit remains an attached diagnostic. Application classes are read without initialising them.
 
-The independent reader requires the explicit v2 schema/profile, closed fields, exact owner/name/descriptor declarations, matching compiler-owned class bytes and recomputed role probe IDs. Method-code digests and harness shape are checked by the frozen offline SDK compiler; they still need actual runtime capture and receipt before invocation admission. Neither metadata acceptance nor the presence of this module enables a generated worker. The v2 direct-call restriction remains in force: reflected wrappers and undeclared handle profiles cannot silently use it.
+The independent reader defaults to the explicit v2 schema/profile. It requires closed fields, exact owner/name/descriptor declarations, matching compiler-owned class bytes and recomputed role probe IDs. Method-code digests and harness shape are checked by the frozen offline SDK compiler; they still need actual runtime capture and receipt before invocation admission. Neither metadata acceptance nor the presence of this module enables a generated worker. The v2 direct-call restriction remains in force: reflected wrappers and undeclared handle profiles cannot silently use it. Explicit private-handle compilation is described below; its route is never inferred from a document.
 
 Bindings and final JSON use one stable private-file reader: canonical owned mode-0700 parent, one owned mode-0600 regular file link, no-follow/nonblocking open, bounded read and descriptor/path identity checks. Binding declarations/output each have a 1 MiB budget. SDK stdout must agree with the retained bindings. The output hash comes from the same opened snapshot as the verified data, and a final snapshot must match its bytes and file identity before publication. Compiler channels, fixed argv and input/output hashes remain available for review.
 
@@ -44,7 +44,23 @@ The `java-sync-private-handle-v1` reader requires explicit selection through `pr
 
 Each schema-3 scope has an exact boolean `route_verified`. An incomplete scope may retain `false`; a producer completion claim requires `true` as well as all the existing exits, span sets, queue and checkpoint evidence. Default reader calls still accept only v2. Neither version can select the other from its fields, and unknown profiles refuse before socket I/O.
 
-Decoded receipt validation uses the frozen identity's explicit profile. The handle route does not relax the complete tree, compiler probe, context, interval, loss or application-outcome checks below. These reader components do not yet supply a generated handle caller, independent handle-binding compiler bridge or actual consumer qualification with the schema-3 producer.
+Decoded receipt validation uses the frozen identity's explicit profile. The handle route does not relax the complete tree, compiler probe, context, interval, loss or application-outcome checks below. Generated runner activation and complete consumer qualification remain open.
+
+## Typed private JDK callers and bindings
+
+`java_handle_callers.members` emits ordinary JDK members and independently requested envelope/rendezvous/wrapper/target declarations. Source and binary owner names are explicit separate inputs. A private static-final `MethodHandle` is created through an ordinary private lookup. The static wrapper loads only that field and its typed arguments, calls `invokeExact` and returns the exact result. It does not adapt or bind arguments. Constructors, factories, argument construction, state observations and error handling belong outside the envelope and wrapper. The source imports no instrumentation API and is the same in both lanes.
+
+The private rendezvous uses `OteleqRendezvous` and the harness-owned ordered `OTELEQ_ACTION_IDS` plan. Package relocation changes only that fixed helper's package declaration. Maintained real-JDK tests check private static and instance calls, primitive payloads including NaN and signed zero, UTF-16 strings, arrays, mutable state, aliases, original exception identity, binary output and a packaged Unicode owner. The emitted signatures and current qualifier cases are explicit; this component does not construct arbitrary object fixtures.
+
+`java_action_bindings.compile(..., profile=java_witness.HANDLE_PROFILE, route=HandleRoute(...))` calls the public offline schema-3 compiler. The caller supplies the expected field name and static/virtual reference kind before compilation. The consumer recomputes all role probes and the route digest, checks the exact invocation descriptor and JVM slot bound, and refuses different fields, changed dispatch or incorrectly typed route members even if a producer rehashes them. The fixed isolated compiler command records its explicit profile; v2 retains its original default SDK API and cannot accept a handle route. Existing source, class, tool, cancellation and output-snapshot guards apply to both profiles.
+
+With a matching prebuilt SDK, run the separate offline contributor qualification in a new directory:
+
+```sh
+make generation-java-handles-otelc OTELC_ROOT=/path/to/otelc REPORT_DIR=/path/to/new-report
+```
+
+The fifteen-case corpus compiles generated private callers for all eight primitive types, String, void, instance arrays and wide instance arguments. It refuses a different expected handle field, a wrong target descriptor and a handle wrapper offered to v2. An application-initialisation sentinel must stay absent. Compiler helper processes run; target applications do not. These checks qualify emitted bytecode and offline metadata. The generated execution pipeline still needs binding/launch integration, host control and complete actual-provider qualification before these components can admit invocation-scoped generated results.
 
 ## Independent decoded action trees
 
