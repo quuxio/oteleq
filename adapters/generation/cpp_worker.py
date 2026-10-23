@@ -169,11 +169,11 @@ __oteleq_abi(output);bool ok=true;
             if index == len(self.sequence) - 1:
                 body += 'ok=ok && std::fputs("]",output)>=0 && ' + self.outcome_write()
                 body += r''' && std::fputs(",\"after\":",output)>=0 && after.write(output);'''
+            # Reserve two bytes for the final object terminator and newline.
             body += r'''
 if(!ok){std::fclose(output);return 92;}
 long captured=std::ftell(output);
 if(captured<0){std::fclose(output);return 92;}
-// Reserve the final object terminator and newline within the case budget.
 if(captured>790526){std::fclose(output);throw capture_failure{"sequence capture budget exceeded"};}
 }
 '''
