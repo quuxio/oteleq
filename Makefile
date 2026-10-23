@@ -124,6 +124,11 @@ node-source-context-check:
 generation-check: node-observer-check node-sequence-check node-source-context-check java-observer-check go-observer-check cpp-observer-check effect-qualification-check
 	$(PYTHON) -m coverage run --data-file=.generation.coverage --source=adapters/generation,ci -m unittest discover -s tests -p 'test_generation*.py' -v
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/evidence_archive.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/evidence_attributes.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/evidence_files.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/evidence_index.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/qualification_archive.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/generation.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/owned_workspace.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/return_expectations.py' --fail-under=80
