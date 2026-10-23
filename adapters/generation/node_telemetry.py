@@ -301,7 +301,7 @@ def function_metrics(bodies, entry: dict, service: str, report: dict, spans: lis
             observed.setdefault(key, []).extend(samples)
     counts = cumulative_counts(observed)
     if controls is not None:
-        totals, unwinds = node_control_receipt.qualify(controls, bodies, spans, series)
+        totals, unwinds = node_control_receipt.qualify(controls, bodies, spans, series, report)
     for name, count in totals.items():
         provider.require(counts.get(("otelc.function.calls", name)) == count
                          and counts.get((DURATION, name)) == count

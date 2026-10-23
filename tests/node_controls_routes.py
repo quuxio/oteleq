@@ -41,6 +41,30 @@ def suppress_calls(message) -> None:
                         point.as_int = 1
 
 
+def alter_exports(attempt: Path, name: str) -> None:
+    """Keep each reply internally valid while breaking its temporal contract."""
+    root = Path(__file__).resolve().parents[1]
+    sys.path[:0] = [str(root / 'adapters/generation'), str(root / 'examples')]
+    from node_control_receipt import control_statuses
+    path = attempt / 'node-controls.json'
+    record = json.loads(path.read_bytes())
+    if name == 'off-export-admission':
+        step = next(step for step in record['steps'] if not step['requested']['emission'])
+        rows = [step['after'][key] for key in ('status', 'flush', 'settled')]
+        increase = 1
+    elif name == 'export-counter-rollback':
+        record['restored']['flush'].update(export_started=0, export_succeeded=0, export_failed=0)
+        rows, increase = [], 0
+    else:
+        final = json.loads((attempt / 'node-runtime/node-status.json').read_bytes())
+        rows = list(control_statuses(record))
+        increase = final['export_started'] + 1
+    for current in rows:
+        current['export_started'] += increase
+        current['export_succeeded'] += increase
+    path.write_text(json.dumps(record))
+
+
 def receipt_controls(profile: Path, workspace: Path, folder: Path) -> int:
     """Actual retained control and OTLP alterations must fail the product verifier."""
     root = Path(__file__).resolve().parents[1]
@@ -73,23 +97,30 @@ def receipt_controls(profile: Path, workspace: Path, folder: Path) -> int:
         'metric-window': lambda record: record['steps'][1]['after'].update(metric_bodies=[0]),
         'restoration': lambda record: record['restored'].update(cursor=record['steps'][-1]['after']['cursor']),
     }
-    for name in (*edits, 'missing-trace', 'retained-metric'):
+    export_errors = {'off-export-admission': 'drained emission-off window',
+                     'export-counter-rollback': 'moved backwards',
+                     'export-final-bound': 'exceed the final SDK report'}
+    for name in (*edits, 'missing-trace', 'retained-metric', *export_errors):
         attempt = folder / ('altered-' + name)
         shutil.copytree(original, attempt)
         if name in edits:
             path = attempt / 'node-controls.json'
             record = json.loads(path.read_bytes());edits[name](record)
             path.write_text(json.dumps(record))
+        elif name in export_errors:
+            alter_exports(attempt, name)
         else:
             alter_otlp(attempt, name)
         try:
             verify(attempt)
         except ValueError as error:
+            if name in export_errors and export_errors[name] not in str(error):
+                raise ValueError('export counter control failed for an unrelated reason: ' + name) from error
             (folder / (name + '.refusal.json')).write_text(json.dumps({'refused': True, 'reason': str(error)}) + '\n')
         else:
             raise ValueError('altered actual live-control evidence was accepted: ' + name)
     verify(original)
-    return len(edits) + 2
+    return len(edits) + 2 + len(export_errors)
 
 
 def current_suite(bundle: Path, application: Path, folder: Path, name: str, *, result: float) -> set[tuple[str, int]]:

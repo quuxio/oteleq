@@ -1,6 +1,7 @@
 """Independently verify live source controls against serial traces and metric bytes."""
 
 from collections import Counter
+from collections.abc import Iterator
 import hashlib
 from pathlib import Path
 
@@ -10,6 +11,35 @@ import node_live
 import node_source as provider
 import otelc_capture as capture
 
+EXPORT_COUNTERS = ("export_started", "export_succeeded", "export_failed")
+
+
+def control_statuses(record: dict) -> Iterator[dict]:
+    """Yield actual replies in the same order as the paused host exchanges."""
+    for step in record["steps"]:
+        yield from (row["status"] for row in step["before"]["history"])
+        yield from (step["after"][name] for name in ("status", "flush", "settled"))
+    yield from (row["status"] for row in record["restored"]["history"])
+    yield record["restored"]["flush"]
+
+
+def export_timeline(record: dict, final: dict) -> None:
+    """A drained off barrier forbids new admissions until explicit re-enable."""
+    previous = dict.fromkeys(EXPORT_COUNTERS, 0)
+    drained_started = None
+    for current in control_statuses(record):
+        provider.require(all(current[key] >= previous[key] for key in EXPORT_COUNTERS),
+                         "live Node exporter counters moved backwards")
+        if drained_started is not None and not current["emission"]:
+            provider.require(current["export_started"] == drained_started,
+                             "live Node export admitted during a drained emission-off window")
+        if current["emission"]:
+            drained_started = None
+        elif current["effective_emission_off"]:
+            drained_started = current["export_started"]
+        previous = current
+    provider.require(all(type(final.get(key)) is int and final[key] >= previous[key]
+                         for key in EXPORT_COUNTERS), "live Node exporter counters exceed the final SDK report")
 
 def count(value: object, maximum: int) -> bool:
     return type(value) is int and 0 <= value <= maximum
@@ -147,7 +177,7 @@ def phase(indices: list[int], series: dict, totals: Counter, unwinds: Counter, *
                              if key[0] != "otelc.function.unwinds" or value), "missing positive or retained live measurements")
 
 
-def qualify(record: dict, bodies: list, spans: list, series: dict) -> tuple[Counter, Counter]:
+def qualify(record: dict, bodies: list, spans: list, series: dict, final: dict) -> tuple[Counter, Counter]:
     """Metrics count collection-enabled trees; traces retain every declared call."""
     groups = trees(spans)
     provider.require(len(groups) == len(record["steps"]), "live Node calls and serial roots differ")
@@ -174,4 +204,5 @@ def qualify(record: dict, bodies: list, spans: list, series: dict) -> tuple[Coun
     provider.require(statuses + 1 <= control.MAX_STATUSES, "aggregate live Node status budget exceeded")
     received = metric_bodies(bodies, record["steps"][-1]["after"]["cursor"], restored["cursor"])
     phase(received, series, totals, unwinds, required=True)
+    export_timeline(record, final)
     return totals, unwinds

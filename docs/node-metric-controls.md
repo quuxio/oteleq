@@ -42,7 +42,7 @@ One application process, its independent SDK process and the same prepared sourc
 
 The supervisor publishes complete private PID receipts atomically. A caller can reach its first checkpoint before the parent is scheduled; the host waits within the same case budget for completed publication and then verifies actual process-group ownership.
 
-Each transition sets collection and emission separately, verifies that the other flag and completed-call count remain unchanged, and waits for already admitted metric exports to drain before an emission-off window starts. Disabled windows last at least the configured one-second export interval. The ordinary case deadline still applies, so longer schedules need a sufficient budget.
+Each transition sets collection and emission separately, verifies that the other flag and completed-call count remain unchanged, and waits for already admitted metric exports to drain before an emission-off window starts. Export counters must be monotonic across the complete retained timeline and cannot exceed the final SDK totals. Once the effective-off drain is acknowledged, no new metric export may be admitted until emission is enabled again, even if no metric body reaches the receiver. Disabled windows last at least the configured one-second export interval. The ordinary case deadline still applies, so longer schedules need a sufficient budget.
 
 The runner retains actual replies and raw receiver positions in `node-controls.json`. It verifies serial complete trace trees for every call, including calls made with collection disabled. Function metric totals include only collection-enabled trees. Direct positive receipts and the final restoration distinguish suppressed recording from emission-only suppression: measurements recorded with emission off must appear when both switches return on. Plain attempts complete the same checkpoints and fabricate no SDK responses.
 
@@ -52,7 +52,7 @@ The pinned SDK's own processed-span and queue metrics remain separate from funct
 
 The maintained corpus contains synchronous, awaited asynchronous and expected-error calls, plus a same-return static mutation which is restored before the final boundary. Complete independent graphs include every intermediate field, descriptor and alias. Nonempty binary stdout/stderr, real control acknowledgements and decoded OTLP are checked through direct execution, generated suites, replay and detached export. It also exercises scalar reduction and its retained suite/replay, followed by current-source promotion before and after a real return-value change. Actual process identities prevent copied reduction evidence from inflating launch counts.
 
-Ten alterations to copied actual control/OTLP evidence check process identities, flag independence, completion counts, disabled windows, restoration, missing traces and withheld retained metrics. The product verifier must refuse every alteration and still accept the preserved original. These checks add no application launches.
+Thirteen alterations to copied actual control/OTLP evidence check process identities, flag independence, completion counts, disabled windows, restoration, missing traces, withheld retained metrics, off-state export admissions, counter rollback and final SDK bounds. The product verifier must refuse every alteration for its intended reason and still accept the preserved original. These checks add no application launches.
 
 ```sh
 make generation-node-controls-otelc \

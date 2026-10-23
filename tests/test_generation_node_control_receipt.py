@@ -64,6 +64,26 @@ def fixture():
 
 
 class NodeControlReceiptTests(unittest.TestCase):
+    def test_drained_emission_off_forbids_new_admission_even_without_raw_metric_receipt(self):
+        _, record, bodies, spans = fixture()
+        for name in ('status', 'flush', 'settled'):
+            record['steps'][2]['after'][name].update(export_started=1, export_succeeded=1)
+        with self.assertRaisesRegex(ValueError, 'drained emission-off window'):
+            self.verify(record, bodies, spans)
+
+    def test_export_timeline_is_monotonic_and_bounded_by_the_final_sdk(self):
+        _, record, bodies, spans = fixture()
+        record['restored']['history'][-1]['status'].update(export_started=1, export_succeeded=1)
+        record['restored']['flush'].update(export_started=1, export_succeeded=1)
+        self.verify(record, bodies, spans)  # Explicit re-enable permits new exports.
+        record['restored']['flush'].update(export_started=0, export_succeeded=0)
+        with self.assertRaisesRegex(ValueError, 'moved backwards'):
+            self.verify(record, bodies, spans)
+        for current in receipt.control_statuses(record):
+            current.update(export_started=2, export_succeeded=2)
+        with self.assertRaisesRegex(ValueError, 'exceed the final SDK report'):
+            self.verify(record, bodies, spans)
+
     def verify(self, record, bodies, spans):
         entry = fixture()[0]
         node_telemetry.function_metrics(bodies, entry, "case", report(), spans, {"app.add"}, controls=record)
