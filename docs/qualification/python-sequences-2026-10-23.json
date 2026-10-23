@@ -1,0 +1,146 @@
+{
+  "qualification_schema_version": 1,
+  "date": "2026-10-23",
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "runtime": {
+    "commit": "18f70b9b56f273cadf2b1ec6668a57c7ddcad9a7",
+    "cli_sha256": "74f31465fbf09a24f663f26e51e53d14ba50af41dc38cf2127b6a9cfdb2fdb84",
+    "tracked_source_files": 412
+  },
+  "verifier": {
+    "commit": "44eaa22f461faefb48eaa50868d6f751def12a2f",
+    "tracked_source_files": 415,
+    "script": "tests/qualify_python_sequences.py --recheck",
+    "new_application_launches": 0,
+    "runtime_sources_unchanged": true,
+    "shared_retained_recheck": "shared-helper-retained-recheck.json",
+    "script_sha256": "93e40faec1d87d8014f8a4b1130e796fe23c04e2be4c80884e4af6c2f6701a72",
+    "shared_helper_sha256": "8a69181d710d4cd155251140cadd87677a73ef2cd460b83c657cb01256385bbf"
+  },
+  "provider": {
+    "repository": "quuxio/otelc",
+    "commit": "d6d03b72026cde8962b11ce3cc184ff3ebcb60d4",
+    "manifest_sha256": "2a8dbf239c6444c0fb536dff049993beade7eaed6578c9654c1e2d7233e9431f",
+    "preserved_records": {
+      "source_sha256": 413,
+      "products_sha256": 586,
+      "dependencies": 6361
+    },
+    "selected_tool_roles_rehashed": 1,
+    "preserved_record_total": 7360
+  },
+  "platform": {
+    "system": "Darwin",
+    "machine": "arm64",
+    "macos_version": "27.0.1"
+  },
+  "results": {
+    "fixed_methods": 6,
+    "matching_methods": 5,
+    "deliberate_intermediate_difference_methods": 1,
+    "actual_application_launches": 150,
+    "raw_attempt_folders": 154,
+    "copied_attempts_excluded": 4,
+    "reports": 30,
+    "typed_observations": 152,
+    "comparisons_recomputed": 38,
+    "raw_instrumented_receipts": 76,
+    "required_route_commands": 34,
+    "altered_evidence_refusals": 5,
+    "prelaunch_source_refusals": 1,
+    "actual_budget_refusal_launches": 1,
+    "actual_class_refusal_launches": 1,
+    "one_call_positive": true,
+    "compact_32_call_positive": true,
+    "rich_32_call_budget_refused": true,
+    "coordinated_class_replacement_refused": true,
+    "detached_export": true,
+    "generated_unittest": true,
+    "per_case_replay": true,
+    "scalar_reduction": {
+      "original": [
+        7
+      ],
+      "reduced": [
+        0
+      ],
+      "schedule_preserved": true
+    },
+    "complete_raw_and_typed_oracles": true
+  },
+  "single_call_compatibility": {
+    "executed_commit": "18f70b9b56f273cadf2b1ec6668a57c7ddcad9a7",
+    "cli_sha256": "74f31465fbf09a24f663f26e51e53d14ba50af41dc38cf2127b6a9cfdb2fdb84",
+    "folder": "compatibility-18f70b9",
+    "reports": 19,
+    "typed_observations": 84,
+    "comparisons_recomputed": 21,
+    "raw_attempt_folders": 85,
+    "actual_application_launches": 81,
+    "copied_attempts_excluded": 4,
+    "raw_instrumented_receipts": 42,
+    "complete_raw_and_typed_oracles": true,
+    "raw_records_preserved": 1628,
+    "raw_manifest": "compatibility-18f70b9-raw-sha256.json",
+    "raw_manifest_sha256": "b171d7e1ee93a491c535393eb816a40fcd1ef0b9ea2dd34a32ec2f8004710bd8",
+    "raw_files_unchanged": true
+  },
+  "retention": {
+    "ordered_records": 3091,
+    "ordered_raw_manifest_sha256": "f380a8024bd04df66a24eedb730cd0080610bdf52768417fd97f477503b80d67",
+    "single_call_records": 1628,
+    "single_call_raw_manifest_sha256": "b171d7e1ee93a491c535393eb816a40fcd1ef0b9ea2dd34a32ec2f8004710bd8",
+    "raw_files_unchanged_by_retained_checks": true
+  },
+  "independent_runtime_review": {
+    "commit": "18f70b9b56f273cadf2b1ec6668a57c7ddcad9a7",
+    "review_sha256": "05485992a755a1f605f72c4198b8fc38c7bcd285d4f8f434227d000ad96deddd",
+    "focused_tests_per_interpreter": 34,
+    "interpreters": [
+      "CPython3.12.15",
+      "CPython3.14.8"
+    ]
+  },
+  "original_failures_preserved": [
+    {
+      "runtime": "3e8308060edbefdb76e4902b8636a97cbdc789dd",
+      "finding": "A separately reproduced plain-worker control replaced the module class and receiver class together while copying method metadata. The original guard accepted it. Pinning the original class identity now refuses before capture; the final corpus includes this actual refusal."
+    },
+    {
+      "runtime": "18f70b9b56f273cadf2b1ec6668a57c7ddcad9a7",
+      "finding": "An earlier attempt stopped after a real metric export loss. Captured requests received HTTP200, but the legacy exporter redacted the failing request exception. Cause remains unresolved. A separately labelled complete quiet-host corpus passed with unchanged source, CLI, provider, policies and strict loss checks. The failed attempt is retained and is not relabelled as successful."
+    }
+  ],
+  "limits": [
+    "Recorded macOS ARM64, CPython3.12.15 and frozen pre-rebuild provider only.",
+    "Declared plain regular-package receivers/factories, fixed scalar construction and one selected synchronous method.",
+    "The original class and source method are pinned; replacing either refuses capture.",
+    "Bounded dictionary, own-static, module-global and returned-alias graphs; complete intermediate observations only within the recorded scope.",
+    "All intermediate graphs share the case budget; a valid rich32-call schedule can exceed it.",
+    "Queue/request headroom covers this diagnostic corpus, not arbitrary metric rates or transport delays.",
+    "No Python async, generator, yield, release, collection, live metric-control or concurrent schedules.",
+    "No invocation-scoped action attribution, mutable object arguments, inherited/native storage or cross-boundary allocation identity.",
+    "Diagnostic helpers are not evidence for a different shipping artefact.",
+    "Other providers, interpreter versions, build/dependency graphs and platforms require separate qualification."
+  ],
+  "selected_tools": {
+    "python": {
+      "path": "/Users/sclarke/github/otelc-qualification/2026-10-20/integrated-provider/d6d03b7/provider/.venv/bin/python",
+      "resolved": "/opt/homebrew/Cellar/python@3.12/3.12.15/Frameworks/Python.framework/Versions/3.12/bin/python3.12",
+      "sha256": "c4e9f06cb179ae4b3728c748990fbbef7f30580ea42c0eb9c702ebc7c7861c89",
+      "version_stdout": "Python 3.12.15\n",
+      "version_stderr": ""
+    }
+  },
+  "independent_verifier_review": {
+    "commit": "44eaa22f461faefb48eaa50868d6f751def12a2f",
+    "review_sha256": "ab17a768cb509c960b62e404660d88a280bd31d42c8c4fb0d1fc8c2f214cf86e",
+    "focused_tests_per_interpreter": 45,
+    "source_files_preserved": 415,
+    "interpreters": [
+      "CPython3.12.15",
+      "CPython3.14.8"
+    ]
+  }
+}

@@ -8,7 +8,7 @@
 
 ## Current workspace
 
-The Python call-only sequence implementation retains intermediate receiver graphs and checks source bindings around each call. It is [under qualification](ordered-sequences.md#python-calls-under-qualification); existing published Python receiver evidence retains its single-call scope. Component checks alone do not qualify the new instrumentation/retained routes.
+The [Python call-only sequence profile](ordered-sequences.md#python-call-sequences) retains intermediate receiver graphs and pins source/class/method bindings around each call. Its [150-launch diagnostic qualification](qualification/python-sequences-2026-10-23.json) covers all retained routes, scalar reduction, one/32-call positives and refusal controls; a separate 81-launch corpus checks existing single-call compatibility. Broader asynchronous, release, collection and live-control actions remain unavailable.
 
 [Declared independent scalar domains](domain-generation.md) can generate concrete case values without a literal `cases` list. Planning freezes the requests in the inventory, and retained suites consume those values. Existing explicit case lists keep their values and order. Declared [numeric argument preconditions](numeric-preconditions.md) constrain generation and scalar shrinking, including fixed ordered calls. General application predicates and richer argument/factory generation remain open.
 

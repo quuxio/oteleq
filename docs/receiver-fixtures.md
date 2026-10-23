@@ -6,6 +6,8 @@ The generator supports declared receivers for ordinary instance methods on plain
 
 [C++ source fixtures](cpp-receivers.md) implement a separate compiler-bound private-access profile, with [331-launch diagnostic qualification](qualification/cpp-receivers-2026-10-20.json). C/Rust receivers, inherited classes, private/dunder Python methods, Python/Node private class data, slots/native storage, arbitrary mutable arguments and Python asynchronous calls remain unsupported. Node supports awaiting an ordinary async method and [ordered calls/release with bounded Node collection](ordered-sequences.md); arbitrary targets, scheduler and iteration sequences remain open. They remain visible gaps rather than passing skipped tests.
 
+[Python ordered calls](ordered-sequences.md#python-call-sequences) reconstruct one receiver per attempt and retain each intermediate graph. Their [150-launch diagnostic qualification](qualification/python-sequences-2026-10-23.json) checks the original class identity, aliases, globals/statics, exceptions, retained routes and scalar reduction. Separate 81-launch evidence checks the original single-call profile.
+
 ## Declare a constructor
 
 No change to the target source is required when its existing constructor accepts supported scalar arguments:
