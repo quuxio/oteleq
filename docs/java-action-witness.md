@@ -2,7 +2,7 @@
 
 ## Status
 
-The independent `java-sync-action-v2` control/final and decoded-trace readers, offline binding bridge and ordinary JDK private harness channel are implemented components. Generated prepared-Java action scopes are not yet available: generated caller wiring, actual SDK control integration and complete qualification with a real frozen producer remain required. Existing generated workers retain their documented name-only witness. These components do not establish equivalence of a shipping artefact.
+The independent `java-sync-action-v2` control/final and decoded-trace readers, offline binding bridge and ordinary JDK private harness channel are implemented components. An explicitly selected `java-sync-private-handle-v1` control/final reader also checks the schema-3 route identity and verification flag. Generated prepared-Java action scopes are not yet available: generated caller wiring, actual SDK control integration and complete qualification with a real frozen producer remain required. Existing generated workers retain their documented name-only witness. These components do not establish equivalence of a shipping artefact.
 
 The [shared witness design](action-witness.md) remains the acceptance boundary. A producer acknowledgement cannot replace actual receiver evidence, and successful framing cannot qualify invocation attribution.
 
@@ -37,6 +37,14 @@ The retained qualification compiles a source fixture whose class initialiser lea
 An incomplete or refused scope remains data. A producer completion claim requires all declared exits, a successful checkpoint, matching started/ended/exported sets, no pending exports and no known queue loss. Prior flush failures remain visible even when a later checkpoint succeeds. Actual scoped OTLP receipt and final process/pipeline health still need independent qualification.
 
 Final reports must be bounded owned mode-0600 regular files inside the canonical owned mode-0700 runtime. The reader uses nonblocking, no-follow opens, a bounded read and opened/path identity checks. The caller's actual JVM PID, frozen producer identity, outer report and producer header must all identify the same JVM. It also checks the frozen runtime/build/probe identity. Duplicate or reordered contexts refuse. Unavailable queue evidence remains unavailable.
+
+## Explicit private-handle reader
+
+The `java-sync-private-handle-v1` reader requires explicit selection through `profile=java_witness.HANDLE_PROFILE`. It accepts only schema/wire version 3. The caller freezes the additional `route_binding_sha256` alongside the original build and compiler probe hashes before binding an `Identity`. Every subsequent acknowledgement and final producer header must match that route and profile. An arm command appends the route digest after the independently expected logical thread ID.
+
+Each schema-3 scope has an exact boolean `route_verified`. An incomplete scope may retain `false`; a producer completion claim requires `true` as well as all the existing exits, span sets, queue and checkpoint evidence. Default reader calls still accept only v2. Neither version can select the other from its fields, and unknown profiles refuse before socket I/O.
+
+Decoded receipt validation uses the frozen identity's explicit profile. The handle route does not relax the complete tree, compiler probe, context, interval, loss or application-outcome checks below. These reader components do not yet supply a generated handle caller, independent handle-binding compiler bridge or actual consumer qualification with the schema-3 producer.
 
 ## Independent decoded action trees
 
