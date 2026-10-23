@@ -1,4 +1,4 @@
-"""Independent Java action-v2 control and final-evidence reader.
+"""Independent explicit Java action control and final-evidence reader.
 
 Accepted framing is data, not invocation qualification. Callers must bind the
 reply to frozen compiler/launch identities, private harness readiness, actual
@@ -17,6 +17,7 @@ import uuid
 from otelc_capture import strict_json
 
 PROFILE = "java-sync-action-v2"
+HANDLE_PROFILE = "java-sync-private-handle-v1"
 VERSION = 2
 MAX_REPLY = 262144
 MAX_FINAL = 4194304
@@ -43,6 +44,17 @@ def require(condition: bool, reason: str) -> None:
     """Absent or contradictory evidence cannot select an attribution fallback."""
     if not condition:
         raise ValueError("Java action witness: " + reason)
+
+
+def profile_version(profile: str) -> int:
+    """Select a closed protocol explicitly, never from producer data."""
+    require(type(profile) is str and profile in (PROFILE, HANDLE_PROFILE), "unsupported expected profile")
+    return 3 if profile == HANDLE_PROFILE else VERSION
+
+
+def hash_fields(profile: str) -> tuple[str, ...]:
+    """Handle routes need their own independently frozen digest."""
+    return HASH_FIELDS + (("route_binding_sha256",) if profile_version(profile) == 3 else ())
 
 
 def hex_id(value: object, width: int, *, nullable: bool = False) -> bool:
@@ -73,25 +85,31 @@ class Identity:
     runtime_id: str
     pid: int
     hashes: tuple[tuple[str, str], ...]
+    profile: str = PROFILE
 
     @classmethod
     def bind(cls, value: dict, expected: dict, *, pid: int,
-             runtime_id: str | None = None) -> "Identity":
+             runtime_id: str | None = None, profile: str = PROFILE) -> "Identity":
         """A first status can supply runtime freshness, never expected build hashes."""
+        fields = hash_fields(profile)
+        require(value["profile"] == profile and type(value["schema_version"]) is int
+                and value["schema_version"] == profile_version(profile), "producer profile differs")
         require(type(pid) is int and pid > 0 and value["pid"] == pid,
                 "producer does not identify the actual JVM")
-        require(type(expected) is dict and set(expected) == set(HASH_FIELDS)
-                and all(hex_id(expected[key], 64) for key in HASH_FIELDS),
+        require(type(expected) is dict and set(expected) == set(fields)
+                and all(hex_id(expected[key], 64) for key in fields),
                 "incomplete independent launch/probe identity")
-        require(all(value[key] == expected[key] for key in HASH_FIELDS),
+        require(all(value[key] == expected[key] for key in fields),
                 "producer build or compiler probe differs")
         require(runtime_id is None or value["runtime_id"] == runtime_id,
                 "producer runtime changed")
-        return cls(value["runtime_id"], pid, tuple((key, expected[key]) for key in HASH_FIELDS))
+        return cls(value["runtime_id"], pid, tuple((key, expected[key]) for key in fields), profile)
 
     def check(self, value: dict) -> None:
         """Every later acknowledgement and final header belongs to this runtime."""
-        require(value["runtime_id"] == self.runtime_id and value["pid"] == self.pid
+        require(value["profile"] == self.profile and type(value["schema_version"]) is int
+                and value["schema_version"] == profile_version(self.profile)
+                and value["runtime_id"] == self.runtime_id and value["pid"] == self.pid
                 and all(value[key] == expected for key, expected in self.hashes),
                 "producer runtime, build or probe changed")
 
@@ -110,9 +128,13 @@ def span_sets(scope: dict) -> tuple[set[str], set[str], set[str]]:
     return started, ended, exported
 
 
-def read_scope(scope: object) -> dict:
+def read_scope(scope: object, *, profile: str = PROFILE) -> dict:
     """Validate incomplete data as incomplete, preserving recoverable flush history."""
-    require(type(scope) is dict and set(scope) == SCOPE_FIELDS, "unsupported scope fields")
+    handle = profile_version(profile) == 3
+    require(type(scope) is dict and set(scope) == SCOPE_FIELDS | ({"route_verified"} if handle else set()),
+            "unsupported scope fields")
+    if handle:
+        require(type(scope["route_verified"]) is bool, "invalid route verification flag")
     require(hex_id(scope["cookie"], 32) and type(scope["phase"]) is str and scope["phase"] in PHASES
             and failure(scope["failure"]), "invalid context identity or phase")
     counter(scope["sequence"], positive=True)
@@ -141,27 +163,30 @@ def read_scope(scope: object) -> dict:
                 and scope["root_span_id"] in started and scope["target_span_id"] in started
                 and scope["root_span_id"] != scope["target_span_id"],
                 "producer completion lacks matching evidence")
+        require(not handle or scope["route_verified"], "producer completion lacks a verified handle route")
     else:
         require(scope["phase"] != "complete", "complete phase contradicts completion flag")
     return scope
 
 
-def reply(value: object, request_id: str | None) -> dict:
-    """Read only the explicit v2 schema; old optional profiles stay unavailable."""
+def reply(value: object, request_id: str | None, *, profile: str = PROFILE) -> dict:
+    """Read the explicitly selected closed schema without version fallback."""
+    version = profile_version(profile)
+    fields = hash_fields(profile)
     require(request_id is None or hex_id(request_id, 32), "invalid expected request identity")
-    require(type(value) is dict and set(value) == REPLY_FIELDS,
+    require(type(value) is dict and set(value) == REPLY_FIELDS | (set(fields) - set(HASH_FIELDS)),
             "unsupported reply fields")
-    require(type(value["schema_version"]) is int and value["schema_version"] == VERSION
-            and value["profile"] == PROFILE and value["request_id"] == request_id
+    require(type(value["schema_version"]) is int and value["schema_version"] == version
+            and value["profile"] == profile and value["request_id"] == request_id
             and hex_id(value["runtime_id"], 32)
             and type(value["pid"]) is int and value["pid"] > 0
-            and all(hex_id(value[key], 64) for key in HASH_FIELDS)
+            and all(hex_id(value[key], 64) for key in fields)
             and type(value["max_scopes"]) is int and value["max_scopes"] == 64
             and type(value["max_spans_per_scope"]) is int and value["max_spans_per_scope"] == 1024
             and failure(value["error"]), "unsupported or uncorrelated reply identity")
     counter(value["rejected_probes"])
     if value["scope"] is not None:
-        read_scope(value["scope"])
+        read_scope(value["scope"], profile=profile)
     return value
 
 
@@ -198,28 +223,30 @@ def endpoint(path: Path) -> tuple[int, int]:
     return info.st_dev, info.st_ino
 
 
-def command(operation: str, arguments: tuple[str, ...], request_id: str) -> bytes:
+def command(operation: str, arguments: tuple[str, ...], request_id: str, *, profile: str = PROFILE) -> bytes:
     """Build the closed producer command vocabulary before opening a socket."""
+    version = profile_version(profile)
     require(hex_id(request_id, 32), "invalid request identity")
     require(type(operation) is str and all(type(value) is str for value in arguments),
             "invalid command types")
     widths = {"status": (32, 32), "end": (32, 32), "cancel": (32, 32)}
     if operation == "arm":
-        require(len(arguments) == 11, "arm requires the expected Java thread ID")
-        for value, width in zip(arguments, (32, 32, 0, 64, 64, 64, 64, 64, 64, 64, 0)):
+        arm_widths = (32, 32, 0, 64, 64, 64, 64, 64, 64, 64, 0) + ((64,) if version == 3 else ())
+        require(len(arguments) == len(arm_widths), "arm requires the expected Java thread and route identities")
+        for value, width in zip(arguments, arm_widths):
             counter(value, positive=True) if width == 0 else require(hex_id(value, width), "invalid arm identity")
     else:
         require(operation in widths and (operation == "status" and not arguments or len(arguments) == 2),
                 "unsupported operation or argument count")
         require(all(hex_id(value, width) for value, width in zip(arguments, widths[operation])),
                 "invalid command identity")
-    return (" ".join((str(VERSION), request_id, operation, *arguments)) + "\n").encode("ascii")
+    return (" ".join((str(version), request_id, operation, *arguments)) + "\n").encode("ascii")
 
 
-def request(path: Path, operation: str, *arguments: str, deadline: float) -> dict:
+def request(path: Path, operation: str, *arguments: str, deadline: float, profile: str = PROFILE) -> dict:
     """Retain a common deadline and exactly one bounded correlated wire frame."""
     request_id = uuid.uuid4().hex
-    wire = command(operation, arguments, request_id)
+    wire = command(operation, arguments, request_id, profile=profile)
     original = endpoint(path)
     with socket.socket(socket.AF_UNIX) as client:
         remaining = min(4., deadline - time.monotonic())
@@ -239,7 +266,7 @@ def request(path: Path, operation: str, *arguments: str, deadline: float) -> dic
             data.extend(piece)
         require(data.count(b"\n") == 1 and endpoint(path) == original,
                 "extra witness frames or replaced socket")
-    return reply(strict_json(bytes(data)), request_id)
+    return reply(strict_json(bytes(data)), request_id, profile=profile)
 
 
 def read_final(runtime: Path, *, pid: int, identity: Identity) -> dict:
@@ -299,18 +326,18 @@ def final_report(value: object, *, pid: int, identity: Identity) -> dict:
     require(type(pid) is int and pid > 0, "missing actual JVM PID")
     require(pid == identity.pid, "actual JVM PID differs from frozen producer identity")
     require(type(value) is dict and set(value) == FINAL_FIELDS
-            and type(value["schema_version"]) is int and value["schema_version"] == VERSION
+            and type(value["schema_version"]) is int and value["schema_version"] == profile_version(identity.profile)
             and value["kind"] == "otelc.java-witness-final" and value["phase"] == "final"
             and type(value["pid"]) is int and value["pid"] == pid
             and value["queue_evidence"] in ("derived_after_shutdown", "unavailable")
             and type(value["scopes"]) is list and len(value["scopes"]) <= 64,
             "unsupported final report identity")
-    header = reply(value["producer"], None)
+    header = reply(value["producer"], None, profile=identity.profile)
     identity.check(header)
     require(header["scope"] is None, "final header hides an action")
     cookies, scope_ids, previous = set(), set(), 0
     for scope in value["scopes"]:
-        read_scope(scope)
+        read_scope(scope, profile=identity.profile)
         require(scope["cookie"] not in cookies and (scope["scope_id"] is None or scope["scope_id"] not in scope_ids)
                 and int(scope["sequence"]) > previous, "duplicate or unordered final context")
         require(value["queue_evidence"] != "unavailable" or scope["queue_dropped"] is None,

@@ -222,7 +222,9 @@ def qualify(report: dict, identity: witness.Identity, actions: list[Action], tar
     witness.require(all(left.end_time_unix_nano <= right.start_time_unix_nano
                         for left, right in zip(roots, roots[1:])), "serial action intervals overlap or reverse")
     scoped = sum(item["spans"] for item in observed)
-    return {"decoder": "Java action-v2 with decoded OTLP traces", "pid": identity.pid,
+    description = (identity.profile + " with decoded OTLP traces" if identity.profile == witness.HANDLE_PROFILE
+                   else "Java action-v2 with decoded OTLP traces")
+    return {"decoder": description, "pid": identity.pid,
             "runtime_id": identity.runtime_id, "actions": observed,
             "trace_batches": trace_batches, "metric_batches": metric_batches,
             "spans": len(seen), "scoped_spans": scoped, "unscoped_spans": len(seen) - scoped,
