@@ -31,6 +31,20 @@ def fake_provider(root: Path) -> tuple[Path, Path]:
 
 
 class PythonInputsTests(unittest.TestCase):
+    def test_native_encoder_builder_dependency_is_inventoried_without_admitting_a_profile(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            sdk, installed = fake_provider(Path(temporary))
+            helper = sdk / "ci/native_encoder.py"
+            helper.write_text("maintained builder dependency")
+            with patch.object(inputs, "dependency_roots", return_value=[installed]):
+                before = inputs.artefacts(sdk, {"python": Path(sys.executable)})
+                self.assertEqual(before["ci/native_encoder.py"], hashlib.sha256(helper.read_bytes()).hexdigest())
+                helper.write_text("changed builder dependency")
+                self.assertNotEqual(inputs.artefacts(sdk, {"python": Path(sys.executable)}), before)
+                helper.unlink(); helper.symlink_to("missing.py")
+                with self.assertRaises(FileNotFoundError):
+                    inputs.artefacts(sdk, {"python": Path(sys.executable)})
+
     def test_selected_venv_spelling_and_explicit_site_paths_are_preserved(self):
         with tempfile.TemporaryDirectory() as temporary:
             prefix = Path(temporary)
