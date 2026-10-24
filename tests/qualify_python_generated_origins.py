@@ -101,7 +101,8 @@ def compare_receipt(path: Path, value: dict) -> None:
     assert python_provider.same(generation.read(path), normalised), str(path)
 
 
-def recheck_attempt(folder: Path, entry: dict, provider: Path, catalogue: dict, interpreter: dict) -> dict:
+def recheck_attempt(folder: Path, entry: dict, provider: Path, catalogue: dict, interpreter: dict,
+                    *, selection_builder=expected_selection) -> dict:
     """Recompute source, owner, both signals and final health without new apps."""
     from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceRequest
 
@@ -111,7 +112,7 @@ def recheck_attempt(folder: Path, entry: dict, provider: Path, catalogue: dict, 
         # remains evidence for that original launch, not a new process.
         assert folder.parent.parent.name == 'original' and actual.is_dir()
         assert generation.manifest(folder) == generation.manifest(actual)
-        return recheck_attempt(actual, entry, provider, catalogue, interpreter)
+        return recheck_attempt(actual, entry, provider, catalogue, interpreter, selection_builder=selection_builder)
     lane = folder.name.split('-')[0]
     assert lane in ('baseline', 'instrumented_on')
     policy = tomllib.loads((folder / 'policy.toml').read_text())
@@ -126,7 +127,7 @@ def recheck_attempt(folder: Path, entry: dict, provider: Path, catalogue: dict, 
     intent = python_prepared.Intent(provider, project, folder / 'python-runtime',
         Path('_oteleq_generated/driver.py'), provider, tools['python'], info, policy,
         folder / 'policy.toml', environment, lane == 'baseline', profile=python_provider.ORIGIN_PROFILE)
-    facts, selected = expected_selection(folder, entry)
+    facts, selected = selection_builder(folder, entry)
     assert facts['plain'] is intent.plain
     verified = generation.read(folder / 'python-verified-origins.json')
     run = python_launch.Run(intent, generation.read(folder / python_launch.LAUNCH_FILE), selected,
@@ -153,7 +154,8 @@ def recheck_attempt(folder: Path, entry: dict, provider: Path, catalogue: dict, 
 
 def retained(folder: Path, cli: Path, provider: Path, catalogue: dict, interpreter: dict) -> dict:
     """Account for every report and actual process, including framework replays."""
-    reports = sorted(folder.rglob('report.json'))
+    reports = sorted(path for path in folder.rglob('report.json')
+                     if not path.is_relative_to(folder / 'effects-promotion'))
     observations, comparisons = shared.compare_reports(folder, reports, cli, check_report, ())
     identities = []
     for path in reports:
@@ -229,8 +231,22 @@ def main() -> None:
             command([cli, 'replay', '--workspace', workspace, '--case', target['case']], folder, 'changed-source', 4)
         finally:
             path.write_bytes(original)
+        import python_origin_effect_workflows as effects
+        effects.run(cli, provider, folder / 'effects-promotion')
     interpreter = interpreter_probe()
     result = retained(folder, cli, provider, before, interpreter)
+    import python_origin_effect_workflows as effects
+    result['effects_and_promotion'] = effects.retained(folder / 'effects-promotion', cli, provider, before,
+                                                     interpreter, recheck_attempt)
+    result['receiver_workflows'] = {name: result[name] for name in (
+        'actual_application_launches', 'sdk_processes', 'reports',
+        'complete_raw_and_typed_observations', 'recomputed_comparisons')}
+    for name in result['receiver_workflows']:
+        result[name] += result['effects_and_promotion'][name]
+    result['scope'] = ('Explicit origin-v2 synchronous receiver/source creation, serial calls, recursion and exceptions; '
+                       'scalar domains, filesystem/HTTP effects, generated/replay/unittest/detached/reduced routes and '
+                       'current-source unchanged/changed/added-function promotion. Broader async/resource actions, '
+                       'live controls, per-action attribution, cache loaders and shipping qualification remain separate.')
     generation.write(folder / ('retained-audit.json' if args.recheck else 'qualification.json'), result)
     print(json.dumps(result), flush=True)
 

@@ -77,9 +77,9 @@ Each attempt retains the actual supervisor PID and fixed argv, caller PID, appli
 
 Actual generated/retained qualification remains in progress. Current-origin capture covers the native script entry and ordinary source loaders inside the application root. Application cache-only loads, unsupported loaders, complete dependency closure, broader async/resource actions, live metric controls, per-action attribution and shipping qualification remain open. Missing origin, loss or truncation is a refusal. The full [completion checklist](completion.md) remains in scope.
 
-## Reproduce generated receiver qualification
+## Reproduce generated workflow qualification
 
-Use an independent SDK copy with matching prebuilt native origin products and a pinned, complete SDK Python environment. The command covers generated execution, fixed receiver constructors/factories, exceptions, recursion, a deliberate same-return mutation, replay, retained unittest, detached export and scalar reduction. It compares complete raw and typed state graphs against independently declared fixture oracles.
+Use an independent SDK copy with matching prebuilt native origin products and a pinned, complete SDK Python environment. The command covers generated execution, fixed receiver constructors/factories, exceptions, recursion, a deliberate same-return mutation, replay, retained unittest, detached export and scalar reduction. A second corpus adds generated scalar domains, globals, complete filesystem bytes/kinds/permissions and scripted HTTP, plus current-source promotion through unchanged bodies, changed bodies and an added function. It compares complete raw and typed state/effect graphs against independently declared fixture oracles.
 
 ```sh
 make generation-python-origins-otelc \
@@ -88,7 +88,7 @@ make generation-python-origins-otelc \
   REPORT_DIR=/absolute/path/to/new-report
 ```
 
-The qualifier also supports `--recheck` with the same CLI, interpreter and provider. This rechecks retained source, process, journal, telemetry, health and comparison evidence without new application launches. Current-source promotion, scalar/effect workflows and broader capabilities need separate qualification before full generated-provider delivery.
+The qualifier also supports `--recheck` with the same CLI, interpreter and provider. This rechecks retained source, process, journal, telemetry, health and comparison evidence without new application launches; a separate metadata-only interpreter probe observes the actual launcher spelling. Retained JSON comparison normalises object keys while preserving boolean/integer distinctions. Copied original shrink observations retain their original process identity and do not increase launch counts. The integrated exact-revision qualification is in progress; broader capabilities and final delivery remain open.
 
 ## Reproduce metadata qualification
 
