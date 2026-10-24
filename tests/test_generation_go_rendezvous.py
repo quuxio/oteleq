@@ -34,7 +34,7 @@ class GoRendezvousTests(unittest.TestCase):
             root = Path(temporary).resolve()
             gate.materialise(root, "main")
             (root / "go.mod").write_text("module example.test/oteleqgate\n\ngo 1.26.0\n")
-            shutil.copyfile(REPO / "tests/fixtures/go-rendezvous-test.go", root / "rendezvous_test.go")
+            shutil.copyfile(REPO / "tests/fixtures/go-rendezvous_test.go", root / "rendezvous_test.go")
             env = {key: value for key, value in os.environ.items() if not key.startswith(("OTEL", "GH_", "GITHUB_", "AWS_", "SONAR_"))}
             env.update(GOWORK="off", GOFLAGS="", GOENV="off", GOTOOLCHAIN="local", GOPROXY="off",
                        GOCACHE=str(REPO / "build/go-rendezvous-cache"))
