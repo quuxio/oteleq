@@ -16,6 +16,7 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(REPO / 'adapters/generation'), str(REPO / 'examples')]
 import generation
 import python_launch as launch
+import qualify_python_generated_origins as qualifier
 from test_generation_python_execution import VERSION, fixture
 from test_generation_python_provider import response
 from test_generation_python_telemetry import traces
@@ -54,6 +55,22 @@ def wire_run(root: Path, *, plain: bool = False) -> tuple:
 
 
 class PythonLaunchTests(unittest.TestCase):
+    def test_qualifier_observes_native_argv0_instead_of_its_own_launch_spelling(self):
+        with patch.dict(qualifier.os.environ, {'PATH': 'tools', 'PYTHONPATH': 'hook', 'GH_TOKEN': 'fake'}, clear=True), \
+             patch.object(qualifier.subprocess, 'run', return_value=SimpleNamespace(stdout=interpreter_response())) as run:
+            value = qualifier.interpreter_probe()
+        self.assertEqual(value['argv0'], '/actual/framework/python')
+        self.assertEqual(run.call_args.args[0][:5], [str(Path(sys.executable).absolute()), '-I', '-S', '-B', '-c'])
+        self.assertEqual(run.call_args.kwargs['env'], {'PATH': 'tools'})
+        self.assertTrue(run.call_args.kwargs['check'])
+
+    def test_qualifier_refuses_oversized_or_incorrect_interpreter_probe_results(self):
+        for raw in (b' ' * 4097, b'null', b'{}', b'{"version":"foreign","cache_tag":"foreign","argv0":"python"}'):
+            with self.subTest(raw=raw[:40]), \
+                 patch.object(qualifier.subprocess, 'run', return_value=SimpleNamespace(stdout=raw)), \
+                 self.assertRaises(AssertionError):
+                qualifier.interpreter_probe()
+
     def test_selected_source_includes_exact_existing_factory_and_constructor_lines(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary).resolve(); (root / 'entry.py').write_text('source')

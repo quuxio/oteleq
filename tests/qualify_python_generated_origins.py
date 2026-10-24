@@ -20,7 +20,7 @@ import python_provider
 import python_selection
 import qualify_python_sequences as legacy
 import sequence_qualification as shared
-from python_sequence_fixture import FUNCTIONS, METHODS, SOURCE, check_observation, function, raw_observation
+from python_sequence_fixture import FUNCTIONS, METHODS, SOURCE, check_observation, raw_observation
 from qualify_project_tests import command
 
 
@@ -95,7 +95,7 @@ def expected_selection(folder: Path, entry: dict) -> tuple:
     return facts, tuple(selected)
 
 
-def recheck_attempt(folder: Path, entry: dict, provider: Path, catalogue: dict) -> dict:
+def recheck_attempt(folder: Path, entry: dict, provider: Path, catalogue: dict, interpreter: dict) -> dict:
     """Recompute source, owner, both signals and final health without new apps."""
     from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceRequest
 
@@ -103,9 +103,9 @@ def recheck_attempt(folder: Path, entry: dict, provider: Path, catalogue: dict) 
     if actual != folder:
         # Shrinking retains a byte-identical copy of the original replay. It
         # remains evidence for that original launch, not a new process.
-        assert 'original' in folder.parts and actual.is_dir()
+        assert folder.parent.parent.name == 'original' and actual.is_dir()
         assert generation.manifest(folder) == generation.manifest(actual)
-        return recheck_attempt(actual, entry, provider, catalogue)
+        return recheck_attempt(actual, entry, provider, catalogue, interpreter)
     lane = folder.name.split('-')[0]
     assert lane in ('baseline', 'instrumented_on')
     policy = tomllib.loads((folder / 'policy.toml').read_text())
@@ -116,9 +116,7 @@ def recheck_attempt(folder: Path, entry: dict, provider: Path, catalogue: dict) 
     environment = generation.capture.environment(project, tools, service, provider)
     environment.update(TMPDIR=str(folder / 'scratch'))
     info = generation.read(folder / 'python-interpreter.json')['observed']
-    assert info['version'] == sys.version and info['cache_tag'] == sys.implementation.cache_tag
-    # Independently observe the same selected framework launch spelling.
-    assert info['argv0'] == sys.orig_argv[0]
+    assert info == interpreter
     intent = python_prepared.Intent(provider, project, folder / 'python-runtime',
         Path('_oteleq_generated/driver.py'), provider, tools['python'], info, policy,
         folder / 'policy.toml', environment, lane == 'baseline', profile=python_provider.ORIGIN_PROFILE)
@@ -149,7 +147,7 @@ def recheck_attempt(folder: Path, entry: dict, provider: Path, catalogue: dict) 
             'sdk_pid': checked[0].sdk_pid, 'plain': intent.plain, 'runtime': str(intent.runtime)}
 
 
-def retained(folder: Path, cli: Path, provider: Path, catalogue: dict) -> dict:
+def retained(folder: Path, cli: Path, provider: Path, catalogue: dict, interpreter: dict) -> dict:
     """Account for every report and actual process, including framework replays."""
     reports = sorted(folder.rglob('report.json'))
     observations, comparisons = shared.compare_reports(folder, reports, cli, check_report, ())
@@ -161,7 +159,7 @@ def retained(folder: Path, cli: Path, provider: Path, catalogue: dict) -> dict:
             for lane in ('baseline', 'instrumented_on'):
                 for repeat in range(2):
                     identities.append(recheck_attempt(path.parent / case['case'] / (lane + '-' + str(repeat)),
-                                                       entries[case['function']], provider, catalogue))
+                                                       entries[case['function']], provider, catalogue, interpreter))
     assert len(identities) == observations and observations > 100
     unique = {row['runtime']: row for row in identities}
     applications = {row['application_pid'] for row in unique.values()}
@@ -180,6 +178,21 @@ def retained(folder: Path, cli: Path, provider: Path, catalogue: dict) -> dict:
         'source_preserved': True, 'inputs_preserved': True, 'python_hexversion': sys.hexversion,
         'cli_sha256': generation.capture.file_digest(cli),
         'scope': 'Explicit origin-v2 synchronous plain receivers, source constructors/factories, serial calls, recursion and exceptions; generated, replayed, unittest, detached and reduced routes. Promotion, scalar/effect workflows, live controls, per-action attribution, cache loaders and shipping qualification remain separate.'}
+
+
+def interpreter_probe() -> dict:
+    """A relative qualifier argv0 cannot replace the actual selected launch recipe."""
+    command = [str(Path(sys.executable).absolute()), '-I', '-S', '-B', '-c',
+        "import sys,json;print(json.dumps(dict(version=sys.version,cache_tag=sys.implementation.cache_tag,argv0=sys.orig_argv[0])))"]
+    environment = {key: value for key, value in os.environ.items()
+                   if not key.startswith(('PYTHON', 'OTEL_', 'OTELC_', 'GH_', 'GITHUB_', 'SONAR_'))}
+    result = subprocess.run(command, env=environment, capture_output=True, check=True, timeout=10)
+    assert len(result.stdout) <= 4096
+    value = generation.capture.strict_json(result.stdout)
+    assert type(value) is dict and set(value) == {'version', 'cache_tag', 'argv0'}
+    assert value['version'] == sys.version and value['cache_tag'] == sys.implementation.cache_tag
+    assert type(value['argv0']) is str and value['argv0'] and '\0' not in value['argv0']
+    return value
 
 
 def main() -> None:
@@ -212,7 +225,8 @@ def main() -> None:
             command([cli, 'replay', '--workspace', workspace, '--case', target['case']], folder, 'changed-source', 4)
         finally:
             path.write_bytes(original)
-    result = retained(folder, cli, provider, before)
+    interpreter = interpreter_probe()
+    result = retained(folder, cli, provider, before, interpreter)
     generation.write(folder / ('retained-audit.json' if args.recheck else 'qualification.json'), result)
     print(json.dumps(result), flush=True)
 
