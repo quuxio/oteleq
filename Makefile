@@ -184,6 +184,17 @@ generation-check: node-observer-check node-sequence-check node-source-context-ch
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/python_cache.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/python_execution.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/python_health.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/go_provider.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/go_health.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/go_files.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/go_context.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/go_context_sources.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/go_build.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/go_hooks.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/go_prepared.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/go_execution.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/go_launch.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/go_rendezvous.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/python_telemetry.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/python_launch.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/live_control.py' --fail-under=80

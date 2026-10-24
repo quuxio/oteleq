@@ -1,5 +1,7 @@
 # Retained Go builds and replay
 
+The rebuilt SDK has a separate [prepared source-provider integration](go-prepared-provider.md). Its independent protocol/health components are implemented; generated runtime admission and actual-provider qualification remain in progress. The legacy evidence and recipe below do not qualify that replacement API.
+
 Go capture and generated scalar tests require otelc's separate build-only/baseline/on replay API. The former combined `go SOURCE.go` compiler/launcher is not a qualified substitute. The API merged through [otelc PR91](https://github.com/quuxio/otelc/pull/91) at `0624ffdb2a02c80b0a7952f9dcd80f4b3fdd3c82`, with the same complete source tree as qualified candidate `5ea90fa`. Retained frozen products and qualification remain identified separately from canonical rebuilds and releases.
 
 ## What happens in an attempt

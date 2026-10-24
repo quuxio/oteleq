@@ -1,0 +1,10 @@
+{
+  "selection_sha256": "02c685ccb4cb25bf56a145e594994a058b9408faadfbceb5290b8d35bdfc5fb7",
+  "origin": "Literal call-only build3 artifacts from frozen SDK33d74f2 public build, with fixture module and selection identifiers substituted once; tests never import SDK or consumer renderers to make expected bytes.",
+  "files": {
+    "otel.instrumentation.go": "//go:build tools\n\npackage tools\nimport (\n _ \"example.test/app/otelc_rules\"\n _ \"go.opentelemetry.io/otelc/instrumentation/runtime\"\n _ \"go.opentelemetry.io/otelc/instrumentation/go.opentelemetry.io/otel/sdk/trace\"\n)\n",
+    "otelc_rules/doc.go": "package rules\n",
+    "otelc_rules/otelc.yaml": "rule_0:\n  target: \"main\"\n  where:\n    func: \"Add\"\n  do:\n    - inject_code:\n        raw: |\n          __otelc_02c685ccb4cb_Invocation := __otelc_02c685ccb4cb_Runtime.Probes.Start(0)\n          defer func(){__otelc_02c685ccb4cb_Invocation.End(false)}()\n\nrule_1:\n  target: \"main\"\n  where:\n    func: \"main\"\n  do:\n    - inject_code:\n        raw: |\n          defer __otelc_02c685ccb4cb_Runtime.Close()\n",
+    "zz_otelc_02c685ccb4cb.go": "package main\nimport (\n __otelc_02c685ccb4cb_probe \"io.quux.otelc/go/probe\"\n __otelc_02c685ccb4cb_official \"go.opentelemetry.io/otelc/pkg/runtime\"\n __otelc_02c685ccb4cb_owned \"io.quux.otelc/go/runtime\"\n)\nvar __otelc_02c685ccb4cb_Runtime = func()*__otelc_02c685ccb4cb_owned.Runtime {\n value,err:=__otelc_02c685ccb4cb_owned.FromEnvironment(__otelc_02c685ccb4cb_official.ContextWithImplicitTelemetry,__otelc_02c685ccb4cb_official.DetachSpanFromGLS)\n if err!=nil{panic(err)}\n if value.Config.SelectionSHA256!=\"02c685ccb4cb25bf56a145e594994a058b9408faadfbceb5290b8d35bdfc5fb7\"{panic(\"Go runtime differs from compiled selection\")}\n return value\n}()\nfunc __otelc_02c685ccb4cb_Track[T any](value *T,id int)*T{\n __otelc_02c685ccb4cb_probe.Track(__otelc_02c685ccb4cb_Runtime.Probes,value,id);return value\n}\nfunc __otelc_02c685ccb4cb_Release[T any](value *T,success bool){__otelc_02c685ccb4cb_probe.Release(__otelc_02c685ccb4cb_Runtime.Probes,value,success)}\n"
+  }
+}

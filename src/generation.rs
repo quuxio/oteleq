@@ -257,6 +257,54 @@ const RESOURCES: &[(&str, &str)] = &[
         include_str!("../adapters/generation/go_project.py"),
     ),
     (
+        "go_provider.py",
+        include_str!("../adapters/generation/go_provider.py"),
+    ),
+    (
+        "go_health.py",
+        include_str!("../adapters/generation/go_health.py"),
+    ),
+    (
+        "go_files.py",
+        include_str!("../adapters/generation/go_files.py"),
+    ),
+    (
+        "go_context.py",
+        include_str!("../adapters/generation/go_context.py"),
+    ),
+    (
+        "go_context_sources.py",
+        include_str!("../adapters/generation/go_context_sources.py"),
+    ),
+    (
+        "go_context_APACHE.txt",
+        include_str!("../adapters/generation/go_context_APACHE.txt"),
+    ),
+    (
+        "go_build.py",
+        include_str!("../adapters/generation/go_build.py"),
+    ),
+    (
+        "go_hooks.py",
+        include_str!("../adapters/generation/go_hooks.py"),
+    ),
+    (
+        "go_prepared.py",
+        include_str!("../adapters/generation/go_prepared.py"),
+    ),
+    (
+        "go_execution.py",
+        include_str!("../adapters/generation/go_execution.py"),
+    ),
+    (
+        "go_launch.py",
+        include_str!("../adapters/generation/go_launch.py"),
+    ),
+    (
+        "go_rendezvous.py",
+        include_str!("../adapters/generation/go_rendezvous.py"),
+    ),
+    (
         "go_receivers.py",
         include_str!("../adapters/generation/go_receivers.py"),
     ),
