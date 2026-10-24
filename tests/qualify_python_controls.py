@@ -12,6 +12,7 @@ import sys
 import python_live_qualification as oracle
 import generation
 import python_inputs
+import python_live_refusals
 import qualify_python_generated_origins as origins
 import qualify_python_sequences as legacy
 import sequence_qualification as shared
@@ -181,6 +182,13 @@ def audit(cli: Path, provider: Path, folder: Path, destination: Path, profile: s
     assert set(folder.rglob('python-application-start.json')) == starts
     assert (observed, comparisons, len(identities)) == (192, 48, 188)
     assert len({row['sdk_pid'] for row in identities.values() if not row['plain']}) == 94
+    report = generation.read(folder / 'comparison/report.json')
+    case, = (row for row in report['cases'] if row['function'] == oracle.function('fail'))
+    entry, = (row for row in report['inventory'] if row['otelc_function'] == case['function'])
+    refusals = python_live_refusals.check(folder / 'comparison' / case['case'] / 'instrumented_on-0',
+        entry, provider, catalogue, destination / 'refusals', selected=oracle.selection,
+        caches=inputs.frozen_caches if profile == oracle.PROFILES[1] else None)
+    assert refusals['count'] == 9
     inputs.verify_originals()
     changed.verify_originals()
     assert python_inputs.artefacts(provider, {'python': Path(sys.executable).absolute()}) == catalogue
@@ -191,6 +199,7 @@ def audit(cli: Path, provider: Path, folder: Path, destination: Path, profile: s
         'sdk_processes': 94, 'reports': 38, 'complete_raw_and_typed_observations': observed,
         'copied_original_observations': 4, 'recomputed_comparisons': comparisons,
         'altered_comparison_refusals': len(shared.CONTROL_VERDICTS),
+        'altered_live_evidence_refusals': refusals['count'],
         'original_evidence_files_held': len(before), 'new_application_launches_during_audit': 0,
         'scope': 'Synchronous source/cache receiver calls, recursion/errors, constructor/factory prefix and all four '
                  'same-process metric states. Generated/replay/unittest/export/detached/reduced/current-source '
