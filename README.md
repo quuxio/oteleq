@@ -190,3 +190,7 @@ This command consumes repeated captured observations from a qualified observer. 
 ```
 
 The [typed comparator](docs/typed-comparison.md) reports field paths, alias/cycle changes, invalid initial fixtures and incomplete captures while retaining repeated execution and telemetry checks. Its shared format accepts all eight language IDs. Generated scalar workers emit that format in `typed-bundle.json`, retaining raw capture separately. They validate declared initial roots and baseline outcome expectations. Richer receivers/factories and additional graph codecs remain incomplete.
+
+## Development
+
+See [repository quality](docs/quality.md) for contributor tools and full checks. `make dependency-audit` runs the [locked dependency audit](docs/dependency-audit.md); required CI and a separate weekly workflow retain its current advisory evidence.

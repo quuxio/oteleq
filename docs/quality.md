@@ -1,5 +1,7 @@
 # Repository quality and badges
 
+[Locked dependency auditing](dependency-audit.md) checks all three repository dependency inventories against current OSV advisories in required CI and a separate weekly/manual workflow. It verifies the pinned scanner, complete package/source denominators and preserved lock facts; errors and advisories cannot pass. `make dependency-audit-check` supplies separate offline regressions and an 80% runner coverage floor. SDK installations, target repositories and system toolchains need their own checks.
+
 CI caches only the pinned `cargo-llvm-cov` executable using an OS, architecture, Rust-toolchain and tool-version key. A cache miss installs the locked version; every run verifies its exact version before running the same formatting, tests and coverage gates. Product sources, build outputs, credentials and telemetry data are not included in this cache. The official cache action is pinned to an immutable revision.
 
 ## Current scope
