@@ -210,9 +210,15 @@ def tagged_attempt(folder: Path, method: str, tags: tuple[str, ...]) -> None:
     evidence = build["command_evidence"]
     assert set(evidence) == {"commands.json", *[f"command-{index}.{suffix}" for index in range(len(build["commands"]))
                                               for suffix in ("stdout", "stderr")]}
+    # Copied shrink attempts keep the original build paths in their records.
+    # Bind those names to that build root and check the complete identity
+    # against the retained bytes, including in a relocated evidence copy.
+    original = Path(build["plain"]["path"]).parent
+    assert original.is_absolute() and ".." not in original.parts
     for name, identity in evidence.items():
         raw = (folder / "go-build" / name).read_bytes()
-        assert identity == {"size": len(raw), "sha256": hashlib.sha256(raw).hexdigest()}
+        assert identity == {"path": str(original / name), "resolved_path": str(original / name),
+                            "size": len(raw), "sha256": hashlib.sha256(raw).hexdigest()}
 
 
 def check_report(path: Path, expected_cases: int = 9, *, backend: str = "legacy", build_tags: tuple[str, ...] = ()) -> int:

@@ -3,6 +3,7 @@ import copy
 import hashlib
 import json
 from pathlib import Path
+import shutil
 import sys
 import tempfile
 import tomllib
@@ -59,16 +60,21 @@ class GoReceiverQualificationTests(unittest.TestCase):
             for name in ("commands.json", "command-0.stdout", "command-0.stderr", "command-1.stdout", "command-1.stderr"):
                 raw = b"literal compiler evidence"
                 (build / name).write_bytes(raw)
-                evidence[name] = {"size": len(raw), "sha256": hashlib.sha256(raw).hexdigest()}
-            receipt = {"schema_version": 5, "build_tags": list(tags), "commands": commands, "command_evidence": evidence}
+                evidence[name] = {"path": str(build / name), "resolved_path": str(build / name),
+                                  "size": len(raw), "sha256": hashlib.sha256(raw).hexdigest()}
+            receipt = {"schema_version": 5, "build_tags": list(tags), "commands": commands,
+                       "command_evidence": evidence, "plain": {"path": str(build / "plain")}}
             inventory = {"schema_version": 2, "build_tags": list(tags), "compiler_inputs": {"counter/api.go": "source"}}
             def publish():
                 (build / "build.json").write_text(json.dumps(receipt))
                 (build / "inspection/inventory.json").write_text(json.dumps(inventory))
             publish()
             qualifier.tagged_attempt(folder, "Read", tags)
+            copied = folder / "copied"
+            shutil.copytree(build, copied / "go-build")
+            qualifier.tagged_attempt(copied, "Read", tags)
             original = copy.deepcopy(receipt), copy.deepcopy(inventory)
-            for change in ("build", "tags", "inspection", "active", "flag", "log", "pin"):
+            for change in ("build", "tags", "inspection", "active", "flag", "log", "pin", "path", "resolved"):
                 receipt, inventory = copy.deepcopy(original)
                 if change == "build": receipt["schema_version"] = 4
                 elif change == "tags": receipt["build_tags"] = ["tools"]
@@ -76,7 +82,8 @@ class GoReceiverQualificationTests(unittest.TestCase):
                 elif change == "active": inventory["compiler_inputs"]["counter/default.go"] = "source"
                 elif change == "flag": receipt["commands"][-1]["argv"].pop()
                 elif change == "log": (build / "command-0.stderr").write_bytes(b"changed")
-                else: pin.write_text("//go:build tools\n")
+                elif change == "pin": pin.write_text("//go:build tools\n")
+                else: receipt["command_evidence"]["commands.json"]["path" if change == "path" else "resolved_path"] = "/other/commands.json"
                 publish()
                 with self.subTest(change=change), self.assertRaises(AssertionError):
                     qualifier.tagged_attempt(folder, "Read", tags)
