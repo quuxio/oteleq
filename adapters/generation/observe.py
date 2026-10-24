@@ -1,16 +1,23 @@
 """MIT-licensed generated Python graph observer. Never compare arbitrary repr output."""
 import struct
 import sys
+from importlib.machinery import SourceFileLoader
 from pathlib import Path
 from types import CodeType, FunctionType, GetSetDescriptorType, MemberDescriptorType, MethodType, ModuleType
 MISSING = object()
 
 
-def function_code(source: Path, name: str, line: int) -> CodeType:
-    """Compile without execution before import to freeze the selected body."""
+def function_code(source: Path, name: str, line: int, *, cached: bool = False) -> CodeType:
+    """Freeze the selected body before import, without executing its module."""
     source = source.resolve(strict=True)
-    compiled = compile(source.read_bytes(), str(source), "exec", dont_inherit=True,
-                       optimize=sys.flags.optimize)
+    if cached:
+        if not sys.dont_write_bytecode:
+            raise ValueError("cache-aware binding requires disabled bytecode writes")
+        # Preserve the ordinary loader's cache decision, including unchecked hashes.
+        compiled = SourceFileLoader('_oteleq_expected', str(source)).get_code('_oteleq_expected')
+    else:
+        compiled = compile(source.read_bytes(), str(source), "exec", dont_inherit=True,
+                           optimize=sys.flags.optimize)
     pending, matches = [compiled], []
     while pending:
         code = pending.pop()

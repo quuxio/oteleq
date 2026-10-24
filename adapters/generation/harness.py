@@ -19,6 +19,7 @@ import node_project
 import java_receivers
 import java_actions
 import python_project
+from python_provider import cached as cached_python
 import preconditions
 import sequences
 
@@ -397,6 +398,7 @@ def global_gaps(entry):
 
 def python_driver(entry, args):
     globals_ = [g["name"] for g in entry["globals"]]
+    code_options = ", cached=True" if cached_python(entry) else ""
     loader = python_project.loader(entry["python_import"]) if "python_import" in entry else '''sys.path.insert(0, str(target.parent))
 spec = importlib.util.spec_from_file_location("_oteleq_target", target)
 module = importlib.util.module_from_spec(spec)
@@ -406,7 +408,7 @@ spec.loader.exec_module(module)
     setup, binding, receiver_root = "", f"function = bound_function(module, {entry['name']!r}, expected_code)", ""
     if "receiver_fixture" in entry:
         fixture = entry["receiver_fixture"]
-        setup = (f"expected_factory = function_code(target, {fixture['source_function']!r}, {fixture['line']!r})"
+        setup = (f"expected_factory = function_code(target, {fixture['source_function']!r}, {fixture['line']!r}{code_options})"
                  if fixture["source_function"] else "expected_factory = None")
         binding = f"receiver, function = bound_receiver(module, {entry['python_receiver_class']!r}, {entry['name'].rsplit('.', 1)[-1]!r}, expected_code, {fixture!r}, expected_factory)\nreceiver_class = type(receiver)"
         names = [item["name"] for item in entry.get("python_class_roots", [])]
@@ -419,7 +421,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 from _oteleq_observe import graph, MISSING, function_code, bound_function, bound_receiver, class_members{imports}
 target = Path({entry['path']!r}).resolve()
-expected_code = function_code(target, {entry['name']!r}, {entry['line']!r})
+expected_code = function_code(target, {entry['name']!r}, {entry['line']!r}{code_options})
 {setup}
 {loader}
 arguments = {args!r}
