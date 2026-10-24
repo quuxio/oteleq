@@ -46,7 +46,7 @@ def helper(package: str, prefix: str, digest: str) -> bytes:
             f' {prefix}official "go.opentelemetry.io/otelc/pkg/runtime"\n'
             f' {prefix}owned "io.quux.otelc/go/runtime"\n)\n'
             f"var {prefix}Runtime = func()*{prefix}owned.Runtime {{\n"
-            f" value,err:={prefix}owned.FromEnvironment({prefix}official.GetSpanFromGLS,{prefix}official.DetachSpanFromGLS)\n"
+            f" value,err:={prefix}owned.FromEnvironment({prefix}official.ContextWithImplicitTelemetry,{prefix}official.DetachSpanFromGLS)\n"
             " if err!=nil{panic(err)}\n"
             f' if value.Config.SelectionSHA256!={json.dumps(digest)}{{panic("Go runtime differs from compiled selection")}}\n'
             " return value\n}()\n"

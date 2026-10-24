@@ -1,4 +1,4 @@
-"""Bind source-build3 products to caller-owned Go inputs and a fixed recipe."""
+"""Bind source-build4 products to caller-owned Go inputs and a fixed recipe."""
 
 from dataclasses import dataclass
 import os
@@ -241,7 +241,7 @@ def selected(value: object, intent: Intent, inventory: dict) -> dict:
 
 
 def read(intent: Intent) -> Build:
-    """Check one completed source-build3 without compiler or application execution."""
+    """Check one completed source-build4 without compiler or application execution."""
     validate_intent(intent)
     original_caller = data_seal(caller_state(intent))
     output = intent.directory
@@ -249,7 +249,7 @@ def read(intent: Intent) -> Build:
         snapshot.verify()
     receipt, identity = files.read(output / "build.json")
     receipt = fields(receipt, FIELDS, "receipt")
-    require(type(receipt["schema_version"]) is int and receipt["schema_version"] == 3
+    require(type(receipt["schema_version"]) is int and receipt["schema_version"] == 4
             and same(receipt["runtime_protocols"], {"config": 2, "health": 4})
             and receipt["kind"] == "otelc.go-source-build" and receipt["source_complete"] is False
             and receipt["root"] == str(intent.original.root) and receipt["target"] == intent.target,

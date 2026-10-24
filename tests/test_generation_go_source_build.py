@@ -1,4 +1,4 @@
-"""Source-build3 readers preserve caller inputs and never execute saved commands."""
+"""Source-build4 readers preserve caller inputs and never execute saved commands."""
 
 import copy
 from dataclasses import replace
@@ -73,7 +73,7 @@ def fixture(base: Path) -> tuple:
         (output / f"command-{index}.stderr").write_bytes(b"")
     write(output / "command-10.stdout", settings)
     write(output / "inspection/inventory.json", inventory)
-    receipt = {"schema_version": 3, "kind": "otelc.go-source-build", "root": str(original), "target": ".",
+    receipt = {"schema_version": 4, "kind": "otelc.go-source-build", "root": str(original), "target": ".",
         "runtime_protocols": {"config": 2, "health": 4},
         "selection": selection, "inputs": intent.original.identities,
         "sdk_inputs": files.freeze(output / "sdk").identities,
@@ -113,7 +113,7 @@ class GoSourceBuildTests(unittest.TestCase):
 
     def test_malformed_identity_tool_or_command_cannot_select_another_program(self):
         original = copy.deepcopy(self.receipt)
-        for key, value in (("schema_version", True), ("schema_version", 2), ("kind", "legacy"),
+        for key, value in (("schema_version", True), ("schema_version", 2), ("schema_version", 3), ("kind", "legacy"),
                 ("runtime_protocols", {"config": 1, "health": 3}), ("runtime_protocols", {"config": 2.0, "health": 4}),
                 ("root", "/another"), ("target", "./other"), ("source_complete", 0),
                 ("toolchain", {**self.intent.toolchain, "go": "/never-read-or-executed"}),

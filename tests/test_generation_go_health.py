@@ -68,10 +68,10 @@ class GoProviderHealthTests(unittest.TestCase):
 
     def test_protocol_descriptor_is_closed_and_never_coerces_numbers_or_flags(self):
         descriptor = {"schema_version": 1, "kind": "otelc.go.protocols", "profile": "go-source-v1",
-            "build": 3, "config": 2, "request": 1, "plan": 1, "prepared": 1, "command": 1,
+            "build": 4, "config": 2, "request": 1, "plan": 1, "prepared": 1, "command": 1,
             "execution": 1, "health": 4, "embedded_sdk": True, "source_complete": False}
         self.assertEqual(provider.verify_protocols(descriptor), descriptor)
-        for key, values in {"schema_version": [True, 1.0], "build": [2, 3.0], "config": [1, 2.0], "request": [True, 2],
+        for key, values in {"schema_version": [True, 1.0], "build": [2, 3, 4.0], "config": [1, 2.0], "request": [True, 2],
                 "profile": ["legacy", None], "health": [3, 4.0], "embedded_sdk": [1, False],
                 "source_complete": [0, True]}.items():
             for value in values:
