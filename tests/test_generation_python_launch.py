@@ -16,6 +16,7 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(REPO / 'adapters/generation'), str(REPO / 'examples')]
 import generation
 import python_launch as launch
+import python_telemetry
 import qualify_python_generated_origins as qualifier
 from test_generation_python_execution import VERSION, fixture
 from test_generation_python_provider import response
@@ -55,6 +56,24 @@ def wire_run(root: Path, *, plain: bool = False) -> tuple:
 
 
 class PythonLaunchTests(unittest.TestCase):
+    def test_retained_receipts_normalise_code_keys_and_preserve_integer_value_types(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / 'receipt.json'
+            value = {'code_calls': {1: 3, 2: 4, 10: 9}, 'code_errors': {1: 0, 2: 0, 10: 1}}
+            generation.write(path, value)
+            before = path.read_bytes()
+            qualifier.compare_receipt(path, value)
+            self.assertEqual(path.read_bytes(), before)
+            self.assertEqual(generation.read(path)['code_calls'], {'1': 3, '2': 4, '10': 9})
+            for changed in ({**value, 'code_calls': {1: 2, 2: 4, 10: 9}},
+                            {**value, 'code_errors': {1: False, 2: 0, 10: 1}},
+                            {**value, 'code_calls': {1: 3, 2: 4, 11: 9}}, {'code_calls': value['code_calls']}):
+                generation.write(path, changed)
+                with self.subTest(changed=changed), self.assertRaises(AssertionError):
+                    qualifier.compare_receipt(path, value)
+            with self.assertRaises(ValueError):
+                qualifier.compare_receipt(path, {'code_calls': {1: 2, '1': 3}})
+
     def test_qualifier_observes_native_argv0_instead_of_its_own_launch_spelling(self):
         with patch.dict(qualifier.os.environ, {'PATH': 'tools', 'PYTHONPATH': 'hook', 'GH_TOKEN': 'fake'}, clear=True), \
              patch.object(qualifier.subprocess, 'run', return_value=SimpleNamespace(stdout=interpreter_response())) as run:
@@ -193,7 +212,7 @@ class PythonLaunchTests(unittest.TestCase):
             value = {'received': {'spans': 1}, 'functions': {'entry.workload': 1}}
             health = {'runtime_losses': {'incomplete': 0}, 'pending': 0}
             bodies = [('/v1/traces', traces().SerializeToString())]
-            with patch.object(launch.python_telemetry, 'decode', return_value=value), \
+            with patch.object(python_telemetry, 'decode', return_value=value), \
                  patch.object(launch.python_health, 'read', return_value=health) as read:
                 result = launch.witness(generation, run, (object(), {1: 'entry.workload'}), folder,
                                          entry(), bodies, 'case', ExportTraceServiceRequest)
@@ -226,7 +245,7 @@ class PythonLaunchTests(unittest.TestCase):
             factory.name = 'entry.make_counter'; factory.span_id = b'f' * 8
             factory.trace_id = b'c' * 16; factory.start_time_unix_nano = 1; factory.end_time_unix_nano = 2
             value = {'received': {'spans': 2}, 'functions': {'entry.workload': 1, 'entry.make_counter': 1}}
-            with patch.object(launch.python_telemetry, 'decode', return_value=value), \
+            with patch.object(python_telemetry, 'decode', return_value=value), \
                  patch.object(launch.python_health, 'read', return_value={'runtime_losses': {}, 'pending': 0}):
                 def witness():
                     return launch.witness(generation, run, (object(), {}), folder, chosen,

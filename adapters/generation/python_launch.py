@@ -15,7 +15,6 @@ import python_inputs
 import python_prepared as prepared
 import python_provider as provider
 import python_selection as selection
-import python_telemetry
 import sequences
 
 LAUNCH_FILE = "python-launch.json"
@@ -146,6 +145,7 @@ def witness(workflow, run: Run, checked: tuple, folder: Path, entry: dict,
             bodies: list, service: str, trace_decoder) -> dict:
     """Join real decoded function totals and direct SDK health to the selection."""
     from opentelemetry.proto.collector.metrics.v1.metrics_service_pb2 import ExportMetricsServiceRequest
+    import python_telemetry
 
     execution, functions = checked
     received = python_telemetry.decode(bodies, execution, service, functions,

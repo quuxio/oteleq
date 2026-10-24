@@ -95,6 +95,12 @@ def expected_selection(folder: Path, entry: dict) -> tuple:
     return facts, tuple(selected)
 
 
+def compare_receipt(path: Path, value: dict) -> None:
+    """Compare JSON documents with strict value types and normalised object keys."""
+    normalised = generation.capture.strict_json(json.dumps(value, allow_nan=False))
+    assert python_provider.same(generation.read(path), normalised), str(path)
+
+
 def recheck_attempt(folder: Path, entry: dict, provider: Path, catalogue: dict, interpreter: dict) -> dict:
     """Recompute source, owner, both signals and final health without new apps."""
     from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceRequest
@@ -125,8 +131,6 @@ def recheck_attempt(folder: Path, entry: dict, provider: Path, catalogue: dict, 
     verified = generation.read(folder / 'python-verified-origins.json')
     run = python_launch.Run(intent, generation.read(folder / python_launch.LAUNCH_FILE), selected,
                             verified['expected_sha256'], facts['parent_pid'])
-    def compare_receipt(path, value):
-        assert generation.read(path) == value, str(path)
     readonly = SimpleNamespace(read=generation.read, write=compare_receipt)
     result = subprocess.CompletedProcess([], 0)
     checked = python_launch.verify(readonly, run, entry, folder, result, catalogue)
