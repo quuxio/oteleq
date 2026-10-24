@@ -18,6 +18,8 @@ Rebuilt [Python prepared execution](python-prepared-provider.md) now connects an
 
 The separate [Python cached-loader profile](python-cache-context.md) has [488-launch diagnostic qualification](qualification/python-generated-caches-2026-10-24.json) across Python 3.12/3.14, with 244 SDK processes, 96 reports and 124 independently recomputed comparisons. Ordinary cache/source-fallback decisions, declared receivers/factories, file/HTTP effects and generated/replayed/framework/detached/reduced/promoted routes preserve source/cache bytes and file facts. The 496 retained observations include 8 copied originals. Explicit cache-read binding does not establish compilation of current source; broader capabilities and the full completion checklist remain open.
 
+Go has independent [rebuilt-provider components](go-prepared-provider.md), including a compiler-only materialised-caller frontend. It rebinds generated target/factory declarations and active source/embed/package denominators before SDK compilation, preserves compiler/export-data identities and supplies those independent expectations to build readers. This advances consumer integration; the public source-v1 generation, retained workflows, receiver/live controls and broader Go build requirements remain open.
+
 | Requirement | Current evidence and remaining work |
 | --- | --- |
 | Source-wide callable accounting in all eight languages | Syntax inventories exist. [Incomplete directory inspection](input-inspection.md) now refuses unreadable or vanished inputs rather than silently omitting them. Semantic/build inclusion, generic instances, inherited/private access and dependencies need project-aware adapters. |

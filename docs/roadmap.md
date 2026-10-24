@@ -76,6 +76,8 @@ Acceptance includes factories/interfaces, constructor/exception identity, module
 
 Explicit [Go module roots](go-package-context.md) now provide active package/type discovery, private library/main callers, sibling scalar state and fixed build tags. [Declared Go receiver fixtures](go-receivers.md) add source-bound private struct/array slots, pointer cycles/interior aliases and primitive panics; its [actual-provider corpus](qualification/go-receivers-2026-10-20.json) completes 168 launches. Broader Go fixtures, fuzz bridges and cgo/workspace recipes remain open.
 
+The rebuilt [Go consumer components](go-prepared-provider.md) include separate build4/config2/health4 readers and independently reconstructed context. The materialised-caller frontend uses the selected compiler and consumer type inventory to bind generated main/library/receiver declarations and complete active module source/embed inputs before SDK builds. It does not enable public source-v1 generation; execution, direct telemetry and retained/live qualification still need that integration.
+
 Deliver Go package/type discovery, private same-package tests and fuzz-to-typed-corpus bridges, plus Rust Cargo/type-aware discovery, external/private harnesses and proptest integration. Their ownership, panic, package/global state and build-variant contracts have independent qualifications.
 
 Acceptance includes unchanged module/manifests/locks, unexported/private access limits, explicit generic instances, panic/defer/recover or unwind/drop scenarios, supported goroutine/async fixtures and witnessed otelc overlay/compiler-wrapper execution. No unsafe fabricated fixtures or unsupported backend substitutions.
