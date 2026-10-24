@@ -169,6 +169,11 @@ generation-check: node-observer-check node-sequence-check node-source-context-ch
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/python_health.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/python_telemetry.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/python_launch.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/live_control.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/python_control.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/python_control_receipt.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/python_live.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/python_checkpoint.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/node_source_worker.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/node_source_context.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/node_launch.py' --fail-under=80

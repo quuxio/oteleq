@@ -226,7 +226,7 @@ def check_exemplars(exemplars: list, bindings: dict) -> None:
 
 
 def decode(bodies: list, execution: python_execution.Execution, service: str, functions: dict,
-           trace_decoder, metric_decoder) -> dict:
+           trace_decoder, metric_decoder, *, measured: tuple | None = None) -> dict:
     """Reconcile both signals with all captured selected code identities."""
     require(type(execution) is python_execution.Execution and python_execution.pid(execution.sdk_pid)
             and type(service) is str and bool(service) and type(functions) is dict and bool(functions)
@@ -234,6 +234,7 @@ def decode(bodies: list, execution: python_execution.Execution, service: str, fu
             and set(functions) == {value.record.identity for value in execution.descriptors},
             "Python telemetry lacks actual execution/code identities")
     nodes, bindings, calls, errors, observed, exemplars = {}, {}, Counter(), Counter(), {}, []
+    error_nodes = set()
     counts = {"trace_batches": 0, "spans": 0, "metric_batches": 0, "metric_points": 0}
     for route, body in bodies:
         require(route in (capture.TRACE_PATH, "/v1/metrics") and type(body) is bytes and bool(body), "unknown or empty Python OTLP body")
@@ -248,15 +249,32 @@ def decode(bodies: list, execution: python_execution.Execution, service: str, fu
         for group in groups:
             if traces:
                 trace_group(group, execution, service, functions, nodes, bindings, calls, errors)
+                error_nodes.update(capture.span_identity(span) for scope in group.scope_spans
+                                   for span in scope.spans if span.status.code == 2)
             else:
                 counts["metric_points"] += metric_group(group, execution, service, functions, observed, exemplars)
     roots = capture.trace_roots(nodes)
-    check_exemplars(exemplars, bindings)
+    metric_calls, metric_errors, chosen = calls, errors, bindings
+    if measured is not None:
+        require(type(measured) is tuple and len(measured) == 3, "invalid controlled Python measurement scope")
+        metric_calls, metric_errors, chosen = measured
+        require(isinstance(metric_calls, dict) and isinstance(metric_errors, dict) and type(chosen) is dict
+                and bool(metric_calls) and all(type(code) is int and code in functions
+                    and type(count) is int and 0 < count <= calls[code] for code, count in metric_calls.items())
+                and set(metric_errors) <= set(metric_calls)
+                and all(type(code) is int and type(count) is int and 0 <= count <= min(metric_calls[code], errors[code])
+                        for code, count in metric_errors.items())
+                and all(key in bindings and type(code) is int and bindings[key] == code for key, code in chosen.items())
+                and Counter(chosen.values()) == metric_calls
+                and metric_errors == Counter(bindings[key] for key in chosen if key in error_nodes),
+                "controlled Python metrics lack selected collected spans")
+    check_exemplars(exemplars, chosen)
     totals = cumulative(observed)
     require(set(calls) == set(functions) and roots > 0 and counts["metric_batches"] > 0,
             "Python selected code or positive signal receipt is missing")
-    expected = {(name, code): calls[code] for name in (CALLS, DURATION) for code in functions}
-    expected.update({(EXCEPTIONS, code): errors[code] for code in functions if errors[code] or (EXCEPTIONS, code) in totals})
+    expected = {(name, code): metric_calls[code] for name in (CALLS, DURATION) for code in metric_calls}
+    expected.update({(EXCEPTIONS, code): metric_errors.get(code, 0) for code in metric_calls
+                     if metric_errors.get(code, 0) or (EXCEPTIONS, code) in totals})
     require(totals == expected, "Python decoded metric totals differ from actual traced functions")
     counts["spans"] = sum(calls.values())
     return {"received": counts, "code_calls": dict(calls), "code_errors": dict(errors), "roots": roots,

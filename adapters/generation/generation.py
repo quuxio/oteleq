@@ -54,6 +54,8 @@ import python_provider
 import python_cache
 import python_inputs
 import python_launch
+import python_live
+import python_control_receipt
 import python_prepared
 import shrinking
 import sequences
@@ -709,9 +711,11 @@ def generator_identity():
         'owned_workspace.py', 'preconditions.py', 'project_tests.py', 'project_runner.py',
         'python_provider.py', 'python_inputs.py', 'python_prepared.py', 'python_journal.py',
         'python_code.py', 'python_code_match.py', 'python_origin.py', 'python_selection.py', 'python_cache.py',
-        'python_execution.py', 'python_health.py', 'python_telemetry.py', 'python_launch.py')})
+        'python_execution.py', 'python_health.py', 'python_telemetry.py', 'python_launch.py',
+        'live_control.py', 'python_control.py', 'python_live.py', 'python_control_receipt.py', 'python_checkpoint.py')})
     files["host-python"] = capture.file_digest(Path(sys.executable))
     files["observer:otelc_capture.py"] = capture.file_digest(Path(capture.__file__))
+    files["observer:otelc_collection.py"] = capture.file_digest(Path(otelc_collection.__file__))
     files["host-version"] = sys.version
     files.update(decoder_files())
     return identity(files)
@@ -1024,7 +1028,7 @@ def baseline_receipt(entry, folder, bodies):
     if sequences.controls(entry):
         if node_source.enabled(entry):
             node_control_receipt.read(folder, entry, bodies, plain=True)
-        else:
+        elif entry["language"] != "python":
             java_control_receipt.read(folder, entry, read(folder / "process.json")["pid"], bodies, plain=True)
 
 
@@ -1050,6 +1054,9 @@ def qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, 
                                                bodies, service=service, trace_decoder=decoder)
     elif lane == "baseline":
         baseline_receipt(entry, folder, bodies)
+        if python_provider.origin(entry) and sequences.controls(entry):
+            run, (execution, _) = python_runtime
+            python_control_receipt.read(folder, entry, execution, run.intent.policy, bodies, plain=True)
     elif python_provider.enabled(entry):
         run, checked = python_runtime
         witness = python_launch.witness(sys.modules[__name__], run, checked, folder, entry, bodies, service, decoder)
@@ -1152,10 +1159,13 @@ def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, ht
         env["NODE_OPTIONS"] = "--expose-gc"
         write(folder / "collection-controls.json", {"NODE_OPTIONS": "--expose-gc", "sequence": case["sequence"]})
     immutable = manifest(project)
-    python_run = None
+    python_run = python_session = None
     java_context = java_project.materialise(workspace, data, folder, project) if language == "java" else None
     receiver_options = attempt_receiver_options(entry, runtime)
     with retained_receiver(folder, receiver_options) as (endpoint, bodies, errors):
+        if python_provider.origin(entry) and sequences.controls(entry):
+            python_session = python_live.Session(folder, case["sequence"], bodies, plain=lane == "baseline")
+            env.update(python_session.environment())
         config = folder / "policy.toml"
         config.write_text(attempt_policy(entry, endpoint, service, runtime))
         if language == "typescript" and not node_source.enabled(entry):
@@ -1171,6 +1181,8 @@ def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, ht
                                                tools, env, folder, config, lane, data["artefacts"][language],
                                                **({'caches': cache_inputs} if cache_inputs is not None else {}))
             command = python_prepared.expected_command(python_run.intent)
+            if python_session is not None:
+                python_session.bind(python_run.intent, python_run.launch)
         else:
             options = attempt_build_options(runtime, java_context)
             command = build_command(root, project, entry, driver, config, tools, env, folder, scratch, lane, **options)
@@ -1187,7 +1199,8 @@ def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, ht
             env.update(bindings)
             write(folder / "http-controls.json", {"declarations": http_effects.selected(data["configuration"]), "environment": bindings})
         with http_effects.observe(http_fixtures, folder, data["configuration"]["limits"]["max_capture_bytes"]) as requests:
-            options = execution_options(entry, case, lane, folder, runtime, bodies, env, service=service)
+            options = execution_options(entry, case, lane, folder, runtime, bodies, env, service=service,
+                                        **({"python_session": python_session} if python_session is not None else {}))
             with java_action_run.retained(options):
                 result = execute(command, working_directory, env, folder, timeout=data["configuration"]["limits"]["case_timeout_ms"] / 1000,
                                  **options)
@@ -1207,14 +1220,18 @@ def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, ht
                            python_runtime=python_checked, **action_options)
 
 
-def execution_options(entry, case, lane, folder, runtime, bodies, env, *, service=None):
+def execution_options(entry, case, lane, folder, runtime, bodies, env, *, service=None, python_session=None):
     """Add only explicitly requested process recording and live host checkpoints."""
     options = {"record_process": True} if runtime is not None or node_source.enabled(entry) or python_provider.origin(entry) else {}
     if sequences.controls(entry):
-        interaction = (node_live.Session(folder, case["sequence"], bodies, language=entry["language"], plain=lane == "baseline")
-                       if node_source.enabled(entry)
-                       else java_live.Session(folder, runtime, case["sequence"], bodies, plain=lane == "baseline",
-                                              service=service, method=entry["otelc_function"].split("(", 1)[0].rsplit(".", 1)[-1]))
+        if python_provider.origin(entry):
+            python_provider.require(isinstance(python_session, python_live.Session), "missing prepared Python live session")
+            interaction = python_session
+        else:
+            interaction = (node_live.Session(folder, case["sequence"], bodies, language=entry["language"], plain=lane == "baseline")
+                           if node_source.enabled(entry)
+                           else java_live.Session(folder, runtime, case["sequence"], bodies, plain=lane == "baseline",
+                                                  service=service, method=entry["otelc_function"].split("(", 1)[0].rsplit(".", 1)[-1]))
         env.update(interaction.environment())
         options["interaction"] = interaction
     if java_actions.enabled(entry):

@@ -6,6 +6,7 @@ import hashlib
 from pathlib import Path
 
 from java_live import metric_bodies, read_owned
+from otelc_collection import serial_trees as trees
 import node_control as control
 import node_live
 import node_source as provider
@@ -139,30 +140,6 @@ def history(rows: list, record: dict, requested: dict, completed: int) -> int:
         previous = current
     status(previous, record, completed, requested)
     return len(rows)
-
-
-def trees(spans: list) -> list[list]:
-    """Complete nonoverlapping serial trees supply counts, not invocation cookies."""
-    nodes = {capture.span_identity(span): span for span in spans}
-    provider.require(len(nodes) == len(spans), "duplicate live Node span")
-    capture.trace_roots({key: (span.trace_id, span.parent_span_id) if span.parent_span_id else None
-                         for key, span in nodes.items()})
-    roots = sorted((key for key, span in nodes.items() if not span.parent_span_id),
-                   key=lambda key: (nodes[key].start_time_unix_nano, nodes[key].end_time_unix_nano))
-    provider.require(all(nodes[left].end_time_unix_nano <= nodes[right].start_time_unix_nano
-                         and (nodes[left].start_time_unix_nano, nodes[left].end_time_unix_nano)
-                         != (nodes[right].start_time_unix_nano, nodes[right].end_time_unix_nano)
-                         for left, right in zip(roots, roots[1:])), "live Node root order is ambiguous or overlapping")
-    grouped = {root: [] for root in roots}
-    for key, span in nodes.items():
-        root = key
-        while nodes[root].parent_span_id:
-            root = (nodes[root].trace_id, nodes[root].parent_span_id)
-        parent = nodes[root]
-        provider.require(parent.start_time_unix_nano <= span.start_time_unix_nano <= span.end_time_unix_nano <= parent.end_time_unix_nano,
-                         "live Node child span escapes its call tree")
-        grouped[root].append(span)
-    return [grouped[root] for root in roots]
 
 
 def phase(indices: list[int], series: dict, totals: Counter, unwinds: Counter, *, required: bool) -> None:

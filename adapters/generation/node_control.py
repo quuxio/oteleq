@@ -1,18 +1,12 @@
 """Independent bounded client for the source Node SDK's live metric endpoint."""
 
-import hashlib
-import json
-import os
 from pathlib import Path
 import re
-import socket
-import stat
 import time
 from typing import cast
 
-from java_live import read_owned
 import node_source as provider
-from otelc_capture import strict_json
+from live_control import endpoint, exchange
 
 COMMANDS = {"status", "flush", "collection on", "collection off", "emission on", "emission off"}
 MAX_REPLY = 4096
@@ -55,46 +49,10 @@ def status(value: object, pid: int) -> dict:
     return value
 
 
-def endpoint(path: Path, pid: int) -> tuple[dict, tuple[int, int, str]]:
-    """Read fixed private metadata without retaining or logging authentication bytes."""
-    parent = path.parent.lstat()
-    provider.require(path.name == CONTROL_FILE and path.parent.resolve(strict=True) == path.parent
-                     and stat.S_ISDIR(parent.st_mode) and parent.st_uid == os.getuid()
-                     and stat.S_IMODE(parent.st_mode) == 0o700, "unsafe Node control runtime")
-    before = path.lstat()
-    raw = read_owned(path, MAX_REPLY)
-    after = path.lstat()
-    provider.require((before.st_dev, before.st_ino) == (after.st_dev, after.st_ino), "live endpoint was replaced while reading")
-    value = strict_json(raw)
-    provider.require(type(value) is dict and set(value) == {"schema_version", "kind", "host", "port", "pid", "token"}
-                     and type(value["schema_version"]) is int and value["schema_version"] == 1
-                     and value["kind"] == "otelc.control.tcp" and value["host"] == "127.0.0.1"
-                     and type(value["port"]) is int and 1 <= value["port"] <= 65535
-                     and type(value["pid"]) is int and value["pid"] == pid
-                     and type(value["token"]) is str and re.fullmatch("[a-f0-9]{64}", value["token"]),
-                     "invalid private Node control descriptor")
-    return value, (after.st_dev, after.st_ino, hashlib.sha256(raw).hexdigest())
-
-
 def request(path: Path, command: str, pid: int, deadline: float) -> dict:
-    """Use one authenticated loopback frame within the common case deadline."""
+    """Validate the Node reply after the shared bounded control transport."""
     provider.require(command in COMMANDS, "unsupported live Node control command")
-    descriptor, identity = endpoint(path, pid)
-    remaining = min(3., deadline - time.monotonic())
-    provider.require(remaining > 0, "live control deadline exceeded")
-    with socket.create_connection(("127.0.0.1", descriptor["port"]), timeout=remaining) as client:
-        client.sendall(json.dumps({"token": descriptor["token"], "command": command}).encode("ascii") + b"\n")
-        data = bytearray()
-        while not data.endswith(b"\n"):
-            remaining = min(3., deadline - time.monotonic())
-            provider.require(remaining > 0, "live control deadline exceeded")
-            client.settimeout(remaining)
-            chunk = client.recv(MAX_REPLY + 1 - len(data))
-            provider.require(chunk and len(data) + len(chunk) <= MAX_REPLY, "incomplete or oversized live control frame")
-            data.extend(chunk)
-        provider.require(data.count(b"\n") == 1 and endpoint(path, pid)[1] == identity,
-                         "extra live control frames or replaced endpoint")
-    return status(strict_json(bytes(data)), pid)
+    return status(exchange(path, command, pid, deadline), pid)
 
 
 def switch(path: Path, pid: int, requested: dict, deadline: float) -> list[dict]:

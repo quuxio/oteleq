@@ -437,11 +437,16 @@ def python_execution(entry: dict, arguments: list) -> str:
         schedule = sequences.concrete(entry, arguments, concrete_arguments)
         binding = (f"bound_method(module, {entry['python_receiver_class']!r}, "
                    f"{entry['name'].rsplit('.', 1)[-1]!r}, receiver, expected_code, receiver_class)")
-        return f'''observations = []
+        controls = sequences.controls(entry)
+        setup = "from _oteleq_checkpoint import checkpoint as _oteleq_checkpoint\n" if controls else ""
+        before = '    _oteleq_checkpoint("before-" + step["id"].removeprefix("step-"))\n' if controls else ""
+        after = '    _oteleq_checkpoint("after-" + step["id"].removeprefix("step-"))\n' if controls else ""
+        finish = '_oteleq_checkpoint("finish")\n' if controls else ""
+        return f'''{setup}observations = []
 for step in {schedule!r}:
     arguments = step["arguments"]
     function = {binding}
-    before = graph(roots())
+{before}    before = graph(roots())
     try:
         result = function(*arguments)
     except Exception as error:
@@ -454,7 +459,7 @@ for step in {schedule!r}:
                          "before": before, "outcome": outcome, "after": after}})
     if outcome["kind"] == "return":
         del result
-capture = {{"before": observations[0]["before"],
+{after}{finish}capture = {{"before": observations[0]["before"],
            "outcome": observations[-1]["outcome"],
            "after": observations[-1]["after"], "steps": observations}}
 Path(os.environ["OTELEQ_OBSERVATION"]).write_text(json.dumps(capture, sort_keys=True))
@@ -798,6 +803,8 @@ def materialise(project, entry, args):
         driver = generated / "driver.py"
         driver.write_text(python_driver(entry, args))
         (generated / "_oteleq_observe.py").write_bytes(Path(__file__).with_name("observe.py").read_bytes())
+        if sequences.controls(entry):
+            (generated / "_oteleq_checkpoint.py").write_bytes(Path(__file__).with_name("python_checkpoint.py").read_bytes())
     elif language in ("c", "cpp"):
         driver = native_materialise(project, entry, args)
     elif language == "java":

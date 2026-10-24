@@ -85,6 +85,8 @@ Rebuilt Python [prepared execution](docs/python-prepared-provider.md) has an exp
 
 The explicit [Python cached-loader profile](docs/python-cache-context.md) preserves existing cache bytes and source timestamps through private and retained execution. Its separate [488-launch diagnostic qualification](docs/qualification/python-generated-caches-2026-10-24.json) covers ordinary cache/fallback decisions, receivers, effects and retained/promoted workflows on Python 3.12/3.14. A cache binding does not prove compilation of current source; the source-only record remains separate.
 
+Python [live metric schedules](docs/python-metric-controls.md) are an implementation candidate for explicit prepared origin/cache receiver calls. Initial Python 3.12 evidence checks five calls through all four metric states in unchanged processes; complete startup/profile/workflow qualification and delivery remain pending.
+
 The explicit [Java private-handle action profile](docs/java-action-witness.md#generated-private-handle-profile) connects generated callers, offline bindings, public preparation, host control, typed outcomes, decoded traces, function metrics and final SDK health. Its [160-JVM diagnostic qualification](docs/qualification/java-generated-actions-2026-10-24.json) covers the recorded safe/archive provider, retained workflows and four metric startup states. Broader Java build, object, asynchronous and shipping scope remains open. Default generated Java profiles retain their documented witness limits.
 
 ### Build
