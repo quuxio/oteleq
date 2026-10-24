@@ -1,0 +1,148 @@
+{
+  "qualification_schema_version": 1,
+  "date": "2026-10-24",
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "platform": {
+    "os": "macOS",
+    "architecture": "ARM64",
+    "go": "1.27.3",
+    "python": "3.12.15"
+  },
+  "runtime": {
+    "commit": "8c60ef5a50338c027ded467b42d7ea93d7b8f773",
+    "tree": "a90083bfaffc232a3beda17b04a5d6841ce5d5d4",
+    "source_archive_sha256": "f93388d6955326ac1a8be243af3005f809de2d39e268a5367255f8b797d8f484",
+    "cli_sha256": "e7a2e49e5bb38356c4e238a1a4718e5fe976a44fa7fb16801eca649a1a971f19",
+    "generator_sha256": "64c2c1c3f78d0698e8c5a51482dc33cac2f7320af8cc966cd48dd35bb29e7f89",
+    "provider_commit": "d2ec6bf9c7c73db9e9864f758c28cfd305ce0903",
+    "provider_tree": "3ecc6538e891645169d1078fec944b180fbbeed3",
+    "provider_source_archive_sha256": "0e554b3e40a2b45b697616a6bc758b64a3dc359e18dce9954e8cc3a6ee1a573d"
+  },
+  "profile": {
+    "backend": "source-v1",
+    "build": 4,
+    "config": 2,
+    "prepared_tools": 1,
+    "health": 4,
+    "request": 1,
+    "plan": 1,
+    "prepared": 1,
+    "command": 1,
+    "execution": 1,
+    "module_roots": "explicit",
+    "build_tags": [],
+    "context": {
+      "tasks": false,
+      "http": false
+    },
+    "lifetimes": false,
+    "collection": true,
+    "emission": true,
+    "traces": true,
+    "source_complete": false
+  },
+  "results": {
+    "case_experiments": 20,
+    "matching_experiments": 12,
+    "applications": 80,
+    "sdk_processes": 40,
+    "trace_batches": 40,
+    "metric_batches": 83,
+    "spans": 68,
+    "metric_points": 442,
+    "difference_experiments": 8,
+    "unique_launch_ids": 80,
+    "distinct_target_functions": 11,
+    "baseline_repeats": 2,
+    "instrumented_repeats": 2,
+    "prelaunch_probe_refusals": 2,
+    "source_preserved": true,
+    "pending": 0,
+    "reported_losses": 0,
+    "sdk_exported_metric_points": null,
+    "routes": {
+      "public_scalar": 4,
+      "public_receivers": 36,
+      "replay": 4,
+      "generated_framework": 4,
+      "detached_framework": 4,
+      "promoted_changed_and_added_source": 8,
+      "receiver_shrink_and_replay_export": 20
+    }
+  },
+  "observations": [
+    "literal scalar return/global state and unchanged raw output",
+    "private struct/array fields and named scalars",
+    "cycles, interior aliases and restored-pointer differences",
+    "value receiver/result copies and nil receivers",
+    "primitive panic and explicit expected-error acceptance",
+    "same-return instance, global and alias mutation differences",
+    "constructor completion before selected calls",
+    "actual native application/SDK identity distinct from the owned supervisor",
+    "direct final SDK health and locally decoded OTLP receipt",
+    "current-source body changes and discovery of an added library function",
+    "receiver scalar reduction from 3 to 0 with fresh final confirmation"
+  ],
+  "preservation": {
+    "provider_source_files": 493,
+    "consumer_source_files": 557,
+    "application_source": "unchanged in recorded run windows; promotion changes only its independent current-source fixture",
+    "tooling": [
+      "selected compiler",
+      "fixed installed weaver",
+      "pinned upstream bundle",
+      "fixed toolchain manifest"
+    ],
+    "dimensions": [
+      "bytes",
+      "device/inode",
+      "mode/owner",
+      "size",
+      "mtime/ctime"
+    ],
+    "scope": "Held separately before/after the recorded execution windows. Later documentation or test-driver changes do not broaden the qualified runtime."
+  },
+  "validation": {
+    "full_local_gate": {
+      "exit_code": 0,
+      "seconds": 668.266,
+      "source_files_held": 557,
+      "generation_tests": 1326,
+      "new_go_module_line_coverage_percent": 100,
+      "rust_product_line_coverage_percent": 97.38
+    },
+    "independent_review_sha256": "5f647a9419817145234f25b358994dd884ebd5fe0f3ec4bdc307cd7b58b1ae19",
+    "independent_additional_corpus": {
+      "applications": 12,
+      "sdk_processes": 6,
+      "scope": "Normal scalar/global result, primitive panic, explicit expected-error acceptance and unexpected-error refusal; separate from the eighty root launches."
+    }
+  },
+  "retained_evidence": {
+    "root": "2026-10-24/go-public",
+    "audit": "eighty-launch-audit.json",
+    "audit_sha256": "af877dd62a4ca1d2776ab4c32285a1e65dde796e51ff8715d18813d236c47834",
+    "stages": [
+      "scalar-development-05",
+      "receiver-development-01",
+      "retained-development-01",
+      "shrink-development-01"
+    ],
+    "driver_failures": "Original prelaunch tool-rebuild refusal, optional-import/environment/lane/witness integration failures, and qualification-driver usage/parsing failures remain separate retained evidence; successful later experiments do not relabel them."
+  },
+  "reproduction": {
+    "command": "make generation-go-source-otelc PYTHON=/absolute/path/to/python OTELC_ROOT=/absolute/path/to/prepared/otelc REPORT_DIR=/absolute/path/to/new-evidence",
+    "qualifier_commit": "57ba8a536eef33c04cd5bf2582edf4428083dd28",
+    "scope": "The maintained nine-receiver run covers generated/framework/exported/shrunk/replayed routes and copied-probe refusals. Its separate fresh execution is not counted in this eighty-launch record."
+  },
+  "remaining": [
+    "tagged build5 and other build recipes",
+    "moduleless, cgo and workspace source-provider builds",
+    "ordered/live metric, task/HTTP and lifetime/resource actions",
+    "general mutable arguments, imported state and richer fixture codecs",
+    "other host/platform/toolchain qualifications",
+    "production shipping artefacts and performance/resource budgets",
+    "full eight-language completion checklist"
+  ]
+}
