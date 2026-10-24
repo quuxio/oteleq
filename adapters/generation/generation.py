@@ -813,7 +813,9 @@ if __name__=="__main__":unittest.main()
         for name in entry.get("go_context", {}).get("files", [entry["path"]]):
             target = preview / name
             target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(workspace / "snapshot" / name, target)
+            # The cache loader validates source timestamps and permissions too.
+            copy_source = shutil.copy2 if python_provider.cached(entry) else shutil.copyfile
+            copy_source(workspace / "snapshot" / name, target)
         harness.materialise(preview, entry, case["arguments"])
     write(workspace / GENERATED_MANIFEST, manifest(destination))
     (workspace / README_FILE).write_text("Generated scalar diagnostic suite. Boilerplate: MIT; application snapshot retains its original licence.\nRun: OTELEQ_PYTHON=/path/to/otelc/.venv/bin/python python3 -I -B tests/test_equivalence.py\nOr: quux-oteleq run --workspace . --report-dir /new/external/report\nEvery blocked selected callable fails the generated strict suite. No shipping-artefact or universal equivalence claim.\nKeep this whole workspace, or export-tests to a new destination.\n")

@@ -1,6 +1,8 @@
 """Private cache copies retain the input and ordinary loader decision."""
 
 import copy
+from contextlib import redirect_stdout
+import io
 import os
 from pathlib import Path
 import py_compile
@@ -9,6 +11,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
@@ -26,6 +29,30 @@ class PythonCacheContextTests(unittest.TestCase):
         self.assertEqual(workflow.retained_provider_directories({}), [])
         self.assertEqual(workflow.retained_provider_directories({'python_cache_context_manifest': {}}),
                          [cache.DIRECTORY])
+
+    def test_generated_harness_keeps_source_metadata_before_attempt_cache_materialisation(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            source, workspace, data, compiled = self.fixture(root)
+            entry = {'id': 'workload', 'language': 'python', 'path': 'target.py',
+                     'name': 'workload', 'line': 1, 'globals': [], 'parameters': ['int'],
+                     'output': 'int', 'status': 'ready', 'input_cases': [[7]],
+                     'expected_baseline': {'kind': 'return'}, 'python_backend': 'prepared',
+                     'python_profile': 'python-native-cache-origins-v3'}
+            data.update(inventory=[entry], cases_per_function=1)
+            original = cache.selection.freeze(source / 'target.py')
+            with patch.object(workflow, 'load_workspace', return_value=(workspace, data)), \
+                    patch.dict(os.environ, {'OTELEQ_EXECUTABLE': '/unused/oteleq'}), redirect_stdout(io.StringIO()):
+                self.assertEqual(workflow.generate(SimpleNamespace(workspace=workspace)), 0)
+            project = root / 'private'
+            shutil.copytree(workspace / 'snapshot', project)
+            shutil.copytree(workspace / 'tests/harnesses/workload-0', project, dirs_exist_ok=True)
+            frozen = cache.materialise(workflow, workspace, data, project)
+            copied = cache.selection.freeze(project / 'target.py')
+            self.assertEqual((copied.content, copied.mode, copied.mtime_ns),
+                             (original.content, original.mode, original.mtime_ns))
+            self.assertEqual(frozen[0].content, compiled.read_bytes())
+            self.assertEqual(cache.selection.freeze(source / 'target.py'), original)
 
     def fixture(self, root: Path, *, mode=py_compile.PycInvalidationMode.TIMESTAMP, level=0):
         source, workspace = root / 'application', root / 'workspace'
