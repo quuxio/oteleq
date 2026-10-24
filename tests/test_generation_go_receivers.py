@@ -97,6 +97,21 @@ class GoReceiverTests(unittest.TestCase):
     def node(self, graph, reference):
         return graph["nodes"][int(reference["node_id"][1:])]["fields"]
 
+    def test_controlled_driver_uses_private_checkpoints_and_keeps_flags_out_of_observer_data(self):
+        entry = self.entry()
+        entry["go_backend"] = "source-v1"
+        entry["sequence_configuration"] = [{"action": "call", "arguments": "case",
+                                             "metrics": {"collection": True, "emission": True}}]
+        sequence = [{**entry["sequence_configuration"][0], "id": "step-0", "arguments": [3]}]
+        configuration = go_receivers.configuration(entry, [3], sequence)
+        self.assertEqual(set(configuration["sequence"][0]), {"id", "action", "arguments"})
+        driver = go_receivers.driver(entry, [3], SOURCE, sequence)
+        self.assertIn("__oteleq_observe.RunControlledSequence(", driver)
+        self.assertIn(",__oteleq_gate.Checkpoint,__oteleq_reflect.ValueOf(", driver)
+        entry["go_backend"] = "legacy"
+        with self.assertRaisesRegex(ValueError, "source-v1 host gate"):
+            go_receivers.driver(entry, [3], SOURCE, sequence)
+
     def test_private_fields_cycles_interior_aliases_and_exact_scalar_bits(self):
         before = generation.manifest(self.snapshot)
         entry = self.entry()

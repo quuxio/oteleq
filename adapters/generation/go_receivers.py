@@ -7,6 +7,7 @@ import struct
 from go_project import OBSERVER_DIRECTORY
 import go_project
 import go_rendezvous
+import sequences
 
 OBSERVER = Path(__file__).with_name("go_observe.go").read_text()
 
@@ -162,7 +163,7 @@ def configuration(entry: dict, arguments: list, sequence: list[dict] | None = No
         result["sequence"] = []
         for index, step in enumerate(sequence):
             require(step.get("id") == "step-" + str(index) and step.get("action") == "call"
-                    and set(step) <= {"id", "action", "arguments", "expected_baseline"},
+                    and set(step) <= {"id", "action", "arguments", "expected_baseline", "metrics"},
                     "sequence requires concrete call-only inputs")
             result["sequence"].append({"id": step["id"], "action": "call",
                                        "arguments": [scalar_input(value) for value in step["arguments"]]})
@@ -185,8 +186,10 @@ def driver(entry: dict, arguments: list, source: str, sequence: list[dict] | Non
     roots = ["__oteleq_observe.Bind(" + json.dumps("global:" + item["name"])
              + ",__oteleq_reflect.ValueOf(&" + item["name"] + "))" for item in entry["globals"]]
     encoded = json.dumps(json.dumps(configuration(entry, arguments, sequence), separators=(",", ":")))
-    runner = "RunSequence" if sequence is not None else "Run"
+    controlled = sequences.controls(entry)
+    require(not controlled or go_rendezvous.enabled(entry), "live receiver calls require the source-v1 host gate")
+    runner = "RunControlledSequence" if controlled else "RunSequence" if sequence is not None else "Run"
     return (source + '\nfunc ' + worker + '(){' + go_rendezvous.statement(entry)
-            + '__oteleq_observe.' + runner + '(' + encoded + ',__oteleq_reflect.ValueOf('
+            + '__oteleq_observe.' + runner + '(' + encoded + (',__oteleq_gate.Checkpoint' if controlled else '') + ',__oteleq_reflect.ValueOf('
             + fixture["factory"] + '),__oteleq_reflect.ValueOf(' + target + ')'
             + (',' + ','.join(roots) if roots else '') + ')}\n')

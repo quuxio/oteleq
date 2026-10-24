@@ -24,15 +24,21 @@ func gateEnvironment(t *testing.T) string {
 	return root
 }
 func gateTask() chan any {
+	return hostTask(AwaitHost)
+}
+func hostTask(call func()) chan any {
 	done := make(chan any, 1)
-	go func() { defer func() { done <- recover() }(); AwaitHost() }()
+	go func() { defer func() { done <- recover() }(); call() }()
 	return done
 }
 func waitGate(t *testing.T, root string, done chan any) {
+	waitHostPhase(t, root, "start", done)
+}
+func waitHostPhase(t *testing.T, root, phase string, done chan any) {
 	t.Helper()
 	end := time.Now().Add(2 * time.Second)
 	for {
-		if _, err := os.Stat(filepath.Join(root, "start.ready")); err == nil {
+		if _, err := os.Stat(filepath.Join(root, phase+".ready")); err == nil {
 			return
 		}
 		select {
@@ -58,16 +64,19 @@ func gateResult(t *testing.T, done chan any, wantFailure bool) {
 	}
 }
 func gateRelease(t *testing.T, root, message string, mode os.FileMode, linked bool) {
+	hostRelease(t, root, "start", message, mode, linked)
+}
+func hostRelease(t *testing.T, root, phase, message string, mode os.FileMode, linked bool) {
 	t.Helper()
-	temporary := filepath.Join(root, "start.resume.tmp")
+	temporary := filepath.Join(root, phase+".resume.tmp")
 	if err := os.WriteFile(temporary, []byte(message), mode); err != nil {
 		t.Fatal(err)
 	}
 	if linked {
-		if err := os.Link(temporary, filepath.Join(root, "start.resume")); err != nil {
+		if err := os.Link(temporary, filepath.Join(root, phase+".resume")); err != nil {
 			t.Fatal(err)
 		}
-	} else if err := os.Rename(temporary, filepath.Join(root, "start.resume")); err != nil {
+	} else if err := os.Rename(temporary, filepath.Join(root, phase+".resume")); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -178,4 +187,58 @@ func TestGoGateHasItsOwnBoundedWait(t *testing.T) {
 	gateEnvironment(t)
 	os.Setenv("OTELEQ_GO_CONTROL_WAIT_MS", "1")
 	gateResult(t, gateTask(), true)
+}
+
+func TestGoCheckpointsBindTheSameProcessAndRetainPublications(t *testing.T) {
+	for _, phase := range []string{"before-0", "after-0", "before-31", "after-31", "finish"} {
+		t.Run(phase, func(t *testing.T) {
+			root := gateEnvironment(t)
+			done := hostTask(func() { Checkpoint(phase) })
+			waitHostPhase(t, root, phase, done)
+			path := filepath.Join(root, phase+".ready")
+			data, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var message struct {
+				Schema int    `json:"schema_version"`
+				Kind   string `json:"kind"`
+				Token  string `json:"token"`
+				PID    int    `json:"pid"`
+				Parent int    `json:"parent_pid"`
+				Phase  string `json:"phase"`
+			}
+			if json.Unmarshal(data, &message) != nil || message.Schema != 1 || message.Kind != "oteleq.go.checkpoint" || message.Token != os.Getenv("OTELEQ_GO_CONTROL_TOKEN") || message.PID != os.Getpid() || message.Parent != os.Getppid() || message.Phase != phase {
+				t.Fatalf("wrong checkpoint: %+v", message)
+			}
+			before, err := os.Stat(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			hostRelease(t, root, phase, message.Token+" "+phase+"\n", 0600, true)
+			gateResult(t, done, false)
+			after, err := os.Stat(path)
+			if err != nil || !os.SameFile(before, after) || after.Sys().(*syscall.Stat_t).Nlink != 2 {
+				t.Fatal("checkpoint changed while waiting")
+			}
+		})
+	}
+}
+
+func TestGoCheckpointRefusesNoncanonicalPhasesAndEarlyAcknowledgement(t *testing.T) {
+	for _, phase := range []string{"", "before", "before--1", "before-00", "before-+1", "before-32", "after-01", "other-0", "../finish", "finish-0"} {
+		t.Run(phase, func(t *testing.T) {
+			root := gateEnvironment(t)
+			gateResult(t, hostTask(func() { Checkpoint(phase) }), true)
+			entries, err := os.ReadDir(root)
+			if err != nil || len(entries) != 0 {
+				t.Fatal("invalid phase published a checkpoint")
+			}
+		})
+	}
+	root := gateEnvironment(t)
+	if err := os.WriteFile(filepath.Join(root, "before-0.resume"), []byte("stale"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	gateResult(t, hostTask(func() { Checkpoint("before-0") }), true)
 }

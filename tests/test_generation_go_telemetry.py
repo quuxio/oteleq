@@ -114,6 +114,30 @@ def bodies(traces, metrics):
 
 
 class GoTelemetryTests(unittest.TestCase):
+    def test_controlled_witness_reads_both_lanes_and_keeps_details_outside_comparator_fields(self):
+        run, traces, metrics = fixture()
+        sequence = [{"metrics": {"collection": True, "emission": True}}]
+        record = {"record_sha256": "c" * 64, "steps": sequence, "interval_ms": 1000}
+        raw = bodies(traces, metrics)
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            with patch.object(telemetry.go_control_receipt, "read", return_value=record) as read, \
+                    patch.object(telemetry.go_control_receipt, "qualify", return_value=({FUNCTION: 1}, {})) as qualify:
+                result = telemetry.witness(run, raw, SERVICE, ExportTraceServiceRequest, folder=folder, sequence=sequence)
+            read.assert_called_once_with(folder, run, sequence, raw)
+            self.assertEqual(qualify.call_args.args[:3], (record, run, raw))
+            self.assertEqual([span.name for span in qualify.call_args.args[3]], [FUNCTION])
+            self.assertEqual(set(result), set(telemetry.WITNESS_FIELDS))
+            detailed = json.loads((folder / "go-verified-telemetry.json").read_text())
+            self.assertEqual(detailed["controls"], {"record_sha256": "c" * 64, "steps": 1,
+                                                    "metric_functions": {FUNCTION: 1}, "interval_ms": 1000})
+            run.prepared.intent.plain, run.session.execution.health = True, None
+            with patch.object(telemetry.go_control_receipt, "read", side_effect=ValueError("missing schedule")), \
+                    self.assertRaisesRegex(ValueError, "missing schedule"):
+                telemetry.witness(run, [], SERVICE, ExportTraceServiceRequest, folder=folder, sequence=sequence)
+        with self.assertRaisesRegex(ValueError, "retained control record"):
+            telemetry.witness(run, [], SERVICE, ExportTraceServiceRequest, sequence=sequence)
+
     def witness(self, run, traces, metrics):
         return telemetry.witness(run, bodies(traces, metrics), SERVICE, ExportTraceServiceRequest)
 

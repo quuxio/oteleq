@@ -133,11 +133,13 @@ Differences include typed values and graph paths. The comparator must handle ali
 
 Mixed-result precedence is tool error, invalid plan, difference, incompleteness, then success. Reports retain every outcome regardless of exit precedence. Inventory/plan success is separate from execution success, and zero executed cases cannot produce a successful comparison.
 
-### Live Java metric controls
+### Live metric controls
 
-The explicit source-v1 Node provider also accepts [live metric schedules](node-metric-controls.md), with separate [696-launch qualification](qualification/node-metric-controls-2026-10-23.json) for the recorded positive-first profiles. Each call declares both flags, starts with a positive control and runs in one unchanged application/SDK pair. Release/collection actions cannot be combined with these states.
+The explicit source-v1 Node provider accepts [live metric schedules](node-metric-controls.md), with separate [696-launch positive-first qualification](qualification/node-metric-controls-2026-10-23.json) and [2,784-launch startup qualification](qualification/node-startup-metric-controls-2026-10-23.json) covering all four initial states. Each call declares both flags; at least one both-on call supplies a positive control. Calls run in one unchanged application/SDK pair. Release/collection actions cannot be combined with these states.
 
-A prepared Java receiver call can include `metrics = { collection = false, emission = true }`. Every call in that schedule must declare both booleans, and the first must enable both as a positive control. The host controls one unchanged JVM through private checkpoints, waits for an effective export-off barrier, and restores both settings before shutdown. [The control guide](java-metric-controls.md) defines direct trace/metric/health checks, budgets and limitations. The ordinary plain/on workflow is unchanged when controls are absent.
+A prepared Java receiver call can include `metrics = { collection = false, emission = true }`. Every call in that schedule must declare both booleans, with a both-on positive control somewhere in the schedule. The host controls one unchanged JVM through private checkpoints, waits for an effective export-off barrier, and restores both settings before shutdown. [The control guide](java-metric-controls.md) defines the qualified initial states, direct trace/metric/health checks, budgets and limitations. The ordinary plain/on workflow is unchanged when controls are absent.
+
+Explicit source-v1 [Go receiver schedules](go-metric-controls.md) implement the same declared states through owned native checkpoints and independent metric-subset checks. Actual-provider and retained-workflow qualification is in progress. Prepared origin/cache [Python schedules](python-metric-controls.md) have their separate qualified profiles.
 
 ### Ordered receiver sequences
 

@@ -7,6 +7,7 @@ import math
 from pathlib import Path
 
 import go_health
+import go_control_receipt
 from go_provider import policy_digest, require
 import otelc_capture as capture
 
@@ -203,45 +204,71 @@ def cumulative_totals(series: dict) -> dict:
     return totals
 
 
-def metrics(bodies: list, run, service: str, names: dict, errors: dict) -> int:
-    """Compare every cumulative sample with independently decoded function spans."""
-    series, points = {}, 0
+def metric_series(bodies: list, run, service: str, names: set[str]) -> tuple[dict, dict, int]:
+    """Retain each receiver position as well as complete cumulative sample histories."""
+    series, windows, points = {}, {}, 0
     kinds = {CALLS: ("sum", "{call}"), ERRORS: ("sum", "{error}"), DURATION: ("histogram", "s")}
     bounds = run.prepared.intent.policy["metrics"]["histogram_boundaries_seconds"]
-    for metric in metric_values(bodies, run, service):
-        if metric.name == LIVE:
-            points += live_gauge(metric)
-            require(points <= MAX_POINTS, "Go metric point budget exceeded")
+    for index, (route, body) in enumerate(bodies):
+        if route != "/v1/metrics":
             continue
-        require(metric.name in kinds and (metric.WhichOneof("data"), metric.unit) == kinds[metric.name],
-                "unknown Go metric or value kind")
-        data = getattr(metric, kinds[metric.name][0])
-        require(data.aggregation_temporality == 2 and bool(data.data_points), "non-cumulative or empty Go metric")
-        for value in data.data_points:
-            key, sample = point(metric, value, set(names), bounds)
-            series.setdefault(key, []).append(sample)
-            points += 1
-            require(points <= MAX_POINTS, "Go metric point budget exceeded")
-    totals = cumulative_totals(series)
+        windows[index] = {}
+        for metric in metric_values([(route, body)], run, service):
+            if metric.name == LIVE:
+                points += live_gauge(metric)
+                require(points <= MAX_POINTS, "Go metric point budget exceeded")
+                continue
+            require(metric.name in kinds and (metric.WhichOneof("data"), metric.unit) == kinds[metric.name],
+                    "unknown Go metric or value kind")
+            data = getattr(metric, kinds[metric.name][0])
+            require(data.aggregation_temporality == 2 and bool(data.data_points), "non-cumulative or empty Go metric")
+            for value in data.data_points:
+                key, sample = point(metric, value, names, bounds)
+                series.setdefault(key, []).append(sample)
+                windows[index][key] = max(windows[index].get(key, 0), sample[2])
+                points += 1
+                require(points <= MAX_POINTS, "Go metric point budget exceeded")
+    return series, windows, points
+
+
+def metric_totals(totals: dict, names: dict, errors: dict) -> None:
+    """Require positive measurements and permit absent genuinely suppressed series."""
     for name, count in names.items():
-        require(totals.get((CALLS, name, "")) == totals.get((DURATION, name, "")) == count,
+        default = 0 if count == 0 else None
+        require(totals.get((CALLS, name, ""), default) == totals.get((DURATION, name, ""), default) == count,
                 "Go function metrics differ from decoded spans")
         for error_type in ERROR_TYPES:
             require(totals.get((ERRORS, name, error_type), 0) == errors.get((name, error_type), 0),
                     "Go error metric differs from decoded unwind spans")
+
+
+def metrics(bodies: list, run, service: str, names: dict, errors: dict) -> int:
+    """Compare every cumulative sample with independently decoded function spans."""
+    series, _, points = metric_series(bodies, run, service, set(names))
+    metric_totals(cumulative_totals(series), names, errors)
     return points
 
 
-def witness(run, bodies: list, service: str, decoder, *, folder: Path | None = None, calls: int = 1) -> dict | None:
+def witness(run, bodies: list, service: str, decoder, *, folder: Path | None = None, calls: int = 1,
+            sequence: list[dict] | None = None) -> dict | None:
     """Keep actual owned SDK health separate from local downstream receipt."""
     run.verify()
+    controls = None
+    if sequence is not None:
+        require(folder is not None, "Go live witness requires its retained control record")
+        controls = go_control_receipt.read(folder, run, sequence, bodies)
     if run.prepared.intent.plain:
         require(not bodies and run.session.execution.health is None, "plain Go worker emitted SDK evidence")
         return None
     require(all(route in (capture.TRACE_PATH, "/v1/metrics") and type(body) is bytes and bool(body)
                 for route, body in bodies), "unknown Go telemetry route or empty body")
     names, spans, errors = traces(bodies, run, service, decoder, calls=calls)
-    points = metrics(bodies, run, service, names, errors)
+    if controls is None:
+        points = metrics(bodies, run, service, names, errors)
+    else:
+        series, windows, points = metric_series(bodies, run, service, set(names))
+        collected, collected_errors = go_control_receipt.qualify(controls, run, bodies, spans, windows)
+        metric_totals(cumulative_totals(series), collected, collected_errors)
     received = {"trace_batches": sum(route == capture.TRACE_PATH for route, _ in bodies),
                 "metric_batches": sum(route == "/v1/metrics" for route, _ in bodies),
                 "spans": len(spans), "metric_points": points}
@@ -261,6 +288,9 @@ def witness(run, bodies: list, service: str, decoder, *, folder: Path | None = N
                 "function_lost", "observer_lost", "unwind_unknown", "lifetime_lost")},
             "pending": health["probe_accounting"]["function_active"] + health["probe_accounting"]["observer_active"],
             "sdk_pid": health["sdk_pid"], "received": received, "health": health}
+    if controls is not None:
+        receipt["controls"] = {"record_sha256": controls["record_sha256"], "steps": len(controls["steps"]),
+                                "metric_functions": dict(collected), "interval_ms": controls["interval_ms"]}
     if folder is not None:
         (folder / "go-verified-telemetry.json").write_text(json.dumps(receipt, indent=2, allow_nan=False) + "\n")
     return {name: receipt[name] for name in WITNESS_FIELDS}

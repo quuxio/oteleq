@@ -97,12 +97,13 @@ def configure_controls(entry: dict, value: list[dict]) -> None:
     prepared_python = origin(entry)
     prepared_java = entry["language"] == "java" and entry.get("java_backend") == "prepared"
     source_node = entry["language"] in ("javascript", "typescript") and entry.get("node_backend") == "source-v1"
-    if (not (prepared_java or source_node or prepared_python)
+    source_go = entry["language"] == "go" and entry.get("go_backend") == "source-v1"
+    if (not (prepared_java or source_node or prepared_python or source_go)
             or any(step["action"] != "call" or "metrics" not in step for step in value)):
-        raise ValueError("live metrics require prepared origin Python/Java or source-v1 Node calls with an explicit state for every call")
+        raise ValueError("live metrics require prepared origin Python/Java or source-v1 Go/Node calls with an explicit state for every call")
     positive = {"collection": True, "emission": True}
     if not any(step["metrics"] == positive for step in value):
-        language = "Python" if prepared_python else "Java" if prepared_java else "Node"
+        language = "Python" if prepared_python else "Java" if prepared_java else "Go" if source_go else "Node"
         raise ValueError("live " + language + " metrics require a collection-on/emission-on positive control")
 
 

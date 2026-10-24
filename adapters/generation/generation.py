@@ -712,7 +712,7 @@ def decoder_files():
 
 def generator_identity():
     here = Path(__file__).parent
-    names = ("generation.py", "policy.py", "return_expectations.py", "filesystem_effects.py", "http_effects.py", "domains.py", "shrinking.py", "sequences.py", "typescript_provider.py", "python_project.py", "go_project.py", "go_provider.py", "go_files.py", "go_context.py", "go_context_sources.py", "go_context_APACHE.txt", "go_build.py", "go_caller.py", "go_source.py", "go_source_run.py", "go_telemetry.py", "go_hooks.py", "go_prepared.py", "go_health.py", "go_execution.py", "go_launch.py", "go_rendezvous.py", "go_receivers.py", "go_graph.py", "go_observe.go", "node_receivers.py", "java_receivers.py", "java_build.py", "java_control.py", "java_profiles.py", "java_live.py", "java_control_receipt.py", "java_health.py", "java_launch.py", "java_provider.py", "java_telemetry.py", "OteleqCompile.java", "java_graph.py", "OteleqGraph.java", "cpp_models.py", "cpp_receivers.py", "cpp_worker.py", "cpp_graph.py", "cpp_observe.hpp", "native_names.py", "discovery.py", "harness.py", "observe.py", "node_observe.mjs", "node_sequence.mjs", "typed_capture.py", "discover.mjs", "discover.go", "Discover.java")
+    names = ("generation.py", "policy.py", "return_expectations.py", "filesystem_effects.py", "http_effects.py", "domains.py", "shrinking.py", "sequences.py", "typescript_provider.py", "python_project.py", "go_project.py", "go_provider.py", "go_files.py", "go_context.py", "go_context_sources.py", "go_context_APACHE.txt", "go_build.py", "go_caller.py", "go_source.py", "go_source_run.py", "go_telemetry.py", "go_hooks.py", "go_prepared.py", "go_health.py", "go_execution.py", "go_launch.py", "go_rendezvous.py", "go_rendezvous.go", "go_receivers.py", "go_graph.py", "go_observe.go", "node_receivers.py", "java_receivers.py", "java_build.py", "java_control.py", "java_profiles.py", "java_live.py", "java_control_receipt.py", "java_health.py", "java_launch.py", "java_provider.py", "java_telemetry.py", "OteleqCompile.java", "java_graph.py", "OteleqGraph.java", "cpp_models.py", "cpp_receivers.py", "cpp_worker.py", "cpp_graph.py", "cpp_observe.hpp", "native_names.py", "discovery.py", "harness.py", "observe.py", "node_observe.mjs", "node_sequence.mjs", "typed_capture.py", "discover.mjs", "discover.go", "Discover.java")
     files = {name: capture.file_digest(here / name) for name in names}
     files.update({name: capture.file_digest(here / name) for name in (
         'java_project.py', 'java_classpath.py', 'java_archives.py', 'java_archive_context.py',
@@ -726,7 +726,7 @@ def generator_identity():
         'python_provider.py', 'python_inputs.py', 'python_prepared.py', 'python_journal.py',
         'python_code.py', 'python_code_match.py', 'python_origin.py', 'python_selection.py', 'python_cache.py',
         'python_execution.py', 'python_health.py', 'python_telemetry.py', 'python_launch.py',
-        'live_control.py', 'go_control.py', 'python_control.py', 'python_live.py', 'python_control_receipt.py', 'python_checkpoint.py')})
+        'live_control.py', 'go_control.py', 'go_live.py', 'go_control_receipt.py', 'python_control.py', 'python_live.py', 'python_control_receipt.py', 'python_checkpoint.py')})
     files["host-python"] = capture.file_digest(Path(sys.executable))
     files["observer:otelc_capture.py"] = capture.file_digest(Path(capture.__file__))
     files["observer:otelc_collection.py"] = capture.file_digest(Path(otelc_collection.__file__))
@@ -1047,7 +1047,7 @@ def baseline_receipt(entry, folder, bodies):
     if sequences.controls(entry):
         if node_source.enabled(entry):
             node_control_receipt.read(folder, entry, bodies, plain=True)
-        elif entry["language"] != "python":
+        elif entry["language"] not in ("python", "go"):
             java_control_receipt.read(folder, entry, read(folder / "process.json")["pid"], bodies, plain=True)
 
 
@@ -1068,7 +1068,8 @@ def qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, 
     witness = None
     if go_source.enabled(entry):
         go_source.require(isinstance(go_runtime, go_source_run.Run), "missing owned Go source execution")
-        witness = go_telemetry.witness(go_runtime, bodies, service, decoder, folder=folder, calls=sequences.call_count(entry))
+        witness = go_telemetry.witness(go_runtime, bodies, service, decoder, folder=folder, calls=sequences.call_count(entry),
+                                       **({"sequence": entry["sequence_configuration"]} if sequences.controls(entry) else {}))
         if lane == "baseline":
             baseline_receipt(entry, folder, bodies)
     elif java_actions.enabled(entry):
@@ -1136,6 +1137,8 @@ def attempt_policy(entry, endpoint, service, runtime):
 def attempt_receiver_options(entry, runtime):
     """Only the explicit source provider permits bounded chunked OTLP."""
     options = {"max_requests": java_provider.MAX_TELEMETRY_REQUESTS} if runtime is not None else {}
+    if go_source.enabled(entry) and sequences.controls(entry):
+        options["max_requests"] = go_source_run.go_live.MAX_TELEMETRY_REQUESTS
     if entry.get("language") in ("cpp", "python") and "sequence_configuration" in entry:
         requests = max(capture.MAX_REQUESTS, 2 * sequences.call_count(entry))
         if requests > capture.MAX_REQUESTS:
@@ -1213,7 +1216,8 @@ def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, ht
                                            project, prefix, env, folder, lane)
         elif go_source.enabled(entry):
             go_run = go_source_run.prepare(sys.modules[__name__], root, project, entry, tools, env, folder,
-                                           config, lane, wait_ms=data["configuration"]["limits"]["case_timeout_ms"])
+                                           config, lane, wait_ms=data["configuration"]["limits"]["case_timeout_ms"],
+                                           **({"sequence": case["sequence"], "bodies": bodies} if sequences.controls(entry) else {}))
             command = go_prepared.command(go_run.prepared.intent)
         elif python_provider.origin(entry):
             python_run = python_launch.prepare(sys.modules[__name__], root, project, entry, driver,
@@ -1262,6 +1266,11 @@ def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, ht
 
 def execution_options(entry, case, lane, folder, runtime, bodies, env, *, service=None, python_session=None, go_session=None):
     """Add only explicitly requested process recording and live host checkpoints."""
+    if go_source.enabled(entry):
+        expected = go_source_run.go_live.Session if sequences.controls(entry) else go_source_run.go_launch.Session
+        go_source.require(isinstance(go_session, expected), "missing native Go ready/release or live session")
+        env.update(go_session.environment())
+        return {"record_process": True, "interaction": go_session}
     options = {"record_process": True} if runtime is not None or node_source.enabled(entry) or python_provider.origin(entry) else {}
     if sequences.controls(entry):
         if python_provider.origin(entry):
@@ -1279,10 +1288,6 @@ def execution_options(entry, case, lane, folder, runtime, bodies, env, *, servic
                                               metrics=options.get('interaction'))
         env.update(interaction.environment())
         options['interaction'] = interaction
-    if go_source.enabled(entry):
-        go_source.require(isinstance(go_session, go_source_run.go_launch.Session), "missing native Go ready/release session")
-        env.update(go_session.environment())
-        options.update(record_process=True, interaction=go_session)
     return options
 
 

@@ -1,5 +1,7 @@
 # Repository guidance
 
+- Explicit Go source-v1 receiver schedules use the original owned native monitor and private checkpoint package. Apply the first metric state before construction, require independent setters and advancing completed flush counters, retain every phase/acknowledgement and seal the host record's original bytes/file facts before final acceptance. Traces count all serial trees; metrics count only collection-enabled trees, including the factory under the initial state. Disabled windows and restored emission-off measurements need direct receipt. Raw generic health remains non-atomic; stronger paused checks apply only after the explicit flush barrier. Generated/retained qualification is separate from component coverage and broader Go admission remains open. See docs/go-metric-controls.md.
+
 - Go readiness/checkpoint implementation belongs in the private `oteleq_generated_control` package. Application declarations may shadow builtins, types and constants; generated host-control code must not invoke them. Keep the import and whole private package in compiler-owned caller inputs, refuse reserved-path collisions (including dangling symlinks), and qualify changed helper recipes separately from frozen older workflows.
 
 - Go compiler-only caller discovery must execute its fixed frontend from the attempt's owned `go-frontend` directory. Preserve that source and its file facts after Rust CLI temporary extraction is removed. Never replace an old missing temporary input or claim that newer durable retention recertifies historical receipts.

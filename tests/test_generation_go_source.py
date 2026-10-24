@@ -169,15 +169,30 @@ class GoSourceTests(unittest.TestCase):
         source.bind(legacy, self.root, self.workspace, self.tools, self.execute)
         self.assertNotIn("go_provider", legacy)
 
-    def test_sequence_profile_admits_only_bounded_uncontrolled_receiver_calls(self):
+    def test_sequence_profile_requires_bounded_calls_and_complete_live_states(self):
         entry = {"receiver_fixture": {}, "sequence_configuration": [{"action": "call", "arguments": "case"}]}
         source.sequence_profile(entry)
+        source.sequence_profile({**entry, "sequence_configuration": [
+            {"action": "call", "metrics": {"collection": True, "emission": True}}]})
         for steps in ([], {}, [entry["sequence_configuration"][0]] * 33, [{"action": "release"}],
-                      [{"action": "call", "metrics": {"collection": True, "emission": True}}]):
+                      [{"action": "call", "metrics": {"collection": False, "emission": True}}],
+                      [{"action": "call", "metrics": {"collection": 1, "emission": True}}],
+                      [{"action": "call", "metrics": {"collection": True, "emission": True}}, {"action": "call"}]):
             with self.subTest(steps=steps), self.assertRaises(ValueError):
                 source.sequence_profile({**entry, "sequence_configuration": steps})
         with self.assertRaises(ValueError):
             source.sequence_profile({"sequence_configuration": [{"action": "call"}]})
+
+    def test_live_policy_keeps_all_four_declared_startup_states(self):
+        for collection in (False, True):
+            for emission in (False, True):
+                flags = {"collection": collection, "emission": emission}
+                entry = {**self.entry, "receiver_fixture": {"factory": "New", "source_path": "service/api.go"},
+                         "sequence_configuration": [{"action": "call", "metrics": flags},
+                                                    {"action": "call", "metrics": {"collection": True, "emission": True}}]}
+                value = source.configuration(entry, "http://127.0.0.1:1", "unit")
+                self.assertEqual({key: value["metrics"][key] for key in flags}, flags)
+                self.assertTrue(value["traces"]["enabled"])
 
     def test_tagged_protocol_is_explicit_and_cannot_reuse_an_untagged_probe(self):
         self.entry["go_options"]["build_tags"] = ["feature", "tools", "\u03c0"]

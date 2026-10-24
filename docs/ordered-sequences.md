@@ -58,7 +58,7 @@ Select `backend = "source-v1"` under `adapters.go`, configure the module root an
 
 The independent reader rejects missing/reordered steps, other action kinds and contradictory outer boundaries. All records share the existing capture/time budgets; reaching a budget cannot yield a partial passing sequence. Source-provider telemetry requires the exact independent root-call count, complete recursive descendants, factory-before-call ordering, serial root trees and matching final cumulative metrics/health.
 
-Component and actual plain-worker regressions cover the new boundary. Public provider execution, generated/exported/replayed/reduced routes and broader Go qualification remain pending. Legacy Go sequences, live metric schedules, release/collection, other targets, goroutine and resource actions remain blocked. This implements a prerequisite for live controls; it does not establish their process or transport observations.
+Component and actual plain-worker regressions cover the new boundary. Explicit [Go live metric schedules](go-metric-controls.md) additionally connect private checkpoints, independent setters and collection-dependent metric/retained-receipt checks. Actual-provider and generated/exported/replayed/reduced qualification of the current recipes remains in progress. Legacy Go sequences and controls, release/collection, other targets, goroutine and resource actions remain blocked.
 
 ## Python call sequences
 

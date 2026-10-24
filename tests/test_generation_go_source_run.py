@@ -124,9 +124,30 @@ class GoSourceRunTests(unittest.TestCase):
         self.checked.intent = intent
         return self.checked
 
-    def run_prepare(self, lane="instrumented_on"):
+    def run_prepare(self, lane="instrumented_on", **options):
         return source_run.prepare(self.workflow, self.root, self.project, self.entry, self.tools,
-                                  self.environment, self.folder, self.config, lane, wait_ms=30000)
+                                  self.environment, self.folder, self.config, lane, wait_ms=30000, **options)
+
+    def test_live_preparation_requires_concrete_calls_and_uses_the_owned_live_session(self):
+        step = {"action": "call", "arguments": "case", "metrics": {"collection": True, "emission": True}}
+        self.entry.update(receiver_fixture={"factory": "New"}, sequence_configuration=[step])
+        for options in ({}, {"sequence": []}, {"bodies": []}, {"sequence": [], "bodies": None}):
+            with self.subTest(options=options), self.assertRaisesRegex(ValueError, "concrete schedule"):
+                self.run_prepare(**options)
+        self.discover.assert_not_called()
+        sequence = [{**step, "id": "step-0", "arguments": [1]}]
+        bodies = []
+        with patch.object(source_run.go_live, "Session", return_value=self.session) as launch:
+            result = self.run_prepare(sequence=sequence, bodies=bodies)
+        self.assertIs(result.session, self.session)
+        launch.assert_called_once_with(self.checked, wait_ms=30000, sequence=sequence, bodies=bodies)
+        self.launcher.assert_not_called()
+
+    def test_uncontrolled_preparation_refuses_an_undeclared_control_channel(self):
+        for options in ({"sequence": []}, {"bodies": []}, {"sequence": [], "bodies": []}):
+            with self.subTest(options=options), self.assertRaisesRegex(ValueError, "concrete schedule"):
+                self.run_prepare(**options)
+        self.discover.assert_not_called()
 
     def test_both_lanes_reconstruct_fixed_commands_and_keep_caller_inputs(self):
         for lane in ("baseline", "instrumented_on"):

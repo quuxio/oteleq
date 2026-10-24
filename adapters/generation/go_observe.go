@@ -466,7 +466,7 @@ func receiverCall(config configuration, receiver, target reflect.Value, values [
 		After: capture(config.Models, roots, reflect.Value{}, "", false, false)}
 }
 
-func runSequence(encoded string, factory, target reflect.Value, globals []Root) {
+func runSequence(encoded string, factory, target reflect.Value, globals []Root, checkpoint func(string)) {
 	var config configuration
 	require(len(encoded) <= 1048576 && json.Unmarshal([]byte(encoded), &config) == nil)
 	require(len(config.Sequence) >= 1 && len(config.Sequence) <= 32)
@@ -484,6 +484,9 @@ func runSequence(encoded string, factory, target reflect.Value, globals []Root) 
 		require(step.ID == "step-"+strconv.Itoa(index) && step.Action == "call")
 		values[index] = arguments(targetTypes[1:], step.Arguments)
 	}
+	if checkpoint != nil {
+		checkpoint("before-0")
+	}
 	receiver := factory.Call(arguments(factoryTypes, config.FactoryArguments))[0]
 	roots["receiver"] = receiver
 	file, err := os.OpenFile(os.Getenv("OTELEQ_OBSERVATION"), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
@@ -491,6 +494,9 @@ func runSequence(encoded string, factory, target reflect.Value, globals []Root) 
 	defer file.Close()
 	output := captureStream{file: file}
 	for index, step := range config.Sequence {
+		if checkpoint != nil && index != 0 {
+			checkpoint("before-" + strconv.Itoa(index))
+		}
 		observed := receiverCall(config, receiver, target, values[index], roots)
 		observed.ID, observed.Action = step.ID, step.Action
 		if index == 0 {
@@ -507,18 +513,34 @@ func runSequence(encoded string, factory, target reflect.Value, globals []Root) 
 			output.write([]byte(`,"after":`))
 			output.value(observed.After)
 		}
+		if checkpoint != nil {
+			checkpoint("after-" + strconv.Itoa(index))
+		}
 	}
 	output.write([]byte("}\n"))
 	require(file.Close() == nil)
+	if checkpoint != nil {
+		checkpoint("finish")
+	}
+}
+
+func sequenceFailure() {
+	if recover() != nil {
+		_, _ = os.Stderr.WriteString("Go receiver fixture or observation is unavailable\n")
+		os.Exit(91)
+	}
 }
 
 // RunSequence retains one constructed receiver and streams each bounded call.
 func RunSequence(encoded string, factory, target reflect.Value, globals ...Root) {
-	defer func() {
-		if recover() != nil {
-			_, _ = os.Stderr.WriteString("Go receiver fixture or observation is unavailable\n")
-			os.Exit(91)
-		}
-	}()
-	runSequence(encoded, factory, target, globals)
+	defer sequenceFailure()
+	runSequence(encoded, factory, target, globals, nil)
+}
+
+// RunControlledSequence pauses the same worker before construction and each call,
+// after every call and after the complete capture, before SDK shutdown.
+func RunControlledSequence(encoded string, checkpoint func(string), factory, target reflect.Value, globals ...Root) {
+	defer sequenceFailure()
+	require(checkpoint != nil)
+	runSequence(encoded, factory, target, globals, checkpoint)
 }

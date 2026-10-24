@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"math"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strconv"
@@ -312,7 +313,7 @@ func TestSequenceBoundsValueCopiesAndValidationBeforeConstruction(t *testing.T) 
 		encoded, _ := json.Marshal(config)
 		path := filepath.Join(t.TempDir(), "sequence.json")
 		t.Setenv("OTELEQ_OBSERVATION", path)
-		runSequence(string(encoded), factory, target, []Root{Bind("global:total", reflect.ValueOf(&total))})
+		runSequence(string(encoded), factory, target, []Root{Bind("global:total", reflect.ValueOf(&total))}, nil)
 		data, err := os.ReadFile(path)
 		if err != nil || !json.Valid(data) || !strings.Contains(string(data), `"value":"13"`) {
 			t.Fatal("value sequence failed", err)
@@ -353,13 +354,13 @@ func TestSequenceBoundsValueCopiesAndValidationBeforeConstruction(t *testing.T) 
 		}
 		t.Setenv("OTELEQ_OBSERVATION", path)
 		refuses(t, func() {
-			runSequence(string(encoded), creator, selected, []Root{Bind("global:total", reflect.ValueOf(&total))})
+			runSequence(string(encoded), creator, selected, []Root{Bind("global:total", reflect.ValueOf(&total))}, nil)
 		})
 		if change != "nil-value" && change != "path" && constructions != calls {
 			t.Fatal("invalid schedule constructed application state", change)
 		}
 	}
-	refuses(t, func() { runSequence("not json", factory, target, nil) })
+	refuses(t, func() { runSequence("not json", factory, target, nil, nil) })
 }
 
 func TestSequenceVoidAndBoundedOutputFailures(t *testing.T) {
@@ -372,7 +373,7 @@ func TestSequenceVoidAndBoundedOutputFailures(t *testing.T) {
 	encoded, _ := json.Marshal(config)
 	path := filepath.Join(t.TempDir(), "void.json")
 	t.Setenv("OTELEQ_OBSERVATION", path)
-	runSequence(string(encoded), factory, target, []Root{Bind("global:total", reflect.ValueOf(&total))})
+	runSequence(string(encoded), factory, target, []Root{Bind("global:total", reflect.ValueOf(&total))}, nil)
 	data, err := os.ReadFile(path)
 	if err != nil || !strings.Contains(string(data), `"kind":"undefined"`) {
 		t.Fatal("missing void outcome", err, string(data))
@@ -390,4 +391,74 @@ func TestSequenceVoidAndBoundedOutputFailures(t *testing.T) {
 		t.Fatal(err)
 	}
 	refuses(t, func() { output.write([]byte("x")) })
+}
+
+func TestControlledCallsPauseBeforeConstructionAndFinishAfterCompleteCapture(t *testing.T) {
+	config, _, _ := sequenceConfig()
+	config.Sequence = sequenceValues("3", "-2", "4")
+	var total amount
+	constructions, calls := 0, 0
+	factory := reflect.ValueOf(func(seed amount) *sample { constructions++; return &sample{count: seed} })
+	target := reflect.ValueOf(func(receiver *sample, value amount) amount {
+		calls++
+		total += value
+		receiver.count += value
+		if value < 0 {
+			panic("known")
+		}
+		return receiver.count
+	})
+	encoded, _ := json.Marshal(config)
+	path := filepath.Join(t.TempDir(), "controlled.json")
+	t.Setenv("OTELEQ_OBSERVATION", path)
+	var phases []string
+	checkpoint := func(phase string) {
+		phases = append(phases, phase)
+		if phase == "before-0" && (constructions != 0 || calls != 0 || total != 0) {
+			t.Fatal("application ran before the initial checkpoint")
+		}
+		if phase == "after-0" && (constructions != 1 || calls != 1 || total != 3) {
+			t.Fatal("factory or first call missing at checkpoint")
+		}
+		if phase == "before-1" && (calls != 1 || total != 3) || phase == "after-1" && (calls != 2 || total != 1) {
+			t.Fatal("panic boundary differs")
+		}
+		if phase == "finish" {
+			data, err := os.ReadFile(path)
+			if err != nil || !json.Valid(data) || constructions != 1 || calls != 3 || total != 5 {
+				t.Fatal("finish precedes a complete retained sequence", err)
+			}
+		}
+	}
+	RunControlledSequence(string(encoded), checkpoint, factory, target, Bind("global:total", reflect.ValueOf(&total)))
+	if !reflect.DeepEqual(phases, []string{"before-0", "after-0", "before-1", "after-1", "before-2", "after-2", "finish"}) {
+		t.Fatal("missing or reordered host checkpoints", phases)
+	}
+}
+
+func TestControlledSequenceRefusesMissingHostBeforeFactory(t *testing.T) {
+	if os.Getenv("OTELEQ_TEST_MISSING_GO_HOST") == "1" {
+		config, _, _ := sequenceConfig()
+		config.Sequence = sequenceValues("3")
+		encoded, _ := json.Marshal(config)
+		var total amount
+		factory := reflect.ValueOf(func(seed amount) *sample {
+			_, _ = os.Stdout.WriteString("APPLICATION_FACTORY_RAN\n")
+			return &sample{count: seed}
+		})
+		target := reflect.ValueOf(func(receiver *sample, value amount) amount { return receiver.count + value })
+		RunControlledSequence(string(encoded), nil, factory, target, Bind("global:total", reflect.ValueOf(&total)))
+		return
+	}
+	path := filepath.Join(t.TempDir(), "must-not-exist.json")
+	command := exec.Command(os.Args[0], "-test.run=^TestControlledSequenceRefusesMissingHostBeforeFactory$")
+	command.Env = append(os.Environ(), "OTELEQ_TEST_MISSING_GO_HOST=1", "OTELEQ_OBSERVATION="+path)
+	output, err := command.Output()
+	failure, ok := err.(*exec.ExitError)
+	if !ok || failure.ExitCode() != 91 || len(output) != 0 || string(failure.Stderr) != "Go receiver fixture or observation is unavailable\n" {
+		t.Fatal("missing host was accepted or application code ran", err, string(output))
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatal("missing host created an observation")
+	}
 }

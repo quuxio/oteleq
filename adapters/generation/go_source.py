@@ -44,17 +44,23 @@ def configure(entry: dict, options: dict) -> None:
 
 
 def sequence_profile(entry: dict) -> None:
-    """Admit bounded ordinary calls while live control integration is incomplete."""
+    """Admit bounded calls with an optional complete, independently controlled schedule."""
     if "sequence_configuration" in entry:
         steps = entry["sequence_configuration"]
         require("receiver_fixture" in entry and type(steps) is list and 1 <= len(steps) <= 32
-                and all(type(step) is dict and step.get("action") == "call" and "metrics" not in step for step in steps),
-                "Go source-v1 requires 1..32 ordinary calls; live metrics require separate integration")
+                and all(type(step) is dict and step.get("action") == "call" for step in steps),
+                "Go source-v1 requires 1..32 receiver calls")
+        if any("metrics" in step for step in steps):
+            require(all(type(step.get("metrics")) is dict and set(step["metrics"]) == {"collection", "emission"}
+                        and all(type(flag) is bool for flag in step["metrics"].values()) for step in steps)
+                    and any(all(step["metrics"].values()) for step in steps),
+                    "Go live metrics require an explicit state for every call and a positive control")
 
 
 def configuration(entry: dict, endpoint: str, service: str) -> dict:
     """Supply the complete common policy, including selected factory declarations."""
     require(enabled(entry) and "go_context" in entry, "explicit source-v1 module entry required")
+    sequence_profile(entry)
     context = entry["go_context"]
     sources = [Path(entry["path"]).relative_to(context["module_root"]).as_posix()]
     functions = [context["import_path"] + "." + entry["name"]]
@@ -62,13 +68,14 @@ def configuration(entry: dict, endpoint: str, service: str) -> dict:
     if fixture:
         sources.append(Path(fixture["source_path"]).relative_to(context["module_root"]).as_posix())
         functions.append(context["import_path"] + "." + fixture["factory"])
+    flags = entry.get("sequence_configuration", [{}])[0].get("metrics", {"collection": True, "emission": True})
     return {"schema_version": 3, "languages": ["go"],
             "resource": {"service_name": service},
             "export": {"endpoint": endpoint, "interval_ms": 1000, "timeout_ms": 1000,
                        "shutdown_timeout_ms": 10000},
             "sources": {"include": sorted(set(sources)), "exclude": []},
             "functions": {"include": functions, "exclude": []},
-            "metrics": {"collection": True, "emission": True,
+            "metrics": {**flags,
                         "histogram_boundaries_seconds": [1e-6, 1e-5, 1e-4, .001, .01, .1, 1.]},
             "traces": {"enabled": True, "sample_ratio": 1.0},
             "lifetimes": {"enabled": False, "include": [], "exclude": [],

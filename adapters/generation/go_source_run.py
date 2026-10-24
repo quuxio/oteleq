@@ -10,6 +10,7 @@ import go_caller
 import go_context
 import go_files as files
 import go_launch
+import go_live
 import go_prepared
 import go_project
 from go_provider import data_seal, require, same
@@ -33,13 +34,19 @@ class Run:
         self.prepared.verify()
         require(self.session.execution is not None, "Go worker did not publish completed owned execution")
         self.session.execution.verify()
+        if isinstance(self.session, go_live.Session):
+            self.session.verify_final()
 
 
 def prepare(workflow, root: Path, project: Path, entry: dict, tools: dict,
-            environment: dict, folder: Path, config: Path, lane: str, *, wait_ms: int) -> Run:
+            environment: dict, folder: Path, config: Path, lane: str, *, wait_ms: int,
+            sequence: list[dict] | None = None, bodies: list | None = None) -> Run:
     """Freeze expectations before producer builds and never execute returned argv."""
     require(go_source.enabled(entry) and lane in ("baseline", "instrumented_on"), "invalid Go source execution lane")
     go_source.sequence_profile(entry)
+    controlled = any("metrics" in step for step in entry.get("sequence_configuration", []))
+    require((controlled and type(sequence) is list and type(bodies) is list)
+            or (not controlled and sequence is None and bodies is None), "Go live preparation lacks its concrete schedule or receiver")
     tags = go_project.canonical_tags(entry["go_options"]["build_tags"])
     module = project / entry["go_context"]["module_root"]
     original = files.freeze(module)
@@ -109,4 +116,6 @@ def prepare(workflow, root: Path, project: Path, entry: dict, tools: dict,
                                   python_prepared.file_identity(tools["python-host"]), policy, lane == "baseline"))
     require(same(checked.intent.policy, policy), "Go prepared policy changed")
     caller.verify()
-    return Run(caller, checked, go_launch.Session(checked, wait_ms=wait_ms), sdk_version)
+    session = (go_live.Session(checked, wait_ms=wait_ms, sequence=sequence, bodies=bodies)
+               if controlled else go_launch.Session(checked, wait_ms=wait_ms))
+    return Run(caller, checked, session, sdk_version)

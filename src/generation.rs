@@ -321,8 +321,20 @@ const RESOURCES: &[(&str, &str)] = &[
         include_str!("../adapters/generation/go_rendezvous.py"),
     ),
     (
+        "go_rendezvous.go",
+        include_str!("../adapters/generation/go_rendezvous.go"),
+    ),
+    (
         "go_control.py",
         include_str!("../adapters/generation/go_control.py"),
+    ),
+    (
+        "go_live.py",
+        include_str!("../adapters/generation/go_live.py"),
+    ),
+    (
+        "go_control_receipt.py",
+        include_str!("../adapters/generation/go_control_receipt.py"),
     ),
     (
         "go_receivers.py",
