@@ -13,6 +13,9 @@ PYTHON_CONTROL_STARTUP ?= both-on
 PYTHON_CONTROL_PROFILE ?= python-native-origins-v2
 AUDIT_DIR ?= $(REPORT_DIR)-audit
 MARKDOWNLINT ?= ./ci/markdownlint/node_modules/.bin/markdownlint
+DEPENDENCY_AUDIT_OUTPUT ?= $(CURDIR)/build/dependency-audit
+
+.PHONY: dependency-audit dependency-audit-check
 
 .PHONY: generation-project-tests-otelc generation-preconditions-otelc generation-domains-otelc generation-input-walks-otelc generation-retained-source-otelc generation-native-project-otelc generation-return-otelc generation-java-sequence-otelc generation-java-controls-otelc generation-java-project-otelc generation-java-archive-otelc generation-node-project-otelc
 .PHONY: node-source-context-check
@@ -30,6 +33,7 @@ MARKDOWNLINT ?= ./ci/markdownlint/node_modules/.bin/markdownlint
 
 help:
 	@printf '%s\n' 'generation-python-controls-otelc Qualify Python startup/live metric states and retained/promoted suites (PYTHON_CONTROL_PROFILE, PYTHON_CONTROL_STARTUP, AUDIT_DIR)'
+	@printf '%s\n' 'dependency-audit Check all locked repository dependencies against current OSV advisories' 'dependency-audit-check Test the audit runner offline and enforce 80% coverage'
 	@printf '%s\n' 'generation-python-cache-workflows-otelc Qualify complete cached Python matrix, receivers, effects and retained/promoted workflows'
 	@printf '%s\n' 'generation-python-caches-otelc Qualify explicit ordinary Python cache decisions and source fallback'
 	@printf '%s\n' 'generation-python-origins-otelc Qualify explicit prepared Python receivers, effects and retained/promoted workflows'
@@ -115,7 +119,15 @@ examples:
 	$(PYTHON) -c 'import json, pathlib, tomllib; files = list(pathlib.Path("examples").rglob("*.json")) + list(pathlib.Path(".badges").glob("*.json")); [json.loads(p.read_text()) for p in files]; tomllib.loads(pathlib.Path("examples/equivalence.toml").read_text()); print("JSON and TOML syntax valid")'
 	$(NODE) --test tests/workflow_syntax.test.mjs
 
-docs-check: lint examples
+dependency-audit:
+	$(PYTHON) ci/dependency_audit.py --output "$(DEPENDENCY_AUDIT_OUTPUT)"
+
+dependency-audit-check:
+	mkdir -p build
+	$(PYTHON) -m coverage run --data-file=build/dependency-audit-unit.coverage --source=ci.dependency_audit -m unittest discover -s tests -p test_dependency_audit.py -v
+	$(PYTHON) -m coverage report --data-file=build/dependency-audit-unit.coverage --fail-under=80
+
+docs-check: lint examples dependency-audit-check
 	$(MAKE) observer-check
 	$(MAKE) generation-check
 

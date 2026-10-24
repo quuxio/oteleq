@@ -47,6 +47,15 @@ jobs:
           sudo apt-get install -y --no-install-recommends clang-18 clang-tools-18 llvm-18-dev libclang-18-dev libclang-cpp18-dev
       - name: Install pinned Python validation tools
         run: 'python -m pip install --require-hashes --only-binary=:all: -r ci/requirements.txt'
+      - name: Audit locked repository dependencies
+        run: make dependency-audit PYTHON=python
+      - name: Retain dependency audit evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: locked-dependency-audit
+          path: build/dependency-audit/
+          retention-days: 7
       - name: Validate matched native compiler frontend
         run: python -m unittest discover -s tests -p test_generation_native_frontend.py -v
         env:
