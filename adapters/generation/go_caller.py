@@ -116,7 +116,10 @@ def selected_targets(inventories: dict, entry: dict, source: str, root: Path, pa
                 and bool(row.get("go_receiver")) == receiver
                 and type(row.get("line")) is int and row["line"] > 0,
                 "Go caller declaration shape differs from the planned callable")
-        receiver_id = ("*" if row["go_receiver"].startswith("*") else "") + name.rsplit(".", 1)[0] if receiver else ""
+        receiver_id = ""
+        if receiver:
+            pointer = "*" if row["go_receiver"].startswith("*") else ""
+            receiver_id = pointer + name.rsplit(".", 1)[0]
         targets.append(Target(package["ImportPath"] + "." + name, filename, row["line"], len(parameters), receiver_id))
     require(len({target.name for target in targets}) == len(targets), "repeated Go caller selection")
     return tuple(targets)

@@ -116,6 +116,15 @@ class GoCallerTests(unittest.TestCase):
         self.assertIn("data.txt", caller.compiler_inputs)
         self.assertNotIn("ordinary.go", caller.compiler_inputs)
 
+    def test_value_receiver_keeps_its_non_pointer_compiler_identity(self):
+        entry = self.materialise('package counter\ntype Counter struct{value int}\n'
+                                 'func New(value int)*Counter{return &Counter{value:value}}\n'
+                                 'func (c Counter) Add(value int)int{return c.value+value}\n',
+                                 path="counter/api.go", name="Counter.Add", receiver=True)
+        caller = self.discover(entry)
+        self.assertEqual(caller.targets[0].name, "example.test/caller/counter.Counter.Add")
+        self.assertEqual(caller.targets[0].receiver_id, "Counter")
+
     def test_missing_or_altered_planned_declaration_refuses(self):
         entry = self.materialise("package main\nfunc Add(value int)int{return value+1}\nfunc main(){}\n")
         for changed in ({**entry, "name": "Absent"}, {**entry, "parameters": []},
