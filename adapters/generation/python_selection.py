@@ -11,6 +11,7 @@ import inspect
 import keyword
 import os
 from pathlib import Path
+import re
 import stat
 
 import python_code
@@ -83,6 +84,7 @@ class Match:
     execution: int
     member: int
     sdk: int | None
+    binding: str = 'source-compiler'
 
 
 @dataclass(frozen=True)
@@ -93,6 +95,36 @@ class Coverage:
     matches: tuple[Match, ...]
 
 
+def _validate_source(source: Source) -> None:
+    require(type(source) is Source and type(source.path) is bytes and source.path.startswith(b'/') and
+            0 < len(source.path) <= inputs.MAX_PATH and b'\0' not in source.path and
+            os.path.normpath(source.path) == source.path and type(source.content) is bytes and
+            len(source.content) <= inputs.MAX_PAYLOAD and type(source.device) is int and 0 <= source.device < 2 ** 64 and
+            type(source.inode) is int and 0 < source.inode < 2 ** 64 and type(source.mtime_ns) is int and
+            type(source.mode) is int and 0 <= source.mode <= 0xffffffff and stat.S_ISREG(source.mode),
+            'invalid frozen Python input facts')
+
+
+def cache_for_source(source: bytes, cached: bytes) -> bool:
+    """An ordinary cache path identifies a source filename, not its compiled bytes."""
+    prefix = os.path.basename(source)[:-3] + b'.'
+    name = os.path.basename(cached)
+    return (source.endswith(b'.py') and os.path.dirname(cached) == os.path.join(os.path.dirname(source), b'__pycache__')
+            and name.startswith(prefix) and re.fullmatch(
+                rb'[A-Za-z0-9_-]+(?:\.opt-[0-9]+)?\.pyc', name[len(prefix):]) is not None)
+
+
+def _caches(value: tuple[Source, ...]) -> dict[bytes, Source]:
+    require(type(value) is tuple and len(value) <= inputs.MAX_RECORDS, 'invalid frozen Python cache catalogue')
+    result = {}
+    for source in value:
+        _validate_source(source)
+        require(source.path.endswith(b'.pyc') and source.path not in result, 'invalid or repeated frozen Python cache')
+        result[source.path] = source
+    require(sum(len(source.content) for source in value) <= inputs.MAX_BYTES, 'frozen Python caches exceed their byte budget')
+    return result
+
+
 def _selections(value: tuple[Selection, ...]) -> dict[tuple[bytes, str, int], Selection]:
     require(type(value) is tuple and 0 < len(value) <= inputs.MAX_RECORDS,
             "selected Python callables must be a non-empty bounded tuple")
@@ -101,13 +133,7 @@ def _selections(value: tuple[Selection, ...]) -> dict[tuple[bytes, str, int], Se
         require(type(selection) is Selection and type(selection.source) is Source,
                 "invalid caller-owned Python selection")
         source = selection.source
-        require(type(source.path) is bytes and source.path.startswith(b'/') and
-                0 < len(source.path) <= inputs.MAX_PATH and b'\0' not in source.path and
-                os.path.normpath(source.path) == source.path and type(source.content) is bytes and
-                len(source.content) <= inputs.MAX_PAYLOAD and type(source.device) is int and 0 <= source.device < 2 ** 64 and
-                type(source.inode) is int and 0 < source.inode < 2 ** 64 and type(source.mtime_ns) is int and
-                type(source.mode) is int and 0 <= source.mode <= 0xffffffff and stat.S_ISREG(source.mode),
-                "invalid frozen Python source facts")
+        _validate_source(source)
         require(source.path not in sources or sources[source.path] == source,
                 "conflicting frozen Python sources")
         sources[source.path] = source
@@ -138,7 +164,8 @@ def _source_matches(actual: inputs.SourceRecord, expected: Source) -> bool:
 
 
 def verify(journal: origin.Journal, selected: tuple[Selection, ...], *,
-           python_version: int, optimisation: int, plain: bool) -> tuple[Coverage, ...]:
+           python_version: int, optimisation: int, plain: bool,
+           caches: tuple[Source, ...] | None = None) -> tuple[Coverage, ...]:
     """Require selected execution in each lane; matching raw health is insufficient.
 
     The caller must first decode against its independently observed application
@@ -148,19 +175,25 @@ def verify(journal: origin.Journal, selected: tuple[Selection, ...], *,
     selections = _selections(selected)
     require(type(journal) is origin.Journal and journal.capture_complete and journal.entry_expected,
             "selected Python origin capture is incomplete")
-    require(type(journal.schema_version) is int and journal.schema_version == 2,
-            "source-only Python selection requires journal2")
+    version = 2 if caches is None else 3
+    require(type(journal.schema_version) is int and journal.schema_version == version,
+            'source-only Python selection requires journal2' if caches is None else 'cache Python selection requires journal3')
+    cache_inputs = {} if caches is None else _caches(caches)
     require(type(plain) is bool and type(python_version) is int and 0 <= python_version <= 0xffffffff and
             python_version >> 24 == 3 and (python_version >> 16 & 255) >= 12 and
             type(optimisation) is int and 0 <= optimisation <= 2,
             "invalid selected Python lane or interpreter")
     sources = {item.source.path: item.source for item in selected}
-    reads, roots, codes, joins = {}, {}, set(), {}
+    reads, cache_reads, roots, codes, joins = {}, {}, {}, set(), {}
     for row in journal.records:
         if type(row) is inputs.SourceRecord:
             if row.path in sources:
                 require(_source_matches(row, sources[row.path]), "selected Python source read differs from frozen input")
                 reads[row.sequence] = row
+            if row.path in cache_inputs:
+                require(row.kind == 3 and _source_matches(row, cache_inputs[row.path]),
+                        'Python cache read differs from frozen input')
+                cache_reads[row.sequence] = row
         elif type(row) is origin.Root:
             require(row.descriptor.record.python_version == python_version, "Python compiler root interpreter differs")
             roots[row.identity] = row
@@ -169,6 +202,11 @@ def verify(journal: origin.Journal, selected: tuple[Selection, ...], *,
             codes.add(row.identity)
         elif type(row) is origin.Join:
             joins[row.origin] = row.sdk
+    for root in roots.values():
+        if root.route == 3:
+            require(root.input_sequence in cache_reads and cache_for_source(
+                root.descriptor.record.path, cache_reads[root.input_sequence].path),
+                'Python cache root lacks its independently frozen source-associated input')
     require(any(type(row) is inputs.SourceRecord and row.kind == 1 for row in journal.records),
             "selected Python capture lacks its native entry")
     require(not plain or not codes and not joins, "plain Python lane contains SDK code or joins")
@@ -178,9 +216,10 @@ def verify(journal: origin.Journal, selected: tuple[Selection, ...], *,
         if type(row) is not origin.Execution:
             continue
         root = roots[row.root]
-        if root.input_sequence not in reads:
+        cached = root.route == 3
+        if root.input_sequence not in (cache_reads if cached else reads):
             continue
-        require(root.compiler_flags == 0 and root.optimisation == optimisation,
+        require(root.compiler_flags == 0 and root.optimisation == (3 if cached else optimisation),
                 "selected Python compiler inputs differ from the declared profile")
         qualname, name, line, flags = _label(root.descriptor, row.member)
         key = row.path, qualname, line
@@ -194,7 +233,8 @@ def verify(journal: origin.Journal, selected: tuple[Selection, ...], *,
                 "selected Python callable has ambiguous compiler members")
         members[member_key] = row.member
         require(plain or row.identity in joins, "selected Python execution lacks its SDK code join")
-        matches[key].append(Match(row.root, row.identity, row.member, joins.get(row.identity)))
+        matches[key].append(Match(row.root, row.identity, row.member, joins.get(row.identity),
+                                  'cache-read' if cached else 'source-compiler'))
     require(all(matches.values()), "selected Python callable lacks source-bound execution")
     require(plain or codes == {match.sdk for group in matches.values() for match in group},
             "Python SDK code is outside the declared callable selection")

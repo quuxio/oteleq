@@ -77,7 +77,7 @@ Each attempt retains the actual supervisor PID and fixed argv, caller PID, appli
 
 The [exact-revision diagnostic record](qualification/python-generated-origins-2026-10-24.json) checks 424 actual application launches, 212 SDK processes and 108 independently recomputed comparisons across the two recorded runtimes. Current-origin capture covers the native script entry and ordinary source loaders inside the application root. Application cache-only loads, unsupported loaders, complete dependency closure, broader async/resource actions, live metric controls, per-action attribution and shipping qualification remain open. Missing origin, loss or truncation is a refusal. The full [completion checklist](completion.md) remains in scope.
 
-The separate [cache context integration](python-cache-context.md) is in progress. Its explicit journal-3 data reader does not enable a generated cache profile; private cache preservation, selected-cache binding and actual generated-workflow qualification are still required.
+The separate [cache context route](python-cache-context.md) implements explicit profile-3 negotiation, private cache/timestamp preservation, both-lane selected cache-byte binding and retained context. Actual generated-workflow qualification is in progress. It keeps cache reads distinct from compilation of current source; the recorded source-only qualification above does not cover this candidate.
 
 ## Reproduce generated workflow qualification
 

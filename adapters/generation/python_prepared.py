@@ -109,7 +109,7 @@ def read(path: Path) -> tuple[dict, bytes]:
 def expected_request(intent: Intent) -> dict:
     """Resolve only independently supplied script intent, with literal arguments."""
     version = provider.profile_version(intent.profile)
-    if version == 2:
+    if version >= 2:
         optimisation(intent)
     provider.require(type(intent.plain) is bool and type(intent.arguments) is tuple
                      and all(type(item) is str and "\0" not in item for item in intent.arguments),
@@ -148,7 +148,8 @@ def expected_plan(original: dict) -> dict:
             "runtime": original["paths"]["runtime"]["resolved"], "python": original["interpreter"]["file"]["path"],
             "argv0": original["interpreter"]["argv0"],
             "native_arguments": [target, *original["arguments"]],
-            "input_scope": "native-application-root-origins" if version == 2 else "native-source-entry-only",
+            "input_scope": {1: 'native-source-entry-only', 2: 'native-application-root-origins',
+                            3: 'native-application-root-source-and-cache-origins'}[version],
             "source_complete": False}
 
 

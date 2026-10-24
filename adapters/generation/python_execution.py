@@ -63,7 +63,8 @@ def verify_shared(value: dict, expected: dict, kind: str, fields: set[str]) -> N
 def native_command(value: object, launch: dict) -> None:
     """The recorded native recipe verifies fixed inputs; it never chooses argv."""
     version = provider.profile_version(launch["request"]["profile"])
-    options = ["--origin-loader-root", launch["plan"]["cwd"]] if version == 2 else []
+    option = {2: '--origin-loader-root', 3: '--origin-loader-caches-root'}.get(version)
+    options = [option, launch['plan']['cwd']] if option is not None else []
     descriptor_index = 1 + len(options)
     provider.require(type(value) is list and all(type(item) is str for item in value)
                      and len(value) == 4 + len(options) + len(launch["plan"]["native_arguments"]),
@@ -124,12 +125,12 @@ def origin_summary(journal: python_origin.Journal, intent: prepared.Intent,
         path = Path(os.fsdecode(row.descriptor.record.path))
         path = path if path.is_absolute() else root / path
         provider.require(path.resolve(strict=True).is_relative_to(root), "Python compiler root is outside application scope")
-        provider.require(row.compiler_flags == 0 and row.optimisation == prepared.optimisation(intent),
+        provider.require(row.compiler_flags == 0 and row.optimisation == (3 if row.route == 3 else prepared.optimisation(intent)),
                          "Python compiler root flags or optimisation differ")
     codes = {row.identity for row in journal.records if type(row) is python_journal.CodeRecord}
     provider.require(not codes and not joins if intent.plain else codes == {row.sdk for row in joins},
                      "Python lane SDK code-origin coverage differs")
-    return {"schema_version": 2, "scope_root": str(root),
+    return {"schema_version": provider.profile_version(intent.profile), "scope_root": str(root),
             "root_ids": [row.identity for row in roots], "execution_ids": [row.identity for row in executions],
             "sdk_joins": [[row.sdk, row.origin] for row in joins], "failures": []}
 
@@ -138,11 +139,11 @@ def entry_evidence(runtime: Path, intent: prepared.Intent, application: int, pyt
     """Recompute the native entry summary and validate code graphs independently."""
     path = runtime / "python-inputs.journal"
     version = provider.profile_version(intent.profile)
-    journal = python_origin.read(path, application) if version == 2 else python_journal.read(path, application)
+    journal = python_origin.read(path, application, version=version) if version >= 2 else python_journal.read(path, application)
     entries = [row for row in journal.records if type(row) is python_journal.SourceRecord and row.kind == 1]
     imports = [row for row in journal.records if type(row) is python_journal.SourceRecord and row.kind == 3]
     codes = [row for row in journal.records if type(row) is python_journal.CodeRecord]
-    complete = journal.capture_complete if version == 2 else journal.complete
+    complete = journal.capture_complete if version >= 2 else journal.complete
     provider.require(complete and len(entries) == 1, "native Python entry input is incomplete")
     entry = intent.entry if intent.entry.is_absolute() else intent.project / intent.entry
     entry = entry.resolve(strict=True)
@@ -156,7 +157,7 @@ def entry_evidence(runtime: Path, intent: prepared.Intent, application: int, pyt
                      "native Python entry bytes or opened-file identity differ")
     provider.require(all(row.python_version == python_version for row in codes), "native Python code interpreter differs")
     descriptors = tuple(python_code.decode(row) for row in codes)
-    if version == 2:
+    if version >= 2:
         provider.require(all(row.descriptor.record.python_version == python_version for row in journal.records
                              if type(row) is python_origin.Root), "Python compiler root interpreter differs")
     summary = {"phase": "complete", "python_finalized": journal.python_finalized,
@@ -166,7 +167,7 @@ def entry_evidence(runtime: Path, intent: prepared.Intent, application: int, pyt
                    {"id": row.identity, "path_hex": row.path.hex(), "sha256": row.sha256,
                     "offset": row.offset, "python_version": row.python_version, "descriptor_version": row.descriptor_version}
                    for row in codes]}
-    if version == 2:
+    if version >= 2:
         summary["origins"] = origin_summary(journal, intent, captured)
     return journal, descriptors, summary
 
