@@ -1,6 +1,6 @@
 # Rebuilt Go provider integration
 
-Status: independent public-protocol, file/build, prepared-recipe and health readers are implemented. Generated integration, independent helper reproduction, owned launch integration and actual-provider workflow qualification remain in progress. These components do not admit the rebuilt provider through the scalar generator. The existing [retained Go build/replay profile](go-build-bundles.md) remains a separate recorded contract.
+Status: independent public-protocol, file/build, call-only helper/rule, prepared-recipe and health readers are implemented. Generated integration, context-profile reproduction, owned launch integration and actual-provider workflow qualification remain in progress. These components do not admit the rebuilt provider through the scalar generator. The existing [retained Go build/replay profile](go-build-bundles.md) remains a separate recorded contract.
 
 ## Explicit protocol boundary
 
@@ -16,7 +16,7 @@ Canonical data seals also bind each stored input catalogue and its file facts. E
 
 `go_build.Intent` supplies the original source snapshot, SDK and separately pinned context snapshot, selected declarations, actual tool identities and original module/settings records. The reader checks the complete build3 receipt against these caller-owned facts. It reconstructs all 15 compiler commands for the initial synchronous call profile, with no context task/HTTP hooks or lifetime selections. Returned argv is compared as data and never executed. Both binaries, the complete compiler channels, compiler inventory, selected source locations and private input catalogues are retained and rechecked after acceptance. Existing module resolutions and original module/language/toolchain/GODEBUG settings remain bound to the independent inputs.
 
-Private SDK/context bytes must match the caller's frozen profiles; original program files must retain their bytes in the private copy. Generated helpers and rules are recorded and sealed against later changes. Independent reproduction of those generated additions is still required before admitting generated execution. HTTP-enabled compiler recipes and broader context/action profiles need separate consumer implementation and qualification.
+Private SDK/context bytes must match the caller's frozen profiles; original program files must retain their bytes in the private copy. `go_hooks` independently reconstructs every generated helper, rule and tooling import for the call-only profile. It checks the exact private file denominator, selection guard, selected function indices, receiver bindings and main shutdown hook. Reserved-path/identifier collisions, extra private code and rehashed altered helpers refuse. Only closed compiler-profile error predicates can enter the generated rule. The reader never imports an SDK renderer to establish expected bytes. Independent context-profile reproduction and actual execution remain required. HTTP-enabled compiler recipes and broader context/action profiles need separate consumer implementation and qualification.
 
 ## Independent preparation
 
@@ -43,11 +43,11 @@ Observed GC, successful resource release, pending objects and unreleased resourc
 ```sh
 PYTHONPATH=tests python -m unittest -v \
   test_generation_go_files test_generation_go_source_build \
-  test_generation_go_prepared test_generation_go_health
+  test_generation_go_hooks test_generation_go_prepared test_generation_go_health
 ```
 
-The maintained literal fixtures cover protocol substitutions, wrong process/policy/selection, compiler/source/module changes, rehashed private copies and launch recipes, missing/unknown fields, exact unsigned counters, live/final separation, unclosed HTTP operations, censored lifetimes, unavailable trace observation, failed exports/drains, receiver disagreements and private-file races. All five modules are embedded with the generator and have independent 80% line-coverage floors.
+The maintained literal fixtures cover protocol substitutions, wrong process/policy/selection, compiler/source/module changes, rehashed private copies/helpers and launch recipes, extra/missing private code, invalid rule bindings, missing/unknown fields, exact unsigned counters, live/final separation, unclosed HTTP operations, censored lifetimes, unavailable trace observation, failed exports/drains, receiver disagreements and private-file races. All six modules are embedded with the generator and have independent 80% line-coverage floors. A frozen literal helper fixture is independent of the consumer renderer and needs explicit review when the recipe changes.
 
-Next connect the checked metadata, independent helper reproduction, owned execution and decoded OTLP to generated/replayed/framework/detached/reduced/promoted workflows. Existing receiver/package support, live metric schedules, source/dependency preservation and refusal controls require qualification against the new provider. Broader Go builds, cgo/workspaces, asynchronous/resource actions, shipping artefacts and the [full completion checklist](completion.md) remain open.
+Next connect the checked metadata/helper recipe, independently reproduced context profile, owned execution and decoded OTLP to generated/replayed/framework/detached/reduced/promoted workflows. Existing receiver/package support, live metric schedules, source/dependency preservation and refusal controls require qualification against the new provider. Broader Go builds, cgo/workspaces, asynchronous/resource actions, shipping artefacts and the [full completion checklist](completion.md) remain open.
 
 The intended result remains **equivalence over these tests and observations**.

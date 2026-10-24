@@ -28,7 +28,7 @@ def fixture(base: Path) -> tuple:
     for path in (original, sdk, context, output, tools):
         path.mkdir()
     (original / "go.mod").write_text("module example.test/app\n\ngo 1.26.0\n")
-    (original / "app.go").write_text("package main\nfunc Add(value int)int{return value+1}\n")
+    (original / "app.go").write_text("package main\nfunc Add(value int)int{return value+1}\nfunc main(){Add(1)}\n")
     (sdk / "go.mod").write_text("module io.quux.otelc/go\n")
     (sdk / "runtime.go").write_text("package runtime\n")
     (context / "context.go").write_text("package context\n")
@@ -46,13 +46,22 @@ def fixture(base: Path) -> tuple:
         "receiver": "", "receiver_id": "", "results": [
             {"error": False, "expression": "_unnamedRetVal0", "failure": "", "pointer": ""}],
         "sha256": files.identity(original / "app.go")["sha256"], "symbol": "Add", "variadic": False}
+    main = {**row, "name": "example.test/app.main", "line": 3, "symbol": "main", "parameters": 0, "results": []}
     inventory = {"schema_version": 1, "root": str(original), "target": ".", "main": "example.test/app",
-        "functions": [copy.deepcopy(row)], "types": [], "allocations": [],
-        "files": {"app.go": row["sha256"]}, "packages": {}, "compiler_inputs": {"app.go": row["sha256"]}}
+        "functions": [copy.deepcopy(row), main], "types": [], "allocations": [],
+        "files": {"app.go": row["sha256"]}, "packages": {"example.test/app": {"name": "main", "directory": "."}},
+        "compiler_inputs": {"app.go": row["sha256"]}}
     selection = {"schema_version": 1, "kind": "otelc.go-source-selection", "main": "example.test/app",
         "functions": [copy.deepcopy(row)], "types": [], "allocations": [], "releases": [],
         "context": {"tasks": False, "http": False}, "source_complete": False}
     selection["sha256"] = selection_digest(selection)
+    golden = json.loads((REPO / "tests/fixtures/go-source-hooks.json").read_text())
+    assert golden["selection_sha256"] == selection["sha256"]
+    for name, text in golden["files"].items():
+        path = output / "private" / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text)
+    (output / "private/go.sum").write_bytes(b"")
     settings = {"Go": "1.26.0", "Module": {"Path": "example.test/app"}}
     modules = [{"Path": "example.test/app", "Main": True, "GoVersion": "1.26.0"}]
     intent = build.Intent(output, files.freeze(original), files.freeze(sdk), ".",

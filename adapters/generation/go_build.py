@@ -6,6 +6,7 @@ from pathlib import Path
 
 import otelc_capture as capture
 import go_files as files
+import go_hooks
 from go_provider import data_seal, require, same, selection_digest
 
 FIELDS = {"schema_version", "kind", "root", "target", "selection", "inputs", "sdk_inputs",
@@ -89,6 +90,8 @@ class Build:
                 "accepted Go build metadata changed")
         for snapshot in (self.intent.original, self.intent.sdk, self.intent.context, self.private, self.sdk, self.context):
             snapshot.verify()
+        go_hooks.verify(self.intent.original, self.private, self.receipt["selection"], self.inventory,
+                        self.intent.settings["Module"]["Path"])
         require(same(files.identity(self.intent.directory / "build.json"), self.identity), "Go build receipt changed")
         for name in ("plain", "instrumented"):
             require(same(files.identity(self.intent.directory / name), self.receipt[name]), "Go binary changed")
@@ -286,6 +289,7 @@ def read(intent: Intent) -> Build:
             require(name in snapshots["private"].identities
                     and all(snapshots["private"].identities[name][key] == original[key] for key in ("sha256", "size")),
                     "Go private copy changed original program data: " + name)
+    go_hooks.verify(intent.original, snapshots["private"], receipt["selection"], inventory, intent.settings["Module"]["Path"])
     state = retained_state(receipt, identity, snapshots["private"], snapshots["sdk"], snapshots["context"], inventory, evidence)
     result = Build(intent, receipt, identity, snapshots["private"], snapshots["sdk"], snapshots["context"],
                    inventory, evidence, original_caller, data_seal(state))
