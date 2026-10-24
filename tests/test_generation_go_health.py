@@ -61,6 +61,8 @@ class GoProviderHealthTests(unittest.TestCase):
         self.assertEqual(provider.selection_digest(value), hashlib.sha256(selection).hexdigest())
         self.assertEqual(len({provider.policy_digest(value), provider.metadata_digest(value),
                               provider.selection_digest(value)}), 3)
+        self.assertNotEqual(provider.data_seal({"value": True}), provider.data_seal({"value": 1}))
+        self.assertNotEqual(provider.data_seal({"value": 1}), provider.data_seal({"value": 1.0}))
         with self.assertRaises(ValueError):
             provider.metadata_digest({"invalid": float("nan")})
 

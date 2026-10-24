@@ -6,7 +6,7 @@ from pathlib import Path
 
 import otelc_capture as capture
 import go_files as files
-from go_provider import require, same, selection_digest
+from go_provider import data_seal, require, same, selection_digest
 
 FIELDS = {"schema_version", "kind", "root", "target", "selection", "inputs", "sdk_inputs",
           "private_inputs", "context_inputs", "inventory", "plain", "instrumented", "modules_before",
@@ -51,6 +51,21 @@ class Intent:
     context: files.Snapshot
 
 
+def caller_state(intent: Intent) -> dict:
+    """Keep caller-owned compiler data fixed while producer records are read."""
+    return {"directory": str(intent.directory), "target": intent.target,
+            "original": intent.original.sealed_metadata, "sdk": intent.sdk.sealed_metadata,
+            "context": intent.context.sealed_metadata, "targets": [vars(target) for target in intent.targets],
+            "toolchain": intent.toolchain, "settings": intent.settings, "modules": intent.modules}
+
+
+def retained_state(receipt: dict, identity: dict, private: files.Snapshot, sdk: files.Snapshot,
+                   context: files.Snapshot, inventory: dict, evidence: dict) -> dict:
+    """Bind accepted records as values as well as checking their original files."""
+    return {"receipt": receipt, "identity": identity, "inventory": inventory, "evidence": evidence,
+            "private": private.sealed_metadata, "sdk": sdk.sealed_metadata, "context": context.sealed_metadata}
+
+
 @dataclass(frozen=True)
 class Build:
     """Checked retained products and independent snapshots for every later use."""
@@ -63,9 +78,15 @@ class Build:
     context: files.Snapshot
     inventory: dict
     evidence: dict[str, tuple]
+    caller_seal: str
+    metadata_seal: str
 
     def verify(self) -> None:
         """Preserve all original facts and actual private products after execution."""
+        require(data_seal(caller_state(self.intent)) == self.caller_seal
+                and data_seal(retained_state(self.receipt, self.identity, self.private, self.sdk,
+                                             self.context, self.inventory, self.evidence)) == self.metadata_seal,
+                "accepted Go build metadata changed")
         for snapshot in (self.intent.original, self.intent.sdk, self.intent.context, self.private, self.sdk, self.context):
             snapshot.verify()
         require(same(files.identity(self.intent.directory / "build.json"), self.identity), "Go build receipt changed")
@@ -219,6 +240,7 @@ def selected(value: object, intent: Intent, inventory: dict) -> dict:
 def read(intent: Intent) -> Build:
     """Check one completed source-build3 without compiler or application execution."""
     validate_intent(intent)
+    original_caller = data_seal(caller_state(intent))
     output = intent.directory
     for snapshot in (intent.original, intent.sdk, intent.context):
         snapshot.verify()
@@ -264,6 +286,8 @@ def read(intent: Intent) -> Build:
             require(name in snapshots["private"].identities
                     and all(snapshots["private"].identities[name][key] == original[key] for key in ("sha256", "size")),
                     "Go private copy changed original program data: " + name)
-    result = Build(intent, receipt, identity, snapshots["private"], snapshots["sdk"], snapshots["context"], inventory, evidence)
+    state = retained_state(receipt, identity, snapshots["private"], snapshots["sdk"], snapshots["context"], inventory, evidence)
+    result = Build(intent, receipt, identity, snapshots["private"], snapshots["sdk"], snapshots["context"],
+                   inventory, evidence, original_caller, data_seal(state))
     result.verify()
     return result

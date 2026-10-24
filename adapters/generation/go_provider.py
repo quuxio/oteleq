@@ -40,3 +40,9 @@ def metadata_digest(value: dict) -> str:
 def selection_digest(value: dict) -> str:
     """Compiler selections use compact sorted JSON without a terminal newline."""
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()).hexdigest()
+
+
+def data_seal(value: dict) -> str:
+    """Preserve caller-owned primitive data between independent verification steps."""
+    encoded = json.dumps(value, sort_keys=True, allow_nan=False, separators=(",", ":"))
+    return hashlib.sha256(encoded.encode()).hexdigest()

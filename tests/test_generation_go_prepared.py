@@ -168,6 +168,37 @@ class GoPreparedTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "frozen Go inputs"):
             result.verify()
 
+    def test_accepted_policy_response_and_evidence_values_remain_bound(self):
+        result = prepared.verify(self.response, self.intent)
+        cases = ((lambda: self.intent.policy["export"], "endpoint", "http://127.0.0.1:1"),
+                 (lambda: result.response, "command", ["/changed/interpreter"]),
+                 (lambda: result.response["plan"], "argv", ["/changed/application"]),
+                 (lambda: self.intent.interpreter, "path", "/changed/interpreter"),
+                 (lambda: result.evidence, "../escape", ({}, ())))
+        for current, key, value in cases:
+            target = current()
+            original = copy.deepcopy(target)
+            target[key] = value
+            with self.subTest(key=key), self.assertRaisesRegex(ValueError, "preparation metadata changed"):
+                result.verify()
+            target.clear(); target.update(original)
+            result.verify()
+
+    def test_policy_mutation_after_recipe_comparison_cannot_be_sealed_as_valid(self):
+        original = files.file
+        path = self.intent.runtime / "go-prepared.json"
+        reads = 0
+        def changed(name, *args, **kwargs):
+            nonlocal reads
+            result = original(name, *args, **kwargs)
+            if name == path:
+                reads += 1
+                if reads == 2:
+                    self.intent.policy["export"]["endpoint"] = "http://127.0.0.1:1"
+            return result
+        with patch.object(files, "file", side_effect=changed), self.assertRaisesRegex(ValueError, "preparation metadata changed"):
+            prepared.verify(self.response, self.intent)
+
     def test_previously_used_runtime_is_only_available_to_explicit_retained_checks(self):
         private(self.intent.runtime / "go-supervisor-start.json", {})
         with self.assertRaisesRegex(ValueError, "already used"):

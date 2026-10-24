@@ -196,6 +196,33 @@ class GoSourceBuildTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 build.validate_intent(invalid)
 
+    def test_accepted_build_and_caller_dictionaries_cannot_change_in_memory(self):
+        actual = build.read(self.intent)
+        cases = ((actual.receipt["selection"], "main", "another/module"),
+                 (actual.inventory, "main", "another/module"), (actual.identity, "size", 1),
+                 (self.intent.toolchain, "go", "/changed/compiler"), (self.intent.settings, "Go", "1.27.0"),
+                 (self.intent.modules[0], "Main", 1), (actual.evidence, "../escape", ({}, ())))
+        for target, key, value in cases:
+            original = copy.deepcopy(target)
+            target[key] = value
+            with self.subTest(key=key), self.assertRaisesRegex(ValueError, "build metadata changed"):
+                actual.verify()
+            target.clear(); target.update(original)
+            actual.verify()
+
+    def test_caller_changes_before_build_sealing_cannot_become_the_new_expectation(self):
+        freeze = files.freeze
+        changed = False
+        def mutate(path):
+            nonlocal changed
+            result = freeze(path)
+            if not changed and path == self.intent.directory / "context":
+                changed = True
+                self.intent.settings["Go"] = "1.27.0"
+            return result
+        with patch.object(files, "freeze", side_effect=mutate), self.assertRaisesRegex(ValueError, "build metadata changed"):
+            build.read(self.intent)
+
 
 if __name__ == "__main__":
     unittest.main()

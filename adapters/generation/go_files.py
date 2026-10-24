@@ -8,7 +8,7 @@ from pathlib import Path, PurePosixPath
 import stat
 
 import otelc_capture as capture
-from go_provider import require
+from go_provider import data_seal, require
 
 MAX_FILE_BYTES = 256 * 1024 * 1024
 MAX_METADATA_BYTES = 32 * 1024 * 1024
@@ -83,10 +83,18 @@ class Snapshot:
     root: Path
     identities: dict[str, dict]
     facts: dict[str, tuple]
+    sealed_metadata: str
 
     def verify(self) -> None:
         """Additions, removals, replacements and metadata changes all refuse reuse."""
+        require(snapshot_seal(self.root, self.identities, self.facts) == self.sealed_metadata,
+                "frozen Go input metadata changed")
         require(freeze(self.root) == self, "frozen Go inputs or original file facts changed")
+
+
+def snapshot_seal(root: Path, identities: dict, facts: dict) -> str:
+    """A frozen dataclass must also bind the values inside its mutable dictionaries."""
+    return data_seal({"root": str(root), "identities": identities, "facts": facts})
 
 
 def freeze(root: Path) -> Snapshot:
@@ -106,7 +114,7 @@ def freeze(root: Path) -> Snapshot:
         total += observed["size"]
         require(len(identities) < MAX_FILES and total <= MAX_TREE_BYTES, "Go input tree exceeds its file/byte budget")
         identities[name], facts[name] = observed, stable
-    return Snapshot(root, identities, facts)
+    return Snapshot(root, identities, facts, snapshot_seal(root, identities, facts))
 
 
 def content(snapshot: Snapshot) -> dict:

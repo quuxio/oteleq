@@ -31,6 +31,14 @@ class Intent:
     arguments: tuple[str, ...] = ()
 
 
+def accepted_state(intent: Intent, response: dict) -> dict:
+    """Bind mutable caller/response values before private metadata is consulted."""
+    return {"build_caller": intent.build.caller_seal, "build_metadata": intent.build.metadata_seal,
+            "runtime": str(intent.runtime), "producer": intent.producer.sealed_metadata,
+            "python": str(intent.python), "interpreter": intent.interpreter, "policy": intent.policy,
+            "plain": intent.plain, "arguments": intent.arguments, "response": response}
+
+
 @dataclass(frozen=True)
 class Prepared:
     """Checked pre-execution records; an owned application PID remains separate."""
@@ -38,9 +46,14 @@ class Prepared:
     intent: Intent
     response: dict
     evidence: dict[str, tuple]
+    accepted_seal: str
+    evidence_seal: str
 
     def verify(self) -> None:
         """Recheck sealed inputs without executing producer code or recorded argv."""
+        provider.require(provider.data_seal(accepted_state(self.intent, self.response)) == self.accepted_seal
+                         and provider.data_seal(self.evidence) == self.evidence_seal,
+                         "accepted Go preparation metadata changed")
         validate_intent(self.intent)
         for name, expected in self.evidence.items():
             actual, stable, _ = files.file(self.intent.runtime / name, private=True)
@@ -163,6 +176,8 @@ def manifest(intent: Intent, original: dict, resolved: dict, config: dict | None
 def verify(response: object, intent: Intent, *, fresh: bool = True) -> Prepared:
     """Compare the whole response and retained documents with a reconstructed recipe."""
     validate_intent(intent)
+    provider.require(type(response) is dict, "Go prepare response must be an object")
+    original_state = provider.data_seal(accepted_state(intent, response))
     provider.require(type(fresh) is bool, "invalid Go runtime freshness request")
     if fresh:
         provider.require(not any((intent.runtime / name).exists() or (intent.runtime / name).is_symlink()
@@ -186,6 +201,6 @@ def verify(response: object, intent: Intent, *, fresh: bool = True) -> Prepared:
         expected_files["config.json"] = expected_manifest["config"]["config"]
     provider.require(all(provider.same(evidence[name][0], expected) for name, expected in expected_files.items()),
                      "Go prepared files changed during independent verification")
-    result = Prepared(intent, response, evidence)
+    result = Prepared(intent, response, evidence, original_state, provider.data_seal(evidence))
     result.verify()
     return result

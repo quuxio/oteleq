@@ -27,6 +27,22 @@ class GoInputFileTests(unittest.TestCase):
         self.path.write_bytes(b"same length!")
         with self.assertRaises(ValueError): original.verify()
 
+    def test_frozen_metadata_cannot_be_coerced_without_changing_its_seal(self):
+        self.path.write_bytes(b"x")
+        snapshot = files.freeze(self.root)
+        snapshot.identities["source.go"]["size"] = True
+        with self.assertRaisesRegex(ValueError, "input metadata changed"):
+            snapshot.verify()
+
+    def test_rewriting_the_catalogue_cannot_hide_a_changed_original_input(self):
+        snapshot = files.freeze(self.root)
+        self.path.write_bytes(b"changed source")
+        current = files.freeze(self.root)
+        snapshot.identities.clear(); snapshot.identities.update(current.identities)
+        snapshot.facts.clear(); snapshot.facts.update(current.facts)
+        with self.assertRaisesRegex(ValueError, "input metadata changed"):
+            snapshot.verify()
+
     def test_arrays_duplicates_nonfinite_links_fifo_and_nonprivate_metadata_refuse(self):
         self.path.write_text('{"ok":true}'); self.path.chmod(0o600)
         self.assertEqual(files.read(self.path, private=True)[0], {"ok": True})
