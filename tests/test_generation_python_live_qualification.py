@@ -1,13 +1,14 @@
 """The live-control qualifier's fixed schedules and literal state denominators."""
 
 import json
+import hashlib
 from pathlib import Path
 import tempfile
 import tomllib
 import unittest
 
 import python_live_qualification as oracle
-from qualify_python_controls import evidence_facts
+from qualify_python_controls import check_current_routes, evidence_facts
 
 
 class PythonLiveQualificationTests(unittest.TestCase):
@@ -87,3 +88,35 @@ class PythonLiveQualificationTests(unittest.TestCase):
             self.assertEqual(evidence_facts(root), original)
             path.write_bytes(b'changed')
             self.assertNotEqual(evidence_facts(root), original)
+
+    def test_promoted_routes_require_every_method_fresh_source_and_workspace(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for name, changed in (('current-original', False), ('current-changed', True)):
+                source = root / ('current-source' if changed else 'cases/application')
+                workspace = root / name
+                workspace.mkdir()
+                (workspace / 'plan.json').write_text(json.dumps({'source': str(source), 'source_manifest': {
+                    key: hashlib.sha256(raw).hexdigest() for key, raw in oracle.sources(changed=changed).items()}}))
+                rows = [{'project_source': str(source), 'workspace': str(workspace)}]
+                for method in oracle.METHODS:
+                    path = workspace / (method + '.json')
+                    path.write_text(json.dumps({'workspace': str(workspace), 'cases': [
+                        {'function': oracle.function(method), 'arguments': [7]}]}))
+                    rows.append({'report': str(path)})
+                (root / (name + '.stdout')).write_text('\n'.join(map(json.dumps, rows)))
+            check_current_routes(root)
+            output = root / 'current-changed.stdout'
+            original = output.read_text()
+            rows = [json.loads(line) for line in original.splitlines()]
+            rows[-1] = rows[-2]
+            output.write_text('\n'.join(map(json.dumps, rows)))
+            with self.assertRaises(AssertionError):
+                check_current_routes(root)
+            output.write_text(original)
+            plan = root / 'current-changed/plan.json'
+            value = json.loads(plan.read_text())
+            value['source_manifest'][oracle.PATH] = '0' * 64
+            plan.write_text(json.dumps(value))
+            with self.assertRaises(AssertionError):
+                check_current_routes(root)

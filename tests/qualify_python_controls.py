@@ -17,6 +17,7 @@ import qualify_python_generated_origins as origins
 import qualify_python_sequences as legacy
 import sequence_qualification as shared
 from python_cache_qualification import CacheInputs
+from python_cache_receiver_workflows import check_routes as check_receiver_routes
 from qualify_project_tests import command
 
 
@@ -135,6 +136,30 @@ def evidence_facts(folder: Path) -> dict:
     return result
 
 
+def check_current_routes(folder: Path) -> None:
+    """Each promoted run must freshly test all six methods against its exact source."""
+    for name, changed in (('current-original', False), ('current-changed', True)):
+        rows = [json.loads(line) for line in (folder / (name + '.stdout')).read_text().splitlines()]
+        source = folder / ('current-source' if changed else 'cases/application')
+        assert len(rows) == len(oracle.METHODS) + 1 and rows[0]['project_source'] == str(source)
+        workspace = Path(rows[0]['workspace'])
+        assert workspace.is_relative_to(folder)
+        plan = generation.read(workspace / 'plan.json')
+        assert plan['source'] == str(source)
+        assert plan['source_manifest'] == {name: hashlib.sha256(raw).hexdigest()
+                                           for name, raw in oracle.sources(changed=changed).items()}
+        paths = [Path(row['report']) for row in rows[1:]]
+        assert len(set(paths)) == len(oracle.METHODS) and all(path.is_relative_to(folder) for path in paths)
+        functions = []
+        for path in paths:
+            report = generation.read(path)
+            assert report['workspace'] == str(workspace)
+            case, = report['cases']
+            assert case['arguments'] == [7]
+            functions.append(case['function'])
+        assert len(set(functions)) == len(oracle.METHODS) and set(functions) == set(oracle.FUNCTIONS)
+
+
 def audit(cli: Path, provider: Path, folder: Path, destination: Path, profile: str, start: str, catalogue: dict) -> dict:
     """Re-read native ownership/origins/health/raw OTLP; start no applications."""
     assert generation.read(folder / 'provider-inputs.json') == catalogue
@@ -144,6 +169,8 @@ def audit(cli: Path, provider: Path, folder: Path, destination: Path, profile: s
     assert inputs.receipt() == generation.read(folder / 'independent-inputs.json')
     assert changed.receipt() == generation.read(folder / 'current-inputs.json')
     check_operations(folder, cli, provider)
+    check_receiver_routes(folder)
+    check_current_routes(folder)
     changed_reports = {Path(row['report']) for row in map(json.loads,
         (folder / 'current-changed.stdout').read_text().splitlines()) if 'report' in row}
     assert len(changed_reports) == len(oracle.METHODS)
