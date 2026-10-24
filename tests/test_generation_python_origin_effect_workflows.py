@@ -2,6 +2,7 @@
 
 import ast
 import copy
+import hashlib
 import json
 from pathlib import Path
 import sys
@@ -15,6 +16,41 @@ import python_origin_effect_workflows as oracle
 
 
 class OriginEffectOracleTests(unittest.TestCase):
+    def test_historical_stage_plan_uses_its_frozen_source_not_the_restored_current_body(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            source = folder / 'application'
+            source.mkdir()
+            (source / 'app.py').write_text(oracle.SOURCE)
+            workspace = folder / 'changed-stage'
+            snapshot = workspace / 'snapshot'
+            snapshot.mkdir(parents=True)
+            text = oracle.stage_source('promoted-changed-body')
+            (snapshot / 'app.py').write_text(text)
+            manifest = {'app.py': hashlib.sha256(text.encode()).hexdigest()}
+            plan = {'source': str(source), 'source_manifest': manifest,
+                    'source_sha256': generation.identity(manifest)}
+            generation.write(workspace / 'plan.json', plan)
+            self.assertEqual(oracle.check_source_plan(workspace, folder, 'promoted-changed-body'),
+                             plan['source_sha256'])
+            for fault in ('manifest', 'source-hash', 'source-path', 'snapshot', 'extra-file'):
+                changed = copy.deepcopy(plan)
+                if fault == 'manifest':
+                    changed['source_manifest'] = {'app.py': hashlib.sha256(oracle.SOURCE.encode()).hexdigest()}
+                elif fault == 'source-hash':
+                    changed['source_sha256'] = '0' * 64
+                elif fault == 'source-path':
+                    changed['source'] = str(folder / 'foreign')
+                elif fault == 'snapshot':
+                    (snapshot / 'app.py').write_text(oracle.SOURCE)
+                else:
+                    (snapshot / 'extra.py').write_text('unexpected')
+                generation.write(workspace / 'plan.json', changed)
+                with self.subTest(fault=fault), self.assertRaises(AssertionError):
+                    oracle.check_source_plan(workspace, folder, 'promoted-changed-body')
+                (snapshot / 'app.py').write_text(text)
+                (snapshot / 'extra.py').unlink(missing_ok=True)
+
     def test_current_source_stages_declare_the_expected_functions_and_counter_change(self):
         for stage in ('direct', 'export', 'promoted-unchanged', 'promoted-changed-body', 'promoted-added-function'):
             source = oracle.stage_source(stage)

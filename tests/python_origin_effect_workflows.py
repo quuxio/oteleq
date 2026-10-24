@@ -141,6 +141,19 @@ def stage_source(stage: str) -> str:
     return changed + '\n' + changed[changed.index('def exercise('):].replace('def exercise(', 'def exercise_added(', 1)
 
 
+def check_source_plan(workspace: Path, folder: Path, stage: str) -> str:
+    """Bind each historical plan and private snapshot to its literal stage body."""
+    assert workspace.is_relative_to(folder)
+    plan = generation.read(workspace / 'plan.json')
+    manifest = {'app.py': hashlib.sha256(stage_source(stage).encode()).hexdigest()}
+    assert plan['source_manifest'] == manifest
+    assert plan['source_sha256'] == generation.identity(manifest)
+    source = workspace / 'snapshot' if stage == 'export' else folder / 'application'
+    assert plan['source'] == str(source)
+    assert generation.manifest(workspace / 'snapshot') == manifest
+    return plan['source_sha256']
+
+
 def selection_builder(text: str):
     """Bind literal source and AST declaration lines to prelaunch file facts."""
     functions = {node.name: node.lineno for node in ast.parse(text).body if isinstance(node, ast.FunctionDef)}
@@ -201,6 +214,8 @@ def retained(folder: Path, cli: Path, provider: Path, catalogue: dict,
     for name in expected_ops:
         assert (folder / (name + '.exit')).read_text() == '0\n'
         assert generation.read(folder / (name + '.started.json'))['expected_exit'] == 0
+    workspaces = {'direct': Path((folder / 'plan.stdout').read_text().strip()),
+                  'export': folder / 'exported'}
     reports = [('direct', folder / 'comparison/report.json'), ('export', folder / 'export-comparison/report.json')]
     for stage in ('promoted-unchanged', 'promoted-changed-body', 'promoted-added-function'):
         records = [json.loads(line) for line in (folder / (stage + '.stdout')).read_text().splitlines()]
@@ -208,9 +223,15 @@ def retained(folder: Path, cli: Path, provider: Path, catalogue: dict,
         assert len(records) == functions * 3 + 1
         workspace = Path(records[0]['workspace'])
         assert workspace.is_relative_to(folder)
+        assert records[0]['project_source'] == str(folder / 'application')
+        workspaces[stage] = workspace
         data = generation.read(workspace / 'plan.json')
         assert len([row for row in data['inventory'] if row['status'] == 'ready']) == functions
         reports.extend((stage, Path(row['report'])) for row in records[1:])
+    assert len(set(workspaces.values())) == 5
+    assert set(folder.rglob('plan.json')) == {workspace / 'plan.json' for workspace in workspaces.values()}
+    source_hashes = {stage: check_source_plan(workspace, folder, stage)
+                     for stage, workspace in workspaces.items()}
     attempts, identities, requested = set(), [], {}
     comparisons = 0
     for stage, path in reports:
@@ -218,6 +239,8 @@ def retained(folder: Path, cli: Path, provider: Path, catalogue: dict,
         functions = 2 if stage == 'promoted-added-function' else 1
         shift = int(stage in ('promoted-changed-body', 'promoted-added-function'))
         report, observed = check_report(path, shift, functions)
+        assert report['workspace'] == str(workspaces[stage])
+        assert report['source_sha256'] == source_hashes[stage]
         assert attempts.isdisjoint(observed)
         attempts |= observed
         entries = {entry['otelc_function']: entry for entry in report['inventory']}

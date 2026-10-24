@@ -174,7 +174,7 @@ def retained(folder: Path, cli: Path, provider: Path, catalogue: dict, interpret
     assert len(applications) == len(owners) == len(unique)
     assert len(sdks) == len(unique) // 2
     assert not applications & owners and not applications & sdks and not owners & sdks
-    shared.verify_sources(folder)
+    shared.verify_sources(folder, excluded=('effects-promotion',))
     assert python_inputs.artefacts(provider, {'python': Path(sys.executable).absolute()}) == catalogue
     return {'claim': 'equivalence over these tests and observations', 'artefact_class': 'diagnostic',
         'actual_application_launches': len(unique), 'sdk_processes': len(sdks), 'reports': len(reports),

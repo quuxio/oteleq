@@ -247,12 +247,14 @@ def compare_reports(folder: Path, reports: list[Path], cli: Path,
     return observations, comparisons
 
 
-def verify_sources(folder: Path) -> None:
-    """Every retained plan still binds its complete source manifest."""
+def verify_sources(folder: Path, *, excluded: tuple[str, ...] = ()) -> None:
+    """Check current sources outside explicitly separate workflow audits."""
     for path in folder.rglob("plan.json"):
+        if any(path.is_relative_to(folder / name) for name in excluded):
+            continue
         plan = json.loads(path.read_text())
         for name, expected in plan["source_manifest"].items():
-            assert hashlib.sha256((Path(plan["source"]) / name).read_bytes()).hexdigest() == expected
+            assert hashlib.sha256((Path(plan["source"]) / name).read_bytes()).hexdigest() == expected, str(path)
 
 
 def exercise_routes(cli: Path, folder: Path, workspace: Path, methods: tuple[str, ...],

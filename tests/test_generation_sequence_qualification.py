@@ -1,5 +1,6 @@
 """Shared qualification checks retain strict graph, transport and route boundaries."""
 import copy
+import hashlib
 import json
 from pathlib import Path
 import tempfile
@@ -11,6 +12,27 @@ import sequence_qualification as shared
 
 
 class SequenceQualificationTests(unittest.TestCase):
+    def test_source_checks_only_exclude_the_explicit_separately_audited_workflow(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            for name in ("receivers", "effects-promotion"):
+                workspace = folder / name
+                workspace.mkdir()
+                source = workspace / "application"
+                source.mkdir()
+                (source / "app.py").write_text("original")
+                (workspace / "plan.json").write_text(json.dumps({
+                    "source": str(source),
+                    "source_manifest": {"app.py": hashlib.sha256(b"original").hexdigest()}}))
+            shared.verify_sources(folder)
+            (folder / "effects-promotion/application/app.py").write_text("changed stage")
+            with self.assertRaises(AssertionError):
+                shared.verify_sources(folder)
+            shared.verify_sources(folder, excluded=("effects-promotion",))
+            (folder / "receivers/application/app.py").write_text("unexpected change")
+            with self.assertRaises(AssertionError):
+                shared.verify_sources(folder, excluded=("effects-promotion",))
+
     def test_contract_requires_every_root_and_the_exact_call_schedule(self):
         bundle = {"contract": {"required_roots": ["receiver"], "steps": [
             {"id": "step-0", "action": "call", "required_roots": ["receiver"]}]}}
