@@ -23,7 +23,7 @@ RECEIVED = {"trace_batches": 2, "spans": 3, "metric_batches": 2, "metric_points"
 
 def report() -> dict:
     """Literal published schema with censored objects and separate API counts."""
-    return {"schema_version": 3, "kind": "otelc.runtime-health", "language": "go", "scope": "sdk_pipeline",
+    return {"schema_version": 4, "kind": "otelc.runtime-health", "language": "go", "scope": "sdk_pipeline",
         "pid": PID, "policy_sha256": POLICY, "selection_sha256": SELECTION, "phase": "final",
         "sdk_attached": True, "source_complete": False,
         "controls": {"schema_version": 1, "pid": PID, "collection": True,
@@ -38,6 +38,7 @@ def report() -> dict:
         "metric_exports": {"observed": True, "attempts": "2", "succeeded": "2", "failed": "0", "closed": True},
         "trace_exports": {"observed": True, "attempts": "2", "succeeded": "2", "failed": "0", "closed": True,
                           "exported_spans": "3", "queue_pending": "0", "queue_dropped": "0"},
+        "http_spans": {"observed": True, "closed": True, "started": "0", "ended": "0", "active": "0"},
         "downstream_receipt": "unavailable", "otlp_partial_rejection": "unavailable"}
 
 
@@ -47,7 +48,7 @@ def validate(value: dict, **options) -> dict:
 
 def qualify(value: dict, **options) -> dict:
     return health.qualify(value, **({"pid": PID, "policy_sha256": POLICY, "selection_sha256": SELECTION,
-        "received": RECEIVED, "function_spans": 3, "observer_completions": 1} | options))
+        "received": RECEIVED, "function_spans": 3, "observer_completions": 1, "received_http_spans": 0} | options))
 
 
 class GoProviderHealthTests(unittest.TestCase):
@@ -65,11 +66,11 @@ class GoProviderHealthTests(unittest.TestCase):
 
     def test_protocol_descriptor_is_closed_and_never_coerces_numbers_or_flags(self):
         descriptor = {"schema_version": 1, "kind": "otelc.go.protocols", "profile": "go-source-v1",
-            "build": 2, "request": 1, "plan": 1, "prepared": 1, "command": 1,
-            "execution": 1, "health": 3, "embedded_sdk": True, "source_complete": False}
+            "build": 3, "config": 2, "request": 1, "plan": 1, "prepared": 1, "command": 1,
+            "execution": 1, "health": 4, "embedded_sdk": True, "source_complete": False}
         self.assertEqual(provider.verify_protocols(descriptor), descriptor)
-        for key, values in {"schema_version": [True, 1.0], "build": [1, 2.0], "request": [True, 2],
-                "profile": ["legacy", None], "health": [2, 3.0], "embedded_sdk": [1, False],
+        for key, values in {"schema_version": [True, 1.0], "build": [2, 3.0], "config": [1, 2.0], "request": [True, 2],
+                "profile": ["legacy", None], "health": [3, 4.0], "embedded_sdk": [1, False],
                 "source_complete": [0, True]}.items():
             for value in values:
                 with self.subTest(key=key, value=value), self.assertRaises(ValueError):
@@ -98,16 +99,71 @@ class GoProviderHealthTests(unittest.TestCase):
 
     def test_unobserved_traces_keep_unavailable_data_and_refuse_received_spans(self):
         value = report(); value["trace_exports"] = {"observed": False}
+        value["http_spans"] = {"observed": False}
         self.assertIs(validate(value), value)
         with self.assertRaises(ValueError):
             qualify(value)
         value["probe_accounting"].update(function_started="0", function_ended="0")
         result = qualify(value, received={**RECEIVED, "trace_batches": 0, "spans": 0}, function_spans=0)
         self.assertIsNone(result["trace_exports"])
+        self.assertIsNone(result["http_spans"])
         for item in ({"observed": False, "queue_pending": "0"}, {"observed": 0}, None):
             value["trace_exports"] = item
             with self.assertRaises(ValueError):
                 validate(value)
+
+    def test_http_operation_counts_are_separate_and_require_actual_complete_receipt(self):
+        value = report()
+        value["http_spans"].update(started="2", ended="2")
+        value["trace_exports"]["exported_spans"] = "5"
+        result = qualify(value, received={**RECEIVED, "spans": 5}, received_http_spans=2)
+        self.assertEqual(result["http_spans"], {"closed": True, "started": 2, "ended": 2, "active": 0})
+        self.assertEqual(result["probe_accounting"]["resource_released"], 0)
+        self.assertEqual(result["probe_accounting"]["gc_observed"], 0)
+        for changes in ({"started": "3"}, {"active": "1"}, {"closed": False}, {"ended": "1"}):
+            changed = copy.deepcopy(value); changed["http_spans"].update(changes)
+            self.assertIs(validate(changed), changed)
+            with self.subTest(changes=changes), self.assertRaisesRegex(ValueError, "HTTP span completions"):
+                qualify(changed, received={**RECEIVED, "spans": 5}, received_http_spans=2)
+        leaked = report(); leaked["http_spans"].update(started="1", ended="0", active="1")
+        with self.assertRaisesRegex(ValueError, "HTTP span completions"):
+            qualify(leaked)
+        with self.assertRaisesRegex(ValueError, "HTTP receipt exceeds"):
+            qualify(value, received_http_spans=4)
+
+    def test_legacy_health_and_invented_or_malformed_http_dimensions_refuse(self):
+        value = report(); value["schema_version"] = 3
+        with self.assertRaises(ValueError):
+            validate(value)
+        del value["http_spans"]
+        with self.assertRaises(ValueError):
+            validate(value)
+        for http in ({"observed": False}, {"observed": 1}, {"observed": True},
+                     {**report()["http_spans"], "active": 0}, {"observed": False, "active": "0"}):
+            with self.subTest(http=http), self.assertRaises(ValueError):
+                validate({**report(), "http_spans": http})
+        value = report(); value["trace_exports"] = value["http_spans"] = {"observed": False}
+        with self.assertRaisesRegex(ValueError, "without a recording observer"):
+            qualify(value, received_http_spans=1)
+
+    def test_runtime_directory_alias_during_read_is_refused(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            runtime = root / "runtime"; runtime.mkdir(mode=0o700)
+            path = runtime / "health.json"; path.write_text(json.dumps(report())); path.chmod(0o600)
+            original = health.os.fstat
+            replaced = False
+            def changed(descriptor):
+                nonlocal replaced
+                info = original(descriptor)
+                if not replaced and stat.S_ISDIR(info.st_mode):
+                    replaced = True
+                    moved = root / "moved"
+                    runtime.rename(moved)
+                    runtime.symlink_to(moved, target_is_directory=True)
+                return info
+            with patch.object(health.os, "fstat", side_effect=changed), self.assertRaisesRegex(ValueError, "runtime changed"):
+                health.read(runtime)
 
     def test_identity_control_and_scope_substitution_refuse(self):
         for key, invalid in (("schema_version", True), ("schema_version", 2), ("language", "java"),

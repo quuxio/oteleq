@@ -6,8 +6,8 @@ from typing import Any
 
 PROFILE = "go-source-v1"
 PROTOCOLS = {"schema_version": 1, "kind": "otelc.go.protocols", "profile": PROFILE,
-             "build": 2, "request": 1, "plan": 1, "prepared": 1, "command": 1,
-             "execution": 1, "health": 3, "embedded_sdk": True, "source_complete": False}
+             "build": 3, "config": 2, "request": 1, "plan": 1, "prepared": 1, "command": 1,
+             "execution": 1, "health": 4, "embedded_sdk": True, "source_complete": False}
 
 
 def require(condition: bool, reason: str) -> None:

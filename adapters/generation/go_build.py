@@ -1,4 +1,4 @@
-"""Bind source-build2 products to caller-owned Go inputs and a fixed recipe."""
+"""Bind source-build3 products to caller-owned Go inputs and a fixed recipe."""
 
 from dataclasses import dataclass
 import os
@@ -10,7 +10,7 @@ from go_provider import require, same, selection_digest
 
 FIELDS = {"schema_version", "kind", "root", "target", "selection", "inputs", "sdk_inputs",
           "private_inputs", "context_inputs", "inventory", "plain", "instrumented", "modules_before",
-          "modules_after", "settings", "toolchain", "commands", "source_complete", "launch_inputs", "source_roster"}
+          "modules_after", "settings", "toolchain", "commands", "source_complete", "launch_inputs", "source_roster", "runtime_protocols"}
 INVENTORY_FIELDS = {"schema_version", "root", "target", "main", "functions", "types", "allocations",
                     "files", "packages", "compiler_inputs"}
 SELECTION_FIELDS = {"schema_version", "kind", "main", "functions", "types", "allocations",
@@ -217,14 +217,15 @@ def selected(value: object, intent: Intent, inventory: dict) -> dict:
 
 
 def read(intent: Intent) -> Build:
-    """Check one completed source-build2 without compiler or application execution."""
+    """Check one completed source-build3 without compiler or application execution."""
     validate_intent(intent)
     output = intent.directory
     for snapshot in (intent.original, intent.sdk, intent.context):
         snapshot.verify()
     receipt, identity = files.read(output / "build.json")
     receipt = fields(receipt, FIELDS, "receipt")
-    require(type(receipt["schema_version"]) is int and receipt["schema_version"] == 2
+    require(type(receipt["schema_version"]) is int and receipt["schema_version"] == 3
+            and same(receipt["runtime_protocols"], {"config": 2, "health": 4})
             and receipt["kind"] == "otelc.go-source-build" and receipt["source_complete"] is False
             and receipt["root"] == str(intent.original.root) and receipt["target"] == intent.target,
             "Go build root, target or schema differs")

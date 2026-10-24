@@ -11,7 +11,7 @@ import go_files as files
 import go_provider as provider
 import python_prepared
 
-CONFIG_VERSION = 1
+CONFIG_VERSION = 2
 MAX_CONFIG_BYTES = 4 * 1024 * 1024
 DOCUMENTS = ("go-request.json", "go-plan.json", "go-prepared.json")
 EXECUTION_FILES = ("go-supervisor-start.json", "go-application-start.json", "go-execution.json", "health.json", "control.json")
@@ -131,6 +131,7 @@ def configuration(intent: Intent) -> dict:
             "timeout_ms": data["export"]["timeout_ms"], "shutdown_timeout_ms": data["export"]["shutdown_timeout_ms"],
             "collection": data["metrics"]["collection"], "emission": data["metrics"]["emission"],
             "traces_enabled": data["traces"]["enabled"], "sample_ratio": data["traces"]["sample_ratio"],
+            "http_context": data["context"]["http"],
             "functions": [row["name"] for row in selection["functions"]], "lifetimes": [],
             "max_live": data["lifetimes"]["max_live"], "boundaries": data["metrics"]["histogram_boundaries_seconds"],
             "policy_sha256": provider.policy_digest(data), "selection_sha256": selection["sha256"]}

@@ -55,9 +55,9 @@ class GoPreparedTests(unittest.TestCase):
         self.intent = prepared.Intent(built, runtime, files.freeze(producer), python,
                                      python_prepared.file_identity(python), policy, False, ("literal argument", "--flag"))
         selection = built.receipt["selection"]["sha256"]
-        self.config = {"schema_version": 1, "service_name": "literal-go-fixture", "endpoint": "http://127.0.0.1:12345",
+        self.config = {"schema_version": 2, "service_name": "literal-go-fixture", "endpoint": "http://127.0.0.1:12345",
             "interval_ms": 1000, "timeout_ms": 1000, "shutdown_timeout_ms": 10000,
-            "collection": True, "emission": True, "traces_enabled": True, "sample_ratio": 1.0,
+            "collection": True, "emission": True, "traces_enabled": True, "sample_ratio": 1.0, "http_context": False,
             "functions": ["example.test/app.Add"], "lifetimes": [], "max_live": 100, "boundaries": [0.01, 0.1],
             "policy_sha256": hashlib.sha256(json.dumps(policy, sort_keys=True).encode()).hexdigest(),
             "selection_sha256": selection}
@@ -73,7 +73,7 @@ class GoPreparedTests(unittest.TestCase):
         manifest = {"schema_version": 1, "kind": "otelc.go.prepared", "profile": "go-source-v1",
             "request_sha256": digest(request), "plan_sha256": digest(plan),
             "config": {"schema_version": 1, "kind": "otelc.go-runtime-config", "directory": str(runtime),
-                "config": config_identity, "health_version": 3,
+                "config": config_identity, "health_version": 4,
                 "environment": {"OTELC_GO_RUNTIME": str(runtime), "OTELC_GO_CONFIG_SHA256": config_identity["sha256"]}},
             "interpreter": self.intent.interpreter,
             "producer": [files.identity(producer / name) for name in ("go_supervisor.py", "prepared_go.py")],
@@ -147,7 +147,8 @@ class GoPreparedTests(unittest.TestCase):
 
     def test_rehashed_private_configuration_must_match_each_original_policy_dimension(self):
         original = copy.deepcopy(self.config)
-        for key, value in (("collection", 1), ("functions", []), ("lifetimes", [{"name": "injected", "resource": True}]),
+        for key, value in (("collection", 1), ("schema_version", 1), ("http_context", 0), ("functions", []),
+                           ("lifetimes", [{"name": "injected", "resource": True}]),
                            ("endpoint", "http://127.0.0.1:1"), ("policy_sha256", "b" * 64), ("unknown", True)):
             self.config = {**original, key: value}
             private(self.intent.runtime / "config.json", self.config); self.publish()

@@ -1,4 +1,4 @@
-"""Read Go health-3 independently and bind final accounting to actual receipt."""
+"""Read Go health-4 independently and bind final accounting to actual receipt."""
 
 import os
 from pathlib import Path
@@ -13,7 +13,7 @@ MAX_COUNTER = (1 << 64) - 1
 FIELDS = {"schema_version", "kind", "language", "scope", "pid", "policy_sha256",
           "selection_sha256", "phase", "sdk_attached", "source_complete", "controls",
           "lifecycle", "metric_flush", "probe_accounting", "metric_exports", "trace_exports",
-          "downstream_receipt", "otlp_partial_rejection"}
+          "downstream_receipt", "otlp_partial_rejection", "http_spans"}
 PROBES = {"function_started", "function_ended", "function_active", "function_lost",
           "observer_started", "observer_ended", "observer_active", "observer_lost", "unwind_unknown",
           "object_admitted", "gc_observed", "resource_released", "objects_pending",
@@ -57,6 +57,16 @@ def exporter(value: object, *, traces: bool) -> dict | None:
                     expected, "trace exports" if traces else "metric exports", closed=True)
 
 
+def http_spans(value: object) -> dict | None:
+    """HTTP operation boundaries stay separate from probes and resource release."""
+    require(type(value) is dict and type(value.get("observed")) is bool, "invalid HTTP span observation")
+    if not value["observed"]:
+        require(set(value) == {"observed"}, "invented unobserved HTTP span counters")
+        return None
+    return counters({name: item for name, item in value.items() if name != "observed"},
+                    {"started", "ended", "active"}, "HTTP spans", closed=True)
+
+
 def read(runtime: Path) -> dict:
     """Read only a completed owned private checkpoint without following links."""
     require(runtime == runtime.resolve(strict=True), "health runtime must be canonical")
@@ -79,6 +89,11 @@ def read(runtime: Path) -> dict:
                                  info.st_ctime_ns, info.st_mode, info.st_uid, info.st_nlink)
         require(len(data) == before.st_size and identity(before) == identity(after) == identity(current),
                 "health checkpoint changed while reading")
+        current_directory = runtime.lstat()
+        require(runtime.resolve(strict=True) == runtime
+                and (directory.st_dev, directory.st_ino, directory.st_mode, directory.st_uid, directory.st_gid)
+                == (current_directory.st_dev, current_directory.st_ino, current_directory.st_mode,
+                    current_directory.st_uid, current_directory.st_gid), "health runtime changed while reading")
         return strict_json(data)
     finally:
         if descriptor is not None:
@@ -89,7 +104,7 @@ def read(runtime: Path) -> dict:
 def validate(value: object, *, pid: int, policy_sha256: str, selection_sha256: str) -> dict:
     """Bind raw live/final fields to caller-owned identities without assuming quiescence."""
     value = fields(value, FIELDS, "report")
-    require(type(value["schema_version"]) is int and value["schema_version"] == 3
+    require(type(value["schema_version"]) is int and value["schema_version"] == 4
             and value["kind"] == "otelc.runtime-health" and value["language"] == "go"
             and value["scope"] == "sdk_pipeline" and value["sdk_attached"] is True
             and value["source_complete"] is False and value["phase"] in ("running", "final"),
@@ -110,18 +125,23 @@ def validate(value: object, *, pid: int, policy_sha256: str, selection_sha256: s
     counters(value["probe_accounting"], PROBES, "probes", closed=True)
     exporter(value["metric_exports"], traces=False)
     exporter(value["trace_exports"], traces=True)
+    http_spans(value["http_spans"])
+    require(value["http_spans"]["observed"] is value["trace_exports"]["observed"],
+            "HTTP span observation differs from the owned trace SDK")
     require(value["downstream_receipt"] == value["otlp_partial_rejection"] == "unavailable",
             "SDK cannot claim downstream delivery or partial-rejection knowledge")
     return value
 
 
 def qualify(value: object, *, pid: int, policy_sha256: str, selection_sha256: str,
-            received: dict, function_spans: int, observer_completions: int) -> dict:
-    """Require closed clean SDK accounting and independently decoded HTTP receipt."""
+            received: dict, function_spans: int, observer_completions: int, received_http_spans: int) -> dict:
+    """Require closed clean SDK accounting and complete diagnostic trace receipt."""
     value = validate(value, pid=pid, policy_sha256=policy_sha256, selection_sha256=selection_sha256)
     received = fields(received, {"trace_batches", "spans", "metric_batches", "metric_points"}, "received")
     require(all(type(number) is int and 0 <= number <= MAX_COUNTER
-                for number in (*received.values(), function_spans, observer_completions)), "invalid independent receipt counts")
+                for number in (*received.values(), function_spans, observer_completions, received_http_spans)),
+            "invalid independent receipt counts")
+    require(received_http_spans <= received["spans"], "HTTP receipt exceeds the complete decoded trace count")
     require(value["phase"] == "final" and value["lifecycle"] == {"flush": "succeeded", "shutdown": "succeeded"},
             "missing final successful SDK flush/shutdown")
     probes = counters(value["probe_accounting"], PROBES, "probes", closed=True)
@@ -131,6 +151,13 @@ def qualify(value: object, *, pid: int, policy_sha256: str, selection_sha256: st
                         "observer_lost", "unwind_unknown", "lifetime_lost")), "active, lost or mismatched probe completions")
     flush = counters(value["metric_flush"], {"attempts", "failed_attempts"}, "metric flush")
     require(flush["attempts"] >= 1 and flush["failed_attempts"] == 0, "missing or failed final metric flush")
+    http = http_spans(value["http_spans"])
+    if http is None:
+        require(received_http_spans == 0, "received HTTP spans without a recording observer")
+    else:
+        require(http["closed"] and http["active"] == 0
+                and http["started"] == http["ended"] == received_http_spans,
+                "active, unclosed or mismatched HTTP span completions")
     exports = {}
     for name, traces, batches in (("metric_exports", False, "metric_batches"), ("trace_exports", True, "trace_batches")):
         actual = exporter(value[name], traces=traces)
@@ -145,4 +172,4 @@ def qualify(value: object, *, pid: int, policy_sha256: str, selection_sha256: st
                         "trace receipt, queue or loss differs")
         exports[name] = actual
     return {"pid": pid, "sdk_pid": pid, "received": received.copy(), "probe_accounting": probes,
-            "metric_flush": flush, **exports, "metric_exported_points": None, "source_complete": False}
+            "metric_flush": flush, "http_spans": http, **exports, "metric_exported_points": None, "source_complete": False}
