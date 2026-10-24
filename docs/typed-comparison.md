@@ -51,4 +51,4 @@ Differences use escaped JSON Pointer paths such as `/after/receiver/calls`; init
 
 The protocol accepts all eight language IDs. That is shared comparator coverage, not evidence that each adapter has emitted or qualified every graph kind. Retained unittest/replay/export consume the typed comparator. Richer receivers/factories, additional language codecs, project build context and shipping qualification remain on the [completion checklist](completion.md).
 
-The [invocation-scoped witness proposal](action-witness.md) describes the producer/consumer work needed to bind a future generated action to an actual runtime context and compiler probe. It is not implemented by this bundle or by the current generated workers.
+The [invocation-scoped witness proposal](action-witness.md) describes the producer/consumer work needed to bind a future generated action to an actual runtime context and compiler probe. This standalone observation bundle keeps its declared witness contract. Explicit [Java private-handle workers](java-action-witness.md) provide separate compiler/context/action capture and qualified receipt checks; other generated language/context profiles remain open.

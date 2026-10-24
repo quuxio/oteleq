@@ -29,12 +29,12 @@ class Release:
 
 
 class JavaHandleCallerTests(unittest.TestCase):
-    def execute(self, parameters, output, work, main, *, instance=False, package="", actions=1, owner="Work"):
+    def execute(self, parameters, output, work, main, *, instance=False, package="", actions=1, owner="Work", references=None):
         caller = (package.replace(".", "/") + "/" if package else "") + "OteleqDriver"
         binary = (package.replace(".", "/") + "/" if package else "") + owner
         source_owner = (package + "." if package else "") + owner
         source, declarations, route = callers.members(source_owner, binary, "target", parameters, output,
-                                                     caller_owner=caller, instance=instance)
+                                                     caller_owner=caller, instance=instance, references=references)
         self.assertNotIn("io.quux.otelc", source)
         self.assertNotIn("otelc.", source)
         self.assertEqual(route.reference_kind, 5 if instance else 6)
@@ -42,8 +42,8 @@ class JavaHandleCallerTests(unittest.TestCase):
             root = Path(temporary).resolve();prefix = "package " + package + ";\n" if package else ""
             files = {"Work.java": prefix + work,
                      "OteleqDriver.java": prefix + "class OteleqDriver {\n" + source
-                         + "public static void main(String[] ignored) throws Throwable {\n" + main
-                         + "\nSystem.out.write(new byte[]{0,(byte)255,10});System.err.write(new byte[]{1,(byte)254,10});}\n}",
+                         + "public static void main(java.lang.String[] ignored) throws java.lang.Throwable {\n" + main
+                         + "\njava.lang.System.out.write(new byte[]{0,(byte)255,10});java.lang.System.err.write(new byte[]{1,(byte)254,10});}\n}",
                      "OteleqRendezvous.java": callers.helper_source(package)}
             for name, text in files.items():(root / name).write_text(text)
             before = {name: hashlib.sha256((root / name).read_bytes()).hexdigest() for name in files}

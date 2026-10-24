@@ -112,6 +112,17 @@ class JavaProfileTests(unittest.TestCase):
             self.assertLessEqual(set(profiles.LICENCES.values()), set(frozen))
             entry = {"language": "java", "java_backend": "prepared", "java_profile": profiles.SAFE}
             generation.provider_stable(root, "java", {"java": java}, frozen, entry)
+            action_entry = {**entry, 'java_witness_profile': 'java-sync-private-handle-v1'}
+            with self.assertRaisesRegex(ValueError, 'missing'):
+                provider.artefacts(root, {'java': java}, profiles.SAFE, action=True)
+            helper = root / provider.HELPER;helper.write_bytes(b'offline compiler and witness helper')
+            action_frozen = provider.artefacts(root, {'java': java}, profiles.SAFE, action=True)
+            self.assertIn(provider.HELPER, action_frozen)
+            self.assertNotIn(provider.HELPER, frozen)
+            generation.provider_stable(root, 'java', {'java': java}, action_frozen, action_entry)
+            helper.write_bytes(b'changed helper')
+            with self.assertRaisesRegex(ValueError, 'SDK or selected tools changed'):
+                generation.provider_stable(root, 'java', {'java': java}, action_frozen, action_entry)
             patch_path = root / profiles.PATCH
             with zipfile.ZipFile(patch_path, "a") as archive:
                 archive.comment = b"changed packaging"

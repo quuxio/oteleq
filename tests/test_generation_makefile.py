@@ -20,7 +20,8 @@ class QualificationRecipeTests(unittest.TestCase):
             for flag in ("--cli", "--comparator"):
                 if line.startswith("\t") and flag + " " in line:
                     targets[target] = flag
-        self.assertEqual(len(targets), 41)
+        self.assertEqual(len(targets), 42)
+        self.assertIn("generation-python-origins-otelc", targets)
         self.assertIn("python-provider-metadata-otelc", targets)
         self.assertIn("generation-cpp-sequence-otelc", targets)
         self.assertIn("generation-python-sequence-otelc", targets)
@@ -39,6 +40,7 @@ class QualificationRecipeTests(unittest.TestCase):
         self.assertIn("generation-java-receiver-otelc", targets)
         self.assertIn("generation-java-sequence-otelc", targets)
         self.assertIn("generation-java-controls-otelc", targets)
+        self.assertIn("generation-java-actions-otelc", targets)
         self.assertIn("generation-java-startup-otelc", targets)
         self.assertIn("generation-java-project-otelc", targets)
         self.assertIn("generation-java-archive-otelc", targets)
@@ -75,6 +77,16 @@ class QualificationRecipeTests(unittest.TestCase):
                             self.assertEqual(arguments[arguments.index('--startup-state') + 1], 'both-on')
                         if name == 'generation-java-startup-otelc':
                             self.assertEqual(arguments[arguments.index('--java-profile') + 1], 'safe-methods-v1')
+                        if name == 'generation-java-actions-otelc':
+                            self.assertEqual(arguments[arguments.index('--java-profile') + 1], 'safe-methods-v1')
+
+    def test_java_action_recipe_retains_explicit_profile_and_retained_only_mode(self):
+        result = subprocess.run(['make', '--no-print-directory', '-n', 'generation-java-actions-otelc',
+            'OTELC_ROOT=/tmp/provider', 'REPORT_DIR=/tmp/evidence', 'PYTHON=/selected/python',
+            'JAVA_ACTION_PROFILE=archive-methods-v1', 'GENERATION_ARGS=--retained-only'],
+            cwd=ROOT, capture_output=True, text=True, check=True)
+        self.assertIn('/selected/python tests/qualify_java_generated_actions.py', result.stdout)
+        self.assertIn('--java-profile "archive-methods-v1" --retained-only', result.stdout)
 
     def test_node_control_recipe_retains_the_explicit_startup_state(self):
         result = subprocess.run(['make', '--no-print-directory', '-n', 'generation-node-controls-otelc',

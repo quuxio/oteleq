@@ -5,6 +5,7 @@ JAVA_BACKEND ?= legacy
 GETTER_EXPECTATION ?= different
 JAVA_PROFILE ?= stock-methods-v1
 PYTHON_PROFILE ?= python-native-inputs-v1
+JAVA_ACTION_PROFILE ?= safe-methods-v1
 NODE_CONTROL_STARTUP ?= both-on
 JAVA_CONTROL_STARTUP ?= both-on
 JAVA_STARTUP_PROFILE ?= safe-methods-v1
@@ -12,6 +13,7 @@ MARKDOWNLINT ?= ./ci/markdownlint/node_modules/.bin/markdownlint
 
 .PHONY: generation-project-tests-otelc generation-preconditions-otelc generation-domains-otelc generation-input-walks-otelc generation-retained-source-otelc generation-native-project-otelc generation-return-otelc generation-java-sequence-otelc generation-java-controls-otelc generation-java-project-otelc generation-java-archive-otelc generation-node-project-otelc
 .PHONY: node-source-context-check
+.PHONY: generation-java-actions-otelc
 .PHONY: python-provider-metadata-otelc
 .PHONY: python-provider-runtime-otelc
 .PHONY: generation-python-origins-otelc
@@ -40,6 +42,7 @@ help:
 	@printf '%s\n' 'generation-java-startup-otelc Qualify Java startup flags and retained routes (JAVA_CONTROL_STARTUP, JAVA_STARTUP_PROFILE)'
 	@printf '%s\n' 'generation-java-bindings-otelc Qualify offline action bindings without starting the application'
 	@printf '%s\n' 'generation-java-handles-otelc Qualify generated private-handle bytecode and offline bindings'
+	@printf '%s\n' 'generation-java-actions-otelc Qualify generated Java action execution, retained routes and altered-evidence refusals (JAVA_ACTION_PROFILE)'
 	@printf '%s\n' 'generation-java-sequence-otelc Qualify Java call sequences and recursive telemetry (JAVA_BACKEND)'
 	@printf '%s\n' 'generation-cpp-sequence-otelc Qualify ordered C++ state, errors, aliases and recursive telemetry'
 	@printf '%s\n' 'generation-python-sequence-otelc Qualify ordered Python package receivers and complete raw/typed graphs'
@@ -174,6 +177,10 @@ generation-check: node-observer-check node-sequence-check node-source-context-ch
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_witness.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_action.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_action_session.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_actions.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_action_launch.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_action_run.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_action_telemetry.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_action_receipt.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_action_bindings.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/java_handle_callers.py' --fail-under=80
@@ -312,6 +319,11 @@ generation-java-bindings-otelc:
 generation-java-handles-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	$(PYTHON) tests/qualify_java_handle_bindings.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)"
+
+generation-java-actions-otelc:
+	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
+	cargo build --locked
+	$(PYTHON) tests/qualify_java_generated_actions.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" --java-profile "$(JAVA_ACTION_PROFILE)" $(GENERATION_ARGS)
 
 generation-java-startup-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"

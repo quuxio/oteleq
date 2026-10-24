@@ -286,6 +286,19 @@ class JavaActionReceiptTests(unittest.TestCase):
         report, message = fixture();message.resource_spans[0].scope_spans[1].spans[0].status.code = 2
         with self.assertRaises(ValueError):qualify(report, message)
 
+    def test_interval_refusal_identifies_trace_spans_and_exact_timestamp_deltas(self):
+        edits = ((0, 2, "end_time_unix_nano", 3924, "5", "4", 10, 3124),
+                 (1, 0, "start_time_unix_nano", 19, "4", "3", -1, -100))
+        for group, index, field, value, child, parent, start_delta, end_delta in edits:
+            report, message = fixture(recursive=True)
+            setattr(message.resource_spans[0].scope_spans[group].spans[index], field, value)
+            with self.subTest(field=field), self.assertRaises(ValueError) as caught:
+                qualify(report, message)
+            self.assertIn("scoped child lies outside its parent interval", str(caught.exception))
+            for item in ("trace=" + "1" * 32, "child=" + child * 16, "parent=" + parent * 16,
+                         "start_delta_ns=" + str(start_delta), "end_delta_ns=" + str(end_delta)):
+                self.assertIn(item, str(caught.exception))
+
     def test_producer_counts_and_forged_joint_omission_cannot_replace_actual_method_receipt(self):
         report, message = fixture();report["scopes"][0]["target_entries"] = "2"
         with self.assertRaises(ValueError):qualify(report, message)

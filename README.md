@@ -83,7 +83,7 @@ Declared [Python ordered calls](docs/ordered-sequences.md#python-call-sequences)
 
 Rebuilt Python [prepared execution](docs/python-prepared-provider.md) has an explicit generated worker route when `adapters.python.backend = "prepared"` and `profile = "python-native-origins-v2"` are both selected. It checks target/declared source creation origins in both lanes, actual process identities, direct health and decoded telemetry. Generated/retained qualification is in progress; the original input-only prepared profile stays blocked, and the default legacy provider is unchanged.
 
-Independent [Java action readers, offline bindings, typed private JDK callers and decoded-trace validation](docs/java-action-witness.md) are implemented for integration work. The explicit private-handle components bind schema-3 route identity to caller-owned declarations. Generated invocation-scoped SDK execution and its complete provider qualification remain open; existing generated Java workers retain their documented witness limits.
+The explicit [Java private-handle action profile](docs/java-action-witness.md#generated-private-handle-profile) connects generated callers, offline bindings, public preparation, host control, typed outcomes, decoded traces, function metrics and final SDK health. Its [160-JVM diagnostic qualification](docs/qualification/java-generated-actions-2026-10-24.json) covers the recorded safe/archive provider, retained workflows and four metric startup states. Broader Java build, object, asynchronous and shipping scope remains open. Default generated Java profiles retain their documented witness limits.
 
 ### Build
 

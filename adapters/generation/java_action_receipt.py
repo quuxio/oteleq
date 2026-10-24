@@ -138,7 +138,10 @@ def _tree(scope: dict, rows: dict, action: Action) -> dict:
             owner = rows[parent][0]
             witness.require(owner.start_time_unix_nano <= span.start_time_unix_nano
                             <= span.end_time_unix_nano <= owner.end_time_unix_nano,
-                            "scoped child lies outside its parent interval")
+                            "scoped child lies outside its parent interval: "
+                            f"trace={span.trace_id.hex()} child={key} parent={parent} "
+                            f"start_delta_ns={span.start_time_unix_nano - owner.start_time_unix_nano} "
+                            f"end_delta_ns={span.end_time_unix_nano - owner.end_time_unix_nano}")
     witness.require(capture.trace_roots(nodes) == 1 and roles["wrapper"] == [root]
                     and roles["target"] == [target] and not rows[root][0].parent_span_id
                     and children[root] == [target], "action lacks its sole wrapper/target root")

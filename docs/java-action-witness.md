@@ -2,7 +2,7 @@
 
 ## Status
 
-The independent `java-sync-action-v2` control/final and decoded-trace readers, offline binding bridge and ordinary JDK private harness channel are implemented components. An explicitly selected `java-sync-private-handle-v1` control/final reader also checks the schema-3 route identity and verification flag. Generated prepared-Java action scopes are not yet available: generated caller wiring, actual SDK control integration and complete qualification with a real frozen producer remain required. Existing generated workers retain their documented name-only witness. These components do not establish equivalence of a shipping artefact.
+The independent `java-sync-action-v2` control/final and decoded-trace readers, offline binding bridge and ordinary JDK private harness channel are implemented. The explicit `java-sync-private-handle-v1` generated profile now connects typed callers, offline compilation, public SDK preparation, host action control, application outcomes, decoded traces, function metrics and final pipeline health. The [160-JVM qualification](qualification/java-generated-actions-2026-10-24.json) covers the recorded synchronous safe/archive workflows and 32 altered-evidence refusals on the frozen provider with clock and completion fixes. Broader callable/build/context profiles remain open. Default generated profiles retain their documented name-only witness. These diagnostic helpers do not establish equivalence of a shipping artefact.
 
 The [shared witness design](action-witness.md) remains the acceptance boundary. A producer acknowledgement cannot replace actual receiver evidence, and successful framing cannot qualify invocation attribution.
 
@@ -14,7 +14,53 @@ The parent freezes a case ID, attempt ID and ordered distinct action IDs. Each r
 
 The selected producer context must match that independently reported Java thread ID before arming. The consumer also binds its opaque cookie and freshness sequence to the runtime instance and frozen compiler/build/probe identities. Another envelope becoming ready first cannot be treated as the intended action. A concurrent action can cause refusal under the initial one-active-action profile; it must not cause false attribution. Virtual threads and asynchronous migration require separate support and remain unavailable.
 
-`java_action_session.Session` connects the ordinary harness to the explicitly selected producer protocol. Before releasing a call it binds the actual JVM and Java thread, frozen case/attempt/build/probe identities, fresh producer context and handle route. It completes each previous scope before permitting the next call. A final ordinary harness barrier keeps the JVM alive until every declared scope has completed. Baseline execution uses the same harness without SDK queries. Separately captured application outcome kinds are joined to the retained pre-release identities for decoded receipt checks. Missing readiness, changed plans, foreign contexts, refused arms and incomplete scopes cannot become successful skips. Transient end replies must still identify the exact pending context before a retry is allowed; they cannot also claim completion. The host retains at most 4,096 control replies and 32 MiB of encoded reply JSON. Exceeding either budget refuses before another call is released. This host component still requires generated runner/launch integration, final health and actual-provider qualification before generated invocation admission.
+`java_action_session.Session` connects the ordinary harness to the explicitly selected producer protocol. Before releasing a call it binds the actual JVM and Java thread, frozen case/attempt/build/probe identities, fresh producer context and handle route. It completes each previous scope before permitting the next call. A final ordinary harness barrier keeps the JVM alive until every declared scope has completed. Baseline execution uses the same harness without SDK queries. Separately captured application outcome kinds are joined to the retained pre-release identities for decoded receipt checks. Missing readiness, changed plans, foreign contexts, refused arms and incomplete scopes cannot become successful skips. Transient end replies must still identify the exact pending context before a retry is allowed; they cannot also claim completion. The host retains at most 4,096 control replies and 32 MiB of encoded reply JSON. Exceeding either budget refuses before another call is released. The generated composition below adds launch, outcome, metric and health checks; its recorded actual-provider qualification is described below.
+
+## Generated private-handle profile
+
+Select the diagnostic profile explicitly in the generation policy:
+
+```toml
+[adapters.java]
+backend = "prepared"
+profile = "safe-methods-v1"
+witness_profile = "java-sync-private-handle-v1"
+```
+
+`archive-methods-v1` is also an explicit implementation route and retains its separate source-root/classpath and runtime-archive checks. Its recorded generated action corpus forces selected-JDK multi-release member resolution and an application/SDK helper package collision. Stock, legacy and unknown witness selections refuse this option. A matching prebuilt SDK must expose the public schema-3 offline compiler, isolated CLI startup, prepare-only witness API and runtime protocol; another profile cannot be selected from returned metadata.
+
+Use the ordinary `plan`, `generate`, `run`, `replay`, `export-tests`, `shrink` and `promote` commands with the selected policy. Generated files remain in the owned external workspace. Existing scalar input, declared receiver/factory, state-observation and sequence limits still apply. The helper does not create arbitrary objects, qualify asynchronous calls or establish shipping-artefact identity.
+
+The build resolves source declarations against compiler-owned binary class names, compiles the same ordinary JDK helpers in both lanes and obtains exact offline role/handle bindings before SDK preparation. Planning freezes the helper JAR as well as SDK sources and selected tools. Preparation cannot rewrite the caller-owned binding or compiler record. The consumer independently reconstructs argv, action properties, metadata, complete tooling inventory, compiler probes and route digest. SDK launch input files may be mode 0600 or 0644 only under the owned mode-0700 runtime; binding and final-report readers retain their mode-0600 requirement.
+
+The host hashes the complete frozen concrete case, generates a fresh attempt ID and fixes ordered action IDs before execution. `java_action_run.Session` composes action and optional live metric controllers under the original executor deadline and actual JVM identity. The socket lives beside the short owned SDK runtime. Both lanes use the same rendezvous and final barrier. Compiler publications are rechecked before and after execution, including identical-byte file replacement.
+
+Every attempted execution retains `java-actions/record.json` with expected identities, actual readiness/releases, arm/completion records and terminal readiness. Bounded control-history files retain raw SDK replies. Each file is at most 4 MiB; there are at most sixteen control-history files. Opened-file snapshots detect later replacement. Sockets close on success, error and cancellation. Raw OTLP is retained after receiver shutdown, including failed executions. A retention failure remains a separate diagnostic on an existing execution error.
+
+`java_action_telemetry` parses ordinary typed observations to obtain each call's return/error kind. It joins those outcomes to the pre-release host identities and independently decoded scoped trees. Function metrics count only selected-method spans, including recursion. Diagnostic `otelc.action.wrapper` and `otelc.action.target` spans have separate count labels in the comparison witness and contribute to final pipeline health. Unscoped selected calls remain visible and contribute to ordinary global function metrics; they cannot satisfy a declared action or a live metric schedule. Live schedules derive each call's collected measurements from its scoped selected-method count and check retained emission-off measurements on restoration.
+
+`verified-actions.json`, `verified-controls.json` when requested, and `verified-health.json` retain the separate conclusions. SDK acknowledgement or matching span names alone cannot qualify a generated action. The published record below identifies the exact qualified provider, callable shapes, workflows and remaining limits.
+
+The maintained contributor corpus uses a selected full JDK 21, qualified Python host, prebuilt SDK and new output directory:
+
+```sh
+make generation-java-actions-otelc OTELC_ROOT=/path/to/otelc \
+  REPORT_DIR=/path/to/new-report JAVA_ACTION_PROFILE=safe-methods-v1
+```
+
+Repeat with `JAVA_ACTION_PROFILE=archive-methods-v1` to force selected-JDK multi-release JAR resolution and SDK helper relocation. Each profile checks private static and receiver calls, complete literal state/error/alias graphs, independent metric startup states, generated/detached suites, frozen replay, scalar reduction, current-source promotion and changed current bodies. Altered copies of real retained evidence must refuse; they start no applications. The independent auditor checks compiler/class inventories, actual process and harness records, every control transition, decoded action trees, function metrics and final pipeline health. `GENERATION_ARGS=--retained-only` rechecks the recorded routes and freshly repeats the refusal controls without launching applications. Matching lanes cannot replace the fixed fixture oracles, and copied shrink records cannot inflate the launch count.
+
+## Published qualification
+
+The [24 October record](qualification/java-generated-actions-2026-10-24.json) qualifies runtime and readers `479f266` against frozen SDK candidate [`42258a4`](https://github.com/quuxio/otelc/commit/42258a4ff8d79682c552274f014b17348c9e05cb), which includes the clock and completion fixes. Safe and archive profiles each complete 19 reports and 80 distinct application JVMs. Complete literal oracles check 1,128 boundary graphs in total; independent host/compiler/receipt checks cover 188 action scopes, 852 spans and 32 altered-evidence refusals. Fresh retained-only audits also pass on Python 3.14 without starting applications. The runtime's full gate passes 1,090 generation tests and preserves all 479 tracked source files. Merged SDK [`217d4f2`](https://github.com/quuxio/otelc/commit/217d4f2d5c4c44606e16272e19b682938e046027) has the identical qualified source tree. Independent compatibility checks preserve all 362 source files, executable modes and four runtime products. The captures retain their original candidate identity and counts; this source-identical delivery check starts no new applications.
+
+The cases cover one private static target and a declared private receiver with four ordered calls, recursion, a supported original exception class/message and receiver aliases. All four initial metric states, generated/detached suites, replay, scalar reduction and unchanged/changed current-source promotion are checked. An intentional same-return global mutation remains a failed equivalence test through replay and reduction.
+
+An earlier detached safe-profile run against SDK `1b02dbc` correctly refused a recursive target span ending 3,124 ns after its parent method span. That raw failure remains retained. Independent regressions reproduce three clock failures on unchanged SDK production and pass after the producer fix; all 76 extension classes match an independent rebuild. The consumer keeps its strict parent-interval checks.
+
+Separate SDK completion checks reproduce two failures on the original `45b7564` completion observer, then pass 79 Java tests and actual-agent tests on Python 3.12 and 3.14 after `42258a4`. All 76 extension classes match an independent rebuild. These checks cover original future/throwable preservation without application error formatting for supported JDK completion stages. They do not extend the generated synchronous action qualification to asynchronous targets or custom stage implementations.
+
+These are selected synchronous diagnostic workloads on macOS ARM64 and JDK 21. General build systems/modules, arbitrary factories/object arguments, asynchronous or virtual-thread attribution, other language action witnesses and shipping artefacts remain open. The full [completion checklist](completion.md) remains in force.
 
 ## Offline compiler bindings
 
@@ -30,7 +76,7 @@ With the matching prebuilt SDK and a selected full JDK, qualify the offline API 
 make generation-java-bindings-otelc OTELC_ROOT=/path/to/otelc REPORT_DIR=/path/to/new-report
 ```
 
-The retained qualification compiles a source fixture whose class initialiser leaves a sentinel if executed. It accepts the direct private target, refuses a wrong target descriptor and a reflected wrapper, and requires that sentinel to remain absent. No application is launched. This contributor command qualifies offline metadata only; generated invocation execution and shipping qualification remain open.
+The retained qualification compiles a source fixture whose class initialiser leaves a sentinel if executed. It accepts the direct private target, refuses a wrong target descriptor and a reflected wrapper, and requires that sentinel to remain absent. No application is launched. This contributor command qualifies offline metadata only; generated execution needs its separate provider qualification. Shipping qualification remains open.
 
 ## Explicit versioned reader
 
@@ -46,7 +92,7 @@ The `java-sync-private-handle-v1` reader requires explicit selection through `pr
 
 Each schema-3 scope has an exact boolean `route_verified`. An incomplete scope may retain `false`; a producer completion claim requires `true` as well as all the existing exits, span sets, queue and checkpoint evidence. Default reader calls still accept only v2. Neither version can select the other from its fields, and unknown profiles refuse before socket I/O.
 
-Decoded receipt validation uses the frozen identity's explicit profile. The handle route does not relax the complete tree, compiler probe, context, interval, loss or application-outcome checks below. Generated runner activation and complete consumer qualification remain open.
+Decoded receipt validation uses the frozen identity's explicit profile. The handle route does not relax the complete tree, compiler probe, context, interval, loss or application-outcome checks below. The generated profile explicitly activates these checks and has the bounded [actual-provider qualification](#published-qualification).
 
 ## Typed private JDK callers and bindings
 
@@ -62,13 +108,13 @@ With a matching prebuilt SDK, run the separate offline contributor qualification
 make generation-java-handles-otelc OTELC_ROOT=/path/to/otelc REPORT_DIR=/path/to/new-report
 ```
 
-The fifteen-case corpus compiles generated private callers for all eight primitive types, String, void, instance arrays and wide instance arguments. It refuses a different expected handle field, a wrong target descriptor and a handle wrapper offered to v2. An application-initialisation sentinel must stay absent. Compiler helper processes run; target applications do not. These checks qualify emitted bytecode and offline metadata. The generated execution pipeline still needs binding/launch integration, host control and complete actual-provider qualification before these components can admit invocation-scoped generated results.
+The fifteen-case corpus compiles generated private callers for all eight primitive types, String, void, instance arrays and wide instance arguments. It refuses a different expected handle field, a wrong target descriptor and a handle wrapper offered to v2. An application-initialisation sentinel must stay absent. Compiler helper processes run; target applications do not. These checks qualify emitted bytecode and offline metadata. The separate generated execution composition has the recorded synchronous qualification above; other shapes and contexts need their own evidence.
 
 ## Independent decoded action trees
 
 `java_action_receipt.py` compares actual decoded trace records with separately retained harness/arm identities captured before release and independently captured application outcome kinds. Final producer fields cannot supply those expectations. Every declared action must match its actual PID/runtime, case/attempt, logical thread, context cookie, sequence and scope ID. Final supported drain and zero observed queue loss are required. Resource and instrumentation-scope attributes also require zero drops and unique typed entries.
 
-The synchronous diagnostic contract selects one source-bound method and its recursion. Each action needs its own fresh trace, one wrapper root and the exact target probe directly beneath that root. Every target or recursive-target probe needs its selected-method child, with the declared namespace/method and pinned instrumentation scope. The complete decoded span-ID set must equal the producer's started, ended and exported sets. Parent edges, intervals, exception status, compiler probe IDs and all nine action/build identity attributes are checked independently. Synchronous recursive siblings must not overlap, regardless of arrival order; equal end/start boundaries are permitted. Missing methods cannot be hidden by reducing both the producer count and the decoded receipt. Unattributed spans inside an action trace, duplicate spans, unknown scopes, unsupported links and dropped observations refuse.
+The synchronous diagnostic contract selects one source-bound method and its recursion. Each action needs its own fresh trace, one wrapper root and the exact target probe directly beneath that root. Every target or recursive-target probe needs its selected-method child, with the declared namespace/method and pinned instrumentation scope. The complete decoded span-ID set must equal the producer's started, ended and exported sets. Parent edges, intervals, exception status, compiler probe IDs and all nine action/build identity attributes are checked independently. A parent-interval refusal includes the trace, child and parent span IDs plus the signed child-minus-parent start/end timestamp deltas in nanoseconds. Synchronous recursive siblings must not overlap, regardless of arrival order; equal end/start boundaries are permitted. Missing methods cannot be hidden by reducing both the producer count and the decoded receipt. Unattributed spans inside an action trace, duplicate spans, unknown scopes, unsupported links and dropped observations refuse.
 
 Serial action root intervals must also follow the declared action order without overlap; equal end/start boundaries are permitted. Background spans remain retained outside the action counts. Metric bodies also remain retained; this component does not decode or qualify them. Final global SDK pipeline health, metric accounting, source/build binding, typed application observations and independent repeats remain separate requirements before generated admission. The decoder accepts at most 4,096 bodies, 32 MiB of raw data and 65,536 decoded spans; exceeding a budget refuses. Its retained receipt digest includes route and body lengths, preserving batch order and boundaries.
 

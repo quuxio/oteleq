@@ -3,6 +3,7 @@ from collections.abc import Callable
 import json
 from pathlib import Path
 import java_live
+import java_actions
 
 
 PRIMITIVES = {"boolean", "byte", "short", "int", "long", "char", "float", "double"}
@@ -122,8 +123,20 @@ constructed=factory.invoke(null,new java.lang.Object[]{{{factory_args}}});'''
     model_fields = ",".join("new java.lang.String[]{" + ",".join(json.dumps(field["name"]) for field in model["fields"]) + "}" for model in models)
     model_types = ",".join("new java.lang.Class<?>[]{" + ",".join(field["type"] + CLASS_LITERAL for field in model["fields"]) + "}" for model in models)
     model_modifiers = ",".join("new int[]{" + ",".join(str(field["modifiers"]) for field in model["fields"]) + "}" for model in models)
+    caller, invoke, thrown, finish = "", "result=target.invoke(receiver,arguments);", "java.lang.Exception", ""
+    failure = '''java.lang.reflect.InvocationTargetException invocation){
+java.lang.Throwable cause=invocation.getCause();if(!(cause instanceof java.lang.Exception))throw new java.lang.AssertionError("target throwable requires another codec");failure=(java.lang.Exception)cause;'''
+    if java_actions.enabled(entry):
+        caller = java_actions.members(entry)[0]
+        actual = ",".join(["receiver", *["(" + type_ + ")arguments[" + str(index) + "]"
+                                      for index, type_ in enumerate(entry["parameters"])]])
+        invoke = ("" if entry["output"] == "void" else "result=") + "oteleqEnvelope(" + actual + ");"
+        failure = '''java.lang.Throwable caught){
+if(!(caught instanceof java.lang.Exception))throw new java.lang.AssertionError("target throwable requires another codec");
+failure=(java.lang.Exception)caught;'''
+        thrown, finish = "java.lang.Throwable", java_actions.FINISH
     template = r'''class OteleqDriver {
-@CHECKPOINT_HELPER@
+@ACTION_CALLER@@CHECKPOINT_HELPER@
 static OteleqGraph observer() throws java.lang.Exception {
 return new OteleqGraph(new java.lang.Class<?>[]{@MODELS@},new java.lang.String[][]{@FIELDS@},new java.lang.Class<?>[][]{@TYPES@},new int[][]{@MODIFIERS@});
 }
@@ -135,11 +148,10 @@ java.util.ArrayList<java.lang.Class<?>> types=new java.util.ArrayList<>(java.uti
 if(outcome){names.add(failure==null?"result":"error");values.add(failure==null?result:failure);types.add(failure==null?@OUTPUT@.class:java.lang.Exception.class);}
 return observer.graph(names.toArray(new java.lang.String[0]),values.toArray(),types.toArray(new java.lang.Class<?>[0]));
 }
-static java.lang.String[] call(@OWNER@ receiver,java.lang.Object[] arguments,java.lang.reflect.Method target) throws java.lang.Exception {
+static java.lang.String[] call(@OWNER@ receiver,java.lang.Object[] arguments,java.lang.reflect.Method target) throws @THROWN@ {
 java.lang.String before=graph(receiver,arguments,null,null,false);
 java.lang.Object result=null;java.lang.Exception failure=null;
-try{result=target.invoke(receiver,arguments);}catch(java.lang.reflect.InvocationTargetException invocation){
-java.lang.Throwable cause=invocation.getCause();if(!(cause instanceof java.lang.Exception))throw new java.lang.AssertionError("target throwable requires another codec");failure=(java.lang.Exception)cause;}
+try{@INVOKE@}catch(@FAILURE@}
 java.lang.String outcome=graph(receiver,arguments,result,failure,true);
 java.lang.String after=graph(receiver,arguments,null,null,false);
 return new java.lang.String[]{before,"{\"kind\":\""+(failure==null?"return":"error")+"\",\"value\":"+outcome+"}",after};
@@ -147,7 +159,7 @@ return new java.lang.String[]{before,"{\"kind\":\""+(failure==null?"return":"err
 static java.lang.String boundaries(java.lang.String[] capture){
 return "\"before\":"+capture[0]+",\"outcome\":"+capture[1]+",\"after\":"+capture[2];
 }
-public static void main(java.lang.String[] ignored) throws java.lang.Exception {
+public static void main(java.lang.String[] ignored) throws @THROWN@ {
 if(java.lang.System.getSecurityManager()!=null)throw new java.lang.AssertionError("custom security manager requires a fixture");
 java.lang.reflect.Method target=@OWNER@.class.getDeclaredMethod(@METHOD@@PARAMS@);
 if(java.lang.reflect.Modifier.isStatic(target.getModifiers()) || target.isSynthetic() || target.isBridge() || target.getReturnType()!=@OUTPUT@.class || !target.trySetAccessible())throw new java.lang.AssertionError("receiver method binding unavailable");
@@ -158,7 +170,7 @@ if(constructed==null || constructed.getClass()!=@OWNER@.class)throw new java.lan
 @OWNER@ receiver=(@OWNER@)constructed;
 @EXECUTION@
 java.nio.file.Files.writeString(java.nio.file.Path.of(java.lang.System.getenv("OTELEQ_OBSERVATION")),capture);
-@FINAL_CHECKPOINT@
+@FINAL_CHECKPOINT@@ACTION_FINISH@
 }
 }
 '''
@@ -169,6 +181,8 @@ java.nio.file.Files.writeString(java.nio.file.Path.of(java.lang.System.getenv("O
                      "OUTPUT": entry["output"], "METHOD": json.dumps(entry["name"].rsplit(".", 1)[-1]),
                      "PARAMS": ("," + params) if params else "", "CONSTRUCT": construct,
                      "EXECUTION": execution(entry, arguments, literal, sequence),
+                     "ACTION_CALLER": caller, "INVOKE": invoke, "FAILURE": failure, "THROWN": thrown,
+                     "ACTION_FINISH": finish,
                      "CHECKPOINT_HELPER": java_live.HELPER if sequence and any("metrics" in step for step in sequence) else "",
                      "FINAL_CHECKPOINT": 'checkpoint("finish");' if sequence and any("metrics" in step for step in sequence) else ""}
     for name, value in substitutions.items():
