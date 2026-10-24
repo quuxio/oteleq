@@ -35,6 +35,17 @@ The generated observer freezes the expected target and source factory bodies thr
 
 ## Qualification still required
 
+The maintained ordinary-loader corpus uses an independent scalar return and complete raw/typed graph oracle in every repeat and lane. It captures literal source/cache facts before planning, retains native/SDK/health/OTLP evidence and recomputes each comparison. It covers timestamp, checked-hash and unchecked-hash caches, an accepted older unchecked body, missing/stale caches and invalid-magic fallback. Use a matching owned SDK copy and a new external output directory:
+
+```sh
+make generation-python-caches-otelc \
+  PYTHON=/path/to/complete/python/environment/bin/python \
+  OTELC_ROOT=/path/to/owned/otelc-copy \
+  REPORT_DIR=/new/external/cache-loader-evidence
+```
+
+Re-audit retained evidence without starting new applications by invoking `tests/qualify_python_caches.py` with the same `--otelc-root`, `--report-dir`, `--cli` and `--recheck`. This corpus alone does not qualify receivers, effects, retained suites or promotion.
+
 Use actual ordinary, checked-hash and unchecked-hash caches on both recorded Python runtimes. Cover unchanged cache use, invalid/stale cache source fallback, receivers/factories, exceptions, recursion, file/HTTP effects and retained/promoted/reduced routes. Include changed cache/source/file facts and equal-but-unrelated cache bytes as refusal controls. Preserve original failures and count actual applications separately from copied or re-audited observations.
 
 This work advances the full [completion checklist](completion.md). It remains **equivalence over these tests and observations**, with shipping artefacts and broader language/build acceptance separate.
