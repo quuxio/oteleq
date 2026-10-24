@@ -57,6 +57,10 @@ const RESOURCES: &[(&str, &str)] = &[
         include_str!("../adapters/generation/python_inputs.py"),
     ),
     (
+        "python_launch.py",
+        include_str!("../adapters/generation/python_launch.py"),
+    ),
+    (
         "project_tests.py",
         include_str!("../adapters/generation/project_tests.py"),
     ),

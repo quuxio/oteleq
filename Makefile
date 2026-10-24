@@ -14,12 +14,14 @@ MARKDOWNLINT ?= ./ci/markdownlint/node_modules/.bin/markdownlint
 .PHONY: node-source-context-check
 .PHONY: python-provider-metadata-otelc
 .PHONY: python-provider-runtime-otelc
+.PHONY: generation-python-origins-otelc
 .PHONY: generation-node-source-collection-otelc generation-node-source-effects-otelc generation-node-source-channels-otelc
 .PHONY: generation-node-controls-otelc generation-java-startup-otelc generation-cpp-sequence-otelc generation-python-sequence-otelc generation-java-bindings-otelc generation-java-handles-otelc
 
 .PHONY: help setup lint examples docs-check observer-check generation-check effect-qualification-check node-observer-check node-sequence-check java-observer-check go-observer-check cpp-observer-check generation-cpp-receiver-otelc generation-go-receiver-otelc generation-java-receiver-otelc generation-otelc generation-policy-otelc generation-rust-otelc rust-semantic-otelc generation-native-otelc generation-shrink-otelc generation-python-project-otelc generation-receiver-otelc generation-node-receiver-otelc generation-go-build-otelc generation-go-project-otelc generation-sequence-otelc generation-typescript-sequence-otelc generation-filesystem-otelc generation-http-otelc resource-otelc capture-otelc report core-check coverage check
 
 help:
+	@printf '%s\n' 'generation-python-origins-otelc Qualify explicit prepared Python receiver and retained-test workflows'
 	@printf '%s\n' 'python-provider-runtime-otelc Qualify a fixed Python runtime/source profile; generated admission stays separate'
 	@printf '%s\n' 'python-provider-metadata-otelc Check rebuilt Python preparation and blocked generated suites; use an owned SDK copy'
 	@printf '%s\n' 'generation-node-controls-otelc Qualify four same-process Node metric states and retained suites'
@@ -158,6 +160,7 @@ generation-check: node-observer-check node-sequence-check node-source-context-ch
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/python_execution.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/python_health.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/python_telemetry.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/python_launch.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/node_source_worker.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/node_source_context.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/node_launch.py' --fail-under=80
@@ -266,6 +269,11 @@ generation-python-sequence-otelc:
 python-provider-runtime-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	$(PYTHON) tests/qualify_python_provider_runtime.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --profile "$(PYTHON_PROFILE)"
+
+generation-python-origins-otelc:
+	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
+	cargo build --locked
+	$(PYTHON) tests/qualify_python_generated_origins.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
 
 python-provider-metadata-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"

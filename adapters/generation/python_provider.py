@@ -26,7 +26,6 @@ ORIGIN_PROTOCOLS = {"schema_version": 2, "kind": "otelc.python.protocols", "prof
                     "code_comparisons": None, "source_complete": False,
                     "origin_scope": "native-entry-and-application-root-source-loaders"}
 ORIGIN_UNAVAILABLE = "both baseline and instrumented selected-source origin bindings are unavailable"
-ORIGIN_PENDING = "generated Python origin-profile execution is not yet qualified"
 
 
 def require(condition: bool, reason: str) -> None:
@@ -63,13 +62,24 @@ def enabled(entry: dict) -> bool:
     return entry.get("language") == "python" and entry.get("python_backend", "legacy") == "prepared"
 
 
+def origin(entry: dict) -> bool:
+    """Generated origin execution requires an explicit second-profile request."""
+    return enabled(entry) and entry.get("python_profile") == ORIGIN_PROFILE
+
+
+def creator(entry: dict) -> str | None:
+    """Include the declared source constructor/factory in origin observations."""
+    name = entry.get("receiver_fixture", {}).get("source_function")
+    return entry["otelc_function"][:-len(entry["name"])] + name if origin(entry) and name else None
+
+
 def configuration(entry: dict, endpoint: str, service: str) -> dict:
     """Supply all common schema-3 fields without inheriting producer defaults."""
     require(enabled(entry), "explicit prepared entry required")
     functions = [entry["otelc_function"]]
-    creator = sequences.creator(entry)
-    if creator is not None:
-        functions.append(creator)
+    creation = creator(entry) if origin(entry) else sequences.creator(entry)
+    if creation is not None:
+        functions.append(creation)
     return {"schema_version": 3, "languages": ["python"],
             "resource": {"service_name": service},
             "export": {"endpoint": endpoint, "interval_ms": 1000, "timeout_ms": 1000,
@@ -160,7 +170,7 @@ def probe_protocols(root: Path, workspace: Path, tools: dict, execute: Callable,
 
 
 def bind(entry: dict, root: Path, workspace: Path, tools: dict, execute: Callable) -> None:
-    """Retain useful negotiation while refusing the as-yet unbound source profile."""
+    """Admit only explicit origin execution after complete public negotiation."""
     if entry["status"] != "ready" or not enabled(entry):
         return
     require(not (workspace / DIRECTORY).is_symlink()
@@ -184,7 +194,8 @@ def bind(entry: dict, root: Path, workspace: Path, tools: dict, execute: Callabl
         value = capture.strict_json(result.stdout)
         verify_capabilities(value, configuration(entry, endpoint, service))
         entry["python_provider"]["resolved"] = value
-        raise ValueError(ORIGIN_PENDING if entry.get("python_profile") == ORIGIN_PROFILE else ORIGIN_UNAVAILABLE)
+        if not origin(entry):
+            raise ValueError(ORIGIN_UNAVAILABLE)
     except (ValueError, OSError, KeyError) as error:
         entry["status"], entry["reason"] = "blocked", "Python prepared provider unavailable: " + str(error)
 
@@ -201,7 +212,8 @@ def verify_probes(workflow, workspace: Path, data: dict) -> None:
             require(entry.get("python_backend", "legacy") == configured, "entry provider differs from frozen policy")
             require(entry.get("python_profile", INPUT_PROFILE) == profile, "entry profile differs from frozen policy")
             if enabled(entry):
-                require(entry["status"] != "ready", ORIGIN_PENDING if profile == ORIGIN_PROFILE else ORIGIN_UNAVAILABLE)
+                if entry["status"] == "ready":
+                    refuse_unbound(entry)
     folder = workspace / DIRECTORY
     expected = data.get("python_provider_manifest")
     if expected is None:
@@ -214,5 +226,14 @@ def verify_probes(workflow, workspace: Path, data: dict) -> None:
 def refuse_unbound(entry: dict) -> None:
     """A hand-edited or direct attempt cannot reach the legacy Python launcher."""
     if enabled(entry):
-        reason = ORIGIN_PENDING if entry.get("python_profile") == ORIGIN_PROFILE else ORIGIN_UNAVAILABLE
-        raise ValueError("Python prepared provider: " + reason)
+        require(origin(entry), ORIGIN_UNAVAILABLE)
+        probe = entry.get("python_provider")
+        require(type(probe) is dict and probe.get("status") == 0
+                and type(probe.get("status")) is int, "missing successful frozen origin negotiation")
+        verify_protocols(probe.get("protocols"), ORIGIN_PROFILE)
+        endpoint, service = "http://127.0.0.1:4318", "oteleq-python-provider"
+        require(probe.get("request") == policy(entry, endpoint, service), "frozen origin request differs")
+        require(type(probe.get("stdout")) is str, "invalid frozen capability output")
+        resolved = capture.strict_json(probe.get("stdout", ""))
+        verify_capabilities(resolved, configuration(entry, endpoint, service))
+        require(same(resolved, probe.get("resolved")), "frozen origin capability response differs")

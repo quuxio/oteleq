@@ -238,18 +238,8 @@ def run(args: argparse.Namespace, workflow) -> int:
     workspace = destination / "workspace"
     workspace.mkdir(mode=0o700)
     shutil.copytree(original_workspace / "snapshot", workspace / "snapshot")
-    if original.get('native_projects'):
-        shutil.copytree(original_workspace / workflow.native_profile.DIRECTORY,
-                        workspace / workflow.native_profile.DIRECTORY)
-    if original.get('java_context'):
-        shutil.copytree(original_workspace / workflow.java_project.DIRECTORY,
-                        workspace / workflow.java_project.DIRECTORY)
-    if 'java_provider_manifest' in original:
-        shutil.copytree(original_workspace / workflow.java_provider.DIRECTORY,
-                        workspace / workflow.java_provider.DIRECTORY)
-    if 'node_provider_manifest' in original:
-        shutil.copytree(original_workspace / workflow.node_source.DIRECTORY,
-                        workspace / workflow.node_source.DIRECTORY)
+    for directory in workflow.retained_provider_directories(original):
+        shutil.copytree(original_workspace / directory, workspace / directory)
     workflow.write(workspace / workflow.OWNED_MARKER, {"schema_version": workflow.VERSION, "id": uuid.uuid4().hex})
     data = derived_data(workflow, original, entry, case)
     best, trials, status = search(workflow, workspace, data, entry, case["arguments"], wanted, destination, args.trials)

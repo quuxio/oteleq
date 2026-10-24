@@ -1,6 +1,6 @@
 # Rebuilt Python provider integration
 
-Status: metadata negotiation, prepared-transport validation and independent execution/journal/health/OTLP readers are implemented. Explicit origin-profile readers add version-2 transport, compiler/module execution and selected-source coverage checks. The fixed-workload qualification command can select either profile. Actual-provider qualification remains separate from component checks. Generated execution through the rebuilt Python provider remains blocked. The default Python backend retains its existing qualified legacy behaviour.
+Status: metadata negotiation, prepared transport and independent execution/journal/health/OTLP readers are implemented. The explicit origin profile also connects generated synchronous workers to compiler/module execution and selected-source coverage. Actual generated and retained-workflow qualification is in progress; no completed release qualification is claimed. The default Python backend retains its existing qualified legacy behaviour. Prepared selection without the explicit origin profile remains blocked.
 
 ## Explicit selection
 
@@ -11,16 +11,17 @@ languages = ["python"]
 
 [adapters.python]
 backend = "prepared"
+profile = "python-native-origins-v2"
 import_roots = ["src"]
 ```
 
-Planning retains each selected callable and records why execution is unavailable. It does not fall back to the legacy backend. Generated and detached strict suites fail blocked callables; an empty runnable corpus cannot become passing equivalence evidence.
+Planning retains each selected callable and probes the complete matching public protocol and capability response. Only the explicit origin profile can reach the generated prepared launcher. Missing capabilities, unsupported callables and the original input-only profile remain visible blockers, with no legacy fallback. Generated and detached strict suites fail blocked callables; an empty runnable corpus cannot become passing equivalence evidence.
 
 ## Implemented checks
 
 The consumer probes `otelc.prepared_python.protocols()` once per workspace using the selected interpreter with `-I -S -B`. The complete closed descriptor must match request/plan/prepared/command/execution 1, journal 1 with record kinds 1-4, code descriptor 2 with readable versions `[2]`, health 2, SDK 1 and code comparisons 1. `source_complete` remains false. Site hooks and application imports are absent from this metadata probe.
 
-The full schema-3 policy and public capability response remain separate records. Candidate declarations do not count as implemented support. A provider without an explicit Python implementation or candidate declaration is refused. The frozen `209b60c` provider advertises only JavaScript/TypeScript candidates; its prepare-only Python API remains useful for checking transport independently.
+The full schema-3 policy and public capability response remain separate records. Candidate declarations do not count as implemented support. A provider without an explicit Python implementation or candidate declaration is refused. Capability metadata alone does not establish a qualified execution route.
 
 The installed-input catalogue retains maintained Python/native sources, requirements, the native builder and its maintained `ci/native_encoder.py` and `ci/native_origin_chain.py` dependencies when present, prebuilt native products, actual installed package bytes and literal internal file-link targets. Helper presence inventories bytes; it does not select or qualify an execution profile. The catalogue preserves the selected interpreter's virtual-environment spelling. Bytecode caches are excluded. Missing/unreadable inputs, directory links, escaping file links, special files and count/byte limits cause refusal. Interpreter/OS libraries and general application import closure remain separate gaps.
 
@@ -38,7 +39,7 @@ For the fixed all-on synchronous workload, the OTLP reader binds both signals to
 
 The health-2 reader reconstructs the public view from the separately retained SDK-1 report and decoded local receipt. Missing counters, loss, unfinished work, failed exports, suppressed collection/emission and inconsistent public summaries refuse qualification. Aggregate flush, downstream receipt and partial rejection remain unavailable. SDK metric-point units remain null; independent collector point counts are reported separately. Plain lanes require no SDK process, health record or OTLP.
 
-## Remaining admission requirements
+## Source-origin and generated execution
 
 ### Explicit origin-journal reader
 
@@ -56,17 +57,38 @@ These checks validate the declared relations' consistency. They do not prove tha
 
 Every selected callable needs a compiler-root/source-read relation and an actual first execution of its exact declared descendant. Source bytes, device/inode, modification time and mode must match the frozen input. The ordinary compiler profile fixes input flags to zero and checks the declared optimisation level. Repeated compilations retain separate root/execution identities; these are not invocation counts. Empty, read-only and unexecuted captures cannot satisfy selection coverage.
 
-The plain lane refuses SDK code records or joins. The instrumented lane requires an SDK code join for every selected execution and accounts for every captured SDK code ID. These checks preserve missing coverage as a refusal. They do not establish per-action attribution or complete dependency closure. The module is embedded and sealed with the generator, with an independent 80% line floor. Authentic native producer qualification, public prepared-profile negotiation, both-lane runtime integration and generated admission remain separate requirements; this component does not enable the blocked prepared backend.
+The plain lane refuses SDK code records or joins. The instrumented lane requires an SDK code join for every selected execution and accounts for every captured SDK code ID. These checks preserve missing coverage as a refusal. They do not establish per-action attribution or complete dependency closure. The module is embedded and sealed with the generator, with an independent 80% line floor. Producer, reader and actual generated-workflow qualification remain separate evidence.
 
 ### Runtime admission
 
 The explicit metadata/runtime route selects `profile = "python-native-origins-v2"` alongside `backend = "prepared"`. Its closed format descriptor fixes request/plan/prepared/command/execution 2, journal 2 kinds 1-7, descriptor 2, health 2 and SDK 1. It requires `code_comparisons = null`, since the SDK's separate post-run comparison API does not accept this journal. The original profile, cache and command spelling remain unchanged by default.
 
-The consumer derives the native `--origin-loader-root` argument from the canonical application root. It recomputes raw source/code/origin summaries, requires the native entry's compiler root and module execution, checks every compiler root stays inside that root, and accounts for SDK code joins independently. Plain lanes refuse SDK records and telemetry. The declared optimisation environment accepts absent, empty or literal `0`, `1`, `2` values; other spellings refuse this qualified profile before launch. Neither format negotiation nor a complete producer summary enables generated execution.
+The consumer derives the native `--origin-loader-root` argument from the canonical application root. It recomputes raw source/code/origin summaries, requires the native entry's compiler root and module execution, checks every compiler root stays inside that root, and accounts for SDK code joins independently. Plain lanes refuse SDK records and telemetry. The declared optimisation environment accepts absent, empty or literal `0`, `1`, `2` values; other spellings refuse the origin profile before launch. Neither format negotiation nor a complete producer summary replaces selected-source execution checks.
 
 An actual qualified source profile requires selected-source origin evidence in **both baseline and instrumented lanes**, from the same SDK-independent observer. The plain lane must have no SDK telemetry. Exact input/read transactions, compiler or loader return objects, selected descendants and instrumented VM/telemetry code IDs need independent binding. Equal code descriptors alone cannot establish source origin.
 
-The new versioned origin observer, independent native recipe qualification, both-lane selected-source binding and generated execution qualification remain in progress. The journal-2 reader does not clear those blockers. Missing origin, loss, truncation, unsupported loaders or unavailable per-action attribution must stay visible. The full [completion checklist](completion.md) remains in scope.
+### Generated worker boundary
+
+`python_launch.py` uses one fixed isolated public-API bootstrap for preparation and independently constructs the SDK supervisor command. A separate fixed interpreter probe observes the selected launcher's native `argv0`; Homebrew framework spelling must not be guessed from the virtual-environment path. Preparation cannot change the frozen SDK products, installed inputs or selected application bytes/file facts.
+
+Before launch, the consumer freezes the target's source, qualified name and line, plus any declared existing source constructor or factory. Both lanes must execute those exact source descendants. The instrumented policy includes the target and source creation function; SDK code IDs must all join that declared selection. A default builtin constructor supplies no source callable and is not invented as source evidence.
+
+Each attempt retains the actual supervisor PID and fixed argv, caller PID, application PID and separate SDK identity. After execution, source facts, launch records, native journals, typed observations, application channels and declared effects are rechecked. Instrumented attempts decode both OTLP signals, require the requested number of independent serial target roots and one source creation root where declared, and check final SDK health directly. Recursive span totals remain separate from the number of requested calls. No legacy runtime report is synthesised.
+
+Actual generated/retained qualification remains in progress. Current-origin capture covers the native script entry and ordinary source loaders inside the application root. Application cache-only loads, unsupported loaders, complete dependency closure, broader async/resource actions, live metric controls, per-action attribution and shipping qualification remain open. Missing origin, loss or truncation is a refusal. The full [completion checklist](completion.md) remains in scope.
+
+## Reproduce generated receiver qualification
+
+Use an independent SDK copy with matching prebuilt native origin products and a pinned, complete SDK Python environment. The command covers generated execution, fixed receiver constructors/factories, exceptions, recursion, a deliberate same-return mutation, replay, retained unittest, detached export and scalar reduction. It compares complete raw and typed state graphs against independently declared fixture oracles.
+
+```sh
+make generation-python-origins-otelc \
+  PYTHON=/absolute/path/to/qualified-sdk-python \
+  OTELC_ROOT=/absolute/path/to/independent-prebuilt-otelc-copy \
+  REPORT_DIR=/absolute/path/to/new-report
+```
+
+The qualifier also supports `--recheck` with the same CLI, interpreter and provider. This rechecks retained source, process, journal, telemetry, health and comparison evidence without new application launches. Current-source promotion, scalar/effect workflows and broader capabilities need separate qualification before full generated-provider delivery.
 
 ## Reproduce metadata qualification
 

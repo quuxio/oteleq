@@ -81,7 +81,7 @@ Declared [Python ordered calls](docs/ordered-sequences.md#python-call-sequences)
 
 ## Usage
 
-Rebuilt Python [provider negotiation and prepared-runtime readers](docs/python-prepared-provider.md) are available for integration work, including a separate fixed-workload process/health/OTLP qualification command and an explicit journal-2 relation reader. Relation consistency does not qualify a producer's source-origin mechanism. Selecting `adapters.python.backend = "prepared"` currently retains explicit source-origin blockers; generated Python execution continues to require its qualified legacy provider.
+Rebuilt Python [prepared execution](docs/python-prepared-provider.md) has an explicit generated worker route when `adapters.python.backend = "prepared"` and `profile = "python-native-origins-v2"` are both selected. It checks target/declared source creation origins in both lanes, actual process identities, direct health and decoded telemetry. Generated/retained qualification is in progress; the original input-only prepared profile stays blocked, and the default legacy provider is unchanged.
 
 Independent [Java action readers, offline bindings, typed private JDK callers and decoded-trace validation](docs/java-action-witness.md) are implemented for integration work. The explicit private-handle components bind schema-3 route identity to caller-owned declarations. Generated invocation-scoped SDK execution and its complete provider qualification remain open; existing generated Java workers retain their documented witness limits.
 

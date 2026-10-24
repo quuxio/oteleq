@@ -20,7 +20,7 @@ class QualificationRecipeTests(unittest.TestCase):
             for flag in ("--cli", "--comparator"):
                 if line.startswith("\t") and flag + " " in line:
                     targets[target] = flag
-        self.assertEqual(len(targets), 40)
+        self.assertEqual(len(targets), 41)
         self.assertIn("python-provider-metadata-otelc", targets)
         self.assertIn("generation-cpp-sequence-otelc", targets)
         self.assertIn("generation-python-sequence-otelc", targets)

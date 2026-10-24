@@ -76,7 +76,7 @@ class PythonProviderTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'protocol probe failed'):
                 provider.probe_protocols(workspace, workspace, tools, execute, provider.ORIGIN_PROFILE)
 
-    def test_origin_configuration_context_and_probe_seal_do_not_admit_execution(self):
+    def test_only_explicit_origin_negotiation_admits_the_frozen_generated_route(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             configured = policy.validate({'adapters': {'python': {'backend': 'prepared', 'profile': provider.ORIGIN_PROFILE}}})
@@ -86,14 +86,39 @@ class PythonProviderTests(unittest.TestCase):
             requested = provider.configuration(selected, 'http://127.0.0.1:4318', 'oteleq-python-provider')
             execute = Mock(side_effect=[completed(provider.ORIGIN_PROTOCOLS), completed(response(requested))])
             provider.bind(selected, root, root, {'python': Path(sys.executable)}, execute)
-            self.assertEqual(selected['status'], 'blocked')
+            self.assertEqual(selected['status'], 'ready')
             self.assertEqual(selected['python_provider']['protocols'], provider.ORIGIN_PROTOCOLS)
+            provider.refuse_unbound(selected)
             data = {'configuration': configured, 'inventory': [selected],
                     'python_provider_manifest': generation.manifest(root / provider.DIRECTORY)}
             provider.verify_probes(generation, root, data)
             selected['python_profile'] = provider.INPUT_PROFILE
             with self.assertRaisesRegex(ValueError, 'profile differs'):
                 provider.verify_probes(generation, root, data)
+
+    def test_origin_requires_frozen_successful_complete_negotiation(self):
+        selected = {**entry(), 'python_profile': provider.ORIGIN_PROFILE}
+        requested = provider.configuration(selected, 'http://127.0.0.1:4318', 'oteleq-python-provider')
+        original = {'status': 0, 'request': provider.policy(selected, 'http://127.0.0.1:4318', 'oteleq-python-provider'),
+                    'protocols': copy.deepcopy(provider.ORIGIN_PROTOCOLS),
+                    'stdout': json.dumps(response(requested)), 'resolved': response(requested)}
+        provider.refuse_unbound({**selected, 'python_provider': original})
+        for probe in (None, {}, *({**original, key: value} for key, value in (
+                ('status', True), ('status', 1), ('request', 'edited'), ('protocols', provider.PROTOCOLS),
+                ('stdout', '{}'), ('stdout', None), ('resolved', {})))):
+            with self.subTest(probe=probe), self.assertRaises(ValueError):
+                provider.refuse_unbound({**selected, 'python_provider': probe})
+
+    def test_origin_policy_includes_declared_source_factories_and_constructors(self):
+        selected = {**entry(), 'python_profile': provider.ORIGIN_PROFILE,
+                    'name': 'Counter.add', 'otelc_function': 'app.Counter.add'}
+        self.assertIsNone(provider.creator(selected))
+        for name in ('Counter.__init__', 'make_counter'):
+            chosen = {**selected, 'receiver_fixture': {'source_function': name}}
+            self.assertEqual(provider.creator(chosen), 'app.' + name)
+            self.assertEqual(provider.configuration(chosen, 'endpoint', 'service')['functions']['include'],
+                             ['app.Counter.add', 'app.' + name])
+        self.assertIsNone(provider.creator({**selected, 'receiver_fixture': {'source_function': None}}))
 
     def test_legacy_default_and_explicit_choices_roundtrip_without_shared_values(self):
         self.assertEqual(policy.validate({}), policy.DEFAULTS)

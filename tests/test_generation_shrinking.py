@@ -242,6 +242,27 @@ domains=[{kind="integer",minimum=0,maximum=100}]
         gen.clean(argparse.Namespace(workspace=retained))
         self.assertFalse(retained.exists())
 
+    def test_reduction_preserves_the_python_provider_probe_seal(self):
+        provider = self.workspace / gen.python_provider.DIRECTORY
+        provider.mkdir()
+        gen.write(provider / 'retained-probe.json', {'literal': 'frozen negotiation'})
+        expected = gen.manifest(provider)
+        data = gen.read(self.workspace / gen.PLAN_FILE)
+        data['python_provider_manifest'] = expected
+        gen.write(self.workspace / gen.PLAN_FILE, data)
+        marker = gen.read(self.workspace / gen.OWNED_MARKER)
+        marker['plan_sha256'] = gen.identity(data)
+        gen.write(self.workspace / gen.OWNED_MARKER, marker)
+        _, result = self.shrink()
+        retained = Path(result['workspace'])
+        _, derived = gen.load_workspace(retained, generated=True)
+        self.assertEqual(derived['python_provider_manifest'], expected)
+        self.assertEqual(gen.manifest(retained / gen.python_provider.DIRECTORY), expected)
+        self.assertEqual(gen.manifest(provider), expected)
+        gen.write(retained / gen.python_provider.DIRECTORY / 'retained-probe.json', {'edited': True})
+        with self.assertRaisesRegex(ValueError, 'provider probes changed'):
+            gen.load_workspace(retained, generated=True)
+
     def test_budget_and_incomplete_candidates_never_claim_full_minimisation(self):
         _, result = self.shrink(trials=1)
         self.assertEqual(result["status"], "budget_limited")
