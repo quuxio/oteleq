@@ -56,6 +56,8 @@ class Intent:
     settings: dict
     modules: list[dict]
     context: files.Snapshot
+    compiler_inputs: dict | None = None
+    packages: dict | None = None
 
 
 def caller_state(intent: Intent) -> dict:
@@ -63,7 +65,8 @@ def caller_state(intent: Intent) -> dict:
     return {"directory": str(intent.directory), "target": intent.target,
             "original": intent.original.sealed_metadata, "sdk": intent.sdk.sealed_metadata,
             "context": intent.context.sealed_metadata, "targets": [vars(target) for target in intent.targets],
-            "toolchain": intent.toolchain, "settings": intent.settings, "modules": intent.modules}
+            "toolchain": intent.toolchain, "settings": intent.settings, "modules": intent.modules,
+            "compiler_inputs": intent.compiler_inputs, "packages": intent.packages}
 
 
 def retained_state(receipt: dict, identity: dict, private: files.Snapshot, sdk: files.Snapshot,
@@ -139,6 +142,10 @@ def validate_intent(intent: Intent) -> None:
     require(MODULE_FILE in intent.original.identities and type(intent.settings) is dict
             and type(intent.settings.get("Module")) is dict
             and type(intent.settings["Module"].get("Path")) is str, "missing Go module identity")
+    require((intent.compiler_inputs is None and intent.packages is None)
+            or (type(intent.compiler_inputs) is dict and bool(intent.compiler_inputs)
+                and type(intent.packages) is dict and bool(intent.packages)),
+            "incomplete independent Go compiler input binding")
     for target in intent.targets:
         require(type(target.name) is str and bool(target.name) and "\0" not in target.name
                 and type(target.line) is int and target.line > 0 and type(target.parameters) is int
@@ -210,6 +217,10 @@ def source_inventory(value: object, intent: Intent) -> dict:
             "Go compiler inventory differs from caller root/target")
     main = intent.settings["Module"]["Path"] + ("/" + intent.target[2:] if intent.target != "." else "")
     require(value["main"] == main, "Go compiler main package differs from the caller target")
+    if intent.compiler_inputs is not None:
+        require(same(value["compiler_inputs"], intent.compiler_inputs)
+                and same(value["packages"], intent.packages),
+                "Go compiler active inputs or packages differ from independent discovery")
     for label in ("files", "compiler_inputs"):
         actual = value[label]
         require(type(actual) is dict and bool(actual) and len(actual) <= files.MAX_FILES, "missing Go compiler source inputs")
