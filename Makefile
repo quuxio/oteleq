@@ -23,7 +23,7 @@ MARKDOWNLINT ?= ./ci/markdownlint/node_modules/.bin/markdownlint
 .PHONY: help setup lint examples docs-check observer-check generation-check effect-qualification-check node-observer-check node-sequence-check java-observer-check go-observer-check cpp-observer-check generation-cpp-receiver-otelc generation-go-receiver-otelc generation-java-receiver-otelc generation-otelc generation-policy-otelc generation-rust-otelc rust-semantic-otelc generation-native-otelc generation-shrink-otelc generation-python-project-otelc generation-receiver-otelc generation-node-receiver-otelc generation-go-build-otelc generation-go-project-otelc generation-sequence-otelc generation-typescript-sequence-otelc generation-filesystem-otelc generation-http-otelc resource-otelc capture-otelc report core-check coverage check
 
 help:
-	@printf '%s\n' 'generation-python-origins-otelc Qualify explicit prepared Python receiver and retained-test workflows'
+	@printf '%s\n' 'generation-python-origins-otelc Qualify explicit prepared Python receivers, effects and retained/promoted workflows'
 	@printf '%s\n' 'python-provider-runtime-otelc Qualify a fixed Python runtime/source profile; generated admission stays separate'
 	@printf '%s\n' 'python-provider-metadata-otelc Check rebuilt Python preparation and blocked generated suites; use an owned SDK copy'
 	@printf '%s\n' 'generation-node-controls-otelc Qualify four same-process Node metric states and retained suites'

@@ -1,0 +1,243 @@
+{
+  "qualification_schema_version": 1,
+  "date": "2026-10-24",
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "scope_status": "qualified recorded synchronous generated origin-v2 receiver and scalar/effect/promotion workflows",
+  "platform": {
+    "os": "macOS",
+    "architecture": "arm64",
+    "python": [
+      "3.12.15",
+      "3.14.8"
+    ]
+  },
+  "runtime": {
+    "repository": "quuxio/oteleq",
+    "commit": "a027f10d2eab0bf2435fc7f5f2fbbd98d1b0c58c",
+    "source_archive_sha256": "7adac9e9955cdc6e9af1a6746ec1cf55055a4d49fec5eebe1c64f361b36f2463",
+    "source_files": 484,
+    "cli_sha256": "6b33375eadc08e28daa896e30d2e0ed903f455fffa8b90259549e65c5247c5f9",
+    "runtime_sources_unchanged_in_verifier": true,
+    "later_source_changes": [
+      "docs/completion.md",
+      "docs/python-prepared-provider.md",
+      "docs/quality.md",
+      "docs/roadmap.md",
+      "tests/python_origin_effect_workflows.py",
+      "tests/qualify_python_generated_origins.py",
+      "tests/sequence_qualification.py",
+      "tests/test_generation_python_origin_effect_workflows.py",
+      "tests/test_generation_sequence_qualification.py"
+    ]
+  },
+  "verifier": {
+    "commit": "fc5ebde7bf7524d533234d83cfe9f6533812eedd",
+    "source_archive_sha256": "e187ab436b0939104cc9046592f375840961fffdfff254c762887309a3c72425",
+    "source_files_preserved": 486,
+    "entrypoint": "tests/qualify_python_generated_origins.py",
+    "retained_option": "--recheck",
+    "files_sha256": {
+      "tests/qualify_python_generated_origins.py": "8a6645e5edfa297aad869687e815f6aea9f465d946a34b9aabd7b115cb67d48f",
+      "tests/python_origin_effect_workflows.py": "ad106b5aeba84fd8df306b6de17929ddca95b432dbe8bd358403e5e7e6a185d7",
+      "tests/sequence_qualification.py": "d9ef1baf5ec8a6ce5c0a31ad3f125473c9ec313a7ce6c2adde260f69e83e7e9f",
+      "tests/python_sequence_fixture.py": "afed7529c9c25adb2fc0606ad97135044f9532ee1e4c2ac494cca4e1653bf623",
+      "tests/qualify_python_sequences.py": "1db7e30549a26ecc170bbcd1d64787529d1663f2288148491ff23ad404538282"
+    }
+  },
+  "execution_drivers": {
+    "receivers": {
+      "commit": "a027f10d2eab0bf2435fc7f5f2fbbd98d1b0c58c",
+      "source_archive_sha256": "7adac9e9955cdc6e9af1a6746ec1cf55055a4d49fec5eebe1c64f361b36f2463"
+    },
+    "effects_and_promotion": {
+      "commit": "e3e39043dac374e42de302dcb0a1fcdd456060bf",
+      "source_archive_sha256": "4378d5f838d1b60f98ca7422e95eea8833a93be98e602042c996fa4719062732"
+    },
+    "note": "The later verifier corrects receipt and historical source auditing; original captures retain their actual runtime and driver identities."
+  },
+  "provider": {
+    "repository": "quuxio/otelc",
+    "commit": "794ccaa8dda93512225fc08fb2583bd7ebc09d0f",
+    "source_archive_sha256": "c799748f2067d4fcc94661332f019b8e728bcca94b63830d8058da46f04ccca3",
+    "source_files_preserved_each_runtime": 382,
+    "profile": "python-native-origins-v2",
+    "protocols": {
+      "request": 2,
+      "plan": 2,
+      "prepared": 2,
+      "command": 2,
+      "execution": 2,
+      "journal": 2,
+      "code": 2,
+      "health": 2,
+      "sdk": 1,
+      "code_comparisons": null,
+      "source_complete": false
+    }
+  },
+  "results": {
+    "completed_corpora": 2,
+    "actual_application_launches": 424,
+    "sdk_processes": 212,
+    "reports": 80,
+    "recomputed_comparisons": 108,
+    "complete_raw_and_typed_observations": 432,
+    "copied_original_observations": 8,
+    "additional_target_applications_in_retained_audits": 0,
+    "metadata_only_interpreter_probe_each_audit": 1
+  },
+  "corpora": [
+    {
+      "python": "3.12.15",
+      "python_hexversion": 51122160,
+      "actual_application_launches": 212,
+      "sdk_processes": 106,
+      "reports": 40,
+      "recomputed_comparisons": 54,
+      "complete_raw_and_typed_observations": 216,
+      "copied_original_observations": 4,
+      "receiver_workflows": {
+        "actual_application_launches": 140,
+        "complete_raw_and_typed_observations": 144,
+        "recomputed_comparisons": 36,
+        "reports": 26,
+        "sdk_processes": 70
+      },
+      "effects_and_promotion": {
+        "actual_application_launches": 72,
+        "complete_raw_and_typed_observations": 72,
+        "complete_raw_graphs_and_effect_oracles": true,
+        "generated_domain_cases_per_function": 3,
+        "recomputed_comparisons": 18,
+        "reports": 14,
+        "scope": "Scalar domains, global mutations, literal filesystem bytes/kinds/modes and scripted HTTP, exported suites and current-source promotion through unchanged/changed/added-source stages.",
+        "sdk_processes": 36,
+        "source_restored": true
+      },
+      "source_preserved": true,
+      "inputs_preserved": true,
+      "provider_source_files_preserved": 382,
+      "provider_input_records": 1517,
+      "provider_input_catalogue_sha256": "422a430d275743b1672f0b97351575f610fe3c2708a7aa30aa337d6f388a60fd",
+      "interpreter_sha256": "c4e9f06cb179ae4b3728c748990fbbef7f30580ea42c0eb9c702ebc7c7861c89",
+      "retained_audit_sha256": "caa039cf48e2852d44f3888e95497f3cd66dd342b96c2baa3edde33826b17424",
+      "launch_identity_set_sha256": "af4fb445ef6a4004ffefe7dbaaa16a67c6ee96f4feaf4a66283927cfc27603a8"
+    },
+    {
+      "python": "3.14.8",
+      "python_hexversion": 51251440,
+      "actual_application_launches": 212,
+      "sdk_processes": 106,
+      "reports": 40,
+      "recomputed_comparisons": 54,
+      "complete_raw_and_typed_observations": 216,
+      "copied_original_observations": 4,
+      "receiver_workflows": {
+        "actual_application_launches": 140,
+        "complete_raw_and_typed_observations": 144,
+        "recomputed_comparisons": 36,
+        "reports": 26,
+        "sdk_processes": 70
+      },
+      "effects_and_promotion": {
+        "actual_application_launches": 72,
+        "complete_raw_and_typed_observations": 72,
+        "complete_raw_graphs_and_effect_oracles": true,
+        "generated_domain_cases_per_function": 3,
+        "recomputed_comparisons": 18,
+        "reports": 14,
+        "scope": "Scalar domains, global mutations, literal filesystem bytes/kinds/modes and scripted HTTP, exported suites and current-source promotion through unchanged/changed/added-source stages.",
+        "sdk_processes": 36,
+        "source_restored": true
+      },
+      "source_preserved": true,
+      "inputs_preserved": true,
+      "provider_source_files_preserved": 382,
+      "provider_input_records": 1453,
+      "provider_input_catalogue_sha256": "7237f13969518aeda37f5b7ec0d9066a799cfc2800ffb461ccda09e5ed84f971",
+      "interpreter_sha256": "1860df605473e659fb393abbec47ef75a187b07777c0acf4322b9a1a1f057a08",
+      "retained_audit_sha256": "6e7855125b1a4040522b67d0efc1e4534f2991d8b29377a2f6b27d5203319877",
+      "launch_identity_set_sha256": "5a6534cb5973e8d27c4f614143d84703955a29b5641e74946e780e5d5414ebf8"
+    }
+  ],
+  "checked_behaviour": [
+    "Independent before-launch target and declared source constructor/factory facts in both lanes",
+    "Actual supervisor/application/SDK identities, raw native journal2 relations and all selected SDK joins",
+    "Complete independently literal receiver/global/own-static graphs, returned aliases/cycles, recursion and supported exceptions",
+    "A deliberate same-return intermediate state difference fails, reduces from7 to0 and stays failed in retained unittest/replay",
+    "Generated, replayed, standard-library unittest, source-detached export and reduced retained routes",
+    "Three independently generated scalar domain cases per function with complete global graph and fixed return expectation",
+    "Literal filesystem before/after bytes, kinds and permissions; scripted binary HTTP request/response and declared headers",
+    "Current-source promotion discovers unchanged bodies, changed bodies and a newly added function",
+    "All five temporal source plans bind their expected literal body and complete private snapshot; the original application is restored",
+    "Every comparison is recomputed; direct OTLP trace/metric and final-health receipts are independently rechecked",
+    "All recorded SDK source, native products, installed package catalogues and selected interpreter bytes remain preserved"
+  ],
+  "separate_fixed_public_transport_and_origin_corpus": {
+    "runtime_commit": "9f820758c5c4e1ac25c779dddf61e2a6422bb716",
+    "actual_application_launches": 24,
+    "actual_sdk_launches": 12,
+    "altered_evidence_refusals": 216,
+    "corpora": [
+      {
+        "python": "3.12.15",
+        "actual_application_launches": 12,
+        "actual_sdk_launches": 6,
+        "altered_evidence_refusals": 108,
+        "report_sha256": "bf2b0da86fdf0d1c722ca41cd574679e972400e3e21a820f9cff0ea4afc0f792"
+      },
+      {
+        "python": "3.14.8",
+        "actual_application_launches": 12,
+        "actual_sdk_launches": 6,
+        "altered_evidence_refusals": 108,
+        "report_sha256": "4df9359fb166170393b6ee18e5adcac290000fd1bad3c92f71873fb942326940"
+      }
+    ],
+    "scope": "Ordinary, recursive and handled-exception fixed workloads with binary stdout/stderr and both-lane selected source origins; not generated observer qualification."
+  },
+  "review": {
+    "worker_review_sha256": "71b163b75a9c3f1d2e51f341280cdb0972f9d4d7eb1e7236a5a2fb6914d0c352",
+    "public_reader_review_sha256": "b2a84aca2ba9a5ef740b4470eb5decece6e1a87c6a8a09265c2b9a3dbba821f2",
+    "scope": "Recorded component and worker reviews; final verifier/publication review and protected main delivery remain separate."
+  },
+  "validation": {
+    "full_gate_commit": "e3e39043dac374e42de302dcb0a1fcdd456060bf",
+    "full_gate_exit_code": 0,
+    "generation_tests": 1132,
+    "rust_product_line_coverage_percent": 97.38,
+    "full_gate_result_sha256": "4517bb5e81a0177c5f7fb4cc21c8c3735ed460ddd2338090043c561a3d0311ce",
+    "full_gate_log_sha256": "302af2078391e8018a2c3cd5988582eeeb84f19eb06ffaacf8ac26b60d068fb0",
+    "verifier_fix_python_tests_each_runtime": 172,
+    "shared_qualification_tests": 6,
+    "scope": "Recorded implementation gate and focused verifier checks; final-head CI/release delivery is separate."
+  },
+  "preserved_failures": [
+    {
+      "commit": "a63b131a68cf9b52faedd454e276e1da36732edd",
+      "kind": "bare CLI import failed because protobuf was imported eagerly",
+      "fixed_commit": "a027f10d2eab0bf2435fc7f5f2fbbd98d1b0c58c",
+      "result_sha256": "81d13e47781bde46253db7945d64eae49134ab8c44ad32ee5c7008c2543e761c"
+    },
+    {
+      "commit": "e3e39043dac374e42de302dcb0a1fcdd456060bf",
+      "kind": "Combined audit compared historical promotion plans against the restored current source",
+      "fixed_commit": "fc5ebde7bf7524d533234d83cfe9f6533812eedd",
+      "failed_logs_sha256": {
+        "312": "aaed86900ef46f9cda19085d6d7d670618b6d68e20693f30590f964a48ff116f",
+        "314": "a915d2a50e53f87ca851519938b0e5e29a26040a36e257b72aa52dffad7af473"
+      },
+      "target_applications_repeated_to_fix_audit": 0
+    }
+  ],
+  "limits": [
+    "Only the recorded synchronous source entry and ordinary application-root source loaders are qualified",
+    "Cache-only or unsupported loaders, namespace/installed-project integration and complete interpreter/OS/import closure remain open",
+    "General object arguments/factories, async/generator/resource actions, live metric controls and per-action attribution remain open",
+    "First-execution/source-root identities are not invocation counts; decoded telemetry supplies the separate call totals",
+    "The native origin observer and generated diagnostic caller are part of the observed workload; this is not shipping-artefact evidence",
+    "Other providers, platforms and callable/build profiles require their own qualification",
+    "All remaining21 requirements in docs/completion.md remain in force"
+  ]
+}

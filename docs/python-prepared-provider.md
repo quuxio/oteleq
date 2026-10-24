@@ -1,6 +1,6 @@
 # Rebuilt Python provider integration
 
-Status: metadata negotiation, prepared transport and independent execution/journal/health/OTLP readers are implemented. The explicit origin profile also connects generated synchronous workers to compiler/module execution and selected-source coverage. Actual generated and retained-workflow qualification is in progress; no completed release qualification is claimed. The default Python backend retains its existing qualified legacy behaviour. Prepared selection without the explicit origin profile remains blocked.
+Status: metadata negotiation, prepared transport and independent execution/journal/health/OTLP readers are implemented. The explicit origin profile also connects generated synchronous workers to compiler/module execution and selected-source coverage. The [424-launch diagnostic qualification](qualification/python-generated-origins-2026-10-24.json) covers the recorded generated and retained workflows on Python 3.12/3.14. Full-project release qualification remains open. The default Python backend retains its existing qualified legacy behaviour. Prepared selection without the explicit origin profile remains blocked.
 
 ## Explicit selection
 
@@ -75,7 +75,7 @@ Before launch, the consumer freezes the target's source, qualified name and line
 
 Each attempt retains the actual supervisor PID and fixed argv, caller PID, application PID and separate SDK identity. After execution, source facts, launch records, native journals, typed observations, application channels and declared effects are rechecked. Instrumented attempts decode both OTLP signals, require the requested number of independent serial target roots and one source creation root where declared, and check final SDK health directly. Recursive span totals remain separate from the number of requested calls. No legacy runtime report is synthesised.
 
-Actual generated/retained qualification remains in progress. Current-origin capture covers the native script entry and ordinary source loaders inside the application root. Application cache-only loads, unsupported loaders, complete dependency closure, broader async/resource actions, live metric controls, per-action attribution and shipping qualification remain open. Missing origin, loss or truncation is a refusal. The full [completion checklist](completion.md) remains in scope.
+The [exact-revision diagnostic record](qualification/python-generated-origins-2026-10-24.json) checks 424 actual application launches, 212 SDK processes and 108 independently recomputed comparisons across the two recorded runtimes. Current-origin capture covers the native script entry and ordinary source loaders inside the application root. Application cache-only loads, unsupported loaders, complete dependency closure, broader async/resource actions, live metric controls, per-action attribution and shipping qualification remain open. Missing origin, loss or truncation is a refusal. The full [completion checklist](completion.md) remains in scope.
 
 ## Reproduce generated workflow qualification
 
@@ -88,7 +88,7 @@ make generation-python-origins-otelc \
   REPORT_DIR=/absolute/path/to/new-report
 ```
 
-The qualifier also supports `--recheck` with the same CLI, interpreter and provider. This rechecks retained source, process, journal, telemetry, health and comparison evidence without new application launches; a separate metadata-only interpreter probe observes the actual launcher spelling. Retained JSON comparison normalises object keys while preserving boolean/integer distinctions. Copied original shrink observations retain their original process identity and do not increase launch counts. The integrated exact-revision qualification is in progress; broader capabilities and final delivery remain open.
+The qualifier also supports `--recheck` with the same CLI, interpreter and provider. This rechecks retained source, process, journal, telemetry, health and comparison evidence without new application launches; a separate metadata-only interpreter probe observes the actual launcher spelling. Retained JSON comparison normalises object keys while preserving boolean/integer distinctions. Copied original shrink observations retain their original process identity and do not increase launch counts. The [integrated exact-revision record](qualification/python-generated-origins-2026-10-24.json) records 80 reports and 432 raw/typed observations; eight copied original shrink observations do not add launches. Promotion audits bind every historical plan and complete private snapshot to its independently declared stage body, then check the restored original source. The earlier failed combined audits remain preserved. Broader capabilities and full-project release qualification remain open.
 
 ## Reproduce metadata qualification
 
