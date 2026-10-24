@@ -140,6 +140,8 @@ Go requires the [retained build/run provider API](docs/go-build-bundles.md). Eac
 
 For ordinary Go instance methods, declare `receiver = { factory = "New", arguments = [10] }` with explicit module roots. [Go receiver fixtures](docs/go-receivers.md) cover private source fields, arrays, primitive panics and pointer aliases, including converted pointer views. Their [nine-case/168-launch corpus](docs/qualification/go-receivers-2026-10-20.json) also checks executable packages and returned struct copies.
 
+The rebuilt [Go prepared provider](docs/go-prepared-provider.md) has independent protocol/health readers. Generated build/launch integration and actual-provider qualification remain in progress; the earlier retained-provider records above do not qualify this replacement API.
+
 Python can use explicit [source package import roots](docs/python-package-context.md), including regular packages and `src` layouts. Relative imports and package initialisers use their real module context; unsupported package contexts remain blockers.
 
 [Declared receiver fixtures](docs/receiver-fixtures.md) test ordinary Python, Java, JavaScript and TypeScript instance methods using existing constructors or same-module factories. They capture supported instance graphs and declared class statics, with independently reconstructed state for every attempt. Node methods can await declared async completion. Java has a separate declared private-access profile; inherited/native storage and arbitrary action targets remain unsupported. The [Node receiver qualification](docs/qualification/node-receivers-2026-10-20.json) records both language IDs, 186 actual launches and detected same-return instance/static mutation controls.
