@@ -27,13 +27,14 @@ class Caller:
     packages: dict
     reads: dict
     seal: str
+    build_tags: tuple[str, ...] = ()
 
     def state(self) -> dict:
         """Seal nested metadata as well as the immutable declaration objects."""
         return {"original": self.original.sealed_metadata, "compiler": self.compiler, "target": self.target,
                 "targets": [vars(target) for target in self.targets],
                 "compiler_inputs": self.compiler_inputs, "packages": self.packages,
-                "reads": self.reads}
+                "reads": self.reads, "build_tags": self.build_tags}
 
     def verify(self) -> None:
         """Retained compiler metadata cannot recertify changed source or tools."""
@@ -51,7 +52,7 @@ class Caller:
                 and toolchain.get("go_sha256") == self.reads[self.compiler][0]["sha256"],
                 "Go build compiler differs from independent caller discovery")
         return Intent(directory, self.original, sdk, self.target, self.targets,
-                      toolchain, settings, modules, context, self.compiler_inputs, self.packages)
+                      toolchain, settings, modules, context, self.compiler_inputs, self.packages, self.build_tags)
 
 
 def package_target(entry: dict) -> tuple[str, str]:
@@ -187,7 +188,8 @@ def discover(original: files.Snapshot, entry: dict, go: Path, environment: dict,
                      input_data=json.dumps(request).encode(), max_output_bytes=files.MAX_METADATA_BYTES)
     go_project.check_result(result, "Go caller type checking failed")
     targets = selected_targets(json.loads(result.stdout), entry, source, original.root, package)
-    caller = Caller(original, str(go), target, targets, inputs, packages, reads, "")
-    caller = Caller(original, str(go), target, targets, inputs, packages, reads, data_seal(caller.state()))
+    tags = go_project.canonical_tags(options["build_tags"])
+    caller = Caller(original, str(go), target, targets, inputs, packages, reads, "", tags)
+    caller = Caller(original, str(go), target, targets, inputs, packages, reads, data_seal(caller.state()), tags)
     caller.verify()
     return caller

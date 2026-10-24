@@ -104,17 +104,22 @@ class GoCallerTests(unittest.TestCase):
         caller.verify()
 
     def test_active_tag_and_embed_inputs_are_compiler_owned(self):
-        self.options = go_project.settings({"module_roots": ["."], "build_tags": ["special"]})
+        self.options = go_project.settings({"backend": "source-v1", "module_roots": ["."],
+                                            "build_tags": ["tools", "\u03c0", "special"]})
         self.environment.update(go_project.environment(self.options))
         (self.project / "data.txt").write_bytes(b"payload")
         (self.project / "ordinary.go").write_text("//go:build !special\n\npackage main\nvar Other=2\n")
-        (self.project / "special.go").write_text('//go:build special\n\npackage main\nimport _ "embed"\n'
+        (self.project / "special.go").write_text('//go:build special && tools && \u03c0\n\npackage main\nimport _ "embed"\n'
                                                 '//go:embed data.txt\nvar Data string\n')
         entry = self.materialise("package main\nfunc Add(value int)int{return value+len(Data)}\nfunc main(){}\n")
         caller = self.discover(entry)
         self.assertIn("special.go", caller.compiler_inputs)
         self.assertIn("data.txt", caller.compiler_inputs)
         self.assertNotIn("ordinary.go", caller.compiler_inputs)
+        self.assertEqual(caller.build_tags, ("special", "tools", "\u03c0"))
+        toolchain = {"go": str(self.go), "go_sha256": caller.reads[str(self.go)][0]["sha256"]}
+        intent = caller.build_intent(self.root / "unused-output", caller.original, toolchain, {}, [], caller.original)
+        self.assertEqual(intent.build_tags, caller.build_tags)
 
     def test_value_receiver_keeps_its_non_pointer_compiler_identity(self):
         entry = self.materialise('package counter\ntype Counter struct{value int}\n'

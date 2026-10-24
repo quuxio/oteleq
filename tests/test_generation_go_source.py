@@ -72,7 +72,8 @@ class GoSourceTests(unittest.TestCase):
     def execute(self, command, cwd, env, folder, **options):
         command = list(map(str, command))
         self.assertEqual(command[:5], list(map(str, source.cli(self.root, self.tools))))
-        value = (source.PROTOCOLS if "go-protocols" in command else {
+        protocols = {**source.PROTOCOLS, **({"build": 5, "inspection": 2} if "--build-tags" in command else {})}
+        value = (protocols if "go-protocols" in command else {
             "policy": source.configuration(self.entry, "http://127.0.0.1:4318", "oteleq-go-provider"),
             "implemented": sorted(source.SDK_LANGUAGES), "remaining": [], "candidates": []})
         return subprocess.CompletedProcess(command, 0, json.dumps(value).encode(), b"")
@@ -155,8 +156,7 @@ class GoSourceTests(unittest.TestCase):
                 source.probe_protocols(self.root, self.workspace, self.tools, self.execute)
 
     def test_unavailable_requests_are_blocked_without_legacy_fallback(self):
-        for values in ({"go_options": {**self.options, "build_tags": ["tag"]}},
-                       {"sequence_configuration": []}, {"go_context": None}):
+        for values in ({"sequence_configuration": []}, {"go_context": None}):
             entry = copy.deepcopy(self.entry)
             entry.update(values)
             if entry.get("go_context") is None:
@@ -168,6 +168,42 @@ class GoSourceTests(unittest.TestCase):
         legacy = {"language": "go", "status": "ready"}
         source.bind(legacy, self.root, self.workspace, self.tools, self.execute)
         self.assertNotIn("go_provider", legacy)
+
+    def test_tagged_protocol_is_explicit_and_cannot_reuse_an_untagged_probe(self):
+        self.entry["go_options"]["build_tags"] = ["feature", "tools", "\u03c0"]
+        source.bind(self.entry, self.root, self.workspace, self.tools, self.execute)
+        self.assertEqual(self.entry["status"], "ready")
+        self.assertEqual(self.entry["go_provider"]["protocols"],
+                         {**source.PROTOCOLS, "build": 5, "inspection": 2})
+        cached = json.loads((self.workspace / source.DIRECTORY / "protocol/response.json").read_text())
+        self.assertEqual(cached["command"][-3:], ["go-protocols", "--prepared-tools", "--build-tags"])
+        with self.assertRaisesRegex(ValueError, "protocol probe failed"):
+            source.probe_protocols(self.root, self.workspace, self.tools, self.execute)
+
+    def test_source_tag_names_are_bounded_literals_and_keep_unicode_for_go(self):
+        options = go_project.settings({"backend": "source-v1", "module_roots": ["."],
+                                       "build_tags": ["\u03c0", "tools", "feature"]})
+        self.assertEqual(options["build_tags"], ["feature", "tools", "\u03c0"])
+        # Unicode category validation occurs in the pinned Go inspector before
+        # compilation, rather than using Python's possibly different tables.
+        self.assertEqual(go_project.canonical_tags(["\U0001f600"]), ("\U0001f600",))
+        for invalid in (None, "tools", [True], [""], ["x,y"], ["x y"], ["-race"],
+                        ["a\n"], ["\ud800"], ["a" * 257], ["\u03c0" * 129],
+                        ["x", "x"], [str(i) for i in range(129)]):
+            with self.subTest(value=repr(invalid)), self.assertRaises(ValueError):
+                go_project.canonical_tags(invalid)
+        with self.assertRaises(ValueError):
+            go_project.settings({"module_roots": ["."], "build_tags": ["\u03c0"]})
+
+    def test_tagged_request_cannot_fall_back_to_a_build4_descriptor(self):
+        self.entry["go_options"]["build_tags"] = ["feature"]
+        def untagged(command, *args, **kwargs):
+            self.assertIn("--build-tags", command)
+            return subprocess.CompletedProcess(command, 0, json.dumps(source.PROTOCOLS).encode(), b"")
+        source.bind(self.entry, self.root, self.workspace, self.tools, untagged)
+        self.assertEqual(self.entry["status"], "blocked")
+        self.assertIn("unsupported prepared-tool Go protocols", self.entry["reason"])
+        self.assertNotIn("go_provider", self.entry)
 
     def test_all_eight_capabilities_and_complete_common_policy_are_required(self):
         expected = source.configuration(self.entry, "http://127.0.0.1:1", "unit")

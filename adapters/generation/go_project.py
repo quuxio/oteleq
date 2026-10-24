@@ -2,11 +2,31 @@
 import json
 from pathlib import Path, PurePosixPath
 import re
+import string
 
 
 COMMAND_DIRECTORY = "oteleq_generated_cmd"
 OBSERVER_DIRECTORY = "oteleq_generated_observer"
 BRIDGE = "OteleqGeneratedRun"
+ASCII_TAG = frozenset(string.ascii_letters + string.digits + "_.")
+
+
+def canonical_tags(value: object) -> tuple[str, ...]:
+    """Bound literal tag inputs; the selected Go parser owns Unicode grammar."""
+    if type(value) not in (tuple, list) or len(value) > 128:
+        raise ValueError("Go build tags require at most 128 literal names")
+    for name in value:
+        if type(name) is not str:
+            raise ValueError("Go build tag must be a string")
+        try:
+            encoded = name.encode("utf-8")
+        except UnicodeEncodeError as error:
+            raise ValueError("Go build tag must be valid UTF-8") from error
+        if not 0 < len(encoded) <= 256 or any(ord(char) < 128 and char not in ASCII_TAG for char in name):
+            raise ValueError("Go build tag must be one bounded literal name")
+    if len(value) != len(set(value)):
+        raise ValueError("Go build tags must be distinct")
+    return tuple(sorted(value))
 
 
 def build_timeout(value: int) -> int:
@@ -32,9 +52,13 @@ def settings(value: dict) -> dict:
         if (not item or path.is_absolute() or str(path) != item or ".." in path.parts
                 or "\\" in item or ":" in item):
             raise ValueError("Go module roots require canonical source-relative paths")
-    if (not isinstance(tags, list) or any(type(tag) is not str or not re.fullmatch(r"[A-Za-z0-9_.]+", tag) for tag in tags)
-            or len(tags) != len(set(tags)) or len(roots) != len(set(roots))):
+    if not isinstance(tags, list) or len(roots) != len(set(roots)):
         raise ValueError("Go module roots and build tags must be valid and distinct")
+    selected_tags = canonical_tags(tags)
+    if backend == "source-v1":
+        tags = list(selected_tags)
+    elif any(not re.fullmatch(r"[A-Za-z0-9_.]+", tag) for tag in tags):
+        raise ValueError("legacy Go build tags require ASCII literal names")
     if tags and not roots:
         raise ValueError("Go build_tags require explicit module_roots")
     result = {"module_roots": roots.copy(), "build_tags": tags.copy(), "build_timeout_ms": timeout}

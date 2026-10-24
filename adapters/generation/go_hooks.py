@@ -111,7 +111,7 @@ def rule(row: dict, main: str, receiver: str, index: int, code: list[str]) -> st
     return result + "  do:\n    - inject_code:\n        raw: |\n" + "".join("          " + line + "\n" for line in code)
 
 
-def generated(selection: dict, inventory: dict, module: str) -> dict[str, bytes]:
+def generated(selection: dict, inventory: dict, module: str, *, build_tags: tuple[str, ...] = ()) -> dict[str, bytes]:
     """Derive all additions for the explicit synchronous, no-context hook profile."""
     require(same(selection["context"], {"tasks": False, "http": False})
             and all(same(selection[name], []) for name in ("types", "allocations", "releases")),
@@ -141,15 +141,16 @@ def generated(selection: dict, inventory: dict, module: str) -> dict[str, bytes]
     additions["otelc_rules/otelc.yaml"] = "\n".join(rules).encode()
     imports = [module + "/otelc_rules", "go.opentelemetry.io/otelc/instrumentation/runtime",
                "go.opentelemetry.io/otelc/instrumentation/go.opentelemetry.io/otel/sdk/trace"]
-    additions["otel.instrumentation.go"] = ("//go:build tools\n\npackage tools\nimport (\n"
+    constraint = "!" + build_tags[0] if build_tags else "tools"
+    additions["otel.instrumentation.go"] = ("//go:build " + constraint + "\n\npackage tools\nimport (\n"
                                            + "".join(" _ " + json.dumps(name) + "\n" for name in imports) + ")\n").encode()
     return additions
 
 
 def verify(original: files.Snapshot, private: files.Snapshot, selection: dict,
-           inventory: dict, module: str) -> None:
+           inventory: dict, module: str, *, build_tags: tuple[str, ...] = ()) -> None:
     """A rehashed manifest cannot admit changed helpers or additional private code."""
-    expected = generated(selection, inventory, module)
+    expected = generated(selection, inventory, module, build_tags=build_tags)
     require(not any((original.root / name).exists() or (original.root / name).is_symlink()
                     for name in ("otelc_rules", "otel.instrumentation.go", "otelc.tool.go"))
             and not set(expected) & set(original.identities), "Go generated helpers collide with original inputs")

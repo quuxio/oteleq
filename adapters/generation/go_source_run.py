@@ -39,8 +39,8 @@ def prepare(workflow, root: Path, project: Path, entry: dict, tools: dict,
             environment: dict, folder: Path, config: Path, lane: str, *, wait_ms: int) -> Run:
     """Freeze expectations before producer builds and never execute returned argv."""
     require(go_source.enabled(entry) and lane in ("baseline", "instrumented_on"), "invalid Go source execution lane")
-    require(not entry["go_options"]["build_tags"], "source build4 cannot execute tagged inputs")
     require("sequence_configuration" not in entry, "Go source-v1 schedules require separate integration")
+    tags = go_project.canonical_tags(entry["go_options"]["build_tags"])
     module = project / entry["go_context"]["module_root"]
     original = files.freeze(module)
     sdk = files.freeze(root / "adapters/go")
@@ -69,6 +69,8 @@ def prepare(workflow, root: Path, project: Path, entry: dict, tools: dict,
     modules = go_project.documents(execute([tools["go"], "list", "-m", "-mod=readonly", "-json", "all"], module).stdout)
     context = go_context.prepare(Path(tooling["bundle"]), folder / "go-context")
     intent = caller.build_intent(folder / "go-build", sdk, tooling, settings, modules, context)
+    require(intent.build_tags == tags,
+            "Go caller build tags differ from the planned options")
     seal = data_seal(go_build.caller_state(intent))
     policy = tomllib.loads(config.read_text())
     require(policy["functions"]["include"] == [target.name for target in caller.targets],
@@ -76,6 +78,8 @@ def prepare(workflow, root: Path, project: Path, entry: dict, tools: dict,
     command = go_source.cli(root, tools) + ["--config", config, "go-build", "--root", module,
                                           "--target", caller.target, "--output", intent.directory,
                                           "--go", tools["go"], "--prepared-tools"]
+    for tag in intent.build_tags:
+        command += ["--build-tag", tag]
     execute(command, root)
     require(data_seal(go_build.caller_state(intent)) == seal, "Go caller inputs changed during SDK build")
     caller.verify()

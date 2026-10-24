@@ -10,6 +10,7 @@ import sys
 import go_build
 import go_context
 import go_files as files
+import go_project
 from go_provider import PROTOCOLS as BUILD_PROTOCOLS, require, same
 import otelc_capture as capture
 import python_inputs
@@ -159,11 +160,15 @@ def verify_capabilities(value: object, expected: dict) -> None:
             and "go" in groups["implemented"] | groups["candidates"], "Go capability partition is unavailable")
 
 
-def probe_protocols(root: Path, workspace: Path, tools: dict, execute: Callable) -> dict:
+def probe_protocols(root: Path, workspace: Path, tools: dict, execute: Callable, *, build_tags: tuple[str, ...] = ()) -> dict:
     """Retain one public descriptor probe before any target compilation or launch."""
     folder = workspace / DIRECTORY / "protocol"
     receipt = folder / "response.json"
     command = cli(root, tools) + ["go-protocols", "--prepared-tools"]
+    expected = PROTOCOLS
+    if build_tags:
+        command.append("--build-tags")
+        expected = {**PROTOCOLS, "build": 5, "inspection": 2}
     require(not (workspace / DIRECTORY).is_symlink() and not folder.is_symlink(), "linked Go protocol directory")
     if receipt.exists() or receipt.is_symlink():
         require(receipt.is_file() and not receipt.is_symlink() and receipt.stat().st_size <= MAX_METADATA,
@@ -183,7 +188,7 @@ def probe_protocols(root: Path, workspace: Path, tools: dict, execute: Callable)
             and record["status"] == 0 and type(record["stdout"]) is str and type(record["stderr"]) is str,
             "public Go protocol probe failed")
     value = capture.strict_json(record["stdout"])
-    require(type(value) is dict and same(value, PROTOCOLS), "unsupported prepared-tool Go protocols")
+    require(type(value) is dict and same(value, expected), "unsupported prepared-tool Go protocols")
     return value
 
 
@@ -193,9 +198,9 @@ def bind(entry: dict, root: Path, workspace: Path, tools: dict, execute: Callabl
         return
     try:
         require("go_context" in entry, "source-v1 currently requires explicit module_roots")
-        require(not entry["go_options"]["build_tags"], "build4 cannot execute tagged inputs; an explicit tagged recipe is required")
         require("sequence_configuration" not in entry, "Go source-v1 live/action schedules need separate integration")
-        protocols = probe_protocols(root, workspace, tools, execute)
+        tags = go_project.canonical_tags(entry["go_options"]["build_tags"])
+        protocols = probe_protocols(root, workspace, tools, execute, build_tags=tags)
         folder = workspace / DIRECTORY / "capabilities" / entry["id"]
         require(not folder.parent.is_symlink(), "linked Go capability directory")
         folder.mkdir(parents=True)

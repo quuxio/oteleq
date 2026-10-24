@@ -2,6 +2,7 @@
 
 from contextlib import ExitStack
 import copy
+from dataclasses import replace
 import json
 from pathlib import Path
 import subprocess
@@ -76,7 +77,8 @@ class GoSourceRunTests(unittest.TestCase):
     def intent(self, directory, sdk, tooling, settings, modules, context):
         self.events.append("intent")
         self.built_intent = go_build.Intent(directory, self.original, sdk, ".", self.caller.targets,
-                                            tooling, settings, modules, context)
+                                            tooling, settings, modules, context,
+                                            build_tags=source_run.go_project.canonical_tags(self.entry["go_options"]["build_tags"]))
         return self.built_intent
 
     def discovery(self, original, entry, compiler, environment, execute):
@@ -158,7 +160,7 @@ class GoSourceRunTests(unittest.TestCase):
                 self.events.clear()
 
     def test_unsupported_selection_refuses_before_any_compiler_or_sdk(self):
-        for key, value in (("go_backend", "legacy"), ("go_options", {"build_tags": ["feature"]}),
+        for key, value in (("go_backend", "legacy"), ("go_options", {"build_tags": ["-race"]}),
                            ("sequence_configuration", {})):
             original = copy.deepcopy(self.entry)
             self.entry[key] = value
@@ -170,6 +172,21 @@ class GoSourceRunTests(unittest.TestCase):
                 self.run_prepare(lane)
         self.discover.assert_not_called()
         self.assertEqual(self.commands, [])
+
+    def test_tagged_build_uses_only_the_caller_bound_literal_names(self):
+        self.entry["go_options"]["build_tags"] = ["tools", "\u03c0", "feature"]
+        self.run_prepare()
+        command = next(words for words, _ in self.commands if "go-build" in words)
+        self.assertEqual(command[-6:], ["--build-tag", "feature", "--build-tag", "tools", "--build-tag", "\u03c0"])
+        self.assertEqual(self.reader.call_args.args[0].build_tags, ("feature", "tools", "\u03c0"))
+
+    def test_caller_cannot_bind_a_different_tag_set_before_sdk_compilation(self):
+        intent = self.caller.build_intent
+        self.caller.build_intent = lambda *args: replace(intent(*args), build_tags=("foreign",))
+        with self.assertRaisesRegex(ValueError, "tags differ from the planned"):
+            self.run_prepare()
+        self.assertNotIn("sdk-build", self.events)
+        self.reader.assert_not_called()
 
     def test_source_service_is_bound_only_by_policy_without_ambient_sdk_settings(self):
         environment, scratch = generation.attempt_environment(self.base, self.root, self.project,
