@@ -1,13 +1,12 @@
 """Prepare only fixed Java argv, verify inputs, and retain the short owned runtime."""
 from collections.abc import Callable, Iterator
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 import json
 import os
 from pathlib import Path
 import re
 import shutil
 import stat
-import sys
 import tempfile
 from urllib.parse import unquote
 
@@ -58,7 +57,7 @@ def files(records: list, expected: set[Path]) -> None:
                          and row == identity(Path(row["path"])), "prepared input changed: " + row["path"])
 
 
-def agent_values(data: dict, owner: str, method: str, profile: str = java_profiles.STOCK) -> dict:
+def agent_values(data: dict, owner: str, method: str, profile: str = java_profiles.STOCK, *, action: bool = False) -> dict:
     """The generated profile enables one source-bound method and no lifetimes."""
     values = {"otel.javaagent.enabled": "true", "otel.sdk.disabled": "false",
             "otel.service.name": data["resource"]["service_name"], "otel.resource.attributes": "otelc.language=java",
@@ -74,7 +73,7 @@ def agent_values(data: dict, owner: str, method: str, profile: str = java_profil
     if java_profiles.corrected(profile):
         values["otel.instrumentation.methods.enabled"] = "false"
         values["otel.instrumentation.otelc-methods.enabled"] = "true"
-    if profile == java_profiles.ARCHIVES:
+    if profile == java_profiles.ARCHIVES or action:
         values.update(dict.fromkeys(("otel.instrumentation.executors.enabled",
                        "otel.instrumentation.java-http-client.enabled", "otel.instrumentation.java-http-server.enabled",
                        "otel.instrumentation.otelc-http-headers.enabled"), "false"))
@@ -108,7 +107,7 @@ def target(entry: dict, application: dict, project: Path) -> tuple[str, str]:
 
 def expected_argv(root: Path, java: Path, classes: Path, main: str, runtime: Path,
                   data: dict, owner: str, method: str, plain: bool, profile: str = java_profiles.STOCK,
-                  *, context: dict | None = None, extension: Path | None = None) -> list[str]:
+                  *, context: dict | None = None, extension: Path | None = None, action: bool = False) -> list[str]:
     """SDK metadata may verify this recipe; it cannot choose executables or flags."""
     args = [str(java), "-Xshare:off", "-Xlog:class+load=info:file=" + str(runtime / CLASS_LOG)]
     if not plain:
@@ -121,7 +120,9 @@ def expected_argv(root: Path, java: Path, classes: Path, main: str, runtime: Pat
                  "-Dotelc.plan=" + str(runtime / PLAN_CONFIG), "-Dotelc.traces.enabled=true",
                  "-Dotelc.lifetime.types=", "-Dotelc.lifetime.resources=", "-Dotelc.lifetime.max-live=4096",
                  "-Dotelc.lifetime.release=close"]
-        args += ["-D" + key + "=" + value for key, value in sorted(agent_values(data, owner, method, profile).items())]
+        args += ["-D" + key + "=" + value for key, value in sorted(agent_values(data, owner, method, profile, action=action).items())]
+        if action:
+            args.insert(1, "-Dotelc.witness.plan=" + str(runtime / "witness.properties"))
     paths = os.pathsep.join(map(str, java_project.runtime_classpath(classes, context)))
     return args + ["-cp", paths, main]
 
@@ -140,6 +141,9 @@ def plan_values(runtime: Path, data: dict, selection: dict) -> dict:
 def verify(launch: dict, *, root: Path, project: Path, folder: Path, tools: dict,
            runtime: Path, entry: dict, data: dict, plain: bool, context: dict | None = None) -> None:
     """Bind the full public response, argv and loaded inputs before and after Java."""
+    import java_actions
+    import java_action_launch
+    action = java_actions.enabled(entry)
     application_path = folder / APPLICATION_FILE
     application = capture.strict_json(application_path.read_bytes())
     classes = folder / CLASSES
@@ -155,7 +159,8 @@ def verify(launch: dict, *, root: Path, project: Path, folder: Path, tools: dict
         extension, extra = java_helper_binding.verify(root, paths, context, folder, runtime)
     verify_identity(launch, application, paths, runtime, data, plain, has_archives)
     provider.require(launch["argv"] == expected_argv(root, java, classes, application["main_class"], runtime,
-                                                   data, owner, method, plain, profile, context=context, extension=extension), "SDK changed the fixed Java launch recipe")
+                                                   data, owner, method, plain, profile, context=context, extension=extension,
+                                                   action=action), "SDK changed the fixed Java launch recipe")
     verify_application(launch["application"], application, application_path, classes, context=context,
                        archive_profile=has_archives)
     if modern:
@@ -171,10 +176,15 @@ def verify(launch: dict, *, root: Path, project: Path, folder: Path, tools: dict
     if plain:
         provider.require(launch["selection_sha256"] is None, "plain launch has an instrumented selection")
     else:
-        tooling |= instrumented_tooling(launch, root, runtime, data, owner, method, profile)
+        tooling |= instrumented_tooling(launch, root, runtime, data, owner, method, profile, action=action)
         if extra:
             tooling |= extra | {root / provider.HELPER}
+    if action and not plain:
+        tooling |= java_action_launch.tooling(root, folder, runtime)
     files(launch["tooling"], tooling)
+    if action and not plain:
+        java_action_launch.verify(launch, folder=folder, runtime=runtime, entry=entry,
+                                 application=application, classes=classes, data=data, owner=owner)
 
 
 def verify_identity(launch: dict, application: dict, paths: list[Path], runtime: Path,
@@ -193,13 +203,13 @@ def verify_identity(launch: dict, application: dict, paths: list[Path], runtime:
 
 
 def instrumented_tooling(launch: dict, root: Path, runtime: Path, data: dict,
-                         owner: str, method: str, profile: str) -> set[Path]:
+                         owner: str, method: str, profile: str, *, action: bool = False) -> set[Path]:
     """Verify selected advice/configuration and return its exact fixed input set."""
     selection = {"methods": {owner: [method]}, "types": [], "resources": []}
     provider.require(launch["selection_sha256"] == provider.digest(selection)
                      and capture.strict_json((runtime / "selection.json").read_bytes()) == selection,
                      "SDK changed resolved method selection")
-    provider.require((runtime / AGENT_CONFIG).read_text() == properties(agent_values(data, owner, method, profile))
+    provider.require((runtime / AGENT_CONFIG).read_text() == properties(agent_values(data, owner, method, profile, action=action))
                      and (runtime / PLAN_CONFIG).read_text() == properties(plan_values(runtime, data, selection)),
                      "SDK changed agent configuration or live controls")
     tooling = {root / provider.AGENT, root / provider.EXTENSION,
@@ -227,19 +237,26 @@ def verify_application(value: dict, application: dict, manifest: Path, classes: 
 def prepare(root: Path, project: Path, folder: Path, tools: dict, runtime: Path,
             entry: dict, data: dict, plain: bool, env: dict, execute: Callable, *, context: dict | None = None) -> list[str]:
     """Use the public prepare-only API, then accept only the independently fixed argv."""
+    import java_actions
+    import java_action_launch
     config = folder / "policy.toml"
-    command = [sys.executable, "-m", "otelc", "--config", config, "java", "--manifest",
+    command = provider.cli(root, entry) + ["--config", config, "java", "--manifest",
                folder / APPLICATION_FILE, "--runtime", runtime, "--prepare-only", "--diagnostic-profile"]
     if plain:
         command.append("--plain")
+    elif java_actions.enabled(entry):
+        command += ["--witness-bindings", java_action_launch.bindings_file(folder),
+                    "--witness-profile", entry[java_actions.FIELD]]
     if entry.get("java_profile") == java_profiles.ARCHIVES:
         paths = java_project.runtime_classpath(folder / CLASSES, context)
         java = tools["java"].resolve(strict=True)
         java_archive_context.prepare_attempt(paths, context, java, folder, env, execute)
         if not plain:
             java_helper_binding.prepare(root, paths, context, java, folder, env, execute)
-    result = execute(command, root, provider.environment(root, tools, folder, env), folder / "sdk-prepare",
-                     max_output_bytes=16 * 1024 * 1024 if context is not None else provider.MAX_METADATA)
+    guard = java_action_launch.preserved_bindings(folder) if java_actions.enabled(entry) else nullcontext()
+    with guard:
+        result = execute(command, root, provider.environment(root, tools, folder, env), folder / "sdk-prepare",
+                         max_output_bytes=16 * 1024 * 1024 if context is not None else provider.MAX_METADATA)
     provider.require(result.returncode == 0, "public SDK preparation failed; inspect sdk-prepare/stderr")
     launch = capture.strict_json(result.stdout)
     verify(launch, root=root, project=project, folder=folder, tools=tools, runtime=runtime,

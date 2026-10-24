@@ -60,7 +60,7 @@ Acceptance includes typed buffers/aliasing, observable globals, internal-linkage
 
 ## Stage 5: Java
 
-The independent [Java action-v2 readers, offline binding bridge and ordinary JDK private harness](java-action-witness.md) bind bounded metadata/protocol data to frozen class/build/probe identities and actual harness PID/logical-thread readiness. Explicit schema-3 private-handle readers, offline bindings and typed ordinary JDK caller members additionally freeze caller-owned route identity and require verified route evidence for completion. Generated SDK action execution and its complete provider qualification remain open. Existing generated workers retain their documented witness limits.
+The independent [Java action-v2 readers, offline binding bridge and ordinary JDK private harness](java-action-witness.md) bind bounded metadata/protocol data to frozen class/build/probe identities and actual harness PID/logical-thread readiness. The explicit generated schema-3 private-handle profile now connects caller/compiler/launch binding, host action control, typed outcomes, decoded traces, function metrics and final SDK health. Complete provider qualification and broader archive-profile action coverage remain open. Default generated workers retain their documented witness limits.
 
 [Prepared Java startup qualification](qualification/java-startup-metric-controls-2026-10-23.json) covers all four initial states in the recorded stock, safe and archive profiles: 2,256 distinct JVMs, 168 evidence refusals and 576 recomputed comparisons. Original failed archive audits remain recorded separately from corrected retained-only verification. Broader Java acceptance below remains open.
 

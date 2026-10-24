@@ -38,6 +38,14 @@ def qualified(entry: dict, name: str) -> str:
     return name if prefix and name.startswith(prefix) else prefix + name
 
 
+def bind_static(entry: dict) -> None:
+    """The explicit typed private lookup satisfies only the ordinary static access gap."""
+    if (enabled(entry) and entry.get('java_static') is True and entry.get('java_private') is True
+            and entry.get('java_constructor') is False and not entry.get('java_receiver_reason')
+            and entry.get('reason') == 'private method needs an access fixture'):
+        entry['reason'] = ''
+
+
 def references(entry: dict, owners: list[str] | None = None) -> dict[str, str]:
     """Bind declared source models to independently compiled binary class names."""
     result = {}

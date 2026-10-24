@@ -2,7 +2,7 @@
 
 ## Status
 
-The independent `java-sync-action-v2` control/final and decoded-trace readers, offline binding bridge and ordinary JDK private harness channel are implemented components. An explicitly selected `java-sync-private-handle-v1` control/final reader also checks the schema-3 route identity and verification flag. Generated prepared-Java action scopes are not yet available: generated caller wiring, actual SDK control integration and complete qualification with a real frozen producer remain required. Existing generated workers retain their documented name-only witness. These components do not establish equivalence of a shipping artefact.
+The independent `java-sync-action-v2` control/final and decoded-trace readers, offline binding bridge and ordinary JDK private harness channel are implemented. The explicit `java-sync-private-handle-v1` generated profile now connects typed callers, offline compilation, public SDK preparation, host action control, application outcomes, decoded traces, function metrics and final pipeline health. Complete exact-revision provider qualification, broader archive-profile coverage and the refusal corpus remain open. Default generated profiles retain their documented name-only witness. These diagnostic helpers do not establish equivalence of a shipping artefact.
 
 The [shared witness design](action-witness.md) remains the acceptance boundary. A producer acknowledgement cannot replace actual receiver evidence, and successful framing cannot qualify invocation attribution.
 
@@ -14,7 +14,32 @@ The parent freezes a case ID, attempt ID and ordered distinct action IDs. Each r
 
 The selected producer context must match that independently reported Java thread ID before arming. The consumer also binds its opaque cookie and freshness sequence to the runtime instance and frozen compiler/build/probe identities. Another envelope becoming ready first cannot be treated as the intended action. A concurrent action can cause refusal under the initial one-active-action profile; it must not cause false attribution. Virtual threads and asynchronous migration require separate support and remain unavailable.
 
-`java_action_session.Session` connects the ordinary harness to the explicitly selected producer protocol. Before releasing a call it binds the actual JVM and Java thread, frozen case/attempt/build/probe identities, fresh producer context and handle route. It completes each previous scope before permitting the next call. A final ordinary harness barrier keeps the JVM alive until every declared scope has completed. Baseline execution uses the same harness without SDK queries. Separately captured application outcome kinds are joined to the retained pre-release identities for decoded receipt checks. Missing readiness, changed plans, foreign contexts, refused arms and incomplete scopes cannot become successful skips. Transient end replies must still identify the exact pending context before a retry is allowed; they cannot also claim completion. The host retains at most 4,096 control replies and 32 MiB of encoded reply JSON. Exceeding either budget refuses before another call is released. This host component still requires generated runner/launch integration, final health and actual-provider qualification before generated invocation admission.
+`java_action_session.Session` connects the ordinary harness to the explicitly selected producer protocol. Before releasing a call it binds the actual JVM and Java thread, frozen case/attempt/build/probe identities, fresh producer context and handle route. It completes each previous scope before permitting the next call. A final ordinary harness barrier keeps the JVM alive until every declared scope has completed. Baseline execution uses the same harness without SDK queries. Separately captured application outcome kinds are joined to the retained pre-release identities for decoded receipt checks. Missing readiness, changed plans, foreign contexts, refused arms and incomplete scopes cannot become successful skips. Transient end replies must still identify the exact pending context before a retry is allowed; they cannot also claim completion. The host retains at most 4,096 control replies and 32 MiB of encoded reply JSON. Exceeding either budget refuses before another call is released. The generated composition below adds launch, outcome, metric and health checks; its complete actual-provider qualification remains separate.
+
+## Generated private-handle profile
+
+Select the development profile explicitly in the generation policy:
+
+```toml
+[adapters.java]
+backend = "prepared"
+profile = "safe-methods-v1"
+witness_profile = "java-sync-private-handle-v1"
+```
+
+`archive-methods-v1` is also an explicit implementation route and retains its separate source-root/classpath and runtime-archive checks. Its complete generated action qualification is still pending. Stock, legacy and unknown witness selections refuse this option. A matching prebuilt SDK must expose the public schema-3 offline compiler, isolated CLI startup, prepare-only witness API and runtime protocol; another profile cannot be selected from returned metadata.
+
+Use the ordinary `plan`, `generate`, `run`, `replay`, `export-tests`, `shrink` and `promote` commands with the selected policy. Generated files remain in the owned external workspace. Existing scalar input, declared receiver/factory, state-observation and sequence limits still apply. The helper does not create arbitrary objects, qualify asynchronous calls or establish shipping-artefact identity.
+
+The build resolves source declarations against compiler-owned binary class names, compiles the same ordinary JDK helpers in both lanes and obtains exact offline role/handle bindings before SDK preparation. Planning freezes the helper JAR as well as SDK sources and selected tools. Preparation cannot rewrite the caller-owned binding or compiler record. The consumer independently reconstructs argv, action properties, metadata, complete tooling inventory, compiler probes and route digest. SDK launch input files may be mode 0600 or 0644 only under the owned mode-0700 runtime; binding and final-report readers retain their mode-0600 requirement.
+
+The host hashes the complete frozen concrete case, generates a fresh attempt ID and fixes ordered action IDs before execution. `java_action_run.Session` composes action and optional live metric controllers under the original executor deadline and actual JVM identity. The socket lives beside the short owned SDK runtime. Both lanes use the same rendezvous and final barrier. Compiler publications are rechecked before and after execution, including identical-byte file replacement.
+
+Every attempted execution retains `java-actions/record.json` with expected identities, actual readiness/releases, arm/completion records and terminal readiness. Bounded control-history files retain raw SDK replies. Each file is at most 4 MiB; there are at most sixteen control-history files. Opened-file snapshots detect later replacement. Sockets close on success, error and cancellation. Raw OTLP is retained after receiver shutdown, including failed executions. A retention failure remains a separate diagnostic on an existing execution error.
+
+`java_action_telemetry` parses ordinary typed observations to obtain each call's return/error kind. It joins those outcomes to the pre-release host identities and independently decoded scoped trees. Function metrics count only selected-method spans, including recursion. Diagnostic `otelc.action.wrapper` and `otelc.action.target` spans have separate count labels in the comparison witness and contribute to final pipeline health. Unscoped selected calls remain visible and contribute to ordinary global function metrics; they cannot satisfy a declared action or a live metric schedule. Live schedules derive each call's collected measurements from its scoped selected-method count and check retained emission-off measurements on restoration.
+
+`verified-actions.json`, `verified-controls.json` when requested, and `verified-health.json` retain the separate conclusions. SDK acknowledgement or matching span names alone cannot qualify a generated action. Full published provider/capability evidence is still required before treating this development profile as qualified.
 
 ## Offline compiler bindings
 
@@ -30,7 +55,7 @@ With the matching prebuilt SDK and a selected full JDK, qualify the offline API 
 make generation-java-bindings-otelc OTELC_ROOT=/path/to/otelc REPORT_DIR=/path/to/new-report
 ```
 
-The retained qualification compiles a source fixture whose class initialiser leaves a sentinel if executed. It accepts the direct private target, refuses a wrong target descriptor and a reflected wrapper, and requires that sentinel to remain absent. No application is launched. This contributor command qualifies offline metadata only; generated invocation execution and shipping qualification remain open.
+The retained qualification compiles a source fixture whose class initialiser leaves a sentinel if executed. It accepts the direct private target, refuses a wrong target descriptor and a reflected wrapper, and requires that sentinel to remain absent. No application is launched. This contributor command qualifies offline metadata only; complete generated-execution and shipping qualification remain open.
 
 ## Explicit versioned reader
 
@@ -46,7 +71,7 @@ The `java-sync-private-handle-v1` reader requires explicit selection through `pr
 
 Each schema-3 scope has an exact boolean `route_verified`. An incomplete scope may retain `false`; a producer completion claim requires `true` as well as all the existing exits, span sets, queue and checkpoint evidence. Default reader calls still accept only v2. Neither version can select the other from its fields, and unknown profiles refuse before socket I/O.
 
-Decoded receipt validation uses the frozen identity's explicit profile. The handle route does not relax the complete tree, compiler probe, context, interval, loss or application-outcome checks below. Generated runner activation and complete consumer qualification remain open.
+Decoded receipt validation uses the frozen identity's explicit profile. The handle route does not relax the complete tree, compiler probe, context, interval, loss or application-outcome checks below. The generated profile explicitly activates these checks; complete consumer qualification remains open.
 
 ## Typed private JDK callers and bindings
 
@@ -62,7 +87,7 @@ With a matching prebuilt SDK, run the separate offline contributor qualification
 make generation-java-handles-otelc OTELC_ROOT=/path/to/otelc REPORT_DIR=/path/to/new-report
 ```
 
-The fifteen-case corpus compiles generated private callers for all eight primitive types, String, void, instance arrays and wide instance arguments. It refuses a different expected handle field, a wrong target descriptor and a handle wrapper offered to v2. An application-initialisation sentinel must stay absent. Compiler helper processes run; target applications do not. These checks qualify emitted bytecode and offline metadata. The generated execution pipeline still needs binding/launch integration, host control and complete actual-provider qualification before these components can admit invocation-scoped generated results.
+The fifteen-case corpus compiles generated private callers for all eight primitive types, String, void, instance arrays and wide instance arguments. It refuses a different expected handle field, a wrong target descriptor and a handle wrapper offered to v2. An application-initialisation sentinel must stay absent. Compiler helper processes run; target applications do not. These checks qualify emitted bytecode and offline metadata. The separate generated execution composition still needs complete actual-provider qualification.
 
 ## Independent decoded action trees
 

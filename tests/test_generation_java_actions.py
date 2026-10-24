@@ -27,6 +27,30 @@ def entry():
 
 
 class JavaGeneratedActionTests(unittest.TestCase):
+    def test_private_static_access_is_bound_only_for_an_explicit_ordinary_handle_target(self):
+        value = {**entry(), 'java_static': True, 'java_private': True, 'java_constructor': False,
+                 'java_receiver_reason': '', 'reason': 'private method needs an access fixture'}
+        actions.bind_static(value)
+        self.assertEqual(value['reason'], '')
+        for changes in ({'java_static': False}, {'java_static': 1}, {'java_private': False},
+                        {'java_constructor': True}, {'java_receiver_reason': 'inherited storage'},
+                        {'reason': 'generic or abstract method needs a fixture'}):
+            candidate = {**value, 'reason': 'private method needs an access fixture', **changes}
+            before = candidate['reason'];actions.bind_static(candidate)
+            self.assertEqual(candidate['reason'], before)
+        candidate = {**value, 'reason': 'private method needs an access fixture'}
+        candidate.pop(actions.FIELD);actions.bind_static(candidate)
+        self.assertEqual(candidate['reason'], 'private method needs an access fixture')
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary);(root / 'Work.java').write_text('class Work {}')
+            function = {**value, 'reason': 'private method needs an access fixture', 'line': 1}
+            config = policy.validate({'adapters': {'java': {'backend': 'prepared', 'profile': java_profiles.SAFE,
+                'witness_profile': java_witness.HANDLE_PROFILE}}})
+            discovered = {'globals': [], 'entrypoints': [], 'package': 'example'}
+            selected = generation.inventory_entry(function, discovered, 'Work.java', 'java', 'a' * 64,
+                                                 root, argparse.Namespace(configuration=config, cases=1))
+            self.assertEqual(selected['status'], 'ready', selected['reason'])
+
     def test_selection_is_explicit_and_requires_the_matching_prepared_profile(self):
         self.assertEqual(actions.settings({}), {})
         self.assertFalse(actions.enabled({}))

@@ -50,23 +50,31 @@ def trace(message, service: str, owner: str, method: str, nodes: dict, intervals
     for group in message.resource_spans:
         resource(group.resource, service)
         for scope in group.scope_spans:
-            provider.require((scope.scope.name, scope.scope.version) == METHOD_SCOPE, "unexpected method instrumentation scope")
-            for span in scope.spans:
-                key = capture.span_identity(span)
-                values = attributes(span.attributes)
-                provider.require(key not in nodes and span.kind == 1
-                                 and values.get("code.namespace") == ("string_value", owner)
-                                 and values.get("code.function") == ("string_value", method)
-                                 and span.name == owner.rsplit(".", 1)[-1] + "." + method,
-                                 "unbound, duplicate or unexpected selected method span")
-                provider.require(span.status.code in (0, 2), "unexpected selected span status")
-                provider.require(span.dropped_attributes_count == span.dropped_events_count == span.dropped_links_count == 0,
-                                 "selected span contains dropped observations")
-                nodes[key] = (span.trace_id, span.parent_span_id) if span.parent_span_id else None
-                intervals[key] = (span.start_time_unix_nano, span.end_time_unix_nano)
-                spans += 1
-                errors += int(span.status.code == 2)
+            count, failed = method_scope(scope, owner, method, nodes, intervals)
+            spans += count
+            errors += failed
     return spans, errors
+
+
+def method_scope(scope, owner: str, method: str, nodes: dict, intervals: dict) -> tuple[int, int]:
+    """Validate ordinary method spans separately from explicit action-role spans."""
+    provider.require((scope.scope.name, scope.scope.version) == METHOD_SCOPE, "unexpected method instrumentation scope")
+    errors = 0
+    for span in scope.spans:
+        key = capture.span_identity(span)
+        values = attributes(span.attributes)
+        provider.require(key not in nodes and span.kind == 1
+                         and values.get("code.namespace") == ("string_value", owner)
+                         and values.get("code.function") == ("string_value", method)
+                         and span.name == owner.rsplit(".", 1)[-1] + "." + method,
+                         "unbound, duplicate or unexpected selected method span")
+        provider.require(span.status.code in (0, 2), "unexpected selected span status")
+        provider.require(span.dropped_attributes_count == span.dropped_events_count == span.dropped_links_count == 0,
+                         "selected span contains dropped observations")
+        nodes[key] = (span.trace_id, span.parent_span_id) if span.parent_span_id else None
+        intervals[key] = (span.start_time_unix_nano, span.end_time_unix_nano)
+        errors += int(span.status.code == 2)
+    return len(scope.spans), errors
 
 
 def metric_point(point, method: str) -> None:

@@ -39,7 +39,7 @@ def prepared(entry: dict) -> bool:
     return entry.get("language") == "java" and entry.get("java_backend", "legacy") == "prepared"
 
 
-def artefacts(root: Path, tools: dict, profile: str = java_profiles.STOCK) -> dict:
+def artefacts(root: Path, tools: dict, profile: str = java_profiles.STOCK, *, action: bool = False) -> dict:
     """Bind prebuilt SDK products and every source module without installing them."""
     require(os.name == "posix", "prepared provider requires qualified POSIX control sockets")
     package = root / "otelc"
@@ -47,7 +47,7 @@ def artefacts(root: Path, tools: dict, profile: str = java_profiles.STOCK) -> di
     paths = [root / AGENT, root / EXTENSION, root / "adapters/java/pom.xml"]
     if java_profiles.corrected(profile):
         paths.extend(java_profiles.patch_inputs(root))
-    if profile == java_profiles.ARCHIVES:
+    if profile == java_profiles.ARCHIVES or action:
         paths.append(root / HELPER)
     for tree in (package, root / "adapters/java/src/main"):
         require(tree.is_dir() and not tree.is_symlink(), "missing SDK source tree: " + str(tree))
@@ -128,6 +128,15 @@ def verify_capabilities(value: object, requested: dict) -> None:
             "candidate languages must be distinct remaining capabilities")
 
 
+def cli(root: Path, entry: dict) -> list:
+    """Select the fixed isolated SDK startup required by the explicit handle API."""
+    if java_actions.enabled(entry):
+        bootstrap = root / 'otelc/cli_bootstrap.py'
+        require(bootstrap.is_file() and not bootstrap.is_symlink(), 'missing isolated SDK CLI bootstrap')
+        return [sys.executable, '-I', '-S', '-B', bootstrap]
+    return [sys.executable, '-m', 'otelc']
+
+
 def bind(entry: dict, root: Path, workspace: Path, tools: dict, execute: Callable) -> None:
     """Retain a public config-only capability response before any application call."""
     if entry["status"] != "ready" or not prepared(entry):
@@ -138,7 +147,7 @@ def bind(entry: dict, root: Path, workspace: Path, tools: dict, execute: Callabl
     config = folder / "policy.toml"
     text = policy(entry, endpoint, service)
     config.write_text(text, encoding="utf-8")
-    command = [sys.executable, "-m", "otelc", "--config", config, "plan"]
+    command = cli(root, entry) + ["--config", config, "plan"]
     env = environment(root, tools, folder, capture.environment(workspace, tools, service, root))
     try:
         result = execute(command, root, env, folder / "probe", max_output_bytes=MAX_METADATA)
