@@ -41,6 +41,15 @@ Every attempted execution retains `java-actions/record.json` with expected ident
 
 `verified-actions.json`, `verified-controls.json` when requested, and `verified-health.json` retain the separate conclusions. SDK acknowledgement or matching span names alone cannot qualify a generated action. Full published provider/capability evidence is still required before treating this development profile as qualified.
 
+The maintained contributor corpus uses a selected full JDK 21, qualified Python host, prebuilt SDK and new output directory:
+
+```sh
+make generation-java-actions-otelc OTELC_ROOT=/path/to/otelc \
+  REPORT_DIR=/path/to/new-report JAVA_ACTION_PROFILE=safe-methods-v1
+```
+
+Repeat with `JAVA_ACTION_PROFILE=archive-methods-v1` to force selected-JDK multi-release JAR resolution and SDK helper relocation. Each profile checks private static and receiver calls, complete literal state/error/alias graphs, independent metric startup states, generated/detached suites, frozen replay, scalar reduction, current-source promotion and changed current bodies. Altered copies of real retained evidence must refuse; they start no applications. The independent auditor checks compiler/class inventories, actual process and harness records, every control transition, decoded action trees, function metrics and final pipeline health. `GENERATION_ARGS=--retained-only` rechecks the recorded routes and freshly repeats the refusal controls without launching applications. Matching lanes cannot replace the fixed fixture oracles, and copied shrink records cannot inflate the launch count.
+
 ## Offline compiler bindings
 
 `java_action_bindings.py` freezes four distinct caller-declared envelope, rendezvous, wrapper and target methods. It calls the public offline SDK compiler from a fixed isolated Python process, pins the selected JDK, and rechecks the application sources, compiler records, class products, SDK inputs and declarations after success, failure or cancellation. Cancellation keeps its original exception; a failed input audit remains an attached diagnostic. Application classes are read without initialising them.

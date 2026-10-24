@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -27,6 +28,15 @@ def entry():
 
 
 class JavaGeneratedActionTests(unittest.TestCase):
+    def test_independent_components_import_without_a_preloaded_generation_module(self):
+        paths = [str(compiled.REPO / 'adapters/generation'), str(compiled.REPO / 'examples')]
+        for module in ('java_action_bindings', 'java_handle_callers', 'java_actions',
+                       'java_action_launch', 'java_action_run', 'java_action_telemetry'):
+            code = 'import sys;sys.path[:0]=' + repr(paths) + ';__import__(' + repr(module) + ')'
+            with self.subTest(module=module):
+                result = subprocess.run([sys.executable, '-I', '-B', '-c', code], capture_output=True, timeout=15)
+                self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_private_static_access_is_bound_only_for_an_explicit_ordinary_handle_target(self):
         value = {**entry(), 'java_static': True, 'java_private': True, 'java_constructor': False,
                  'java_receiver_reason': '', 'reason': 'private method needs an access fixture'}

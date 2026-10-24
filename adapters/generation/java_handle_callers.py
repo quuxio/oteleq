@@ -1,5 +1,7 @@
 """Ordinary typed JDK callers for an explicitly declared private handle route."""
 
+from __future__ import annotations
+
 import json
 import unicodedata
 
