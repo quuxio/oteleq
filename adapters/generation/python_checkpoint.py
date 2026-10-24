@@ -58,6 +58,8 @@ def checkpoint(phase: str) -> None:
         stream.write(message)
     # An existing boundary is an error, including an existing symbolic link.
     os.link(temporary, ready, follow_symlinks=False)
-    temporary.unlink()
     while not read_resume(root / (phase + ".resume"), message):
         time.sleep(.001)
+    # Unlinking changes the shared inode's ctime. The host must finish its
+    # stable-file read before either link is removed.
+    temporary.unlink()

@@ -12,6 +12,7 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(REPO / "adapters/generation"), str(REPO / "examples")]
 import python_checkpoint as checkpoint
 import python_control as control
+import java_live
 from python_control_fixture import report, status
 
 
@@ -99,6 +100,27 @@ class PythonControlTests(unittest.TestCase):
                     checkpoint.read_resume(resume, b"expected")
             resume.unlink()
             self.assertFalse(checkpoint.read_resume(resume, b"expected"))
+
+    def test_published_marker_metadata_stays_fixed_until_the_host_acknowledges(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            env = {checkpoint.ROOT_ENV: str(root), checkpoint.TOKEN_ENV: "a" * 32}
+            message = ("a" * 32 + " before-0\n").encode()
+            original = checkpoint.read_resume
+            def host(path, expected):
+                # The host can start reading immediately after link publication.
+                # Removing the temporary link earlier can change ctime mid-read.
+                self.assertTrue((root / "before-0.tmp").exists(),
+                                "published marker changed before host acknowledgement")
+                self.assertEqual((root / "before-0.ready").stat().st_nlink, 2)
+                java_live.marker(root / "before-0.ready", message)
+                path.write_bytes(message)
+                path.chmod(0o600)
+                return original(path, expected)
+            with patch.dict(os.environ, env), patch.object(checkpoint, "read_resume", side_effect=host):
+                checkpoint.checkpoint("before-0")
+            self.assertFalse((root / "before-0.tmp").exists())
+            self.assertEqual((root / "before-0.ready").stat().st_nlink, 1)
 
 
 if __name__ == "__main__":
