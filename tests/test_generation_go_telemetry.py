@@ -1,7 +1,9 @@
 """Independent literal Go protobuf, causal-tree and final-health falsifiers."""
 
+import json
 from pathlib import Path
 import sys
+import tempfile
 from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
@@ -121,11 +123,22 @@ class GoTelemetryTests(unittest.TestCase):
                 run, traces, metrics = fixture(**options)
                 result = self.witness(run, traces, metrics)
                 self.assertEqual(result["spans"], 1 + int(options.get("recursive", False)) + int(options.get("factory", False)))
-                self.assertEqual(result["sdk_pid"], PID)
                 self.assertEqual(result["pending"], 0)
-                self.assertIsNone(result["health"]["metric_exported_points"])
+                self.assertEqual(set(result), {"decoder", "raw_otlp_sha256", "functions", "spans", "losses", "pending"})
                 self.assertEqual(len(result["raw_otlp_sha256"]), 64)
                 run.verify.assert_called_once()
+
+    def test_detailed_health_and_receipt_stay_outside_the_closed_comparator_witness(self):
+        run, traces, metrics = fixture()
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            result = telemetry.witness(run, bodies(traces, metrics), SERVICE, ExportTraceServiceRequest, folder=folder)
+            receipt = json.loads((folder / "go-verified-telemetry.json").read_text())
+            self.assertEqual({name: receipt[name] for name in telemetry.WITNESS_FIELDS}, result)
+            self.assertEqual(receipt["sdk_pid"], PID)
+            self.assertIsNone(receipt["health"]["metric_exported_points"])
+            self.assertEqual(receipt["received"], {"trace_batches": 1, "metric_batches": 1, "spans": 1, "metric_points": 4})
+            self.assertNotIn("health", result)
 
     def test_plain_execution_cannot_emit_or_invent_sdk_evidence(self):
         run, traces, metrics = fixture()

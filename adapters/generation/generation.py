@@ -1068,7 +1068,7 @@ def qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, 
     witness = None
     if go_source.enabled(entry):
         go_source.require(isinstance(go_runtime, go_source_run.Run), "missing owned Go source execution")
-        witness = go_telemetry.witness(go_runtime, bodies, service, decoder)
+        witness = go_telemetry.witness(go_runtime, bodies, service, decoder, folder=folder)
         if lane == "baseline":
             baseline_receipt(entry, folder, bodies)
     elif java_actions.enabled(entry):
@@ -1163,6 +1163,20 @@ def retained_receiver(folder, options):
         capture.retain_http(folder, records[1], records[2])
 
 
+def attempt_environment(workspace, root, project, entry, tools, service, folder):
+    """Use owned scratch/caches and configure rebuilt SDKs only through policy."""
+    env = capture.environment(project, tools, service, root)
+    scratch = folder / "scratch"
+    scratch.mkdir()
+    env.update({"TMPDIR": str(scratch), "HOME": str(scratch), "GOCACHE": str(workspace / "go-cache/build"), "GOMODCACHE": str(workspace / "go-cache/modules"), "GOTOOLCHAIN": "local",
+                "OTELEQ_OBSERVATION": str(folder / "observation"), "OTELC_REPORT_PATH": str(folder / "runtime.json")})
+    if "go_options" in entry:
+        env.update(go_project.environment(entry["go_options"]))
+    if go_source.enabled(entry):
+        env.pop("OTEL_SERVICE_NAME", None)
+    return env, scratch
+
+
 def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, http_fixtures, runtime):
     """Capture each lane with the same private source, effects and process budgets."""
     root, language = Path(data["otelc_root"]), entry["language"]
@@ -1175,13 +1189,7 @@ def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, ht
     cache_inputs = python_cache.materialise(sys.modules[__name__], workspace, data, project) if python_provider.cached(entry) else None
     driver = driver_path(project, entry)
     service = "oteleq-gen-" + uuid.uuid4().hex
-    env = capture.environment(project, tools, service, root)
-    scratch = folder / "scratch"
-    scratch.mkdir()
-    env.update({"TMPDIR": str(scratch), "HOME": str(scratch), "GOCACHE": str(workspace / "go-cache/build"), "GOMODCACHE": str(workspace / "go-cache/modules"), "GOTOOLCHAIN": "local",
-                "OTELEQ_OBSERVATION": str(folder / "observation"), "OTELC_REPORT_PATH": str(folder / "runtime.json")})
-    if "go_options" in entry:
-        env.update(go_project.environment(entry["go_options"]))
+    env, scratch = attempt_environment(workspace, root, project, entry, tools, service, folder)
     if sequences.collects(entry) and not node_source.enabled(entry):
         env["NODE_OPTIONS"] = "--expose-gc"
         write(folder / "collection-controls.json", {"NODE_OPTIONS": "--expose-gc", "sequence": case["sequence"]})

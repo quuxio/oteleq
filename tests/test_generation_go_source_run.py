@@ -121,12 +121,12 @@ class GoSourceRunTests(unittest.TestCase):
         self.checked.intent = intent
         return self.checked
 
-    def run_prepare(self, lane="instrumented"):
+    def run_prepare(self, lane="instrumented_on"):
         return source_run.prepare(self.workflow, self.root, self.project, self.entry, self.tools,
                                   self.environment, self.folder, self.config, lane, wait_ms=30000)
 
     def test_both_lanes_reconstruct_fixed_commands_and_keep_caller_inputs(self):
-        for lane in ("baseline", "instrumented"):
+        for lane in ("baseline", "instrumented_on"):
             with self.subTest(lane=lane):
                 self.folder = self.base / lane
                 self.folder.mkdir()
@@ -165,10 +165,27 @@ class GoSourceRunTests(unittest.TestCase):
             with self.subTest(key=key), self.assertRaises(ValueError):
                 self.run_prepare()
             self.entry = original
-        with self.assertRaises(ValueError):
-            self.run_prepare("other")
+        for lane in ("other", "instrumented"):
+            with self.assertRaises(ValueError):
+                self.run_prepare(lane)
         self.discover.assert_not_called()
         self.assertEqual(self.commands, [])
+
+    def test_source_service_is_bound_only_by_policy_without_ambient_sdk_settings(self):
+        environment, scratch = generation.attempt_environment(self.base, self.root, self.project,
+            self.entry, self.tools, "unit-service", self.folder)
+        self.assertNotIn("OTEL_SERVICE_NAME", environment)
+        self.assertFalse(any(name.startswith("OTEL_") for name in environment))
+        self.assertEqual(environment["OTELC_GO"], str(self.tools["go"]))
+        self.assertEqual(environment["GOCACHE"], str(self.base / "go-cache/build"))
+        self.assertEqual(environment["GOFLAGS"], "")
+        self.assertTrue(scratch.is_dir())
+        legacy = {**self.entry, "go_backend": "legacy"}
+        other = self.base / "legacy-attempt"
+        other.mkdir()
+        environment, _ = generation.attempt_environment(self.base, self.root, self.project,
+            legacy, self.tools, "unit-service", other)
+        self.assertEqual(environment["OTEL_SERVICE_NAME"], "unit-service")
 
     def test_policy_must_bind_independently_discovered_functions_before_build(self):
         self.config.write_text('[functions]\ninclude = ["another.Function"]\n')

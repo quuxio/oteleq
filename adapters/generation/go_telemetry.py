@@ -2,9 +2,9 @@
 
 from collections import Counter
 import hashlib
+import json
 import math
-
-from google.protobuf.message import DecodeError
+from pathlib import Path
 
 import go_health
 from go_provider import policy_digest, require
@@ -18,6 +18,7 @@ LIVE = "otelc.lifetime.live"
 ERROR_TYPES = {"panic", "goexit", "returned_error"}
 MAX_SPANS = 16384
 MAX_POINTS = 65536
+WITNESS_FIELDS = ("decoder", "raw_otlp_sha256", "functions", "spans", "losses", "pending")
 
 
 def attributes(rows) -> dict:
@@ -47,6 +48,7 @@ def scope(value) -> None:
 
 def decode(decoder, body: bytes):
     """Malformed wire input is a retained qualification failure."""
+    from google.protobuf.message import DecodeError
     try:
         return decoder.FromString(body)
     except DecodeError as error:
@@ -226,7 +228,7 @@ def metrics(bodies: list, run, service: str, names: dict, errors: dict) -> int:
     return points
 
 
-def witness(run, bodies: list, service: str, decoder) -> dict | None:
+def witness(run, bodies: list, service: str, decoder, *, folder: Path | None = None) -> dict | None:
     """Keep actual owned SDK health separate from local downstream receipt."""
     run.verify()
     if run.prepared.intent.plain:
@@ -249,9 +251,12 @@ def witness(run, bodies: list, service: str, decoder) -> dict | None:
     raw = hashlib.sha256()
     for route, body in bodies:
         raw.update(len(route).to_bytes(8, "big") + route.encode() + len(body).to_bytes(8, "big") + body)
-    return {"decoder": "opentelemetry-proto Go traces/metrics with independent owned health4",
+    receipt = {"decoder": "opentelemetry-proto Go traces/metrics with independent owned health4",
             "raw_otlp_sha256": raw.hexdigest(), "functions": names, "spans": len(spans),
             "losses": {name: health["probe_accounting"][name] for name in (
                 "function_lost", "observer_lost", "unwind_unknown", "lifetime_lost")},
             "pending": health["probe_accounting"]["function_active"] + health["probe_accounting"]["observer_active"],
             "sdk_pid": health["sdk_pid"], "received": received, "health": health}
+    if folder is not None:
+        (folder / "go-verified-telemetry.json").write_text(json.dumps(receipt, indent=2, allow_nan=False) + "\n")
+    return {name: receipt[name] for name in WITNESS_FIELDS}

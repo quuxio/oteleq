@@ -18,6 +18,12 @@ import go_source as source
 
 
 class GoSourceTests(unittest.TestCase):
+    def test_optional_protobuf_decoder_does_not_block_cli_help_or_planning(self):
+        code = ("import sys;sys.path[:0]=" + repr([str(REPO / "adapters/generation"), str(REPO / "examples")])
+                + ";import go_telemetry")
+        result = subprocess.run([sys.executable, "-I", "-S", "-B", "-c", code], capture_output=True, timeout=10)
+        self.assertEqual(result.returncode, 0, result.stderr.decode())
+
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)

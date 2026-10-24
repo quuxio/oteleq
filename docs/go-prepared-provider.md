@@ -18,11 +18,11 @@ backend = "source-v1"
 module_roots = ["."]
 ```
 
-Use the ordinary `plan`, `generate` and `run` commands with that policy. The default backend remains `legacy`. The development source route currently requires an explicit module root and untagged, single-call fixtures. Tagged builds and ordered/live schedules remain visible blockers; they cannot fall back to the legacy provider.
+Pass that file with `plan --config /absolute/path/to/equivalence.toml`, then use the ordinary `generate` and `run` commands. The default backend remains `legacy`. The development source route currently requires an explicit module root and untagged, single-call fixtures. Tagged builds and ordered/live schedules remain visible blockers; they cannot fall back to the legacy provider.
 
 Planning freezes the public SDK entrypoint, Go runtime/inspector sources, host Python installation and executable bytecode caches, selected native compiler, fixed installed weaver, pinned upstream bundle and complete common-policy/protocol replies. `go-protocols --prepared-tools` must advertise the closed build-4 descriptor with `prepared_tools = 1`. Each attempt uses fixed `go-build --prepared-tools` and `go --prepare-only` recipes. Build and preparation replies supply checked data, never executable commands. Prepared-tool reuse must preserve the installation independently of the application's private module/build caches; the consumer refuses changed tool identities.
 
-The independent Go OTLP reader checks exact service/SDK resources and scopes, selected call trees and factory ordering, cumulative function/error metrics and duration histograms. Disabled lifetime hooks permit only their two explicit zero live gauges. Actual final SDK health, owned native PID and downstream receipt remain separate evidence. Missing signals, unknown data, changed inputs or failed lifecycle checks cannot qualify a case. These implemented checks do not replace actual public-workflow qualification.
+The independent Go OTLP reader checks exact service/SDK resources and scopes, selected call trees and factory ordering, cumulative function/error metrics and duration histograms. Disabled lifetime hooks permit only their two explicit zero live gauges. Actual final SDK health, owned native PID and downstream receipt remain separate evidence in `go-verified-telemetry.json`; the comparator receives only its six supported witness fields. Missing signals, unknown data, changed inputs or failed lifecycle checks cannot qualify a case. These implemented checks do not replace actual public-workflow qualification.
 
 ## Independent inputs and build recipes
 

@@ -38,7 +38,7 @@ class Run:
 def prepare(workflow, root: Path, project: Path, entry: dict, tools: dict,
             environment: dict, folder: Path, config: Path, lane: str, *, wait_ms: int) -> Run:
     """Freeze expectations before producer builds and never execute returned argv."""
-    require(go_source.enabled(entry) and lane in ("baseline", "instrumented"), "invalid Go source execution lane")
+    require(go_source.enabled(entry) and lane in ("baseline", "instrumented_on"), "invalid Go source execution lane")
     require(not entry["go_options"]["build_tags"], "source build4 cannot execute tagged inputs")
     require("sequence_configuration" not in entry, "Go source-v1 schedules require separate integration")
     module = project / entry["go_context"]["module_root"]
