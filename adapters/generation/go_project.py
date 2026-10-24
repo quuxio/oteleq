@@ -18,8 +18,11 @@ def build_timeout(value: int) -> int:
 
 def settings(value: dict) -> dict:
     """Freeze module roots, shared build tags and the per-command build budget."""
-    if not isinstance(value, dict) or set(value) - {"module_roots", "build_tags", "build_timeout_ms"}:
-        raise ValueError("adapters.go accepts module_roots, build_tags and build_timeout_ms")
+    if not isinstance(value, dict) or set(value) - {"backend", "module_roots", "build_tags", "build_timeout_ms"}:
+        raise ValueError("adapters.go accepts backend, module_roots, build_tags and build_timeout_ms")
+    backend = value.get("backend", "legacy")
+    if type(backend) is not str or backend not in ("legacy", "source-v1"):
+        raise ValueError("adapters.go.backend must be legacy or source-v1")
     timeout = build_timeout(value.get("build_timeout_ms", 180000))
     roots, tags = value.get("module_roots", []), value.get("build_tags", [])
     if not isinstance(roots, list) or any(type(item) is not str for item in roots):
@@ -34,7 +37,10 @@ def settings(value: dict) -> dict:
         raise ValueError("Go module roots and build tags must be valid and distinct")
     if tags and not roots:
         raise ValueError("Go build_tags require explicit module_roots")
-    return {"module_roots": roots.copy(), "build_tags": tags.copy(), "build_timeout_ms": timeout}
+    result = {"module_roots": roots.copy(), "build_tags": tags.copy(), "build_timeout_ms": timeout}
+    if "backend" in value:
+        result["backend"] = backend
+    return result
 
 
 def environment(options: dict) -> dict[str, str]:

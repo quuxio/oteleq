@@ -17,6 +17,10 @@ import uuid
 
 import discovery
 import go_project
+import go_source
+import go_source_run
+import go_prepared
+import go_telemetry
 import go_receivers
 import cpp_receivers
 import filesystem_effects
@@ -255,6 +259,10 @@ def discovery_tools(root: Path, language: str, adapters: dict) -> tuple[dict, di
     """Resolve the selected compiler/runtime tools and their provider identities."""
     rust_backend = adapters.get("rust", {}).get("backend", "compiler")
     selected = capture.selected_tools(root, language)
+    if language == "go" and adapters.get("go", {}).get("backend") == go_source.SOURCE:
+        selected = {name: path.resolve(strict=True) for name, path in selected.items()}
+        selected["python-host"] = Path(sys.executable).absolute()
+        return selected, go_source.artefacts(root, selected)
     if language == "python" and adapters.get("python", {}).get("backend") == "prepared":
         return selected, python_inputs.artefacts(root, selected)
     if language in node_source.LANGUAGES and adapters.get("node", {}).get("backend") == node_source.SOURCE:
@@ -436,6 +444,7 @@ def configure_go_context(entry: dict, discovered: dict, configuration: dict) -> 
         entry["go_shadowed_recovery"] |= entry["go_context"]["shadowed_recovery"]
         relative = Path(entry["path"]).relative_to(entry["go_context"]["module_root"])
         entry["otelc_runtime_function"] = str(relative.with_suffix("")).replace("/", ".") + "." + entry["name"]
+    go_source.configure(entry, configuration["adapters"]["go"])
 
 
 def configure_entry_context(entry, discovered, configuration, snapshot, excluded):
@@ -521,6 +530,7 @@ def bind_runtime_providers(entry, root, workspace, tools):
     node_source.bind(entry, root, workspace, tools, execute)
     java_provider.bind(entry, root, workspace, tools, execute)
     python_provider.bind(entry, root, workspace, tools, execute)
+    go_source.bind(entry, root, workspace, tools, execute)
 
 
 def inventory_tree(contents, root, snapshot, workspace, args, native_projects=None, java_context=None, *, original_source=None):
@@ -644,6 +654,8 @@ def plan(args):
         data["node_provider_manifest"] = manifest(workspace / node_source.DIRECTORY)
     if (workspace / python_provider.DIRECTORY).exists():
         data["python_provider_manifest"] = manifest(workspace / python_provider.DIRECTORY)
+    if (workspace / go_source.DIRECTORY).exists():
+        data["go_provider_manifest"] = manifest(workspace / go_source.DIRECTORY)
     if python_context is not None:
         data['python_cache_context_manifest'] = python_context
         data['source_sha256'] = identity({'source': data['source_sha256'], 'python_cache_context': python_context})
@@ -700,7 +712,7 @@ def decoder_files():
 
 def generator_identity():
     here = Path(__file__).parent
-    names = ("generation.py", "policy.py", "return_expectations.py", "filesystem_effects.py", "http_effects.py", "domains.py", "shrinking.py", "sequences.py", "typescript_provider.py", "python_project.py", "go_project.py", "go_provider.py", "go_files.py", "go_context.py", "go_context_sources.py", "go_context_APACHE.txt", "go_build.py", "go_caller.py", "go_hooks.py", "go_prepared.py", "go_health.py", "go_execution.py", "go_launch.py", "go_rendezvous.py", "go_receivers.py", "go_graph.py", "go_observe.go", "node_receivers.py", "java_receivers.py", "java_build.py", "java_control.py", "java_profiles.py", "java_live.py", "java_control_receipt.py", "java_health.py", "java_launch.py", "java_provider.py", "java_telemetry.py", "OteleqCompile.java", "java_graph.py", "OteleqGraph.java", "cpp_models.py", "cpp_receivers.py", "cpp_worker.py", "cpp_graph.py", "cpp_observe.hpp", "native_names.py", "discovery.py", "harness.py", "observe.py", "node_observe.mjs", "node_sequence.mjs", "typed_capture.py", "discover.mjs", "discover.go", "Discover.java")
+    names = ("generation.py", "policy.py", "return_expectations.py", "filesystem_effects.py", "http_effects.py", "domains.py", "shrinking.py", "sequences.py", "typescript_provider.py", "python_project.py", "go_project.py", "go_provider.py", "go_files.py", "go_context.py", "go_context_sources.py", "go_context_APACHE.txt", "go_build.py", "go_caller.py", "go_source.py", "go_source_run.py", "go_telemetry.py", "go_hooks.py", "go_prepared.py", "go_health.py", "go_execution.py", "go_launch.py", "go_rendezvous.py", "go_receivers.py", "go_graph.py", "go_observe.go", "node_receivers.py", "java_receivers.py", "java_build.py", "java_control.py", "java_profiles.py", "java_live.py", "java_control_receipt.py", "java_health.py", "java_launch.py", "java_provider.py", "java_telemetry.py", "OteleqCompile.java", "java_graph.py", "OteleqGraph.java", "cpp_models.py", "cpp_receivers.py", "cpp_worker.py", "cpp_graph.py", "cpp_observe.hpp", "native_names.py", "discovery.py", "harness.py", "observe.py", "node_observe.mjs", "node_sequence.mjs", "typed_capture.py", "discover.mjs", "discover.go", "Discover.java")
     files = {name: capture.file_digest(here / name) for name in names}
     files.update({name: capture.file_digest(here / name) for name in (
         'java_project.py', 'java_classpath.py', 'java_archives.py', 'java_archive_context.py',
@@ -749,6 +761,7 @@ def load_workspace(path, generated=False):
     java_provider.verify_probes(sys.modules[__name__], workspace, data)
     node_source.verify_probes(sys.modules[__name__], workspace, data)
     python_provider.verify_probes(sys.modules[__name__], workspace, data)
+    go_source.verify_probes(sys.modules[__name__], workspace, data)
     python_cache.verify(sys.modules[__name__], workspace, data)
     if generated and manifest(workspace / "tests") != read(workspace / GENERATED_MANIFEST):
         raise ValueError("generated suite or corpus changed; create a new plan")
@@ -830,6 +843,8 @@ if __name__=="__main__":unittest.main()
 
 
 def policy(entry, endpoint, *, service="oteleq-generation"):
+    if go_source.enabled(entry):
+        return go_source.policy(entry, endpoint, service)
     if python_provider.enabled(entry):
         return python_provider.policy(entry, endpoint, service)
     if node_source.enabled(entry):
@@ -923,6 +938,8 @@ def execute_capture_build(command, cwd, environment, folder, timeout):
 
 
 def build_command(root, project, entry, driver, config, tools, env, folder, scratch, lane, *, prepared_runtime=None, java_context=None):
+    if go_source.enabled(entry):
+        raise ValueError("Go source-v1 requires its owned build/preparation context")
     if python_provider.enabled(entry):
         raise ValueError("Python prepared execution requires its owned launch context")
     language = entry["language"]
@@ -1035,7 +1052,8 @@ def baseline_receipt(entry, folder, bodies):
 
 
 def qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, decoder, *, extra_channels=None,
-                    capture_complete=True, prepared_runtime=None, python_runtime=None, action_session=None, case=None):
+                    capture_complete=True, prepared_runtime=None, python_runtime=None, action_session=None, case=None,
+                    go_runtime=None):
     if errors or result.returncode:
         raise ValueError("application exit or OTLP capture failed; inspect retained stdout/stderr")
     if python_provider.enabled(entry):
@@ -1048,7 +1066,12 @@ def qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, 
     if len(result.stdout) + len(result.stderr) + observation.stat().st_size + sum(map(len, extra_channels.values())) > data["configuration"]["limits"]["max_capture_bytes"]:
         raise ValueError("case observation exceeds comparator channel budget")
     witness = None
-    if java_actions.enabled(entry):
+    if go_source.enabled(entry):
+        go_source.require(isinstance(go_runtime, go_source_run.Run), "missing owned Go source execution")
+        witness = go_telemetry.witness(go_runtime, bodies, service, decoder)
+        if lane == "baseline":
+            baseline_receipt(entry, folder, bodies)
+    elif java_actions.enabled(entry):
         java_provider.require(isinstance(action_session, java_action_run.Session), 'missing generated action host session')
         if lane == 'baseline':
             baseline_receipt(entry, folder, bodies)
@@ -1086,6 +1109,8 @@ def provider_stable(root, language, tools, expected, entry):
         java_provider.require(java_provider.artefacts(root, tools, entry.get("java_profile", java_profiles.STOCK), **options) == expected, "SDK or selected tools changed")
     elif node_source.enabled(entry):
         node_source.require(node_source.artefacts(root, tools) == expected, "SDK or selected Node tools changed")
+    elif go_source.enabled(entry):
+        go_source.require(go_source.artefacts(root, tools) == expected, "SDK or selected Go inputs changed")
     else:
         capture.stable(root, language, tools, expected, rust_backend=entry.get("rust_backend", "compiler"))
 
@@ -1103,7 +1128,7 @@ def attempt(workspace, data, entry, case, lane, folder, decoder, *, http_fixture
 
 def attempt_policy(entry, endpoint, service, runtime):
     """Prepared providers consume the same original per-attempt service identity."""
-    if runtime is not None or node_source.enabled(entry) or python_provider.enabled(entry):
+    if runtime is not None or node_source.enabled(entry) or python_provider.enabled(entry) or go_source.enabled(entry):
         return policy(entry, endpoint, service=service)
     return policy(entry, endpoint)
 
@@ -1115,7 +1140,7 @@ def attempt_receiver_options(entry, runtime):
         requests = max(capture.MAX_REQUESTS, 2 * sequences.call_count(entry))
         if requests > capture.MAX_REQUESTS:
             options["max_requests"] = requests
-    if node_source.enabled(entry):
+    if node_source.enabled(entry) or go_source.enabled(entry):
         options["allow_chunked"] = True
     return options
 
@@ -1161,7 +1186,7 @@ def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, ht
         env["NODE_OPTIONS"] = "--expose-gc"
         write(folder / "collection-controls.json", {"NODE_OPTIONS": "--expose-gc", "sequence": case["sequence"]})
     immutable = manifest(project)
-    python_run = python_session = None
+    python_run = python_session = go_run = None
     java_context = java_project.materialise(workspace, data, folder, project) if language == "java" else None
     receiver_options = attempt_receiver_options(entry, runtime)
     with retained_receiver(folder, receiver_options) as (endpoint, bodies, errors):
@@ -1178,6 +1203,10 @@ def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, ht
             prefix = [root / 'target/debug/quux-otelc', '--config', config, '--language', language]
             command = native_profile.build(sys.modules[__name__], workspace, data, entry, case,
                                            project, prefix, env, folder, lane)
+        elif go_source.enabled(entry):
+            go_run = go_source_run.prepare(sys.modules[__name__], root, project, entry, tools, env, folder,
+                                           config, lane, wait_ms=data["configuration"]["limits"]["case_timeout_ms"])
+            command = go_prepared.command(go_run.prepared.intent)
         elif python_provider.origin(entry):
             python_run = python_launch.prepare(sys.modules[__name__], root, project, entry, driver,
                                                tools, env, folder, config, lane, data["artefacts"][language],
@@ -1202,7 +1231,8 @@ def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, ht
             write(folder / "http-controls.json", {"declarations": http_effects.selected(data["configuration"]), "environment": bindings})
         with http_effects.observe(http_fixtures, folder, data["configuration"]["limits"]["max_capture_bytes"]) as requests:
             options = execution_options(entry, case, lane, folder, runtime, bodies, env, service=service,
-                                        **({"python_session": python_session} if python_session is not None else {}))
+                                        **({"python_session": python_session} if python_session is not None else {}),
+                                        **({"go_session": go_run.session} if go_run is not None else {}))
             with java_action_run.retained(options):
                 result = execute(command, working_directory, env, folder, timeout=data["configuration"]["limits"]["case_timeout_ms"] / 1000,
                                  **options)
@@ -1219,10 +1249,10 @@ def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, ht
                                                           data["artefacts"][language]))
     return qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, decoder,
                            extra_channels=effect_channels, capture_complete=complete, prepared_runtime=runtime,
-                           python_runtime=python_checked, **action_options)
+                           python_runtime=python_checked, go_runtime=go_run, **action_options)
 
 
-def execution_options(entry, case, lane, folder, runtime, bodies, env, *, service=None, python_session=None):
+def execution_options(entry, case, lane, folder, runtime, bodies, env, *, service=None, python_session=None, go_session=None):
     """Add only explicitly requested process recording and live host checkpoints."""
     options = {"record_process": True} if runtime is not None or node_source.enabled(entry) or python_provider.origin(entry) else {}
     if sequences.controls(entry):
@@ -1241,6 +1271,10 @@ def execution_options(entry, case, lane, folder, runtime, bodies, env, *, servic
                                               metrics=options.get('interaction'))
         env.update(interaction.environment())
         options['interaction'] = interaction
+    if go_source.enabled(entry):
+        go_source.require(isinstance(go_session, go_source_run.go_launch.Session), "missing native Go ready/release session")
+        env.update(go_session.environment())
+        options.update(record_process=True, interaction=go_session)
     return options
 
 
@@ -1415,7 +1449,8 @@ def retained_provider_directories(data):
                  (data.get('java_context'), java_project.DIRECTORY),
                  ('java_provider_manifest' in data, java_provider.DIRECTORY),
                  ('node_provider_manifest' in data, node_source.DIRECTORY),
-                 ('python_provider_manifest' in data, python_provider.DIRECTORY))
+                 ('python_provider_manifest' in data, python_provider.DIRECTORY),
+                 ('go_provider_manifest' in data, go_source.DIRECTORY))
     return [directory for present, directory in providers if present] + (
         [python_cache.DIRECTORY] if 'python_cache_context_manifest' in data else [])
 

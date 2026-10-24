@@ -1,12 +1,28 @@
 # Rebuilt Go provider integration
 
-Status: independent public-protocol, file/build, materialised caller discovery, context reconstruction, call-only helper/rule, prepared-recipe, owned-execution and health components are implemented for build 4. A private generated worker gate binds the actual process before constructors, observations or target calls. A development scalar pair checks this path with an independently reconstructed 21-file context profile. Public generator admission, receiver/live-control and retained-route qualification remain in progress. These components do not admit the rebuilt provider through the scalar generator. The existing [retained Go build/replay profile](go-build-bundles.md) and earlier development build-3 pair remain separate recorded contracts.
+Status: an explicit development generator route now connects the independent public-protocol, file/build, materialised caller discovery, context reconstruction, call-only helper/rule, prepared-recipe, owned-execution, decoded OTLP and health components for build 4. A private generated worker gate binds the actual process before constructors, observations or target calls. Component checks and an earlier development scalar pair cover parts of this path; public generated, receiver/live-control and retained-route qualification remain incomplete. The development route requires the SDK's explicit prepared-tool reuse API. The existing [retained Go build/replay profile](go-build-bundles.md) and earlier development build-3 pair remain separate recorded contracts.
 
 ## Explicit protocol boundary
 
 The reader accepts the explicit `go-source-v1` descriptor: build 4; configuration 2; request, plan, prepared, command and execution 1; health 4; embedded SDK; `source_complete = false`. Build metadata must bind `runtime_protocols = {config: 2, health: 4}`. Missing or additional fields, another profile, substituted versions and numeric/boolean coercions are refused. Earlier build-2/build-3 evidence belongs to its separately frozen source; the active reader does not reinterpret it. Metadata cannot select an older combined compiler/launcher or qualify source closure.
 
 The application and SDK share one native Go PID. The prepared supervisor has a separate PID. The complete consumer must bind both to its actual owned process group and fixed build/launch recipe before accepting runtime evidence. Receiving a valid descriptor alone cannot establish that relation.
+
+## Development generator route
+
+Select the rebuilt provider explicitly in the application policy:
+
+```toml
+[adapters.go]
+backend = "source-v1"
+module_roots = ["."]
+```
+
+Use the ordinary `plan`, `generate` and `run` commands with that policy. The default backend remains `legacy`. The development source route currently requires an explicit module root and untagged, single-call fixtures. Tagged builds and ordered/live schedules remain visible blockers; they cannot fall back to the legacy provider.
+
+Planning freezes the public SDK entrypoint, Go runtime/inspector sources, host Python installation and executable bytecode caches, selected native compiler, fixed installed weaver, pinned upstream bundle and complete common-policy/protocol replies. `go-protocols --prepared-tools` must advertise the closed build-4 descriptor with `prepared_tools = 1`. Each attempt uses fixed `go-build --prepared-tools` and `go --prepare-only` recipes. Build and preparation replies supply checked data, never executable commands. Prepared-tool reuse must preserve the installation independently of the application's private module/build caches; the consumer refuses changed tool identities.
+
+The independent Go OTLP reader checks exact service/SDK resources and scopes, selected call trees and factory ordering, cumulative function/error metrics and duration histograms. Disabled lifetime hooks permit only their two explicit zero live gauges. Actual final SDK health, owned native PID and downstream receipt remain separate evidence. Missing signals, unknown data, changed inputs or failed lifecycle checks cannot qualify a case. These implemented checks do not replace actual public-workflow qualification.
 
 ## Independent inputs and build recipes
 
@@ -60,11 +76,12 @@ Observed GC, successful resource release, pending objects and unreleased resourc
 PYTHONPATH=tests python -m unittest -v \
   test_generation_go_files test_generation_go_caller test_generation_go_context test_generation_go_source_build \
   test_generation_go_hooks test_generation_go_prepared test_generation_go_health \
-  test_generation_go_execution test_generation_go_launch test_generation_go_rendezvous
+  test_generation_go_execution test_generation_go_launch test_generation_go_rendezvous \
+  test_generation_go_source test_generation_go_source_run test_generation_go_telemetry
 ```
 
-The maintained literal fixtures cover protocol substitutions, wrong process/policy/selection, compiler/source/module changes, rehashed private copies/helpers and launch recipes, extra/missing private code, invalid rule bindings, missing/unknown fields, exact unsigned counters, pre-call ownership/release, live/final separation, unclosed HTTP operations, censored lifetimes, unavailable trace observation, failed exports/drains, receiver disagreements and private-file races. Context tests check the complete 21-file hash denominator, selected archive members, exact patches, pinned attribution, source races and fresh private output. The compact archive unit fixture stubs the file-hash boundary; actual full-release reconstruction has separate development execution evidence. All twelve Python modules and the attribution file are embedded/retained with the generator; the modules have independent 80% line-coverage floors. The actual compiled Go gate has separate race checks, invalid-binding/release cases and an 80% statement floor. Frozen literal helper/context fixtures are independent of the consumer renderers and need explicit review when a recipe changes.
+The maintained literal fixtures cover protocol substitutions, wrong process/policy/selection, compiler/source/module changes, rehashed private copies/helpers and launch recipes, extra/missing private code, invalid rule bindings, missing/unknown fields, exact unsigned counters, pre-call ownership/release, live/final separation, unclosed HTTP operations, censored lifetimes, unavailable trace observation, failed exports/drains, receiver disagreements and private-file races. Context tests check the complete 21-file hash denominator, selected archive members, exact patches, pinned attribution, source races and fresh private output. The compact archive unit fixture stubs the file-hash boundary; actual full-release reconstruction has separate development execution evidence. The twelve provider components, three development generator modules and attribution file are embedded/retained with the generator; all fifteen Python modules have independent 80% line-coverage floors. The actual compiled Go gate has separate race checks, invalid-binding/release cases and an 80% statement floor. Frozen literal helper/context fixtures are independent of the consumer renderers and need explicit review when a recipe changes.
 
-Next complete the explicit backend's public configuration/discovery/build integration and connect the owned execution and decoded OTLP through generated/replayed/framework/detached/reduced/promoted workflows. Existing receiver/package support, live metric schedules, source/dependency preservation and refusal controls require qualification against the new provider. Additional SDK recipes require explicit adaptation and new evidence. Broader Go builds, cgo/workspaces, asynchronous/resource actions, shipping artefacts and the [full completion checklist](completion.md) remain open.
+Next qualify the explicit backend's public generated/replayed/framework/detached/reduced/promoted workflows against the prepared-tool reuse API. Existing receiver/package support, live metric schedules, source/dependency preservation and refusal controls require qualification against the new provider. Additional SDK recipes require explicit adaptation and new evidence. Broader Go builds, cgo/workspaces, asynchronous/resource actions, shipping artefacts and the [full completion checklist](completion.md) remain open.
 
 The intended result remains **equivalence over these tests and observations**.

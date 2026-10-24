@@ -191,6 +191,9 @@ generation-check: node-observer-check node-sequence-check node-source-context-ch
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/go_context_sources.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/go_build.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/go_caller.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/go_source.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/go_source_run.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/go_telemetry.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/go_hooks.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/go_prepared.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/go_execution.py' --fail-under=80
