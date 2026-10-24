@@ -1,6 +1,6 @@
 # Python live metric schedules
 
-Status: implementation candidate; complete workflow qualification and protected delivery are pending. The first Python 3.12 origin-v2 smoke run completed two baseline and two instrumented applications. Its complete literal state/alias graphs, native origins, controls, SDK health, OTLP and comparison were rechecked without new target launches. This is initial diagnostic evidence, not admission of every profile or workload.
+Status: [recorded diagnostic qualification](qualification/python-metric-controls-2026-10-24.json) covers 3,008 actual applications across Python 3.12.15/3.14.8, both explicit origin/cache profiles and all four initial metric states on macOS ARM64. It checks declared synchronous receiver workflows against the recorded SDK and native inputs. Other providers, workloads and the full project remain separate acceptance work.
 
 Explicit [prepared origin-v2](python-prepared-provider.md) and [cached-loader profile3](python-cache-context.md) receiver call sequences can declare independent metric collection and emission states. One unchanged native application and SDK pair execute the whole instrumented schedule. Target sources require no imports, decorators or control calls. A generated private helper pauses each diagnostic call while the external host changes the real SDK controls.
 
@@ -34,7 +34,7 @@ sequence = [
 
 Use the normal [plan, generate and run commands](automatic-generation.md#build-and-run). The selected provider, native tools and installed SDK dependencies must match the chosen Python environment before planning. Preparation must not introduce new products into an already frozen catalogue.
 
-Every call must declare both flags, and at least one call must have collection and emission enabled. The first call fixes the actual startup state; it may request any of the four states. Broader startup/profile qualification remains pending. Legacy and input-only prepared profiles refuse live schedules. A source constructor or factory can finish before the first checkpoint: its trace and its measurements follow the initial state and are counted separately.
+Every call must declare both flags, and at least one call must have collection and emission enabled. The first call fixes the actual startup state; it may request any of the four states. The recorded matrix checks each initial state in both profiles and runtimes. Legacy and input-only prepared profiles refuse live schedules. A source constructor or factory can finish before the first checkpoint: its trace and its measurements follow the initial state and are counted separately.
 
 Add [typed return expectations](expected-returns.md) where the intended values are known. Repeated equality alone cannot establish that both lanes returned the intended result.
 
@@ -50,7 +50,13 @@ Only collection-enabled call trees contribute function metrics. Measurement coun
 
 `python-controls.json` retains the requested states, process bindings, command/health replies, receipt positions and held intervals. `python-verified-controls.json` records the checked code counts and collected span denominator. Endpoint authentication keys are excluded from these records. Original private SDK runtime files still require private retention.
 
-## Scope and remaining qualification
+## Recorded scope and reproduction
+
+The [24 October record](qualification/python-metric-controls-2026-10-24.json) binds runtime and retained-only verifier `7495d31`, CLI SHA-256 `e6973a648d05897900a378d6f14195803698d2f67818b8e142d429293a69c5f3` and frozen otelc `ce4cf74`. All 16 configurations pass: two Python runtimes, two profiles and four initial states. The record contains 3,008 actual applications, 1,504 SDK processes, 608 reports, 3,072 complete raw/typed observations, 768 independently recomputed comparisons, 80 altered-comparison refusals and 144 altered-live-evidence refusals. The observations include 64 copied shrink originals; those copies add no launches. Every final audit preserves original evidence bytes and file facts and starts no target applications.
+
+Each locked runtime retains 1,519 provider catalogue entries, including 1,421 installed files and 11 native tool files. Both complete 389-file SDK source copies match the recorded source archive. Exact source/tool identities and the retained route denominators are in the record. This is the executed provider; a static compatibility bridge or newer SDK commit does not add new execution evidence.
+
+Earlier smoke and failed matrix results remain separate. The old runtime failed a checkpoint stable-file read after 12 successful configurations; three configurations were not started. The failed configuration retains 185 actual application starts and 92 SDK starts outside the successful denominator. The corrected hard-link publication receives this fresh complete matrix. Its deterministic regression fails without the fix; strict checkpoint checks remain in place.
 
 ### Run the maintained workflow qualification
 
@@ -72,8 +78,8 @@ For a retained-only audit, keep the same evidence directory, profile, startup st
 
 The audit also checks nine altered-evidence refusals: missing calls, wrong process/startup identities, a short disabled interval, a missing export barrier, a changed requested state, extra collected calls and a missing creation trace. Seven control-file byte records are substituted in memory, and two raw OTLP corpora are changed separately. The checked native execution and original files stay fixed. These are decoder refusal controls; they are not additional application executions.
 
-This candidate covers declared synchronous Python receiver calls under explicit prepared origin/cache profiles. It keeps the existing source/installed-input guards and ordinary typed observations. It does not add asynchronous schedules, lifetime controls, arbitrary observation roots or invocation cookies. Serial trace grouping remains distinct from the [action witness](action-witness.md).
+The recorded profile covers declared synchronous Python receiver calls under explicit prepared origin/cache profiles. It keeps the existing source/installed-input guards and ordinary typed observations. It does not add asynchronous schedules, lifetime controls, arbitrary observation roots or invocation cookies. Serial trace grouping remains distinct from the [action witness](action-witness.md).
 
-All startup states, both selected Python runtimes/profiles, constructor/factory and recursive/error cases, generated/replayed/framework/detached/reduced/promoted routes, altered-evidence controls and source preservation still require the maintained complete qualification corpus. Independent review, the full final gate, rendered guidance, protected checks and merge remain required. The [full project checklist](completion.md) stays open.
+The complete matrix covers all initial states, both recorded runtimes/profiles, source constructors/factories, recursive/error cases, generated/replayed/framework/detached/reduced/promoted routes, altered-evidence controls and source preservation. A different callable/build/loader shape, runtime, provider or asynchronous/resource profile requires new qualification. The [full project checklist](completion.md) stays open.
 
 The result remains **equivalence over these tests and observations**.
