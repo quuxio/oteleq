@@ -1,13 +1,16 @@
 """Retained cache audits require independent bytes and complete original/private facts."""
 import copy
+import json
 import os
 from pathlib import Path
 import py_compile
 import shutil
+import subprocess
 import sys
 import tempfile
 import tomllib
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / 'adapters/generation'), str(ROOT / 'examples')]
@@ -21,6 +24,23 @@ SOURCE = b'def selected(value:int)->int:return value+1\n'
 
 
 class PythonCacheQualificationTests(unittest.TestCase):
+    def test_repeated_retained_comparisons_use_the_exact_public_verdict_and_preserve_receipts(self):
+        expected = {'verdict': 'equivalent_observed', 'scope': {'language': 'python'}}
+        complete = subprocess.CompletedProcess([], 0, json.dumps(expected).encode(), b'')
+        with patch.object(qualifier.subprocess, 'run', return_value=complete) as execute:
+            for _ in range(2):
+                qualifier.recompute_case(Path('/consumer'), Path('/retained/bundle.json'), expected)
+            self.assertEqual(execute.call_count, 2)
+            self.assertEqual(execute.call_args.args[0],
+                             ['/consumer', 'compare-observations', '/retained/bundle.json'])
+            self.assertEqual(execute.call_args.kwargs['timeout'], 30)
+        for returned, code in [({'verdict': 'equivalent', 'scope': {'language': 'python'}}, 0),
+                               ({**expected, 'scope': {'language': 'java'}}, 0), (expected, 1)]:
+            result = subprocess.CompletedProcess([], code, json.dumps(returned).encode(), b'')
+            with self.subTest(returned=returned, code=code), \
+                    patch.object(qualifier.subprocess, 'run', return_value=result), self.assertRaises(AssertionError):
+                qualifier.recompute_case(Path('/consumer'), Path('/retained/bundle.json'), expected)
+
     def fixture(self, root: Path, *, cached: bool = True):
         source, workspace = root / 'application', root / 'workspace'
         source.mkdir(); workspace.mkdir(); path = source / 'target.py'; path.write_bytes(SOURCE)

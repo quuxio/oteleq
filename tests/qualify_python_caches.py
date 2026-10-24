@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import py_compile
+import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -128,6 +129,15 @@ def check_report(path: Path, mode: str) -> int:
     return 4
 
 
+def recompute_case(cli: Path, bundle: Path, expected: dict) -> None:
+    """Repeat a pure comparison without relaunching or replacing any operation receipt."""
+    result = subprocess.run([str(cli), 'compare-observations', str(bundle)],
+                            capture_output=True, check=False, timeout=30)
+    assert result.returncode == 0
+    observed = generation.capture.strict_json(result.stdout)
+    assert python_provider.same(observed, expected) and observed['verdict'] == 'equivalent_observed'
+
+
 def recheck(folder: Path, cli: Path, provider: Path, catalogue: dict) -> dict:
     """Recompute native input bindings, health, telemetry and every typed comparison."""
     assert generation.read(folder / 'provider-inputs.json') == catalogue
@@ -143,8 +153,7 @@ def recheck(folder: Path, cli: Path, provider: Path, catalogue: dict) -> dict:
         entry, = [e for e in data['inventory'] if e['status'] == 'ready']
         case = data['cases'][0]
         bundle = report.parent / case['case'] / 'typed-bundle.json'
-        result = json.loads(command([cli, 'compare-observations', bundle], root, 'retained-comparison'))
-        assert result['verdict'] == 'equivalent'
+        recompute_case(cli, bundle, case['comparison'])
         expected = 'source-compiler' if mode in FALLBACK else 'cache-read'
         bindings[mode] = expected
         for lane in ('baseline', 'instrumented_on'):
