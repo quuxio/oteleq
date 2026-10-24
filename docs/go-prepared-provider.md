@@ -80,11 +80,13 @@ Observed GC, successful resource release, pending objects and unreleased resourc
 
 ## Component checks and remaining work
 
+The independent `go_control` component reads the existing private TCP endpoint, checks closed status replies, sets collection and emission independently and binds running health to the actual native PID, policy and compiled selection. Paused call-only health requires complete selected probes, no losses and live exporters; asynchronous exporter counters remain separate snapshots. The completed emission-off reply supplies the SDK's export barrier. This component does not yet connect generated call checkpoints, retained schedule receipts or collection-dependent metric oracles. Generated Go metric schedules remain blocked pending that integration and actual-provider qualification.
+
 ```sh
 PYTHONPATH=tests python -m unittest -v \
   test_generation_go_files test_generation_go_caller test_generation_go_context test_generation_go_source_build \
   test_generation_go_hooks test_generation_go_prepared test_generation_go_health \
-  test_generation_go_execution test_generation_go_launch test_generation_go_rendezvous \
+  test_generation_go_execution test_generation_go_launch test_generation_go_rendezvous test_generation_go_control \
   test_generation_go_source test_generation_go_source_run test_generation_go_telemetry
 ```
 

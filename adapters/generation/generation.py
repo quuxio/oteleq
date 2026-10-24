@@ -726,7 +726,7 @@ def generator_identity():
         'python_provider.py', 'python_inputs.py', 'python_prepared.py', 'python_journal.py',
         'python_code.py', 'python_code_match.py', 'python_origin.py', 'python_selection.py', 'python_cache.py',
         'python_execution.py', 'python_health.py', 'python_telemetry.py', 'python_launch.py',
-        'live_control.py', 'python_control.py', 'python_live.py', 'python_control_receipt.py', 'python_checkpoint.py')})
+        'live_control.py', 'go_control.py', 'python_control.py', 'python_live.py', 'python_control_receipt.py', 'python_checkpoint.py')})
     files["host-python"] = capture.file_digest(Path(sys.executable))
     files["observer:otelc_capture.py"] = capture.file_digest(Path(capture.__file__))
     files["observer:otelc_collection.py"] = capture.file_digest(Path(otelc_collection.__file__))
