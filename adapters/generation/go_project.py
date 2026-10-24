@@ -10,6 +10,7 @@ OBSERVER_DIRECTORY = "oteleq_generated_observer"
 CONTROL_DIRECTORY = "oteleq_generated_control"
 BRIDGE = "OteleqGeneratedRun"
 ASCII_TAG = frozenset(string.ascii_letters + string.digits + "_.")
+SOURCE_BACKENDS = ("source-v1", "source-scope-v1")
 
 
 def canonical_tags(value: object) -> tuple[str, ...]:
@@ -42,8 +43,8 @@ def settings(value: dict) -> dict:
     if not isinstance(value, dict) or set(value) - {"backend", "module_roots", "build_tags", "build_timeout_ms"}:
         raise ValueError("adapters.go accepts backend, module_roots, build_tags and build_timeout_ms")
     backend = value.get("backend", "legacy")
-    if type(backend) is not str or backend not in ("legacy", "source-v1"):
-        raise ValueError("adapters.go.backend must be legacy or source-v1")
+    if type(backend) is not str or backend not in ("legacy", *SOURCE_BACKENDS):
+        raise ValueError("adapters.go.backend must be legacy, source-v1 or source-scope-v1")
     timeout = build_timeout(value.get("build_timeout_ms", 180000))
     roots, tags = value.get("module_roots", []), value.get("build_tags", [])
     if not isinstance(roots, list) or any(type(item) is not str for item in roots):
@@ -56,7 +57,7 @@ def settings(value: dict) -> dict:
     if not isinstance(tags, list) or len(roots) != len(set(roots)):
         raise ValueError("Go module roots and build tags must be valid and distinct")
     selected_tags = canonical_tags(tags)
-    if backend == "source-v1":
+    if backend in SOURCE_BACKENDS:
         tags = list(selected_tags)
     elif any(not re.fullmatch(r"[A-Za-z0-9_.]+", tag) for tag in tags):
         raise ValueError("legacy Go build tags require ASCII literal names")

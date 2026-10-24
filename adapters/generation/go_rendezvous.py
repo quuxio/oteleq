@@ -15,7 +15,7 @@ SOURCE = Path(__file__).with_name("go_rendezvous.go").read_text()
 
 
 def enabled(entry: dict) -> bool:
-    return entry.get("go_backend") == "source-v1"
+    return entry.get("go_backend") in go_project.SOURCE_BACKENDS
 
 
 def statement(entry: dict) -> str:

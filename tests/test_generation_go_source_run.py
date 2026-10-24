@@ -19,6 +19,9 @@ import go_build
 import go_files
 import go_source
 import go_source_run as source_run
+import go_tooling
+from go_provider import SCOPE_HELPER_PROFILE
+from test_generation_go_tooling import fixture as tooling_fixture, query as tooling_query
 
 
 class GoSourceRunTests(unittest.TestCase):
@@ -96,10 +99,19 @@ class GoSourceRunTests(unittest.TestCase):
         self.commands.append((words, cwd))
         self.assertEqual(timeout, 1.234)
         self.assertIs(environment, self.environment)
-        self.assertEqual(max_output_bytes, go_files.MAX_METADATA_BYTES)
+        is_tooling_query = (go_source.scope_safe(self.entry)
+                            and (words[1:2] == ["env"] or words[1:2] == ["version"]))
+        self.assertEqual(max_output_bytes, 1024 * 1024 if is_tooling_query else go_files.MAX_METADATA_BYTES)
         self.assertTrue((folder / "command.json").is_file())
         if input_data is not None:
             self.assertEqual((folder / "stdin").read_bytes(), input_data)
+        if is_tooling_query:
+            self.events.append("tooling-query")
+            result = tooling_query(self.tooling, words, cwd)
+            result.returncode = self.status
+            (folder / "stdout").write_bytes(result.stdout)
+            (folder / "stderr").write_bytes(result.stderr)
+            return result
         if "go-build" in words:
             self.events.append("sdk-build")
             if self.build_action:
@@ -201,6 +213,51 @@ class GoSourceRunTests(unittest.TestCase):
         command = next(words for words, _ in self.commands if "go-build" in words)
         self.assertEqual(command[-6:], ["--build-tag", "feature", "--build-tag", "tools", "--build-tag", "\u03c0"])
         self.assertEqual(self.reader.call_args.args[0].build_tags, ("feature", "tools", "\u03c0"))
+
+    def scope_tooling(self):
+        directory, compiler, tools, _ = tooling_fixture(self, self.base,
+            directory=self.root / go_tooling.DIRECTORY)
+        self.tools["go"] = compiler
+        self.tooling = tools
+        self.entry["go_backend"] = go_source.SCOPE_SOURCE
+        return patch.object(source_run.go_source, "toolchain", return_value=tools), directory
+
+    def test_scope_preparation_queries_fixed_tools_before_caller_and_binds_both_builds(self):
+        selected, directory = self.scope_tooling()
+        with selected:
+            for tags, lane in (([], "baseline"), (["feature", "tools"], "instrumented_on")):
+                self.folder = self.base / lane
+                self.folder.mkdir()
+                self.config = self.folder / "policy.toml"
+                self.config.write_text(go_source.policy(self.entry, "http://127.0.0.1:1", "unit"))
+                self.entry["go_options"]["build_tags"] = tags
+                self.run_prepare(lane)
+                intent = self.reader.call_args.args[0]
+                self.assertEqual(intent.helper_profile, SCOPE_HELPER_PROFILE)
+                self.assertEqual(intent.tooling.directory, directory)
+                self.assertEqual(len(intent.tooling.queries), 3)
+                intent.tooling.verify()
+                command = next(words for words, _ in self.commands if "go-build" in words)
+                tail = ["--scope-safe", "--tooling-directory", str(directory)]
+                tail += [value for tag in tags for value in ("--build-tag", tag)]
+                self.assertEqual(command[-len(tail):], tail)
+                self.assertEqual(self.events[:4], ["tooling-query"] * 3 + ["discovery"])
+                retained = generation.read(self.folder / "go-toolchain.json")
+                self.assertEqual(retained["seal"], intent.tooling.seal)
+                self.assertEqual(retained["state"]["queries"], intent.tooling.queries)
+                self.assertEqual(generation.read(self.folder / generation.BUILD_IDENTITIES)["profile"],
+                                 "go-source-scope-v1")
+                self.commands.clear()
+                self.events.clear()
+
+    def test_failed_scope_tool_query_cannot_reach_caller_or_sdk_build(self):
+        selected, _ = self.scope_tooling()
+        self.status = 2
+        with selected, self.assertRaisesRegex(ValueError, "public build/preparation failed"):
+            self.run_prepare()
+        self.discover.assert_not_called()
+        self.reader.assert_not_called()
+        self.assertEqual(self.events, ["tooling-query"])
 
     def test_caller_cannot_bind_a_different_tag_set_before_sdk_compilation(self):
         intent = self.caller.build_intent

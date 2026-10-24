@@ -1,6 +1,6 @@
 """Build and prepare owned Go workers through fixed public SDK commands."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import json
 from pathlib import Path
 import tomllib
@@ -13,7 +13,8 @@ import go_launch
 import go_live
 import go_prepared
 import go_project
-from go_provider import data_seal, require, same
+import go_tooling
+from go_provider import SCOPE_HELPER_PROFILE, data_seal, require, same
 import go_source
 import otelc_capture as capture
 import python_prepared
@@ -52,7 +53,8 @@ def prepare(workflow, root: Path, project: Path, entry: dict, tools: dict,
     original = files.freeze(module)
     sdk = files.freeze(root / "adapters/go")
     producer = files.freeze(root / "otelc")
-    tooling = go_source.toolchain(root, tools)
+    backend = entry["go_backend"]
+    tooling = go_source.toolchain(root, tools, backend=backend)
     timeout = go_project.build_timeout(entry["go_build_timeout_ms"]) / 1000
     count = 0
 
@@ -70,6 +72,11 @@ def prepare(workflow, root: Path, project: Path, entry: dict, tools: dict,
         require(result.returncode == 0, "Go public build/preparation failed; inspect retained compiler channels")
         return result
 
+    tooling_binding = None
+    if go_source.scope_safe(entry):
+        tooling_binding = go_tooling.prepare(go_source.tooling_directory(root, backend), tools["go"], execute)
+        require(same(tooling_binding.tools, tooling), "Go scope tooling changed before caller binding")
+        workflow.write(folder / "go-toolchain.json", {"state": tooling_binding.state(), "seal": tooling_binding.seal})
     caller = go_caller.discover(original, entry, tools["go"], environment, execute,
                                 frontend_directory=folder / "go-frontend")
     workflow.write(folder / "go-caller.json", {**caller.state(), "seal": caller.seal})
@@ -77,6 +84,8 @@ def prepare(workflow, root: Path, project: Path, entry: dict, tools: dict,
     modules = go_project.documents(execute([tools["go"], "list", "-m", "-mod=readonly", "-json", "all"], module).stdout)
     context = go_context.prepare(Path(tooling["bundle"]), folder / "go-context")
     intent = caller.build_intent(folder / "go-build", sdk, tooling, settings, modules, context)
+    if tooling_binding is not None:
+        intent = replace(intent, helper_profile=SCOPE_HELPER_PROFILE, tooling=tooling_binding)
     require(intent.build_tags == tags,
             "Go caller build tags differ from the planned options")
     seal = data_seal(go_build.caller_state(intent))
@@ -86,13 +95,15 @@ def prepare(workflow, root: Path, project: Path, entry: dict, tools: dict,
     command = go_source.cli(root, tools) + ["--config", config, "go-build", "--root", module,
                                           "--target", caller.target, "--output", intent.directory,
                                           "--go", tools["go"], "--prepared-tools"]
+    if tooling_binding is not None:
+        command += ["--scope-safe", "--tooling-directory", go_source.tooling_directory(root, backend)]
     for tag in intent.build_tags:
         command += ["--build-tag", tag]
     execute(command, root)
     require(data_seal(go_build.caller_state(intent)) == seal, "Go caller inputs changed during SDK build")
     caller.verify()
     build = go_build.read(intent)
-    workflow.write(folder / workflow.BUILD_IDENTITIES, {"profile": "go-source-v1", "build": build.identity,
+    workflow.write(folder / workflow.BUILD_IDENTITIES, {"profile": "go-" + backend, "build": build.identity,
         "plain": build.receipt["plain"], "instrumented": build.receipt["instrumented"], "caller_seal": caller.seal,
         "selection_sha256": build.receipt["selection"]["sha256"]})
     private_modules = go_project.documents(execute([tools["go"], "list", "-m", "-mod=readonly", "-json", "all"],

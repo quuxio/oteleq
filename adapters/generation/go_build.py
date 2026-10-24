@@ -1,4 +1,4 @@
-"""Bind source-build4/5 products to caller-owned Go inputs and fixed recipes."""
+"""Bind explicit source-build4/5/6/7 products to caller-owned Go inputs."""
 
 from dataclasses import dataclass
 import os
@@ -9,7 +9,8 @@ import otelc_capture as capture
 import go_files as files
 import go_hooks
 import go_project
-from go_provider import data_seal, require, same, selection_digest
+import go_tooling
+from go_provider import SCOPE_HELPER_PROFILE, data_seal, require, same, selection_digest
 
 BUILD_FILE = "build.json"
 INVENTORY_FILE = "inspection/inventory.json"
@@ -60,6 +61,8 @@ class Intent:
     compiler_inputs: dict | None = None
     packages: dict | None = None
     build_tags: tuple[str, ...] = ()
+    helper_profile: str | None = None
+    tooling: go_tooling.Binding | None = None
 
 
 def caller_state(intent: Intent) -> dict:
@@ -68,7 +71,8 @@ def caller_state(intent: Intent) -> dict:
             "original": intent.original.sealed_metadata, "sdk": intent.sdk.sealed_metadata,
             "context": intent.context.sealed_metadata, "targets": [vars(target) for target in intent.targets],
             "toolchain": intent.toolchain, "settings": intent.settings, "modules": intent.modules,
-            "compiler_inputs": intent.compiler_inputs, "packages": intent.packages, "build_tags": intent.build_tags}
+            "compiler_inputs": intent.compiler_inputs, "packages": intent.packages, "build_tags": intent.build_tags,
+            "helper_profile": intent.helper_profile, "tooling": intent.tooling.seal if intent.tooling is not None else None}
 
 
 def retained_state(receipt: dict, identity: dict, private: files.Snapshot, sdk: files.Snapshot,
@@ -102,7 +106,9 @@ class Build:
         for snapshot in (self.intent.original, self.intent.sdk, self.intent.context, self.private, self.sdk, self.context):
             snapshot.verify()
         go_hooks.verify(self.intent.original, self.private, self.receipt["selection"], self.inventory,
-                        self.intent.settings["Module"]["Path"], build_tags=self.intent.build_tags)
+                        self.intent.settings["Module"]["Path"], build_tags=self.intent.build_tags,
+                        helper_profile=self.intent.helper_profile)
+        verify_tooling(self.intent)
         require(same(files.identity(self.intent.directory / BUILD_FILE), self.identity), "Go build receipt changed")
         for name in ("plain", "instrumented"):
             require(same(files.identity(self.intent.directory / name), self.receipt[name]), "Go binary changed")
@@ -139,6 +145,7 @@ def validate_intent(intent: Intent) -> None:
     validate_target(intent.target)
     require(type(intent.build_tags) is tuple and go_project.canonical_tags(intent.build_tags) == intent.build_tags,
             "Go build intent requires canonical literal tags")
+    verify_tooling(intent)
     require(type(intent.targets) is tuple and 0 < len(intent.targets) <= files.MAX_FILES
             and all(type(target) is Target for target in intent.targets)
             and all(type(target.name) is str for target in intent.targets)
@@ -155,6 +162,19 @@ def validate_intent(intent: Intent) -> None:
                 and type(target.line) is int and target.line > 0 and type(target.parameters) is int
                 and target.parameters >= 0 and type(target.receiver_id) is str, "invalid Go selected declaration")
         files.relative(target.file)
+
+
+def verify_tooling(intent: Intent) -> None:
+    """Only a caller-queried tooling2 binding admits the explicit scope-safe recipes."""
+    require(type(intent.toolchain) is dict and intent.helper_profile in (None, SCOPE_HELPER_PROFILE),
+            "unsupported Go helper profile or toolchain")
+    if intent.helper_profile is None:
+        require(intent.tooling is None and intent.toolchain.get("schema_version") != 2,
+                "scope-safe Go tooling cannot select an old build format")
+    else:
+        require(type(intent.tooling) is go_tooling.Binding and len(intent.tooling.queries) == 3
+                and same(intent.toolchain, intent.tooling.tools), "scope-safe Go build lacks its caller-held tooling2 binding")
+        intent.tooling.verify()
 
 
 def verify_tools(value: object, expected: dict) -> None:
@@ -281,12 +301,19 @@ def read(intent: Intent) -> Build:
     for snapshot in (intent.original, intent.sdk, intent.context):
         snapshot.verify()
     receipt, identity = files.read(output / BUILD_FILE)
-    receipt = fields(receipt, FIELDS | ({"build_tags", "command_evidence"} if intent.build_tags else set()), "receipt")
-    require(type(receipt["schema_version"]) is int and receipt["schema_version"] == (5 if intent.build_tags else 4)
+    scope = intent.helper_profile is not None
+    extra = ({"build_tags"} if intent.build_tags else set()) | ({"command_evidence"} if intent.build_tags or scope else set())
+    receipt = fields(receipt, FIELDS | extra | ({"helper_profile"} if scope else set()), "receipt")
+    version = 6 if scope else 4
+    if intent.build_tags:
+        version += 1
+    require(type(receipt["schema_version"]) is int and receipt["schema_version"] == version
             and same(receipt["runtime_protocols"], {"config": 2, "health": 4})
             and receipt["kind"] == "otelc.go-source-build" and receipt["source_complete"] is False
             and receipt["root"] == str(intent.original.root) and receipt["target"] == intent.target,
             "Go build root, target or schema differs")
+    if scope:
+        require(receipt["helper_profile"] == intent.helper_profile, "Go build helper profile differs from caller selection")
     if intent.build_tags:
         require(same(receipt["build_tags"], list(intent.build_tags)), "Go build differs from caller tags")
     require(same(receipt["inputs"], intent.original.identities), "Go original input inventory differs")
@@ -301,11 +328,11 @@ def read(intent: Intent) -> Build:
                  *[f"command-{index}.{suffix}" for index in range(len(expected_commands)) for suffix in ("stdout", "stderr")]]:
         observed, stable, _ = files.file(output / name)
         evidence[name] = observed, stable
-    if intent.build_tags:
+    if intent.build_tags or scope:
         names = ["commands.json", *[f"command-{index}.{suffix}" for index in range(len(expected_commands))
                                    for suffix in ("stdout", "stderr")]]
         require(same(receipt["command_evidence"], {name: evidence[name][0] for name in names}),
-                "Go tagged compiler evidence differs from retained files")
+                "Go compiler evidence differs from retained files")
     after_settings, _ = files.read(output / "command-10.stdout")
     verify_modules(receipt, intent, after_settings)
     for name in ("plain", "instrumented"):
@@ -330,7 +357,7 @@ def read(intent: Intent) -> Build:
                     and all(snapshots["private"].identities[name][key] == original[key] for key in ("sha256", "size")),
                     "Go private copy changed original program data: " + name)
     go_hooks.verify(intent.original, snapshots["private"], receipt["selection"], inventory,
-                    intent.settings["Module"]["Path"], build_tags=intent.build_tags)
+                    intent.settings["Module"]["Path"], build_tags=intent.build_tags, helper_profile=intent.helper_profile)
     state = retained_state(receipt, identity, snapshots["private"], snapshots["sdk"], snapshots["context"], inventory, evidence)
     result = Build(intent, receipt, identity, snapshots["private"], snapshots["sdk"], snapshots["context"],
                    inventory, evidence, original_caller, data_seal(state))

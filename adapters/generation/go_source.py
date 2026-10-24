@@ -11,11 +11,13 @@ import go_build
 import go_context
 import go_files as files
 import go_project
-from go_provider import PROTOCOLS as BUILD_PROTOCOLS, require, same
+import go_tooling
+from go_provider import PROTOCOLS as BUILD_PROTOCOLS, SCOPE_HELPER_PROFILE, require, same
 import otelc_capture as capture
 import python_inputs
 
 SOURCE = "source-v1"
+SCOPE_SOURCE = "source-scope-v1"
 DIRECTORY = "go-source-provider"
 PROTOCOLS = {**BUILD_PROTOCOLS, "prepared_tools": 1}
 MAX_METADATA = 256 * 1024
@@ -32,7 +34,17 @@ REQUIRED = {"otelc/cli_bootstrap.py", "otelc/go_build.py", "otelc/go_source.py",
 
 def enabled(entry: dict) -> bool:
     """Only the explicit Go backend selects the rebuilt compiler and launcher."""
-    return entry.get("language") == "go" and entry.get("go_backend", "legacy") == SOURCE
+    return entry.get("language") == "go" and entry.get("go_backend", "legacy") in go_project.SOURCE_BACKENDS
+
+
+def scope_safe(entry: dict) -> bool:
+    """The operator selects the new helper/tool format explicitly."""
+    return entry.get("language") == "go" and entry.get("go_backend") == SCOPE_SOURCE
+
+
+def tooling_directory(root: Path, backend: str) -> Path:
+    require(backend in go_project.SOURCE_BACKENDS, "unsupported Go source backend")
+    return root / (go_tooling.DIRECTORY if backend == SCOPE_SOURCE else "build/go-upstream")
 
 
 def configure(entry: dict, options: dict) -> None:
@@ -49,7 +61,7 @@ def sequence_profile(entry: dict) -> None:
         steps = entry["sequence_configuration"]
         require("receiver_fixture" in entry and type(steps) is list and 1 <= len(steps) <= 32
                 and all(type(step) is dict and step.get("action") == "call" for step in steps),
-                "Go source-v1 requires 1..32 receiver calls")
+                "Go source provider requires 1..32 receiver calls")
         if any("metrics" in step for step in steps):
             require(all(type(step.get("metrics")) is dict and set(step["metrics"]) == {"collection", "emission"}
                         and all(type(flag) is bool for flag in step["metrics"].values()) for step in steps)
@@ -59,7 +71,7 @@ def sequence_profile(entry: dict) -> None:
 
 def configuration(entry: dict, endpoint: str, service: str) -> dict:
     """Supply the complete common policy, including selected factory declarations."""
-    require(enabled(entry) and "go_context" in entry, "explicit source-v1 module entry required")
+    require(enabled(entry) and "go_context" in entry, "explicit source Go module entry required")
     sequence_profile(entry)
     context = entry["go_context"]
     sources = [Path(entry["path"]).relative_to(context["module_root"]).as_posix()]
@@ -95,8 +107,11 @@ def policy(entry: dict, endpoint: str, service: str) -> str:
     return "\n".join(lines) + "\n"
 
 
-def toolchain(root: Path, tools: dict) -> dict:
+def toolchain(root: Path, tools: dict, *, backend: str = SOURCE) -> dict:
     """Installed metadata qualifies caller-selected tools; it cannot select Go."""
+    directory = tooling_directory(root, backend)
+    if backend == SCOPE_SOURCE:
+        return go_tooling.read(directory, tools["go"]).tools
     value, _ = files.read(root / TOOLCHAIN_FILE)
     require(set(value) == TOOLCHAIN_FIELDS and type(value["schema_version"]) is int
             and value["schema_version"] == 1 and value["module"] == "go.opentelemetry.io/otelc"
@@ -128,16 +143,22 @@ def installed_files(root: Path, suffixes: set[str] | None = None) -> list[Path]:
     return sorted(result)
 
 
-def artefacts(root: Path, tools: dict) -> dict:
+def artefacts(root: Path, tools: dict, *, backend: str = SOURCE) -> dict:
     """Freeze SDK/inspector/tooling inputs and the isolated host's installed wheels."""
     require(root.is_dir() and root.resolve(strict=True) == root, "Go provider root must be canonical")
     require(tools["python-host"] == Path(sys.executable).absolute(), "Go CLI must use the selected host spelling")
-    selected = [root / name for name in ("bin/quux-otelc", "requirements.txt", "requirements-dev.txt", TOOLCHAIN_FILE)]
+    directory = tooling_directory(root, backend)
+    selected = [root / name for name in ("bin/quux-otelc", "requirements.txt", "requirements-dev.txt")]
+    selected.append(directory / "toolchain.json")
+    if backend == SCOPE_SOURCE:
+        source = go_tooling.source_snapshot(directory / "source")
+        selected += [directory / go_tooling.MANIFEST, *[source.root / name for name in source.identities]]
     selected += installed_files(root / "otelc")
     selected += installed_files(root / "ci", {".py", ".pyc"})
     selected += installed_files(root / "adapters/go")
     selected += installed_files(root / "adapters/go-source")
-    require(REQUIRED <= {path.relative_to(root).as_posix() for path in selected}, "incomplete Go provider installation")
+    required = REQUIRED | ({"ci/go_scope_patch.py", "otelc/go_prepared_tools.py"} if backend == SCOPE_SOURCE else set())
+    require(required <= {path.relative_to(root).as_posix() for path in selected}, "incomplete Go provider installation")
     paths = [(path.relative_to(root).as_posix(), path, root) for path in selected]
     for installed in python_inputs.dependency_roots(tools["python-host"]):
         paths.extend(("installed:" + str(installed) + ":" + path.relative_to(installed).as_posix(), path, installed)
@@ -148,7 +169,7 @@ def artefacts(root: Path, tools: dict) -> dict:
         if path.is_symlink():
             result["tool-link:" + name] = hashlib.sha256(os.fsencode(os.readlink(path))).hexdigest()
     result["host-python-identity"] = capture.file_digest(tools["python-host"].resolve(strict=True))
-    selected_tools = toolchain(root, tools)
+    selected_tools = toolchain(root, tools, backend=backend)
     for name in ("go", "weaver", "bundle"):
         result["toolchain:" + name] = files.identity(Path(selected_tools[name]))["sha256"]
     return result
@@ -176,15 +197,20 @@ def verify_capabilities(value: object, expected: dict) -> None:
             and "go" in groups["implemented"] | groups["candidates"], "Go capability partition is unavailable")
 
 
-def probe_protocols(root: Path, workspace: Path, tools: dict, execute: Callable, *, build_tags: tuple[str, ...] = ()) -> dict:
+def probe_protocols(root: Path, workspace: Path, tools: dict, execute: Callable, *, build_tags: tuple[str, ...] = (),
+                    backend: str = SOURCE) -> dict:
     """Retain one public descriptor probe before any target compilation or launch."""
     folder = workspace / DIRECTORY / "protocol"
     receipt = folder / "response.json"
-    command = cli(root, tools) + ["go-protocols", "--prepared-tools"]
+    require(backend in go_project.SOURCE_BACKENDS, "unsupported Go protocol backend")
+    command = cli(root, tools) + ["go-protocols", *(["--scope-safe"] if backend == SCOPE_SOURCE else []), "--prepared-tools"]
     expected = PROTOCOLS
     if build_tags:
         command.append("--build-tags")
         expected = {**PROTOCOLS, "build": 5, "inspection": 2}
+    if backend == SCOPE_SOURCE:
+        expected = {**expected, "build": 7 if build_tags else 6, "inspection": 2 if build_tags else 1,
+                    "helper_profile": SCOPE_HELPER_PROFILE, "prepared_tools": 2}
     require(not (workspace / DIRECTORY).is_symlink() and not folder.is_symlink(), "linked Go protocol directory")
     if receipt.exists() or receipt.is_symlink():
         require(receipt.is_file() and not receipt.is_symlink() and receipt.stat().st_size <= MAX_METADATA,
@@ -213,10 +239,10 @@ def bind(entry: dict, root: Path, workspace: Path, tools: dict, execute: Callabl
     if entry["status"] != "ready" or not enabled(entry):
         return
     try:
-        require("go_context" in entry, "source-v1 currently requires explicit module_roots")
+        require("go_context" in entry, "Go source provider requires explicit module_roots")
         sequence_profile(entry)
         tags = go_project.canonical_tags(entry["go_options"]["build_tags"])
-        protocols = probe_protocols(root, workspace, tools, execute, build_tags=tags)
+        protocols = probe_protocols(root, workspace, tools, execute, build_tags=tags, backend=entry["go_backend"])
         folder = workspace / DIRECTORY / "capabilities" / entry["id"]
         require(not folder.parent.is_symlink(), "linked Go capability directory")
         folder.mkdir(parents=True)
@@ -241,10 +267,11 @@ def bind(entry: dict, root: Path, workspace: Path, tools: dict, execute: Callabl
 def verify_probes(workflow, workspace: Path, data: dict) -> None:
     """Retained probes cannot change provider selection or package/runtime names."""
     options = data["configuration"]["adapters"]["go"]
-    source = options.get("backend", "legacy") == SOURCE
+    source = options.get("backend", "legacy") in go_project.SOURCE_BACKENDS
     for entry in data["inventory"]:
         if entry.get("language") == "go":
-            require(enabled(entry) == source, "Go entry backend differs from project policy")
+            require(entry.get("go_backend", "legacy") == options.get("backend", "legacy")
+                    and enabled(entry) == source, "Go entry backend differs from project policy")
             if enabled(entry) and "go_context" in entry:
                 require(same(entry.get("go_options"), options)
                         and entry.get("otelc_runtime_function") == entry["go_context"]["import_path"] + "." + entry["name"],

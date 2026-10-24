@@ -32,13 +32,31 @@ Planning requires the separate `go-protocols --prepared-tools --build-tags` desc
 
 The reader additionally binds build-5 `command_evidence` to every retained compiler log. It reconstructs the tooling import guard as the negation of the first requested tag, so an explicit `tools` tag cannot turn that private tooling package into application code. Retained tag, inventory, command, log and helper substitutions refuse independently. Component tests and compiler-only discovery are implemented; public generated/retained qualification of this candidate is still pending. The existing 80-launch record remains untagged evidence.
 
+### Candidate private-bootstrap builds
+
+Set `adapters.go.backend = "source-scope-v1"` to select the separate candidate `private-bootstrap-v1` helper profile. It requires prepared-tools 2, untagged build 6/inspection 1 or tagged build 7/inspection 2, with configuration 2 and health 4. Component checks are implemented; generated, live and retained workflow qualification remains pending. Existing build-4/5 records keep their original helper and tooling requirements.
+
+Prepare the compatible SDK's private weaver in its fixed `build/go-upstream-scope` directory. The public protocol query is `go-protocols --scope-safe --prepared-tools`, with `--build-tags` added only for a nonempty tag selection. Each public build adds `--scope-safe --tooling-directory /absolute/sdk/build/go-upstream-scope`. The consumer chooses these arguments and paths; metadata cannot choose a command or trigger a fallback.
+
+From the compatible SDK root, prepare that tooling with the selected native compiler:
+
+```sh
+/absolute/path/to/qualified/python -B -m ci.build_go_upstream \
+  --go /absolute/path/to/native/go --scope-safe \
+  --output /absolute/path/to/sdk/build/go-upstream-scope
+```
+
+The independent tooling reader authenticates the complete original `go.opentelemetry.io/otelc@v1.0.1` catalogue against the pinned official module and go.mod checksums. It then permits the one exact `raw-empty-globals-v1` backport and checks every private source byte. Before caller discovery it retains three fixed observations: native Go environment, Go build metadata for the fixed weaver, and the weaver's version. The private weaver identifies itself as `v1.0.1+quux.scope.1`; its build metadata remains `(devel)`. Source, manifests, tools, original file facts and query values stay sealed through build acceptance and reuse.
+
+One generated private bootstrap package owns SDK initialisation, builtin aliases, constants and static-type nil checks. Application-package helpers use qualified private types and a runtime accessor. This avoids relying on application declarations named `nil`, `any`, `bool`, `int`, `panic`, `true` or `false`. The consumer reconstructs every helper and rule independently and refuses reserved namespace collisions, extra private source and rehashed helper changes. Both build 6 and build 7 bind all retained compiler channels. These source/helper checks do not establish equivalence for unexecuted application inputs.
+
 ## Independent inputs and build recipes
 
 `go_files` snapshots canonical original inputs without executing application code. Reads refuse links, special files, incomplete directory walks, changed parent directories, altered bytes/file facts and reached file/tree budgets. Each tree is bounded to 4,096 files and 256 MiB; JSON metadata is bounded to 32 MiB. Original device/inode, mode, ownership, size and timestamps remain distinct from content identity.
 
 Canonical data seals also bind each stored input catalogue and its file facts. Editing a frozen object's dictionaries, including numeric/boolean substitutions or rewriting them to match changed files, cannot turn it into a newly accepted snapshot. Build caller data is sealed before provider records are read; accepted receipt/inventory/evidence values remain bound on every recheck.
 
-`go_build.Intent` supplies the original source snapshot, SDK and independently prepared context snapshot, selected declarations, canonical tags, actual tool identities and original module/settings records. The reader checks the complete explicitly selected build-4 or build-5 receipt against these caller-owned facts. It reconstructs all 15 compiler commands for the initial synchronous call profile, with no context task/HTTP hooks or lifetime selections. Returned argv is compared as data and never executed. Both binaries, the complete compiler channels, compiler inventory, selected source locations and private input catalogues are retained and rechecked after acceptance. Existing module resolutions and original module/language/toolchain/GODEBUG settings remain bound to the independent inputs.
+`go_build.Intent` supplies the original source snapshot, SDK and independently prepared context snapshot, selected declarations, canonical tags, actual tool identities and original module/settings records. The reader checks the complete explicitly selected build-4/5 or build-6/7 receipt against these caller-owned facts; build 6/7 additionally requires the sealed, independently queried tooling2 binding and helper profile. It reconstructs all 15 compiler commands for the initial synchronous call profile, with no context task/HTTP hooks or lifetime selections. Returned argv is compared as data and never executed. Both binaries, the complete compiler channels, compiler inventory, selected source locations and private input catalogues are retained and rechecked after acceptance. Existing module resolutions and original module/language/toolchain/GODEBUG settings remain bound to the independent inputs.
 
 Before invoking the producer, the caller uses `go_context.prepare(bundle, output)` to create the expected context in a new external directory. The consumer checks the pinned official `go.opentelemetry.io/otelc@v1.0.1` bundle digest, reads exactly thirteen fixed ordinary members and applies the reviewed no-task recipe. It preserves nine upstream files, patches four and adds eight, including the exact manifest and attribution. The expected telemetry/baggage extensions and rules are fixed consumer literals; no SDK renderer or producer output supplies the expected bytes. The context snapshot retains file facts and refuses later changes. Task inheritance, HTTP-enabled builds and other recipes require explicit extensions and separate qualification.
 
@@ -91,6 +109,11 @@ PYTHONPATH=tests python -m unittest -v \
   test_generation_go_execution test_generation_go_launch test_generation_go_rendezvous test_generation_go_control \
   test_generation_go_live test_generation_go_control_receipt \
   test_generation_go_source test_generation_go_source_run test_generation_go_telemetry
+
+# Separate candidate private-bootstrap components:
+PYTHONPATH=tests python -m unittest -v \
+  test_generation_go_tooling test_generation_go_scope_hooks \
+  test_generation_go_scope_source test_generation_go_scope_build
 ```
 
 The maintained literal fixtures cover protocol substitutions, wrong process/policy/selection, compiler/source/module changes, rehashed private copies/helpers and launch recipes, extra/missing private code, invalid rule bindings, missing/unknown fields, exact unsigned counters, pre-call ownership/release, live/final separation, unclosed HTTP operations, censored lifetimes, unavailable trace observation, failed exports/drains, receiver disagreements and private-file races. Context tests check the complete 21-file hash denominator, selected archive members, exact patches, pinned attribution, source races and fresh private output. The compact archive unit fixture stubs the file-hash boundary; actual full-release reconstruction has separate development execution evidence. The provider/generator modules and attribution file are embedded/retained with the generator, with independent 80% line-coverage floors. The actual compiled Go readiness/checkpoint package has separate race checks, invalid-binding/release cases and an 80% statement floor. Frozen literal helper/context fixtures are independent of the consumer renderers and need explicit review when a recipe changes.
@@ -106,7 +129,9 @@ make generation-go-source-otelc \
 
 The command keeps the existing receiver corpus's complete literal field/alias/panic oracles and adds native ownership, exact selected target/factory receipt and copied-probe refusal checks. It creates fresh evidence and does not retry failed operations. Its separate execution must pass before being cited as a new qualification. The original 80-launch record also checks scalar/global outcomes and changed-source promotion with added library discovery.
 
-For the candidate tagged workflow, invoke `tests/qualify_go_receivers.py` with the same `--otelc-root`, `--report-dir` and `--cli` values, `--backend source-v1` and repeated `--build-tag NAME` arguments. The fixtures retain the complete field/result oracles and add an excluded alternative factory with a different value. Each tagged attempt also checks both compiler flags, the active source choice, the tooling import guard and every retained compiler channel identity. A completed run is required before claiming tagged receiver or retained-suite qualification.
+Use `GO_SOURCE_BACKEND=source-scope-v1` for the separate private-bootstrap candidate. The qualifier then requires build6/7, prepared-tools2, the retained native query seal and every compiler channel in generated, framework, exported, replayed and reduced attempts. For a tagged corpus, also set `GENERATION_ARGS='--build-tag feature --build-tag tools'`. These commands start new qualification; component tests or an older source-v1 result cannot replace their successful execution.
+
+For the candidate tagged workflow, invoke `tests/qualify_go_receivers.py` with the same `--otelc-root`, `--report-dir` and `--cli` values, the explicit `--backend source-v1` or `--backend source-scope-v1` and repeated `--build-tag NAME` arguments. The fixtures retain the complete field/result oracles and add an excluded alternative factory with a different value. Each tagged attempt also checks both compiler flags, the active source choice, the tooling import guard and every retained compiler channel identity. A completed run is required before claiming tagged receiver or retained-suite qualification.
 
 Live metric schedules require their pending actual-provider and retained-workflow qualification. Additional build/context recipes and richer source/dependency graphs require new integration and evidence. Broader Go builds, cgo/workspaces, asynchronous/resource actions, shipping artefacts and the [full completion checklist](completion.md) remain open.
 

@@ -2,6 +2,8 @@
 
 Status: implemented for explicit `source-v1` call-only receiver workers; actual-provider and retained-workflow qualification is in progress. Component tests do not establish complete Go support. The [prepared-provider guide](go-prepared-provider.md) names the accepted SDK protocols and remaining build limits.
 
+The separate candidate `source-scope-v1` backend uses the same schedule contract with private-bootstrap-v1 and build6/7/prepared-tools2. Its generated, live and retained execution requires separate qualification; older source-v1 records do not cover it.
+
 ## Declare a schedule
 
 Use an existing same-package factory and put an explicit metric state on every call. At least one call must enable both collection and emission. The first call's state also supplies the initial SDK policy, before the factory runs.

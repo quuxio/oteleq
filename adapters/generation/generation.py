@@ -259,10 +259,10 @@ def discovery_tools(root: Path, language: str, adapters: dict) -> tuple[dict, di
     """Resolve the selected compiler/runtime tools and their provider identities."""
     rust_backend = adapters.get("rust", {}).get("backend", "compiler")
     selected = capture.selected_tools(root, language)
-    if language == "go" and adapters.get("go", {}).get("backend") == go_source.SOURCE:
+    if language == "go" and adapters.get("go", {}).get("backend") in go_project.SOURCE_BACKENDS:
         selected = {name: path.resolve(strict=True) for name, path in selected.items()}
         selected["python-host"] = Path(sys.executable).absolute()
-        return selected, go_source.artefacts(root, selected)
+        return selected, go_source.artefacts(root, selected, backend=adapters["go"]["backend"])
     if language == "python" and adapters.get("python", {}).get("backend") == "prepared":
         return selected, python_inputs.artefacts(root, selected)
     if language in node_source.LANGUAGES and adapters.get("node", {}).get("backend") == node_source.SOURCE:
@@ -726,7 +726,7 @@ def generator_identity():
         'python_provider.py', 'python_inputs.py', 'python_prepared.py', 'python_journal.py',
         'python_code.py', 'python_code_match.py', 'python_origin.py', 'python_selection.py', 'python_cache.py',
         'python_execution.py', 'python_health.py', 'python_telemetry.py', 'python_launch.py',
-        'live_control.py', 'go_control.py', 'go_live.py', 'go_control_receipt.py', 'python_control.py', 'python_live.py', 'python_control_receipt.py', 'python_checkpoint.py')})
+        'live_control.py', 'go_control.py', 'go_live.py', 'go_control_receipt.py', 'go_tooling.py', 'python_control.py', 'python_live.py', 'python_control_receipt.py', 'python_checkpoint.py')})
     files["host-python"] = capture.file_digest(Path(sys.executable))
     files["observer:otelc_capture.py"] = capture.file_digest(Path(capture.__file__))
     files["observer:otelc_collection.py"] = capture.file_digest(Path(otelc_collection.__file__))
@@ -1111,7 +1111,8 @@ def provider_stable(root, language, tools, expected, entry):
     elif node_source.enabled(entry):
         node_source.require(node_source.artefacts(root, tools) == expected, "SDK or selected Node tools changed")
     elif go_source.enabled(entry):
-        go_source.require(go_source.artefacts(root, tools) == expected, "SDK or selected Go inputs changed")
+        go_source.require(go_source.artefacts(root, tools, backend=entry["go_backend"]) == expected,
+                          "SDK or selected Go inputs changed")
     else:
         capture.stable(root, language, tools, expected, rust_backend=entry.get("rust_backend", "compiler"))
 

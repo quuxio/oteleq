@@ -18,9 +18,10 @@ class GoReceiverQualificationTests(unittest.TestCase):
     def test_source_policy_is_explicit_and_legacy_policy_keeps_its_defaults(self):
         legacy = tomllib.loads(qualifier.policy_text())
         self.assertEqual(legacy["adapters"]["go"], {"module_roots": ["."]})
-        source = tomllib.loads(qualifier.policy_text(backend="source-v1"))
-        self.assertEqual(source["adapters"]["go"], {"module_roots": ["."], "backend": "source-v1", "build_timeout_ms": 900000})
-        self.assertEqual(source["fixtures"], legacy["fixtures"])
+        for backend in ("source-v1", "source-scope-v1"):
+            source = tomllib.loads(qualifier.policy_text(backend=backend))
+            self.assertEqual(source["adapters"]["go"], {"module_roots": ["."], "backend": backend, "build_timeout_ms": 900000})
+            self.assertEqual(source["fixtures"], legacy["fixtures"])
         with self.assertRaises(AssertionError):
             qualifier.policy_text(backend="unknown")
 
@@ -92,7 +93,7 @@ class GoReceiverQualificationTests(unittest.TestCase):
 
     def test_complete_source_framework_has_a_separate_aggregate_budget(self):
         output = "\n".join(json.dumps({"report": str(index)}) for index in range(9))
-        for backend, timeout in (("legacy", 900), ("source-v1", 3600)):
+        for backend, timeout in (("legacy", 900), ("source-v1", 3600), ("source-scope-v1", 3600)):
             with patch.object(qualifier, "command", return_value=output) as execute, \
                     patch.object(qualifier, "check_report", return_value=4) as check:
                 self.assertEqual(qualifier.framework(Path("workspace"), Path("folder"), "suite", backend=backend), 36)
@@ -123,6 +124,12 @@ class GoReceiverQualificationTests(unittest.TestCase):
                 qualifier.source_attempt(folder, case, attempt, "baseline")
             attempt["execution"]["witness"] = witness
             qualifier.source_attempt(folder, case, attempt, "instrumented_on")
+            identities = folder / "build-identities.json"
+            identities.write_text(json.dumps({"profile": "go-source-scope-v1"}))
+            qualifier.source_attempt(folder, case, attempt, "instrumented_on", backend="source-scope-v1")
+            with self.assertRaises(AssertionError):
+                qualifier.source_attempt(folder, case, attempt, "instrumented_on")
+            identities.write_text(json.dumps({"profile": "go-source-v1"}))
             for kind in ("pid", "functions", "loss", "points", "extra-witness", "function-id", "kernel"):
                 changed, altered = copy.deepcopy(receipt), copy.deepcopy(attempt)
                 if kind == "pid":
@@ -145,6 +152,64 @@ class GoReceiverQualificationTests(unittest.TestCase):
                 with self.subTest(kind=kind), self.assertRaises(AssertionError):
                     qualifier.source_attempt(folder, case, altered, "instrumented_on")
                 start.write_text(json.dumps({"kernel": kernel}))
+
+    def test_scope_receipts_bind_every_compiler_channel_and_literal_native_query(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            build = folder / "go-build"
+            build.mkdir()
+            directory = folder / "sdk/build/go-upstream-scope"
+            go, weaver = "/selected/go/bin/go", str(directory / "bin/otelc")
+            metadata = weaver + ": go1.27.3\n\tmod\tgo.opentelemetry.io/otelc\t(devel)\t\n"
+            tools = {"schema_version": 2, "go": go, "weaver": weaver, "build_metadata": metadata,
+                     "go_version": "go1.27.3", "platform": {"GOOS": "darwin", "GOARCH": "arm64"}}
+            environment = {"GOROOT": "/selected/go", "GOVERSION": "go1.27.3", "GOOS": "darwin",
+                           "GOARCH": "arm64", "GOHOSTOS": "darwin", "GOHOSTARCH": "arm64"}
+            commands = [[go, "env", "-json", "GOROOT", "GOVERSION", "GOOS", "GOARCH", "GOHOSTOS", "GOHOSTARCH"],
+                        [go, "version", "-m", weaver], [weaver, "version"]]
+            state = {"directory": str(directory), "tools": tools, "source": "a" * 64, "reads": {},
+                     "queries": [{"command": command, "stdout": value} for command, value in
+                                 zip(commands, (json.dumps(environment), metadata, "otelc version v1.0.1+quux.scope.1\n"))]}
+            evidence = {}
+            for name in ("commands.json", *[f"command-{index}.{suffix}" for index in range(15) for suffix in ("stdout", "stderr")]):
+                raw = b"fixed compiler channel"
+                path = build / name
+                path.write_bytes(raw)
+                evidence[name] = {"path": str(path), "resolved_path": str(path), "size": len(raw),
+                                  "sha256": hashlib.sha256(raw).hexdigest()}
+            receipt = {"schema_version": 6, "helper_profile": "private-bootstrap-v1", "toolchain": tools,
+                       "commands": [{} for _ in range(15)], "command_evidence": evidence, "plain": {"path": str(build / "plain")}}
+            def publish():
+                (build / "build.json").write_text(json.dumps(receipt))
+                encoded = json.dumps(state, sort_keys=True, allow_nan=False, separators=(",", ":"))
+                (folder / "go-toolchain.json").write_text(json.dumps({"state": state,
+                    "seal": hashlib.sha256(encoded.encode()).hexdigest()}))
+            publish()
+            qualifier.scope_attempt(folder, ())
+            receipt["schema_version"] = 7
+            publish()
+            qualifier.scope_attempt(folder, ("feature",))
+            original_receipt, original_state = copy.deepcopy(receipt), copy.deepcopy(state)
+            for change in ("build", "helper", "tool-format", "logs", "query-argv", "query-version",
+                           "query-env", "source", "directory", "seal", "extra-query"):
+                receipt, state = copy.deepcopy(original_receipt), copy.deepcopy(original_state)
+                if change == "build": receipt["schema_version"] = 5
+                elif change == "helper": receipt["helper_profile"] = "old"
+                elif change == "tool-format": receipt["toolchain"]["schema_version"] = 1
+                elif change == "logs": receipt["command_evidence"].pop("command-14.stderr")
+                elif change == "query-argv": state["queries"][0]["command"] = ["another"]
+                elif change == "query-version": state["queries"][2]["stdout"] = "otelc version v1.0.1"
+                elif change == "query-env": state["queries"][0]["stdout"] = "{}"
+                elif change == "source": state["source"] = "x" * 64
+                elif change == "directory": state["directory"] = str(folder / "sdk/build/go-upstream")
+                elif change == "extra-query": state["queries"][0]["extra"] = True
+                publish()
+                if change == "seal":
+                    retained = json.loads((folder / "go-toolchain.json").read_text())
+                    retained["seal"] = "0" * 64
+                    (folder / "go-toolchain.json").write_text(json.dumps(retained))
+                with self.subTest(change=change), self.assertRaises(AssertionError):
+                    qualifier.scope_attempt(folder, ("feature",))
 
     def test_copied_source_probe_controls_require_prelaunch_refusal(self):
         with tempfile.TemporaryDirectory() as temporary:
