@@ -4,6 +4,7 @@ import hashlib
 import json
 from pathlib import Path
 import unicodedata
+from typing import cast
 
 import go_files as files
 from go_provider import require, same
@@ -24,6 +25,7 @@ def identifier(value: object) -> bool:
 def failure(results: object) -> str:
     """Only the compiler profile's literal error predicates can enter a rule."""
     require(type(results) is list and len(results) <= 4096, "invalid Go hook result denominator")
+    results = cast(list, results)
     predicates, names = [], set()
     for row in results:
         require(type(row) is dict and set(row) == {"expression", "error", "failure", "pointer"}
@@ -55,15 +57,8 @@ def helper(package: str, prefix: str, digest: str) -> bytes:
             f"func {prefix}Release[T any](value *T,success bool){{{prefix}probe.Release({prefix}Runtime.Probes,value,success)}}\n").encode()
 
 
-def generated(selection: dict, inventory: dict, module: str) -> dict[str, bytes]:
-    """Derive all additions for the explicit synchronous, no-context hook profile."""
-    require(same(selection["context"], {"tasks": False, "http": False})
-            and all(same(selection[name], []) for name in ("types", "allocations", "releases")),
-            "unsupported Go generated hook profile")
-    digest = selection["sha256"]
-    require(type(digest) is str and len(digest) == 64 and all(char in "0123456789abcdef" for char in digest),
-            "invalid Go hook selection digest")
-    prefix = "__otelc_" + digest[:12] + "_"
+def package_bindings(inventory: dict, module: str) -> dict:
+    """Bind every generated package to its declared source directory."""
     packages = inventory["packages"]
     require(type(packages) is dict and bool(packages) and len(packages) <= files.MAX_FILES,
             "missing Go hook package bindings")
@@ -75,37 +70,67 @@ def generated(selection: dict, inventory: dict, module: str) -> dict[str, bytes]
             files.relative(directory)
         require(name == module + ("/" + directory if directory != "." else ""),
                 "Go hook package differs from its source directory")
+    return packages
+
+
+def callable_binding(row: dict, packages: dict) -> tuple[dict, str]:
+    """Validate callable spelling and storage before emitting source text."""
+    require(type(row["package"]) is str and row["package"] in packages and identifier(row["symbol"]),
+            "invalid Go hook callable binding")
+    fact = packages[row["package"]]
+    require(Path(row["file"]).parent.as_posix() == fact["directory"], "Go hook callable differs from package directory")
+    receiver = row["receiver_id"]
+    require(type(receiver) is str and (not receiver or identifier(receiver.removeprefix("*"))),
+            "invalid Go hook receiver")
+    expected_name = row["package"] + "." + (receiver.removeprefix("*") + "." if receiver else "") + row["symbol"]
+    require(row["name"] == expected_name, "Go hook callable name differs from symbol/receiver")
+    return fact, receiver
+
+
+def injection(row: dict, selected: dict, prefix: str, finish: bool, package: dict) -> list[str]:
+    """Keep shutdown ordering and selected invocation indices explicit."""
+    code = []
+    if finish:
+        require(package["name"] == "main" and type(row["parameters"]) is int
+                and row["parameters"] == 0 and same(row["results"], []),
+                "invalid Go main shutdown binding")
+        code.append("defer " + prefix + "Runtime.Close()")
+    if row["name"] in selected:
+        predicate = failure(row["results"])
+        code += [f"{prefix}Invocation := {prefix}Runtime.Probes.Start({selected[row['name']]})",
+                 "defer func(){" + prefix + "Invocation.End(" + predicate + ")}()"]
+    return code
+
+
+def rule(row: dict, main: str, receiver: str, index: int, code: list[str]) -> str:
+    """Serialise checked callable bindings with the fixed injected code."""
+    target = "main" if row["package"] == main else row["package"]
+    result = f"rule_{index}:\n  target: {json.dumps(target)}\n  where:\n    func: {json.dumps(row['symbol'])}\n"
+    if receiver:
+        result += "    recv: " + json.dumps(receiver) + "\n"
+    return result + "  do:\n    - inject_code:\n        raw: |\n" + "".join("          " + line + "\n" for line in code)
+
+
+def generated(selection: dict, inventory: dict, module: str) -> dict[str, bytes]:
+    """Derive all additions for the explicit synchronous, no-context hook profile."""
+    require(same(selection["context"], {"tasks": False, "http": False})
+            and all(same(selection[name], []) for name in ("types", "allocations", "releases")),
+            "unsupported Go generated hook profile")
+    digest = selection["sha256"]
+    require(type(digest) is str and len(digest) == 64 and all(char in "0123456789abcdef" for char in digest),
+            "invalid Go hook selection digest")
+    prefix = "__otelc_" + digest[:12] + "_"
+    packages = package_bindings(inventory, module)
     selected = {row["name"]: index for index, row in enumerate(selection["functions"])}
     additions, rules, used, mains = {}, [], set(), 0
     for row in inventory["functions"]:
         finish = row["package"] == inventory["main"] and row["symbol"] == "main" and row["receiver_id"] == ""
         if row["name"] not in selected and not finish:
             continue
-        require(type(row["package"]) is str and row["package"] in packages and identifier(row["symbol"]),
-                "invalid Go hook callable binding")
-        fact = packages[row["package"]]
-        require(Path(row["file"]).parent.as_posix() == fact["directory"], "Go hook callable differs from package directory")
-        receiver = row["receiver_id"]
-        require(type(receiver) is str and (not receiver or identifier(receiver.removeprefix("*"))),
-                "invalid Go hook receiver")
-        expected_name = row["package"] + "." + (receiver.removeprefix("*") + "." if receiver else "") + row["symbol"]
-        require(row["name"] == expected_name, "Go hook callable name differs from symbol/receiver")
-        code = []
-        if finish:
-            mains += 1
-            require(fact["name"] == "main" and type(row["parameters"]) is int
-                    and row["parameters"] == 0 and same(row["results"], []),
-                    "invalid Go main shutdown binding")
-            code.append("defer " + prefix + "Runtime.Close()")
-        if row["name"] in selected:
-            predicate = failure(row["results"])
-            code += [f"{prefix}Invocation := {prefix}Runtime.Probes.Start({selected[row['name']]})",
-                     "defer func(){" + prefix + "Invocation.End(" + predicate + ")}()"]
-        target = "main" if row["package"] == inventory["main"] else row["package"]
-        rule = f"rule_{len(rules)}:\n  target: {json.dumps(target)}\n  where:\n    func: {json.dumps(row['symbol'])}\n"
-        if receiver:
-            rule += "    recv: " + json.dumps(receiver) + "\n"
-        rules.append(rule + "  do:\n    - inject_code:\n        raw: |\n" + "".join("          " + line + "\n" for line in code))
+        fact, receiver = callable_binding(row, packages)
+        code = injection(row, selected, prefix, finish, fact)
+        rules.append(rule(row, inventory["main"], receiver, len(rules), code))
+        mains += int(finish)
         used.add(row["package"])
     require(mains == 1, "Go hooks require one main shutdown binding")
     for package in sorted(used):

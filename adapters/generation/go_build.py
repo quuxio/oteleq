@@ -3,11 +3,17 @@
 from dataclasses import dataclass
 import os
 from pathlib import Path
+from typing import cast
 
 import otelc_capture as capture
 import go_files as files
 import go_hooks
 from go_provider import data_seal, require, same, selection_digest
+
+BUILD_FILE = "build.json"
+INVENTORY_FILE = "inspection/inventory.json"
+MODULE_FILE = "go.mod"
+READONLY_FLAG = "-mod=readonly"
 
 FIELDS = {"schema_version", "kind", "root", "target", "selection", "inputs", "sdk_inputs",
           "private_inputs", "context_inputs", "inventory", "plain", "instrumented", "modules_before",
@@ -92,10 +98,10 @@ class Build:
             snapshot.verify()
         go_hooks.verify(self.intent.original, self.private, self.receipt["selection"], self.inventory,
                         self.intent.settings["Module"]["Path"])
-        require(same(files.identity(self.intent.directory / "build.json"), self.identity), "Go build receipt changed")
+        require(same(files.identity(self.intent.directory / BUILD_FILE), self.identity), "Go build receipt changed")
         for name in ("plain", "instrumented"):
             require(same(files.identity(self.intent.directory / name), self.receipt[name]), "Go binary changed")
-        require(same(files.identity(self.intent.directory / "inspection/inventory.json"), self.receipt["inventory"]),
+        require(same(files.identity(self.intent.directory / INVENTORY_FILE), self.receipt["inventory"]),
                 "Go compiler inventory changed")
         verify_tools(self.receipt["toolchain"], self.intent.toolchain)
         for name, expected in self.evidence.items():
@@ -108,6 +114,15 @@ def fields(value: object, expected: set[str], label: str) -> dict:
     return value
 
 
+def validate_target(value: object) -> None:
+    """Require a canonical package target without treating paths as suffixes."""
+    require(type(value) is str, "Go build requires one fixed main-package target")
+    value = cast(str, value)
+    if value != ".":
+        require(value.startswith("./"), "Go build requires one fixed main-package target")
+        files.relative(value[2:])
+
+
 def validate_intent(intent: Intent) -> None:
     """Reject malformed caller declarations before reading any returned product."""
     output = intent.directory
@@ -116,13 +131,12 @@ def validate_intent(intent: Intent) -> None:
     require(all(type(value) is files.Snapshot for value in (intent.original, intent.sdk, intent.context))
             and not any(output.is_relative_to(root) or root.is_relative_to(output)
                         for root in (intent.original.root, intent.sdk.root, intent.context.root)), "Go build output overlaps source")
-    require(type(intent.target) is str and (intent.target == "." or intent.target.startswith("./")
-            and files.relative(intent.target[2:]) == intent.target[2:]), "Go build requires one fixed main-package target")
+    validate_target(intent.target)
     require(type(intent.targets) is tuple and 0 < len(intent.targets) <= files.MAX_FILES
             and all(type(target) is Target for target in intent.targets)
             and all(type(target.name) is str for target in intent.targets)
             and len({target.name for target in intent.targets}) == len(intent.targets), "invalid Go target denominator")
-    require("go.mod" in intent.original.identities and type(intent.settings) is dict
+    require(MODULE_FILE in intent.original.identities and type(intent.settings) is dict
             and type(intent.settings.get("Module")) is dict
             and type(intent.settings["Module"].get("Path")) is str, "missing Go module identity")
     for target in intent.targets:
@@ -143,6 +157,7 @@ def verify_tools(value: object, expected: dict) -> None:
 def module_graph(value: object) -> dict[str, dict]:
     """A missing, repeated or malformed module cannot establish preservation."""
     require(type(value) is list and bool(value) and len(value) <= files.MAX_FILES, "missing Go module graph")
+    value = cast(list, value)
     result = {}
     for row in value:
         require(type(row) is dict and type(row.get("Path")) is str and bool(row["Path"])
@@ -172,18 +187,18 @@ def commands(intent: Intent) -> list[dict]:
     root, output, go = intent.original.root, intent.directory, intent.toolchain["go"]
     private = output / "private"
     recipes = [([go, "mod", "edit", "-json"], root),
-               ([go, "list", "-m", "-mod=readonly", "-json", "all"], root)]
+               ([go, "list", "-m", READONLY_FLAG, "-json", "all"], root)]
     replacements = {name: output / "context" / suffix for name, suffix in REPLACEMENTS.items()}
     replacements["io.quux.otelc/go"] = output / "sdk"
     recipes += [([go, "mod", "edit", "-replace=" + name + "=" + str(path), "-require=" + name + "@v0.0.0"], private)
                 for name, path in replacements.items()]
     recipes += [([go, "mod", "edit", "-require=go.opentelemetry.io/otel/sdk@v1.47.0"], private),
-                ([go, "mod", "tidy"], private), ([go, "list", "-m", "-mod=readonly", "-json", "all"], private),
+                ([go, "mod", "tidy"], private), ([go, "list", "-m", READONLY_FLAG, "-json", "all"], private),
                 ([go, "mod", "edit", "-json"], private), ([go, "mod", "verify"], root),
                 ([go, "mod", "verify"], private),
-                ([go, "build", "-mod=readonly", "-o", str(output / "plain"), intent.target], root),
+                ([go, "build", READONLY_FLAG, "-o", str(output / "plain"), intent.target], root),
                 ([intent.toolchain["weaver"], "--work-dir", str(output / "weaver-work"), "go", "build",
-                  "-mod=readonly", "-o", str(output / "instrumented"), intent.target], private)]
+                  READONLY_FLAG, "-o", str(output / "instrumented"), intent.target], private)]
     return [{"argv": argv, "cwd": str(cwd), "exit_code": 0} for argv, cwd in recipes]
 
 
@@ -247,7 +262,7 @@ def read(intent: Intent) -> Build:
     output = intent.directory
     for snapshot in (intent.original, intent.sdk, intent.context):
         snapshot.verify()
-    receipt, identity = files.read(output / "build.json")
+    receipt, identity = files.read(output / BUILD_FILE)
     receipt = fields(receipt, FIELDS, "receipt")
     require(type(receipt["schema_version"]) is int and receipt["schema_version"] == 4
             and same(receipt["runtime_protocols"], {"config": 2, "health": 4})
@@ -262,7 +277,7 @@ def read(intent: Intent) -> Build:
     _, _, raw_commands = files.file(output / "commands.json", files.MAX_METADATA_BYTES, keep=True)
     require(same(capture.strict_json(raw_commands), expected_commands), "Go retained compiler command log differs")
     evidence = {}
-    for name in ["build.json", "commands.json", "plain", "instrumented", "inspection/inventory.json",
+    for name in [BUILD_FILE, "commands.json", "plain", "instrumented", INVENTORY_FILE,
                  *[f"command-{index}.{suffix}" for index in range(len(expected_commands)) for suffix in ("stdout", "stderr")]]:
         observed, stable, _ = files.file(output / name)
         evidence[name] = observed, stable
@@ -271,11 +286,11 @@ def read(intent: Intent) -> Build:
     for name in ("plain", "instrumented"):
         require(os.access(output / name, os.X_OK) and same(files.identity(output / name), receipt[name]),
                 "Go binary identity or executable permission differs")
-    inventory, observed = files.read(output / "inspection/inventory.json")
+    inventory, observed = files.read(output / INVENTORY_FILE)
     require(same(observed, receipt["inventory"]), "Go compiler inventory file differs")
     inventory = source_inventory(inventory, intent)
     selected(receipt["selection"], intent, inventory)
-    launch_names = set(inventory["compiler_inputs"]) | {"go.mod"} | ({"go.sum"} & set(intent.original.identities))
+    launch_names = set(inventory["compiler_inputs"]) | {MODULE_FILE} | ({"go.sum"} & set(intent.original.identities))
     require(same(receipt["launch_inputs"], {name: intent.original.identities[name] for name in launch_names})
             and receipt["source_roster"] == sorted(name for name in intent.original.identities if Path(name).suffix in SOURCE_SUFFIXES),
             "Go compiled input or source roster differs")
@@ -285,7 +300,7 @@ def read(intent: Intent) -> Build:
     require(files.content(snapshots["sdk"]) == files.content(intent.sdk), "Go private SDK differs from caller-frozen source")
     require(files.content(snapshots["context"]) == files.content(intent.context), "Go context differs from caller-frozen profile")
     for name, original in intent.original.identities.items():
-        if name not in ("go.mod", "go.sum"):
+        if name not in (MODULE_FILE, "go.sum"):
             require(name in snapshots["private"].identities
                     and all(snapshots["private"].identities[name][key] == original[key] for key in ("sha256", "size")),
                     "Go private copy changed original program data: " + name)

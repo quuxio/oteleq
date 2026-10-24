@@ -8,6 +8,9 @@ import go_prepared as prepared
 from go_provider import PROFILE, data_seal, metadata_digest, policy_digest, require, same
 from otelc_capture import strict_json
 
+EXECUTION_FILE = "go-execution.json"
+HEALTH_FILE = "health.json"
+
 START_FILES = ("go-supervisor-start.json", "go-application-start.json")
 
 
@@ -85,7 +88,7 @@ def bind(launch: prepared.Prepared, owner: Owner) -> Started:
             and same(list(owner.command), prepared.command(launch.intent)),
             "invalid caller-owned Go process binding")
     launch.verify()
-    path = launch.intent.runtime / "go-execution.json"
+    path = launch.intent.runtime / EXECUTION_FILE
     require(not path.exists() and not path.is_symlink(), "Go application already completed before binding")
     values = {name: record(launch.intent.runtime / name) for name in START_FILES}
     expected = (owner_record(launch, owner), application_record(launch, owner))
@@ -122,14 +125,14 @@ def finish(started: Started, returncode: int) -> Execution:
     started.verify()
     launch, owner = started.prepared, started.owner
     runtime = launch.intent.runtime
-    value, identity = record(runtime / "go-execution.json")
-    evidence = {"go-execution.json": identity}
+    value, identity = record(runtime / EXECUTION_FILE)
+    evidence = {EXECUTION_FILE: identity}
     health = None
     if launch.intent.plain:
         require(not any((runtime / name).exists() or (runtime / name).is_symlink()
-                        for name in ("health.json", "control.json")), "plain Go execution has SDK evidence")
+                        for name in (HEALTH_FILE, "control.json")), "plain Go execution has SDK evidence")
     else:
-        _, evidence["health.json"] = record(runtime / "health.json", go_health.MAX_REPORT_BYTES)
+        _, evidence[HEALTH_FILE] = record(runtime / HEALTH_FILE, go_health.MAX_REPORT_BYTES)
         health = go_health.read(runtime)
         go_health.validate(health, pid=owner.application_pid, policy_sha256=policy_digest(launch.intent.policy),
                            selection_sha256=launch.intent.build.receipt["selection"]["sha256"])
@@ -137,7 +140,7 @@ def finish(started: Started, returncode: int) -> Execution:
                 and same(health["lifecycle"], {"flush": "succeeded", "shutdown": "succeeded"})
                 and health["probe_accounting"]["closed"] is True,
                 "Go execution lacks a completed final SDK lifecycle")
-        verify_evidence(launch, {"health.json": evidence["health.json"]})
+        verify_evidence(launch, {HEALTH_FILE: evidence[HEALTH_FILE]})
     expected = {"schema_version": 1, "kind": "otelc.go.execution", "profile": PROFILE,
                 "launch_id": launch.response["request"]["launch_id"], "supervisor": owner_record(launch, owner),
                 "application_pid": owner.application_pid, "sdk_pid": None if launch.intent.plain else owner.application_pid,

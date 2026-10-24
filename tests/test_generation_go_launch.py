@@ -150,28 +150,32 @@ class GoOwnedLaunchTests(unittest.TestCase):
 
     def test_kernel_query_uses_fixed_argv_and_refuses_inexact_or_foreign_output(self):
         good = subprocess.CompletedProcess([], 0, b"101 202 101\n", b"")
+        deadline = time.monotonic() + 60
         with patch.object(launch.subprocess, "run", return_value=good) as run:
             self.assertEqual(launch.kernel(101, time.monotonic() + 5),
                              {"pid": 101, "parent_pid": 202, "process_group": 101})
             self.assertEqual(run.call_args.args[0], ["/bin/ps", "-p", "101", "-o", "pid=,ppid=,pgid="])
         for value in (b"101 202\n", b"101.0 202 101", b"303 202 101", b"101 0 101", b"101 202 1", b"x" * 300):
-            with patch.object(launch.subprocess, "run", return_value=replace_result(good, value)), self.assertRaises(ValueError):
-                launch.kernel(101, time.monotonic() + 5)
+            invalid = replace_result(good, value)
+            with patch.object(launch.subprocess, "run", return_value=invalid), self.assertRaises(ValueError):
+                launch.kernel(101, deadline)
         with self.assertRaises(ValueError):
-            launch.kernel(True, time.monotonic() + 5)
+            launch.kernel(True, deadline)
         with self.assertRaises(ValueError):
             launch.kernel(101, 0.)
 
     def test_kernel_accepts_exact_parent_pid_one_and_refuses_invalid_boundaries(self):
         good = subprocess.CompletedProcess([], 0, b"101 1 101\n", b"")
+        deadline = time.monotonic() + 60
         with patch.object(launch.subprocess, "run", return_value=good):
             self.assertEqual(launch.kernel(101, time.monotonic() + 5),
                              {"pid": 101, "parent_pid": 1, "process_group": 101})
         for value in (b"1 202 101", b"101 -1 101", b"101 1.0 101", b"101 true 101",
                       b"101 01 101", b"101 2147483648 101", b"101 1 1", b"101 1 2147483648"):
-            with self.subTest(value=value), patch.object(launch.subprocess, "run", return_value=replace_result(good, value)), \
+            invalid = replace_result(good, value)
+            with self.subTest(value=value), patch.object(launch.subprocess, "run", return_value=invalid), \
                     self.assertRaises(ValueError):
-                launch.kernel(101, time.monotonic() + 5)
+                launch.kernel(101, deadline)
 
 
 def replace_result(result, stdout):

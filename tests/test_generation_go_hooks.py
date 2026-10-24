@@ -149,13 +149,15 @@ class GoHookTests(unittest.TestCase):
         for name in ("otelc_rules", "otel.instrumentation.go", "otelc.tool.go", next(name for name in self.render() if name.startswith("zz_"))):
             path = self.intent.original.root / name
             path.mkdir() if name == "otelc_rules" else path.write_bytes(b"collision")
+            original = files.freeze(self.intent.original.root)
             with self.subTest(name=name), self.assertRaisesRegex(ValueError, "collide"):
-                hooks.verify(files.freeze(self.intent.original.root), private, self.selection, self.inventory, "example.test/app")
+                hooks.verify(original, private, self.selection, self.inventory, "example.test/app")
             path.rmdir() if path.is_dir() else path.unlink()
         path = self.intent.original.root / "app.go"
         path.write_text(path.read_text() + "// __otelc_" + self.selection["sha256"][:12] + "_\n")
+        original = files.freeze(self.intent.original.root)
         with self.assertRaisesRegex(ValueError, "identifier collides"):
-            hooks.verify(files.freeze(self.intent.original.root), private, self.selection, self.inventory, "example.test/app")
+            hooks.verify(original, private, self.selection, self.inventory, "example.test/app")
 
 
 if __name__ == "__main__":

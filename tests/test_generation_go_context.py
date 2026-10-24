@@ -122,8 +122,9 @@ class GoContextTests(unittest.TestCase):
                 elif kind == "oversized":
                     values.pop(name); member.size = context.MAX_MEMBER_BYTES + 1; data = b"x" * member.size
                 extra = member, data
+            raw = archive(values, extra=extra)
             with self.subTest(kind=kind), self.assertRaises(ValueError):
-                context.members(archive(values, extra=extra))
+                context.members(raw)
         member = tarfile.TarInfo("../../never-extracted"); member.size = 1
         self.assertEqual(context.members(archive(self.original, extra=(member, b"x"))), self.original)
         self.assertFalse((self.base.parent / "never-extracted").exists())

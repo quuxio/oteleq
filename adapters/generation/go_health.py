@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import re
 import stat
+from typing import cast
 
 from go_provider import require
 from otelc_capture import strict_json
@@ -29,6 +30,7 @@ def fields(value: object, expected: set[str], label: str) -> dict:
 
 def count(value: object, label: str) -> int:
     """Unknown values and inexact decimal encodings cannot become zero."""
+    # Wire counters use ASCII digits, including every digit after the first.
     require(type(value) is str and re.fullmatch(r"0|[1-9][0-9]{0,19}", value) is not None
             and int(value) <= MAX_COUNTER, "invalid health counter: " + label)
     return int(value)
@@ -47,6 +49,7 @@ def counters(value: object, expected: set[str], label: str, *, closed: bool = Fa
 def exporter(value: object, *, traces: bool) -> dict | None:
     """An absent trace exporter has no invented queue or delivery counters."""
     require(type(value) is dict and type(value.get("observed")) is bool, "invalid exporter observation")
+    value = cast(dict, value)
     if not value["observed"]:
         require(set(value) == {"observed"} and traces, "missing exporter or invented unobserved counters")
         return None
@@ -60,6 +63,7 @@ def exporter(value: object, *, traces: bool) -> dict | None:
 def http_spans(value: object) -> dict | None:
     """HTTP operation boundaries stay separate from probes and resource release."""
     require(type(value) is dict and type(value.get("observed")) is bool, "invalid HTTP span observation")
+    value = cast(dict, value)
     if not value["observed"]:
         require(set(value) == {"observed"}, "invented unobserved HTTP span counters")
         return None
@@ -158,6 +162,13 @@ def qualify(value: object, *, pid: int, policy_sha256: str, selection_sha256: st
         require(http["closed"] and http["active"] == 0
                 and http["started"] == http["ended"] == received_http_spans,
                 "active, unclosed or mismatched HTTP span completions")
+    exports = export_receipts(value, received)
+    return {"pid": pid, "sdk_pid": pid, "received": received.copy(), "probe_accounting": probes,
+            "metric_flush": flush, "http_spans": http, **exports, "metric_exported_points": None, "source_complete": False}
+
+
+def export_receipts(value: dict, received: dict) -> dict:
+    """Join final export/queue accounting to independently decoded batches."""
     exports = {}
     for name, traces, batches in (("metric_exports", False, "metric_batches"), ("trace_exports", True, "trace_batches")):
         actual = exporter(value[name], traces=traces)
@@ -171,5 +182,4 @@ def qualify(value: object, *, pid: int, policy_sha256: str, selection_sha256: st
                         and actual["queue_pending"] == actual["queue_dropped"] == 0,
                         "trace receipt, queue or loss differs")
         exports[name] = actual
-    return {"pid": pid, "sdk_pid": pid, "received": received.copy(), "probe_accounting": probes,
-            "metric_flush": flush, "http_spans": http, **exports, "metric_exported_points": None, "source_complete": False}
+    return exports

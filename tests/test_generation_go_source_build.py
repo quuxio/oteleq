@@ -205,6 +205,14 @@ class GoSourceBuildTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 build.validate_intent(invalid)
 
+    def test_package_target_syntax_remains_canonical_and_is_not_a_suffix_match(self):
+        for target in (".", "./worker", "./one/two"):
+            with self.subTest(target=target):
+                build.validate_target(target)
+        for target in (None, True, 1, "", "worker", "../worker", "./", "./.", "./one/..", "./one//two"):
+            with self.subTest(target=target), self.assertRaises(ValueError):
+                build.validate_target(target)
+
     def test_accepted_build_and_caller_dictionaries_cannot_change_in_memory(self):
         actual = build.read(self.intent)
         cases = ((actual.receipt["selection"], "main", "another/module"),

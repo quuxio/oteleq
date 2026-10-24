@@ -142,8 +142,9 @@ class GoProviderHealthTests(unittest.TestCase):
             validate(value)
         for http in ({"observed": False}, {"observed": 1}, {"observed": True},
                      {**report()["http_spans"], "active": 0}, {"observed": False, "active": "0"}):
+            value = {**report(), "http_spans": http}
             with self.subTest(http=http), self.assertRaises(ValueError):
-                validate({**report(), "http_spans": http})
+                validate(value)
         value = report(); value["trace_exports"] = value["http_spans"] = {"observed": False}
         with self.assertRaisesRegex(ValueError, "without a recording observer"):
             qualify(value, received_http_spans=1)
@@ -173,11 +174,13 @@ class GoProviderHealthTests(unittest.TestCase):
                 ("sdk_attached", 1), ("source_complete", 0), ("phase", []),
                 ("policy_sha256", "c" * 64), ("selection_sha256", "c" * 64),
                 ("downstream_receipt", "succeeded"), ("otlp_partial_rejection", "zero")):
+            value = {**report(), key: invalid}
             with self.subTest(key=key), self.assertRaises(ValueError):
-                validate({**report(), key: invalid})
+                validate(value)
         for options in ({"pid": True}, {"pid": 1}, {"policy_sha256": "A" * 64}, {"selection_sha256": None}):
+            value = report()
             with self.assertRaises(ValueError):
-                validate(report(), **options)
+                validate(value, **options)
         for key, invalid in (("schema_version", True), ("pid", PID + 1), ("collection", 1),
                              ("emission", None), ("effective_emission_off", True)):
             value = report(); value["controls"][key] = invalid
@@ -196,7 +199,7 @@ class GoProviderHealthTests(unittest.TestCase):
                 validate(value)
         for section, key in (("probe_accounting", "function_started"), ("metric_flush", "attempts"),
                              ("trace_exports", "exported_spans")):
-            for invalid in (None, True, 0, -1, "00", "-1", "+1", "1.0", "1e2", "١", str(1 << 64)):
+            for invalid in (None, True, 0, -1, "00", "-1", "+1", "1.0", "1e2", "١", "1١", str(1 << 64)):
                 value = report(); value[section][key] = invalid
                 with self.subTest(section=section, invalid=invalid), self.assertRaises(ValueError):
                     validate(value)
@@ -222,8 +225,9 @@ class GoProviderHealthTests(unittest.TestCase):
         for options in ({"function_spans": True}, {"observer_completions": -1},
                 {"received": {**RECEIVED, "trace_batches": True}}, {"received": {**RECEIVED, "spans": 4}},
                 {"received": {**RECEIVED, "metric_batches": 3}}, {"received": {}}):
+            value = report()
             with self.assertRaises(ValueError):
-                qualify(report(), **options)
+                qualify(value, **options)
 
     def test_private_file_reader_rejects_links_permissions_fifo_and_oversize(self):
         with tempfile.TemporaryDirectory() as temporary:

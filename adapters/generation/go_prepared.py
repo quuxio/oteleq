@@ -11,6 +11,7 @@ import go_files as files
 import go_provider as provider
 import python_prepared
 
+CONFIG_FILE = "config.json"
 CONFIG_VERSION = 2
 MAX_CONFIG_BYTES = 4 * 1024 * 1024
 DOCUMENTS = ("go-request.json", "go-plan.json", "go-prepared.json")
@@ -152,7 +153,7 @@ def configuration(intent: Intent) -> dict:
 
 def config_manifest(intent: Intent) -> dict | None:
     """Private configuration bytes must consume the complete independently derived policy."""
-    path = intent.runtime / "config.json"
+    path = intent.runtime / CONFIG_FILE
     if intent.plain:
         provider.require(not path.exists() and not path.is_symlink(), "plain Go lane unexpectedly has SDK configuration")
         return None
@@ -194,11 +195,11 @@ def verify(response: object, intent: Intent, *, fresh: bool = True) -> Prepared:
                 "request": expected_request, "plan": expected_plan, "prepared": expected_manifest,
                 "command": command(intent), "source_complete": False}
     provider.require(type(response) is dict and provider.same(response, expected), "Go prepare response differs from checked records")
-    names = (*DOCUMENTS, *(("config.json",) if not intent.plain else ()))
+    names = (*DOCUMENTS, *((CONFIG_FILE,) if not intent.plain else ()))
     evidence = {name: files.file(intent.runtime / name, private=True)[:2] for name in names}
     expected_files = {name: records[name][1] for name in DOCUMENTS}
     if not intent.plain:
-        expected_files["config.json"] = expected_manifest["config"]["config"]
+        expected_files[CONFIG_FILE] = expected_manifest["config"]["config"]
     provider.require(all(provider.same(evidence[name][0], expected) for name, expected in expected_files.items()),
                      "Go prepared files changed during independent verification")
     result = Prepared(intent, response, evidence, original_state, provider.data_seal(evidence))

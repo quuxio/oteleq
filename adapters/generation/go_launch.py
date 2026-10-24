@@ -18,6 +18,9 @@ from go_provider import data_seal, require, same
 from otelc_capture import strict_json
 
 
+READY_FILE = "start.ready"
+
+
 def kernel(pid: int, deadline: float) -> dict:
     """Query only the candidate owned PID with a fixed system tool and no shell."""
     require(type(pid) is int and 1 < pid <= 0x7fffffff and time.monotonic() < deadline,
@@ -26,6 +29,7 @@ def kernel(pid: int, deadline: float) -> dict:
                             env={"LC_ALL": "C", "PATH": "/usr/bin:/bin"},
                             capture_output=True, timeout=min(2., max(.001, deadline - time.monotonic())))
     values = result.stdout.split()
+    # These are literal ASCII wire identities from LC_ALL=C, not Unicode digits.
     require(result.returncode == 0 and len(result.stdout) <= 256 and not result.stderr
             and len(values) == 3 and all(re.fullmatch(rb"[1-9][0-9]{0,9}", value) for value in values)
             and all(1 < int(values[index]) <= 0x7fffffff for index in (0, 2))
@@ -97,18 +101,18 @@ class Session:
                 rendezvous.WAIT_ENV: str(self.binding.wait_ms)}
 
     def ready(self) -> dict | None:
-        path = self.binding.root / "start.ready"
+        path = self.binding.root / READY_FILE
         if not path.exists() and not path.is_symlink():
             return None
         evidence, raw = {}, None
-        for name in ("start.ready", "start.tmp"):
+        for name in (READY_FILE, "start.tmp"):
             identity, facts, data = files.file(self.binding.root / name, 1024, keep=True)
             require(stat.S_IMODE(facts[2]) == 0o600 and facts[3] == os.getuid() and facts[8] == 2,
                     "unsafe Go ready checkpoint")
             evidence[name] = identity, facts
             if raw is None:
                 raw = data
-        require(evidence["start.ready"][1] == evidence["start.tmp"][1], "Go ready publication has different links")
+        require(evidence[READY_FILE][1] == evidence["start.tmp"][1], "Go ready publication has different links")
         value = strict_json(raw)
         require(type(value) is dict and set(value) == {"schema_version", "kind", "token", "pid", "parent_pid"}
                 and same({key: value[key] for key in ("schema_version", "kind", "token")},

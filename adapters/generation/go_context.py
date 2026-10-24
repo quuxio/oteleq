@@ -11,6 +11,8 @@ import go_context_sources as source
 import go_files as files
 from go_provider import require
 
+RULES_FILE = "otelc.yaml"
+
 BUNDLE_SHA256 = "4a928c69ce269e37c98413c93159713fa7bcd8169c5d6b4de167305dc5ca9bb2"
 LICENCE_SHA256 = "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
 MAX_BUNDLE_BYTES = 16 * 1024 * 1024
@@ -18,9 +20,9 @@ MAX_MEMBER_BYTES = 1024 * 1024
 TRACE = "instrumentation/go.opentelemetry.io/otel/sdk/trace/"
 INPUTS = {
     **{"instrumentation_temp/go.opentelemetry.io/otel/sdk/trace/" + name: TRACE + name
-       for name in ("gls.go", "go.mod", "go.sum", "hook.go", "otel_trace_context.go", "otelc.yaml")},
+       for name in ("gls.go", "go.mod", "go.sum", "hook.go", "otel_trace_context.go", RULES_FILE)},
     **{"instrumentation_temp/runtime/" + name: "instrumentation/runtime/" + name
-       for name in ("go.mod", "otelc.yaml", "runtime_gls.go", "stub.go")},
+       for name in ("go.mod", RULES_FILE, "runtime_gls.go", "stub.go")},
     "pkg_temp/go.mod": "pkg/go.mod", "pkg_temp/hook/context.go": "pkg/hook/context.go",
     "pkg_temp/runtime/trace_context.go": "pkg/runtime/trace_context.go",
 }
@@ -74,7 +76,7 @@ def render(original: dict[str, bytes], licence: bytes) -> dict[str, bytes]:
     require(result[path].count(marker) == 1, "Go task reset rule differs from fixed patch")
     result[path] = result[path].split(marker)[0] + source.RESET_RULE
     result["pkg/runtime/trace_context.go"] += source.DETACH_BRIDGE
-    result[TRACE + "otelc.yaml"] += source.DETACH_RULE + source.TELEMETRY_RULES
+    result[TRACE + RULES_FILE] += source.DETACH_RULE + source.TELEMETRY_RULES
     result.update({TRACE + "otelc_detached_span.go": source.DETACH_SOURCE,
                    TRACE + "otelc_telemetry_context.go": source.TELEMETRY_SOURCE,
                    TRACE + "otelc_baggage_context.go": source.BAGGAGE_SOURCE,
