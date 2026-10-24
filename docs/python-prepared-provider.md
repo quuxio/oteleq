@@ -50,6 +50,14 @@ An SDK join references earlier execution and code records with a one-to-one pair
 
 These checks validate the declared relations' consistency. They do not prove that the producer observed a genuine read, compiler return or selected VM execution. `capture_complete` reports only finalisation and raw loss counters; an empty journal or missing selected join cannot establish selection coverage. Synthetic wire fixtures and exhaustive small-graph permutation oracles test the component, separately from authentic producer qualification.
 
+### Selected-source coverage component
+
+`python_selection.freeze(path)` retains bounded canonical source bytes and opened-file facts before launch. `verify` takes those caller-owned facts, the selected ordinary function or declared plain receiver method's qualified name and source line, the selected interpreter version and optimisation level, and an independently decoded journal. Expected selection never comes from producer receipts.
+
+Every selected callable needs a compiler-root/source-read relation and an actual first execution of its exact declared descendant. Source bytes, device/inode, modification time and mode must match the frozen input. The ordinary compiler profile fixes input flags to zero and checks the declared optimisation level. Repeated compilations retain separate root/execution identities; these are not invocation counts. Empty, read-only and unexecuted captures cannot satisfy selection coverage.
+
+The plain lane refuses SDK code records or joins. The instrumented lane requires an SDK code join for every selected execution and accounts for every captured SDK code ID. These checks preserve missing coverage as a refusal. They do not establish per-action attribution or complete dependency closure. The module is embedded and sealed with the generator, with an independent 80% line floor. Authentic native producer qualification, public prepared-profile negotiation, both-lane runtime integration and generated admission remain separate requirements; this component does not enable the blocked prepared backend.
+
 ### Runtime admission
 
 An actual qualified source profile requires selected-source origin evidence in **both baseline and instrumented lanes**, from the same SDK-independent observer. The plain lane must have no SDK telemetry. Exact input/read transactions, compiler or loader return objects, selected descendants and instrumented VM/telemetry code IDs need independent binding. Equal code descriptors alone cannot establish source origin.
