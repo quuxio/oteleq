@@ -1,4 +1,4 @@
-"""Independent explicit journal-2 relations; framing is not runtime admission."""
+"""Independent explicit source/cache relations; framing is not runtime admission."""
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -11,6 +11,7 @@ import python_prepared
 from python_provider import require
 
 MAGIC = b"OTLCPY2\0"
+CACHE_MAGIC = b"OTLCPY3\0"
 ROOT = struct.Struct("!10Q")
 EXECUTION = struct.Struct("!7Q")
 JOIN = struct.Struct("!7Q")
@@ -21,7 +22,7 @@ WIDTHS = {1: inputs.SOURCE.size, 2: inputs.FINAL.size, 3: inputs.SOURCE.size,
 
 @dataclass(frozen=True)
 class Root:
-    """A compiler result references one earlier consumed input transaction."""
+    """A source compiler or cache return references one earlier consumed input."""
 
     sequence: int
     identity: int
@@ -73,6 +74,7 @@ class Journal:
     python_finalized: bool
     entry_expected: bool
     comparison_steps: int
+    schema_version: int = 2
 
     @property
     def capture_complete(self) -> bool:
@@ -85,15 +87,21 @@ def _field(descriptor: python_code.Descriptor, member: int, name: str) -> python
 
 
 def _root(sequence: int, path: bytes, payload: bytes, pid: int,
-          sources: dict[int, inputs.SourceRecord]) -> Root:
+          sources: dict[int, inputs.SourceRecord], journal_version: int) -> Root:
     actual, identity, transaction, loader, token, route, version, schema, flags, optimisation = ROOT.unpack_from(payload)
     require(actual == pid and identity > 0 and transaction > 0 and token in sources
-            and route in (1, 2) and flags <= 0x7fffffff and optimisation <= 2,
+            and ((route in (1, 2) and flags <= 0x7fffffff and optimisation <= 2)
+                 or (journal_version == 3 and route == 3 and flags == 0 and optimisation == 3)),
             "invalid Python compiler root metadata or input reference")
     source = sources[token]
-    require(source.path == path and ((route == 1 and source.kind == 1 and loader == 0)
-            or (route == 2 and source.kind == 3 and loader > 0 and path.endswith(b".py"))),
-            "unsupported Python compiler root route or path")
+    if route == 3:
+        require(source.kind == 3 and loader > 0 and source.path.endswith(b".pyc")
+                and path.endswith(b".py") and len(source.content) >= 16,
+                "unsupported Python cache root input or code path")
+    else:
+        require(source.path == path and ((route == 1 and source.kind == 1 and loader == 0)
+                or (route == 2 and source.kind == 3 and loader > 0 and path.endswith(b".py"))),
+                "unsupported Python compiler root route or path")
     record = inputs.CodeRecord(sequence, path, payload[ROOT.size:], identity, 0, version, schema)
     descriptor = python_code.decode(record)
     require(_field(descriptor, descriptor.root, "co_name").value == "<module>",
@@ -127,8 +135,9 @@ def _execution(sequence: int, path: bytes, payload: bytes, pid: int, roots: dict
 
 
 class _Reader:
-    def __init__(self, pid: int, comparison_limit: int):
+    def __init__(self, pid: int, comparison_limit: int, version: int):
         self.pid = pid
+        self.version = version
         self.records: list[Record] = []
         self.sources: dict[int, inputs.SourceRecord] = {}
         self.roots: dict[int, Root] = {}
@@ -159,7 +168,7 @@ class _Reader:
             self.profile_matches(descriptor)
             self.codes[row.identity] = descriptor
         elif kind == 5:
-            row = _root(sequence, path, payload, self.pid, self.sources)
+            row = _root(sequence, path, payload, self.pid, self.sources, self.version)
             require(row.identity not in self.roots and row.transaction not in self.transactions
                     and row.input_sequence not in self.consumed, "reused Python compiler root, transaction or read token")
             self.profile_matches(row.descriptor)
@@ -199,25 +208,27 @@ class _Reader:
                 and finalized in (0, 1) and expected in (0, 1), "Python origin terminal counts differ")
         if capture == journal == 0:
             require(set(self.codes) == set(range(1, len(self.codes) + 1)), "Python origin SDK code identities are incomplete")
-        return Journal(self.pid, tuple(self.records), capture, journal, bool(finalized), bool(expected), self.budget.steps)
+        return Journal(self.pid, tuple(self.records), capture, journal, bool(finalized), bool(expected),
+                       self.budget.steps, self.version)
 
 
-def decode(data: bytes, pid: int, *, comparison_limit: int = MAX_STEPS) -> Journal:
-    """Require explicit J2 framing, backward references and exact terminal counts.
+def decode(data: bytes, pid: int, *, comparison_limit: int = MAX_STEPS, version: int = 2) -> Journal:
+    """Require caller-selected framing, backward references and terminal counts.
 
     This pure-data reader does not claim that a producer really observed its
     declared compiler/loader/VM relations. Authentic runtime qualification and
     selected-function coverage remain separate admission requirements.
     """
+    require(type(version) is int and version in (2, 3), "unsupported explicit Python origin journal version")
     require(type(data) is bytes and len(data) <= inputs.MAX_BYTES and type(pid) is int and 0 < pid < 2 ** 64,
             "invalid Python origin journal size or PID")
-    reader = _Reader(pid, comparison_limit)
+    reader = _Reader(pid, comparison_limit, version)
     position, sequence = 0, 0
     while position < len(data):
         require(len(data) - position >= inputs.HEADER.size, "truncated Python origin record header")
         magic, kind, flags, reserved, current, path_size, size = inputs.HEADER.unpack_from(data, position)
         position += inputs.HEADER.size
-        require(magic == MAGIC and kind in WIDTHS and flags == reserved == 0
+        require(magic == (MAGIC if version == 2 else CACHE_MAGIC) and kind in WIDTHS and flags == reserved == 0
                 and current == sequence + 1 and current <= inputs.MAX_RECORDS and path_size <= inputs.MAX_PATH,
                 "invalid Python origin record framing")
         width = WIDTHS[kind]
@@ -237,6 +248,7 @@ def decode(data: bytes, pid: int, *, comparison_limit: int = MAX_STEPS) -> Journ
     raise ValueError("Python prepared provider: origin journal lacks finalization evidence")
 
 
-def read(path: Path, pid: int, *, comparison_limit: int = MAX_STEPS) -> Journal:
+def read(path: Path, pid: int, *, comparison_limit: int = MAX_STEPS, version: int = 2) -> Journal:
     """Snapshot an owned bounded private file only after its owner has stopped."""
-    return decode(python_prepared.read_bytes(path, inputs.MAX_BYTES), pid, comparison_limit=comparison_limit)
+    return decode(python_prepared.read_bytes(path, inputs.MAX_BYTES), pid,
+                  comparison_limit=comparison_limit, version=version)

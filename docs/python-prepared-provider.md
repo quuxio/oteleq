@@ -77,6 +77,8 @@ Each attempt retains the actual supervisor PID and fixed argv, caller PID, appli
 
 The [exact-revision diagnostic record](qualification/python-generated-origins-2026-10-24.json) checks 424 actual application launches, 212 SDK processes and 108 independently recomputed comparisons across the two recorded runtimes. Current-origin capture covers the native script entry and ordinary source loaders inside the application root. Application cache-only loads, unsupported loaders, complete dependency closure, broader async/resource actions, live metric controls, per-action attribution and shipping qualification remain open. Missing origin, loss or truncation is a refusal. The full [completion checklist](completion.md) remains in scope.
 
+The separate [cache context integration](python-cache-context.md) is in progress. Its explicit journal-3 data reader does not enable a generated cache profile; private cache preservation, selected-cache binding and actual generated-workflow qualification are still required.
+
 ## Reproduce generated workflow qualification
 
 Use an independent SDK copy with matching prebuilt native origin products and a pinned, complete SDK Python environment. The command covers generated execution, fixed receiver constructors/factories, exceptions, recursion, a deliberate same-return mutation, replay, retained unittest, detached export and scalar reduction. A second corpus adds generated scalar domains, globals, complete filesystem bytes/kinds/permissions and scripted HTTP, plus current-source promotion through unchanged bodies, changed bodies and an added function. It compares complete raw and typed state/effect graphs against independently declared fixture oracles.

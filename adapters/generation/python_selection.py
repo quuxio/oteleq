@@ -148,6 +148,8 @@ def verify(journal: origin.Journal, selected: tuple[Selection, ...], *,
     selections = _selections(selected)
     require(type(journal) is origin.Journal and journal.capture_complete and journal.entry_expected,
             "selected Python origin capture is incomplete")
+    require(type(journal.schema_version) is int and journal.schema_version == 2,
+            "source-only Python selection requires journal2")
     require(type(plain) is bool and type(python_version) is int and 0 <= python_version <= 0xffffffff and
             python_version >> 24 == 3 and (python_version >> 16 & 255) >= 12 and
             type(optimisation) is int and 0 <= optimisation <= 2,
