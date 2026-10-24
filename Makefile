@@ -9,6 +9,9 @@ JAVA_ACTION_PROFILE ?= safe-methods-v1
 NODE_CONTROL_STARTUP ?= both-on
 JAVA_CONTROL_STARTUP ?= both-on
 JAVA_STARTUP_PROFILE ?= safe-methods-v1
+PYTHON_CONTROL_STARTUP ?= both-on
+PYTHON_CONTROL_PROFILE ?= python-native-origins-v2
+AUDIT_DIR ?= $(REPORT_DIR)-audit
 MARKDOWNLINT ?= ./ci/markdownlint/node_modules/.bin/markdownlint
 
 .PHONY: generation-project-tests-otelc generation-preconditions-otelc generation-domains-otelc generation-input-walks-otelc generation-retained-source-otelc generation-native-project-otelc generation-return-otelc generation-java-sequence-otelc generation-java-controls-otelc generation-java-project-otelc generation-java-archive-otelc generation-node-project-otelc
@@ -19,12 +22,14 @@ MARKDOWNLINT ?= ./ci/markdownlint/node_modules/.bin/markdownlint
 .PHONY: generation-python-origins-otelc
 .PHONY: generation-python-caches-otelc
 .PHONY: generation-python-cache-workflows-otelc
+.PHONY: generation-python-controls-otelc
 .PHONY: generation-node-source-collection-otelc generation-node-source-effects-otelc generation-node-source-channels-otelc
 .PHONY: generation-node-controls-otelc generation-java-startup-otelc generation-cpp-sequence-otelc generation-python-sequence-otelc generation-java-bindings-otelc generation-java-handles-otelc
 
 .PHONY: help setup lint examples docs-check observer-check generation-check effect-qualification-check node-observer-check node-sequence-check java-observer-check go-observer-check cpp-observer-check generation-cpp-receiver-otelc generation-go-receiver-otelc generation-java-receiver-otelc generation-otelc generation-policy-otelc generation-rust-otelc rust-semantic-otelc generation-native-otelc generation-shrink-otelc generation-python-project-otelc generation-receiver-otelc generation-node-receiver-otelc generation-go-build-otelc generation-go-project-otelc generation-sequence-otelc generation-typescript-sequence-otelc generation-filesystem-otelc generation-http-otelc resource-otelc capture-otelc report core-check coverage check
 
 help:
+	@printf '%s\n' 'generation-python-controls-otelc Qualify Python startup/live metric states and retained/promoted suites (PYTHON_CONTROL_PROFILE, PYTHON_CONTROL_STARTUP, AUDIT_DIR)'
 	@printf '%s\n' 'generation-python-cache-workflows-otelc Qualify complete cached Python matrix, receivers, effects and retained/promoted workflows'
 	@printf '%s\n' 'generation-python-caches-otelc Qualify explicit ordinary Python cache decisions and source fallback'
 	@printf '%s\n' 'generation-python-origins-otelc Qualify explicit prepared Python receivers, effects and retained/promoted workflows'
@@ -306,6 +311,11 @@ python-provider-metadata-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
 	$(PYTHON) tests/qualify_python_provider_metadata.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
+
+generation-python-controls-otelc:
+	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)" && test -n "$(AUDIT_DIR)"
+	cargo build --locked
+	$(PYTHON) tests/qualify_python_controls.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" --profile "$(PYTHON_CONTROL_PROFILE)" --startup-state "$(PYTHON_CONTROL_STARTUP)" --audit-dir "$(AUDIT_DIR)" $(GENERATION_ARGS)
 
 generation-python-project-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"

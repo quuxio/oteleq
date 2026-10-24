@@ -123,10 +123,10 @@ def raw_observation(method: str, amount: int, active: bool, *, steps: int = 2,
                     compact: bool = False, padding: bool = False) -> dict:
     """Specify every expected field, alias and intermediate application result."""
     assert method in METHODS and type(amount) is int and 0 <= amount <= 7
-    assert steps in (1, 2, 32) and (not compact or method == 'identity')
+    assert steps in (1, 2, 5, 32) and (not compact or method == 'identity')
     state = {'value': 10, 'total': 0, 'calls': 0, 'history': []}
     observations = []
-    for index, argument in enumerate([amount] + [2 if steps == 2 else 0] * (steps - 1)):
+    for index, argument in enumerate([amount] + [2 if steps in (2, 5) else 0] * (steps - 1)):
         before = graph(state, argument, compact=compact, padding=padding)
         changes = [0, argument] if method == 'recursive' and argument > 0 else [argument]
         for value in changes:

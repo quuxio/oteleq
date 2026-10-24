@@ -50,6 +50,24 @@ Only collection-enabled call trees contribute function metrics. Measurement coun
 
 ## Scope and remaining qualification
 
+### Run the maintained workflow qualification
+
+Use an owned SDK copy whose native tools are already built for the selected locked Python environment. The output and audit directories must be new, separate and outside both source trees:
+
+```sh
+make generation-python-controls-otelc \
+  PYTHON=/path/to/locked/python \
+  OTELC_ROOT=/path/to/owned/otelc \
+  REPORT_DIR=/path/to/new/evidence \
+  AUDIT_DIR=/path/to/new/audit \
+  PYTHON_CONTROL_PROFILE=python-native-origins-v2 \
+  PYTHON_CONTROL_STARTUP=both-off
+```
+
+The supported startup choices are `both-on`, `collection-off`, `emission-off` and `both-off`. Repeat with `PYTHON_CONTROL_PROFILE=python-native-cache-origins-v3` for ordinary caches and with each qualified Python environment. Each invocation retains six literal receiver methods, constructor/factory setup, recursion, exceptions and an intentional intermediate difference. It exercises generated tests, replay, unittest, detached exports, scalar reduction and promotion against original and changed current sources.
+
+For a retained-only audit, keep the same evidence directory, profile, startup state, interpreter and SDK, select a new `AUDIT_DIR`, and add `GENERATION_ARGS=--retained-only`. Comparisons are recomputed in that separate directory. Original receipt bytes and file identity/timestamp facts must remain unchanged, and no target applications are started. A started or partial execution is never automatically restarted. Inspect its terminal command receipts before recovery.
+
 This candidate covers declared synchronous Python receiver calls under explicit prepared origin/cache profiles. It keeps the existing source/installed-input guards and ordinary typed observations. It does not add asynchronous schedules, lifetime controls, arbitrary observation roots or invocation cookies. Serial trace grouping remains distinct from the [action witness](action-witness.md).
 
 All startup states, both selected Python runtimes/profiles, constructor/factory and recursive/error cases, generated/replayed/framework/detached/reduced/promoted routes, altered-evidence controls and source preservation still require the maintained complete qualification corpus. Independent review, the full final gate, rendered guidance, protected checks and merge remain required. The [full project checklist](completion.md) stays open.

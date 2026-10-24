@@ -20,7 +20,8 @@ class QualificationRecipeTests(unittest.TestCase):
             for flag in ("--cli", "--comparator"):
                 if line.startswith("\t") and flag + " " in line:
                     targets[target] = flag
-        self.assertEqual(len(targets), 44)
+        self.assertEqual(len(targets), 45)
+        self.assertIn("generation-python-controls-otelc", targets)
         self.assertIn("generation-python-cache-workflows-otelc", targets)
         self.assertIn("generation-python-caches-otelc", targets)
         self.assertIn("generation-python-origins-otelc", targets)
@@ -75,12 +76,21 @@ class QualificationRecipeTests(unittest.TestCase):
                         self.assertEqual(result.returncode, 0, result.stderr)
                         arguments = json.loads(record.read_text())
                         self.assertEqual(arguments[arguments.index(flag) + 1], expected)
-                        if name in ('generation-node-controls-otelc', 'generation-java-startup-otelc'):
+                        if name in ('generation-node-controls-otelc', 'generation-java-startup-otelc', 'generation-python-controls-otelc'):
                             self.assertEqual(arguments[arguments.index('--startup-state') + 1], 'both-on')
                         if name == 'generation-java-startup-otelc':
                             self.assertEqual(arguments[arguments.index('--java-profile') + 1], 'safe-methods-v1')
                         if name == 'generation-java-actions-otelc':
                             self.assertEqual(arguments[arguments.index('--java-profile') + 1], 'safe-methods-v1')
+
+    def test_python_control_recipe_retains_profile_startup_and_separate_audit(self):
+        result = subprocess.run(['make', '--no-print-directory', '-n', 'generation-python-controls-otelc',
+            'OTELC_ROOT=/tmp/provider', 'REPORT_DIR=/tmp/evidence', 'AUDIT_DIR=/tmp/audit-two',
+            'PYTHON_CONTROL_STARTUP=both-off', 'PYTHON_CONTROL_PROFILE=python-native-cache-origins-v3',
+            'GENERATION_ARGS=--retained-only'], cwd=ROOT, capture_output=True, text=True, check=True)
+        self.assertIn('tests/qualify_python_controls.py', result.stdout)
+        self.assertIn('--profile "python-native-cache-origins-v3" --startup-state "both-off"', result.stdout)
+        self.assertIn('--audit-dir "/tmp/audit-two" --retained-only', result.stdout)
 
     def test_java_action_recipe_retains_explicit_profile_and_retained_only_mode(self):
         result = subprocess.run(['make', '--no-print-directory', '-n', 'generation-java-actions-otelc',
