@@ -11,7 +11,6 @@ import python_control as control
 import python_health as health
 import python_live
 import python_provider as provider
-import python_telemetry as telemetry
 
 
 def checked_status(value: object, record: dict, completed: int, flags: dict, command: str) -> dict:
@@ -110,6 +109,8 @@ def read(folder: Path, entry: dict, execution, policy: dict, bodies: list, *, pl
 
 def phase(indices: list[int], series: dict, calls: Counter, errors: Counter, *, required: bool) -> None:
     """Count only collected trees; successful export is checked through receipt."""
+    import python_telemetry as telemetry
+
     expected = {(metric, code): count for code, count in calls.items() if count
                 for metric in (telemetry.CALLS, telemetry.DURATION)}
     expected.update({(telemetry.EXCEPTIONS, code): errors[code] for code, count in calls.items() if count})
@@ -127,6 +128,8 @@ def phase(indices: list[int], series: dict, calls: Counter, errors: Counter, *, 
 def qualify(record: dict, entry: dict, bodies: list, execution, service: str, functions: dict,
             trace_decoder, metric_decoder, final: dict) -> tuple[Counter, Counter, dict]:
     """Use full selected serial trees and literal code IDs as the denominator."""
+    import python_telemetry as telemetry
+
     spans, series = [], {}
     for index, (route, body) in enumerate(bodies):
         if route == capture.TRACE_PATH:
