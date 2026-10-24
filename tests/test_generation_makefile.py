@@ -20,7 +20,7 @@ class QualificationRecipeTests(unittest.TestCase):
             for flag in ("--cli", "--comparator"):
                 if line.startswith("\t") and flag + " " in line:
                     targets[target] = flag
-        self.assertEqual(len(targets), 45)
+        self.assertEqual(len(targets), 46)
         self.assertIn("generation-python-controls-otelc", targets)
         self.assertIn("generation-python-cache-workflows-otelc", targets)
         self.assertIn("generation-python-caches-otelc", targets)
@@ -48,6 +48,7 @@ class QualificationRecipeTests(unittest.TestCase):
         self.assertIn("generation-java-project-otelc", targets)
         self.assertIn("generation-java-archive-otelc", targets)
         self.assertIn("generation-go-receiver-otelc", targets)
+        self.assertIn("generation-go-source-otelc", targets)
         self.assertIn("rust-semantic-otelc", targets)
         with tempfile.TemporaryDirectory() as temporary:
             base = Path(temporary)

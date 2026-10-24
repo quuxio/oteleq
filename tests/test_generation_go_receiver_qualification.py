@@ -5,13 +5,88 @@ import json
 from pathlib import Path
 import sys
 import tempfile
+import tomllib
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import qualify_go_receivers as qualifier
 
 
 class GoReceiverQualificationTests(unittest.TestCase):
+    def test_source_policy_is_explicit_and_legacy_policy_keeps_its_defaults(self):
+        legacy = tomllib.loads(qualifier.policy_text())
+        self.assertEqual(legacy["adapters"]["go"], {"module_roots": ["."]})
+        source = tomllib.loads(qualifier.policy_text(backend="source-v1"))
+        self.assertEqual(source["adapters"]["go"], {"module_roots": ["."], "backend": "source-v1", "build_timeout_ms": 900000})
+        self.assertEqual(source["fixtures"], legacy["fixtures"])
+        with self.assertRaises(AssertionError):
+            qualifier.policy_text(backend="unknown")
+
+    def test_source_receipt_requires_owned_native_pid_exact_functions_and_closed_witness(self):
+        function = "example.test/receiver/counter.Counter.Read"
+        case = {"function": "counter.api.Counter.Read"}
+        witness = {"decoder": "literal", "raw_otlp_sha256": "a" * 64,
+                   "functions": {function: 1, "example.test/receiver/counter.Nil": 1},
+                   "spans": 2, "losses": {"function_lost": 0}, "pending": 0}
+        receipt = {**copy.deepcopy(witness), "sdk_pid": 12, "received": {"spans": 2},
+                   "health": {"metric_exported_points": None}}
+        kernel = {"supervisor": {"pid": 11, "process_group": 11},
+                  "application": {"pid": 12, "parent_pid": 11, "process_group": 11}}
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            (folder / "go-runtime").mkdir()
+            start = folder / "go-runtime/oteleq-go-start.json"
+            start.write_text(json.dumps({"kernel": kernel}))
+            (folder / "build-identities.json").write_text(json.dumps({"profile": "go-source-v1"}))
+            attempt = {"observation": {"function_id": function}, "execution": {"witness": None}}
+            qualifier.source_attempt(folder, case, attempt, "baseline")
+            target = folder / "go-verified-telemetry.json"
+            target.write_text(json.dumps(receipt))
+            with self.assertRaises(AssertionError):
+                qualifier.source_attempt(folder, case, attempt, "baseline")
+            attempt["execution"]["witness"] = witness
+            qualifier.source_attempt(folder, case, attempt, "instrumented_on")
+            for kind in ("pid", "functions", "loss", "points", "extra-witness", "function-id", "kernel"):
+                changed, altered = copy.deepcopy(receipt), copy.deepcopy(attempt)
+                if kind == "pid":
+                    changed["sdk_pid"] = 13
+                elif kind == "functions":
+                    changed["functions"] = {function: 1}
+                elif kind == "loss":
+                    changed["losses"]["function_lost"] = 1
+                elif kind == "points":
+                    changed["health"]["metric_exported_points"] = 0
+                elif kind == "extra-witness":
+                    altered["execution"]["witness"]["health"] = {}
+                elif kind == "function-id":
+                    altered["observation"]["function_id"] = "another.Function"
+                else:
+                    changed_kernel = copy.deepcopy(kernel)
+                    changed_kernel["application"]["parent_pid"] = 99
+                    start.write_text(json.dumps({"kernel": changed_kernel}))
+                target.write_text(json.dumps(changed))
+                with self.subTest(kind=kind), self.assertRaises(AssertionError):
+                    qualifier.source_attempt(folder, case, altered, "instrumented_on")
+                start.write_text(json.dumps({"kernel": kernel}))
+
+    def test_copied_source_probe_controls_require_prelaunch_refusal(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            def command(arguments, destination, label, expected=0):
+                if "export-tests" in arguments:
+                    target = Path(arguments[arguments.index("--destination") + 1]) / "go-source-provider/protocol"
+                    target.mkdir(parents=True)
+                    (target / "response.json").write_text("{}")
+                else:
+                    self.assertEqual(expected, 4)
+                    (destination / (label + ".stderr")).write_text("frozen Go provider probes changed")
+                return ""
+            with patch.object(qualifier, "command", side_effect=command) as execute:
+                result = qualifier.source_probe_guards(Path("cli"), Path("workspace"), folder, {"id": "case"})
+            self.assertEqual(execute.call_count, 4)
+            self.assertEqual(result, {"refusal_controls": 2, "actual_application_launches": 0, "prelaunch_refusals": 2})
+
     def test_shrink_selection_ignores_excluded_same_named_methods(self):
         plan = {"inventory": [{"id": "main", "name": "Counter.InstanceDifference", "status": "excluded"},
                               {"id": "library", "name": "Counter.InstanceDifference", "status": "ready"}]}

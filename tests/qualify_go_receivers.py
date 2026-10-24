@@ -47,7 +47,7 @@ def selected(name: str) -> str:
     return ("cmd.api.Counter." if name == "Main" else "counter.api.Counter.") + name
 
 
-def policy_text(methods: tuple[str, ...] = METHODS) -> str:
+def policy_text(methods: tuple[str, ...] = METHODS, *, backend: str = "legacy") -> str:
     """Explicit source selection and independent fixed construction inputs."""
     text = 'schema_version=1\nlanguages=["go"]\n[adapters.go]\nmodule_roots=["."]\n[functions]\ninclude=' + json.dumps([selected(name) for name in methods]) + '\n'
     for name in methods:
@@ -56,10 +56,14 @@ def policy_text(methods: tuple[str, ...] = METHODS) -> str:
             text += 'domains=[{kind="integer",minimum=0,maximum=3}]\n'
         if name == "Fail":
             text += 'expected_baseline={kind="error",category="panic",type="go.string"}\n'
+    if backend == "source-v1":
+        text = text.replace('[adapters.go]\n', '[adapters.go]\nbackend="source-v1"\nbuild_timeout_ms=900000\n')
+    else:
+        assert backend == "legacy"
     return text
 
 
-def prepare(cli: Path, provider: Path, folder: Path) -> Path:
+def prepare(cli: Path, provider: Path, folder: Path, *, backend: str = "legacy") -> Path:
     folder.mkdir()
     source = folder / "application"
     (source / "counter").mkdir(parents=True)
@@ -69,7 +73,7 @@ def prepare(cli: Path, provider: Path, folder: Path) -> Path:
     (source / "cmd/api.go").write_text(SOURCE.replace("package counter", "package main")
                                       + "\nfunc main(){}\nfunc (value Counter) Main(amount Number)Counter{value.value+=amount;return value}\n")
     policy = folder / "equivalence.toml"
-    policy.write_text(policy_text())
+    policy.write_text(policy_text(backend=backend))
     workspace = Path(command([cli, "plan", "--source", source, "--otelc-root", provider,
                               "--workspace-parent", folder, "--config", policy], folder, "plan"))
     plan = json.loads((workspace / "plan.json").read_text())
@@ -148,7 +152,32 @@ def copied_result(graph: dict, argument: int) -> None:
         assert node(graph, fields[name])["value"] == node(graph, original[name])["value"]
 
 
-def check_report(path: Path, expected_cases: int = 9) -> int:
+def source_attempt(folder: Path, case: dict, attempt: dict, lane: str) -> None:
+    """Retain native ownership and separately checked SDK receipt for source-v1."""
+    method = case["function"].rsplit(".", 1)[-1]
+    package = "example.test/receiver/" + ("cmd" if method == "Main" else "counter")
+    expected = {package + ".Counter." + method: 1, package + (".Nil" if method == "Read" else ".New"): 1}
+    assert attempt["observation"]["function_id"] == package + ".Counter." + method
+    start = json.loads((folder / "go-runtime/oteleq-go-start.json").read_text())
+    owner, application = start["kernel"]["supervisor"], start["kernel"]["application"]
+    assert application["parent_pid"] == owner["pid"] == application["process_group"] == owner["process_group"]
+    assert application["pid"] != owner["pid"]
+    identities = json.loads((folder / "build-identities.json").read_text())
+    assert identities["profile"] == "go-source-v1"
+    if lane == "baseline":
+        assert attempt["execution"]["witness"] is None
+        assert not (folder / "go-verified-telemetry.json").exists()
+    else:
+        receipt = json.loads((folder / "go-verified-telemetry.json").read_text())
+        assert receipt["functions"] == expected and receipt["sdk_pid"] == application["pid"]
+        assert receipt["received"]["spans"] == 2 and receipt["pending"] == 0 and not any(receipt["losses"].values())
+        assert receipt["health"]["metric_exported_points"] is None
+        witness = attempt["execution"]["witness"]
+        assert set(witness) == {"decoder", "raw_otlp_sha256", "functions", "spans", "losses", "pending"}
+        assert witness == {name: receipt[name] for name in witness}
+
+
+def check_report(path: Path, expected_cases: int = 9, *, backend: str = "legacy") -> int:
     """Each actual lane/repeat must satisfy an independent complete fixture oracle."""
     report = json.loads(path.read_text())
     assert report["source_preserved"] and not report["blocked"] and len(report["cases"]) == expected_cases
@@ -184,6 +213,10 @@ def check_report(path: Path, expected_cases: int = 9) -> int:
                         assert result["kind"] == "integer" and result["value"] == str(expected)
                 folder = path.parent / case["case"] / (lane + "-" + str(index))
                 assert (folder / "stdout").read_bytes() == (folder / "stderr").read_bytes() == b""
+                if backend == "source-v1":
+                    source_attempt(folder, case, attempt, lane)
+                    continue
+                assert backend == "legacy"
                 if lane == "instrumented_on":
                     assert attempt["execution"]["witness"]["functions"] == {case["function"]: 1}
                 identities = json.loads((folder / "build-identities.json").read_text())
@@ -195,11 +228,11 @@ def check_report(path: Path, expected_cases: int = 9) -> int:
     return launches
 
 
-def framework(workspace: Path, folder: Path, label: str) -> int:
+def framework(workspace: Path, folder: Path, label: str, *, backend: str = "legacy") -> int:
     outputs = command([sys.executable, workspace / "tests/test_equivalence.py"], folder, label, expected=1)
     reports = [json.loads(line) for line in outputs.splitlines()]
     assert len(reports) == 9
-    return sum(check_report(Path(item["report"]), 1) for item in reports)
+    return sum(check_report(Path(item["report"]), 1, backend=backend) for item in reports)
 
 
 def selected_case(plan: dict, corpus: list, name: str) -> dict:
@@ -281,11 +314,30 @@ def refusals(cli: Path, provider: Path, folder: Path) -> dict:
     return result
 
 
+def source_probe_guards(cli: Path, workspace: Path, folder: Path, case: dict) -> dict:
+    """Changed and missing copied probes refuse before an application is launched."""
+    for label in ("changed", "missing"):
+        target = folder / (label + "-probes")
+        command([cli, "export-tests", "--workspace", workspace, "--destination", target, "--apply"],
+                folder, label + "-export")
+        record = target / "go-source-provider/protocol/response.json"
+        if label == "changed":
+            record.write_bytes(record.read_bytes() + b" ")
+        else:
+            record.unlink()
+        command([cli, "replay", "--workspace", target, "--case", case["id"]],
+                folder, label + "-probes", expected=4)
+        assert "frozen Go provider probes changed" in (folder / (label + "-probes.stderr")).read_text()
+        assert not (target / "runs").exists()
+    return {"refusal_controls": 2, "actual_application_launches": 0, "prelaunch_refusals": 2}
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--otelc-root", type=Path, required=True)
     parser.add_argument("--report-dir", type=Path, required=True)
     parser.add_argument("--cli", type=Path, required=True)
+    parser.add_argument("--backend", choices=("legacy", "source-v1"), default="legacy")
     args = parser.parse_args()
     provider, cli, folder = args.otelc_root.resolve(strict=True), args.cli.resolve(strict=True), args.report_dir.resolve()
     if folder.is_relative_to(provider) or folder.is_relative_to(Path(__file__).resolve().parents[1]):
@@ -293,15 +345,15 @@ def main() -> None:
     folder.mkdir(mode=0o700)
     os.environ.update(OTELEQ_PYTHON=sys.executable, OTELEQ_CLI=str(cli))
     work = folder / "receivers"
-    workspace = prepare(cli, provider, work)
+    workspace = prepare(cli, provider, work, backend=args.backend)
     command([cli, "run", "--workspace", workspace, "--report-dir", work / "comparison"], work, "run", expected=1)
-    launches = check_report(work / "comparison/report.json")
-    launches += framework(workspace, work, "framework")
+    launches = check_report(work / "comparison/report.json", backend=args.backend)
+    launches += framework(workspace, work, "framework", backend=args.backend)
     exported = work / "exported"
     command([cli, "export-tests", "--workspace", workspace, "--destination", exported, "--apply"], work, "export")
     command([cli, "run", "--workspace", exported, "--report-dir", work / "export-comparison"], work, "export-run", expected=1)
-    launches += check_report(work / "export-comparison/report.json")
-    launches += framework(exported, work, "export-framework")
+    launches += check_report(work / "export-comparison/report.json", backend=args.backend)
+    launches += framework(exported, work, "export-framework", backend=args.backend)
     corpus = json.loads((workspace / "tests/corpus.json").read_text())
     plan = json.loads((workspace / "plan.json").read_text())
     case = selected_case(plan, corpus, "Counter.InstanceDifference")
@@ -312,10 +364,13 @@ def main() -> None:
     assert shrink["reduced_arguments"] == [0] and shrink["status"] == "candidate_rule_minimal"
     paths = [work / "shrink/original/report.json", work / "shrink/confirmation/report.json",
              *[Path(item["report"]) for item in shrink["trials"]]]
-    launches += sum(check_report(path, 1) for path in paths)
+    launches += sum(check_report(path, 1, backend=args.backend) for path in paths)
     replay = json.loads(command([cli, "replay", "--workspace", shrink["workspace"], "--case", case["id"]], work, "replay", expected=1))
-    launches += check_report(Path(replay["report"]), 1)
-    refused = refusals(cli, provider, folder / "refusals")
+    launches += check_report(Path(replay["report"]), 1, backend=args.backend)
+    if args.backend == "source-v1":
+        refused = source_probe_guards(cli, workspace, work, case)
+    else:
+        refused = refusals(cli, provider, folder / "refusals")
     launches += refused["actual_application_launches"]
     for path in (workspace, exported, Path(shrink["workspace"])):
         frozen = json.loads((path / "plan.json").read_text())
@@ -324,7 +379,7 @@ def main() -> None:
     commands = [path for path in folder.rglob("command.json") if path.parent.name.startswith(("baseline-", "instrumented_on-"))]
     unique = {hashlib.sha256(path.read_bytes()).hexdigest() for path in commands}
     assert len(unique) == launches
-    result = {"claim": "equivalence over these tests and observations", "artefact_class": "diagnostic",
+    result = {"claim": "equivalence over these tests and observations", "artefact_class": "diagnostic", "backend": args.backend,
               "cli_sha256": hashlib.sha256(cli.read_bytes()).hexdigest(), "cases": 9, "matching_cases": 6,
               "difference_controls": 3, "actual_application_launches": launches, "source_preserved": True,
               "prelaunch_source_refusals": controls, "retained_attempt_folders": len(commands), "unique_command_identities": len(unique),
