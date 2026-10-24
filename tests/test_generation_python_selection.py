@@ -108,7 +108,7 @@ class PythonSelectionTests(unittest.TestCase):
         with patch('builtins.compile', side_effect=AssertionError('must not compile')):
             result, = check(rows, chosen=(replace(expected(), qualname='Counter.workload'),))
         self.assertEqual(len(result.matches), 1)
-        for flags in (0, 4, 8, 16, 32, 128, 512):
+        for flags in (0, 4, 8, 16, 32, 128, 256, 512):
             changed_root, changed_code = copy.deepcopy(root), copy.deepcopy(code)
             changed_root['nodes'][8]['metadata']['co_flags'] = (3 | flags) if flags else 0
             changed_code['nodes'][0]['metadata']['co_flags'] = (3 | flags) if flags else 0

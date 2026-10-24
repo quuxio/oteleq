@@ -45,8 +45,8 @@ def builder_inputs(root: Path) -> list[Path]:
     This inventories input bytes only. Presence of the helper does not select
     an execution profile or establish native/source-origin qualification.
     """
-    encoder = root / "ci/native_encoder.py"
-    return [root / "ci/build_python_inputs.py", *([encoder] if encoder.exists() or encoder.is_symlink() else [])]
+    helpers = (root / "ci/native_encoder.py", root / "ci/native_origin_chain.py")
+    return [root / "ci/build_python_inputs.py", *[path for path in helpers if path.exists() or path.is_symlink()]]
 
 
 def files(root: Path, *, suffixes: set[str] | None = None) -> list[Path]:

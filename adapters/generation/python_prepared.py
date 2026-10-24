@@ -46,6 +46,7 @@ class Intent:
     environment: dict[str, str]
     plain: bool
     arguments: tuple[str, ...] = ()
+    profile: str = provider.INPUT_PROFILE
 
 
 def encoded(value: Any) -> bytes:
@@ -107,13 +108,16 @@ def read(path: Path) -> tuple[dict, bytes]:
 
 def expected_request(intent: Intent) -> dict:
     """Resolve only independently supplied script intent, with literal arguments."""
+    version = provider.profile_version(intent.profile)
+    if version == 2:
+        optimisation(intent)
     provider.require(type(intent.plain) is bool and type(intent.arguments) is tuple
                      and all(type(item) is str and "\0" not in item for item in intent.arguments),
                      "invalid caller-owned Python lane or arguments")
     for path in (intent.provider_root, intent.project, intent.runtime, intent.caller, intent.python, intent.policy_file):
         provider.require(path.is_absolute(), "caller-owned Python paths must be absolute")
     actual_entry = intent.entry if intent.entry.is_absolute() else intent.project / intent.entry
-    provider.require(not str(intent.entry).startswith("-") and actual_entry.suffix == ".py"
+    provider.require(actual_entry.suffix == ".py" and actual_entry.is_file()
                      and actual_entry.resolve(strict=True).is_relative_to(intent.project.resolve(strict=True)),
                      "prepared entry must be source inside the private project")
     provider.require(type(intent.interpreter) is dict and set(intent.interpreter) == {"version", "cache_tag", "argv0"}
@@ -124,7 +128,7 @@ def expected_request(intent: Intent) -> dict:
     policy_bytes = intent.policy_file.read_bytes()
     provider.require(hashlib.sha256(policy_bytes).hexdigest() == policy_identity["sha256"], "prepared policy changed while reading")
     policy_source = {**policy_identity, "text": policy_bytes.decode("utf-8")}
-    return {"schema_version": 1, "profile": "python-native-inputs-v1", "policy": intent.policy,
+    return {"schema_version": version, "profile": intent.profile, "policy": intent.policy,
             "policy_source": policy_source, "cwd": str(intent.caller.resolve(strict=True)),
             "paths": {"root": {"requested": str(intent.project), "resolved": str(intent.project.resolve(strict=True))},
                       "runtime": {"requested": str(intent.runtime), "resolved": str(intent.runtime.resolve(strict=True))},
@@ -136,18 +140,29 @@ def expected_request(intent: Intent) -> dict:
 
 def expected_plan(original: dict) -> dict:
     """Derive fixed native script arguments from the checked original request."""
-    return {"schema_version": 1, "profile": "python-native-inputs-v1", "policy": original["policy"],
+    version = provider.profile_version(original["profile"])
+    target = original["paths"]["entry"]["requested"]
+    target = "./" + target if target.startswith("-") else target
+    return {"schema_version": version, "profile": original["profile"], "policy": original["policy"],
             "plain": original["plain"], "cwd": original["paths"]["root"]["resolved"],
             "runtime": original["paths"]["runtime"]["resolved"], "python": original["interpreter"]["file"]["path"],
             "argv0": original["interpreter"]["argv0"],
-            "native_arguments": [original["paths"]["entry"]["requested"], *original["arguments"]],
-            "input_scope": "native-source-entry-only", "source_complete": False}
+            "native_arguments": [target, *original["arguments"]],
+            "input_scope": "native-application-root-origins" if version == 2 else "native-source-entry-only",
+            "source_complete": False}
 
 
 def expected_command(intent: Intent) -> list[str]:
     """Receipts cannot select an executable, supervisor, option or runtime path."""
     return [str(intent.python), "-I", "-S", "-B", str(intent.provider_root / "otelc/python_supervisor.py"),
             "--runtime", str(intent.runtime.resolve(strict=True))]
+
+
+def optimisation(intent: Intent) -> int:
+    """The qualified origin profile declares its environment-derived compiler level."""
+    value = intent.environment.get("PYTHONOPTIMIZE")
+    provider.require(value in (None, "", "0", "1", "2"), "unsupported declared Python optimisation environment")
+    return int(value or "0")
 
 
 def verify_products(prepared: dict, intent: Intent, catalogue: dict) -> None:
@@ -185,12 +200,13 @@ def verify(value: Any, intent: Intent, catalogue: dict) -> None:
     root = intent.provider_root
     maintained = [root / "bin/quux-otelc", *sorted((root / "otelc").glob("*.py")),
                   *python_inputs.builder_inputs(root), root / "requirements.txt", root / "requirements-dev.txt"]
-    expected = {"schema_version": 1, "kind": "otelc.python.prepared",
+    version = provider.profile_version(intent.profile)
+    expected = {"schema_version": version, "kind": "otelc.python.prepared",
                 "request_sha256": digest(original), "plan_sha256": digest(plan),
                 "driver": prepared["driver"], "build_manifest": prepared["build_manifest"],
                 "producer": [file_identity(path) for path in maintained],
                 "entry": file_identity(Path(original["paths"]["entry"]["resolved"])), "source_complete": False}
-    response = {"schema_version": 1, "kind": "otelc.python.command", "request": original,
+    response = {"schema_version": version, "kind": "otelc.python.command", "request": original,
                 "plan": plan, "prepared": expected, "command": expected_command(intent), "source_complete": False}
     provider.require(provider.same(value, response), "public Python command differs from independent intent or fixed recipe")
     for name, document in (("python-request.json", original), ("python-resolved-plan.json", plan), ("python-prepared.json", expected)):

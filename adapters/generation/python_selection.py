@@ -20,7 +20,8 @@ from python_provider import require
 
 FUNCTION_FLAGS = inspect.CO_OPTIMIZED | inspect.CO_NEWLOCALS
 UNSUPPORTED_FLAGS = (inspect.CO_VARARGS | inspect.CO_VARKEYWORDS | inspect.CO_NESTED |
-                     inspect.CO_GENERATOR | inspect.CO_COROUTINE | inspect.CO_ASYNC_GENERATOR)
+                     inspect.CO_GENERATOR | inspect.CO_COROUTINE | inspect.CO_ITERABLE_COROUTINE |
+                     inspect.CO_ASYNC_GENERATOR)
 
 
 @dataclass(frozen=True)

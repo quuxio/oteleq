@@ -45,6 +45,20 @@ class PythonInputsTests(unittest.TestCase):
                 with self.assertRaises(FileNotFoundError):
                     inputs.artefacts(sdk, {"python": Path(sys.executable)})
 
+    def test_native_origin_builder_dependency_is_frozen_when_present(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            sdk, installed = fake_provider(Path(temporary))
+            helper = sdk / 'ci/native_origin_chain.py'
+            helper.write_text('maintained native image resolver')
+            with patch.object(inputs, 'dependency_roots', return_value=[installed]):
+                before = inputs.artefacts(sdk, {'python': Path(sys.executable)})
+                self.assertEqual(before['ci/native_origin_chain.py'], hashlib.sha256(helper.read_bytes()).hexdigest())
+                helper.write_text('changed native resolver')
+                self.assertNotEqual(inputs.artefacts(sdk, {'python': Path(sys.executable)}), before)
+                helper.unlink(); helper.symlink_to('missing.py')
+                with self.assertRaises(FileNotFoundError):
+                    inputs.artefacts(sdk, {'python': Path(sys.executable)})
+
     def test_selected_venv_spelling_and_explicit_site_paths_are_preserved(self):
         with tempfile.TemporaryDirectory() as temporary:
             prefix = Path(temporary)

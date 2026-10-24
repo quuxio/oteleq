@@ -444,6 +444,8 @@ def configure_entry_context(entry, discovered, configuration, snapshot, excluded
         configure_go_context(entry, discovered, configuration)
     if language == "python" and "backend" in adapters["python"]:
         entry["python_backend"] = adapters["python"]["backend"]
+    if language == "python" and "profile" in adapters["python"]:
+        entry["python_profile"] = adapters["python"]["profile"]
     if language == "python" and not excluded and adapters["python"]["import_roots"]:
         try:
             entry["python_import"] = python_project.context(snapshot, entry["path"], adapters["python"]["import_roots"])
