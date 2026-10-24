@@ -5,6 +5,7 @@ from pathlib import Path, PurePosixPath
 import struct
 
 from go_project import OBSERVER_DIRECTORY
+import go_rendezvous
 
 OBSERVER = Path(__file__).with_name("go_observe.go").read_text()
 
@@ -175,6 +176,7 @@ def driver(entry: dict, arguments: list, source: str) -> str:
     roots = ["__oteleq_observe.Bind(" + json.dumps("global:" + item["name"])
              + ",__oteleq_reflect.ValueOf(&" + item["name"] + "))" for item in entry["globals"]]
     encoded = json.dumps(json.dumps(configuration(entry, arguments), separators=(",", ":")))
-    return (source + '\nfunc ' + worker + '(){__oteleq_observe.Run(' + encoded + ',__oteleq_reflect.ValueOf('
+    return (source + '\nfunc ' + worker + '(){' + go_rendezvous.statement(entry)
+            + '__oteleq_observe.Run(' + encoded + ',__oteleq_reflect.ValueOf('
             + fixture["factory"] + '),__oteleq_reflect.ValueOf(' + target + ')'
             + (',' + ','.join(roots) if roots else '') + ')}\n')

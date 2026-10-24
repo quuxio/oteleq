@@ -11,6 +11,7 @@ import struct
 import domains
 import go_project
 import go_receivers
+import go_rendezvous
 import cpp_receivers
 import cpp_worker
 import native_names
@@ -704,6 +705,7 @@ func __oteleqValue(v interface{{}}) string {{
  }}
 }}
 func {worker}(){{
+ {go_rendezvous.statement(entry)}
  s:=__oteleq_fmt.Sprintf(`abi:{{"pointer_bits":%d}}`+"\\nbefore\\n",__oteleq_reflect.TypeOf(0).Bits()); {state}
  func(){{defer func(){{if p:=recover();__oteleq_reflect.ValueOf(p).IsValid(){{s+="error:"+__oteleqValue(p)+"\\n"}}}}();{invoked}}}()
  s+="after\\n"; {state}
@@ -771,6 +773,8 @@ def go_materialise(project, entry, args, original):
         driver.parent.mkdir(parents=True)
         driver.write_text("package main\nimport __oteleq_target " + json.dumps(context["import_path"])
                           + "\nfunc main(){__oteleq_target." + go_project.BRIDGE + "()}\n")
+    if go_rendezvous.enabled(entry):
+        go_rendezvous.materialise(project / context["directory"], context["package"])
     return driver
 
 
@@ -828,4 +832,6 @@ def materialise(project, entry, args):
                 (generated / "node_sequence.mjs").write_bytes(Path(__file__).with_name("node_sequence.mjs").read_bytes())
                 (generated / "node_checkpoint.mjs").write_bytes(Path(__file__).with_name("node_checkpoint.mjs").read_bytes())
         driver.write_text(emit(entry, args, original))
+        if language == "go" and go_rendezvous.enabled(entry):
+            go_rendezvous.materialise(driver.parent, entry["go_package"])
     return driver
