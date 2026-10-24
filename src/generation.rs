@@ -29,6 +29,10 @@ const RESOURCES: &[(&str, &str)] = &[
         include_str!("../adapters/generation/python_origin.py"),
     ),
     (
+        "python_selection.py",
+        include_str!("../adapters/generation/python_selection.py"),
+    ),
+    (
         "python_execution.py",
         include_str!("../adapters/generation/python_execution.py"),
     ),
@@ -51,6 +55,10 @@ const RESOURCES: &[(&str, &str)] = &[
     (
         "python_inputs.py",
         include_str!("../adapters/generation/python_inputs.py"),
+    ),
+    (
+        "python_launch.py",
+        include_str!("../adapters/generation/python_launch.py"),
     ),
     (
         "project_tests.py",

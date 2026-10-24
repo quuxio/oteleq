@@ -33,6 +33,93 @@ def completed(value, status: int = 0):
 
 
 class PythonProviderTests(unittest.TestCase):
+    def test_origin_profile_policy_is_explicit_and_never_changes_legacy_defaults(self):
+        original = copy.deepcopy(policy.DEFAULTS)
+        for profile in (provider.INPUT_PROFILE, provider.ORIGIN_PROFILE):
+            configured = policy.validate({'adapters': {'python': {'backend': 'prepared', 'profile': profile}}})
+            self.assertEqual(configured['adapters']['python']['profile'], profile)
+            self.assertEqual(policy.validate(configured), configured)
+        self.assertEqual(policy.validate({}), original)
+        for value in ({'profile': provider.ORIGIN_PROFILE}, {'backend': 'legacy', 'profile': provider.INPUT_PROFILE},
+                      *({'backend': 'prepared', 'profile': value} for value in (True, None, 'unknown'))):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                provider.settings(value)
+
+    def test_origin_protocol_descriptor_cannot_be_selected_by_returned_fields(self):
+        provider.verify_protocols(copy.deepcopy(provider.ORIGIN_PROTOCOLS), provider.ORIGIN_PROFILE)
+        for value, profile in ((provider.ORIGIN_PROTOCOLS, provider.INPUT_PROFILE),
+                               (provider.PROTOCOLS, provider.ORIGIN_PROFILE), (provider.PROTOCOLS, 'unknown')):
+            with self.subTest(profile=profile), self.assertRaises(ValueError):
+                provider.verify_protocols(value, profile)
+        for key, values in {'schema_version': [1, True], 'profile': [provider.INPUT_PROFILE, None],
+                            'code_comparisons': [1, False], 'source_complete': [True, 0],
+                            'origin_scope': ['whole-program', None],
+                            'journal': [{'schema_version': 1, 'record_kinds': [1, 2, 3, 4]}]}.items():
+            for value in values:
+                with self.subTest(key=key, value=value), self.assertRaises(ValueError):
+                    provider.verify_protocols({**provider.ORIGIN_PROTOCOLS, key: value}, provider.ORIGIN_PROFILE)
+
+    def test_origin_probe_has_a_separate_cache_and_literal_explicit_profile(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary); tools = {'python': Path(sys.executable)}
+            execute = Mock(side_effect=[completed(provider.PROTOCOLS), completed(provider.ORIGIN_PROTOCOLS)])
+            provider.probe_protocols(workspace, workspace, tools, execute)
+            for _ in range(2):
+                self.assertEqual(provider.probe_protocols(workspace, workspace, tools, execute, provider.ORIGIN_PROFILE),
+                                 provider.ORIGIN_PROTOCOLS)
+            self.assertEqual(execute.call_count, 2)
+            self.assertIn("protocols(profile='python-native-origins-v2')", execute.call_args.args[0][5])
+            folder = workspace / provider.DIRECTORY
+            original = json.loads((folder / 'protocol/response.json').read_bytes())
+            target = folder / 'protocol-origins-v2/response.json'
+            target.write_text(json.dumps(original))
+            with self.assertRaisesRegex(ValueError, 'protocol probe failed'):
+                provider.probe_protocols(workspace, workspace, tools, execute, provider.ORIGIN_PROFILE)
+
+    def test_only_explicit_origin_negotiation_admits_the_frozen_generated_route(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            configured = policy.validate({'adapters': {'python': {'backend': 'prepared', 'profile': provider.ORIGIN_PROFILE}}})
+            selected = entry()
+            generation.configure_entry_context(selected, {}, configured, root, False)
+            self.assertEqual(selected['python_profile'], provider.ORIGIN_PROFILE)
+            requested = provider.configuration(selected, 'http://127.0.0.1:4318', 'oteleq-python-provider')
+            execute = Mock(side_effect=[completed(provider.ORIGIN_PROTOCOLS), completed(response(requested))])
+            provider.bind(selected, root, root, {'python': Path(sys.executable)}, execute)
+            self.assertEqual(selected['status'], 'ready')
+            self.assertEqual(selected['python_provider']['protocols'], provider.ORIGIN_PROTOCOLS)
+            provider.refuse_unbound(selected)
+            data = {'configuration': configured, 'inventory': [selected],
+                    'python_provider_manifest': generation.manifest(root / provider.DIRECTORY)}
+            provider.verify_probes(generation, root, data)
+            selected['python_profile'] = provider.INPUT_PROFILE
+            with self.assertRaisesRegex(ValueError, 'profile differs'):
+                provider.verify_probes(generation, root, data)
+
+    def test_origin_requires_frozen_successful_complete_negotiation(self):
+        selected = {**entry(), 'python_profile': provider.ORIGIN_PROFILE}
+        requested = provider.configuration(selected, 'http://127.0.0.1:4318', 'oteleq-python-provider')
+        original = {'status': 0, 'request': provider.policy(selected, 'http://127.0.0.1:4318', 'oteleq-python-provider'),
+                    'protocols': copy.deepcopy(provider.ORIGIN_PROTOCOLS),
+                    'stdout': json.dumps(response(requested)), 'resolved': response(requested)}
+        provider.refuse_unbound({**selected, 'python_provider': original})
+        for probe in (None, {}, *({**original, key: value} for key, value in (
+                ('status', True), ('status', 1), ('request', 'edited'), ('protocols', provider.PROTOCOLS),
+                ('stdout', '{}'), ('stdout', None), ('resolved', {})))):
+            with self.subTest(probe=probe), self.assertRaises(ValueError):
+                provider.refuse_unbound({**selected, 'python_provider': probe})
+
+    def test_origin_policy_includes_declared_source_factories_and_constructors(self):
+        selected = {**entry(), 'python_profile': provider.ORIGIN_PROFILE,
+                    'name': 'Counter.add', 'otelc_function': 'app.Counter.add'}
+        self.assertIsNone(provider.creator(selected))
+        for name in ('Counter.__init__', 'make_counter'):
+            chosen = {**selected, 'receiver_fixture': {'source_function': name}}
+            self.assertEqual(provider.creator(chosen), 'app.' + name)
+            self.assertEqual(provider.configuration(chosen, 'endpoint', 'service')['functions']['include'],
+                             ['app.Counter.add', 'app.' + name])
+        self.assertIsNone(provider.creator({**selected, 'receiver_fixture': {'source_function': None}}))
+
     def test_legacy_default_and_explicit_choices_roundtrip_without_shared_values(self):
         self.assertEqual(policy.validate({}), policy.DEFAULTS)
         for backend in ("legacy", "prepared"):

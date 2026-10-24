@@ -25,6 +25,7 @@ import python_health
 import python_inputs
 import python_prepared
 import python_provider
+import python_selection
 import python_telemetry
 
 PREFIX = '''import sys
@@ -63,22 +64,32 @@ def source(case: str) -> bytes:
 
 
 def prepare(root: Path, folder: Path, project: Path, environment: dict, interpreter: dict,
-            endpoint: str, service: str, plain: bool) -> tuple:
+            endpoint: str, service: str, plain: bool, profile: str = python_provider.INPUT_PROFILE) -> tuple:
     """Construct fixed commands from caller intent, never from returned argv."""
     entry = {"language": "python", "python_backend": "prepared", "path": "entry.py", "otelc_function": "entry.workload"}
     config = folder / "policy.toml"
     config.write_text(python_provider.policy(entry, endpoint, service))
     policy = python_provider.configuration(entry, endpoint, service)
     runtime = folder / "runtime"
-    command = [sys.executable, "-I", "-S", "-B", root / "otelc/cli_bootstrap.py", "--config", config,
-               "python", "--root", project, "--entry", "entry.py", "--runtime", runtime, "--prepare-only"]
-    if plain:
-        command.append("--plain")
+    version = python_provider.profile_version(profile)
+    if version == 2:
+        bootstrap = ("import json,sys;from pathlib import Path;sys.path.insert(0,sys.argv[1]);"
+                     "from otelc.config import Policy;from otelc import prepared_python;"
+                     "print(json.dumps(prepared_python.prepare(Policy.load(Path(sys.argv[2])),Path(sys.argv[3]),"
+                     "root=Path(sys.argv[4]),entry='entry.py',plain=sys.argv[5]=='plain',"
+                     "profile='python-native-origins-v2'),sort_keys=True))")
+        command = [sys.executable, "-I", "-S", "-B", "-c", bootstrap, root, config, runtime, project,
+                   "plain" if plain else "instrumented"]
+    else:
+        command = [sys.executable, "-I", "-S", "-B", root / "otelc/cli_bootstrap.py", "--config", config,
+                   "python", "--root", project, "--entry", "entry.py", "--runtime", runtime, "--prepare-only"]
+        if plain:
+            command.append("--plain")
     result = generation.execute(command, root, environment, folder / "prepare", timeout=180,
                                 max_output_bytes=python_prepared.MAX_METADATA)
     python_provider.require(result.returncode == 0, "actual prepare-only failed: " + str(folder))
     intent = python_prepared.Intent(root, project, runtime, Path("entry.py"), root, Path(sys.executable).absolute(),
-                                    interpreter, policy, config, environment, plain)
+                                    interpreter, policy, config, environment, plain, profile=profile)
     return intent, generation.capture.strict_json(result.stdout)
 
 
@@ -168,7 +179,8 @@ def controls(intent, launch, owner, catalogue, execution, bodies, service, recei
     return refused
 
 
-def attempt(root: Path, folder: Path, case: str, plain: bool, interpreter: dict, catalogue: dict, tools: dict) -> dict:
+def attempt(root: Path, folder: Path, case: str, plain: bool, interpreter: dict, catalogue: dict, tools: dict,
+            profile: str = python_provider.INPUT_PROFILE) -> dict:
     """Fresh files, processes and fixture state isolate every repeat and lane."""
     folder.mkdir(mode=0o700)
     project = folder / "application"
@@ -178,13 +190,23 @@ def attempt(root: Path, folder: Path, case: str, plain: bool, interpreter: dict,
     service = "oteleq-python-runtime-" + case + "-" + folder.parent.name
     environment = generation.capture.environment(folder, tools, service, root)
     with generation.capture.receiver(response_path=folder / "http-responses.json") as (endpoint, bodies, errors):
-        intent, launch = prepare(root, folder, project, environment, interpreter, endpoint, service, plain)
+        intent, launch = prepare(root, folder, project, environment, interpreter, endpoint, service, plain, profile)
         python_prepared.verify(launch, intent, catalogue)
         python_provider.require(python_inputs.artefacts(root, tools) == catalogue, "Python preparation changed frozen SDK inputs")
         command = python_prepared.expected_command(intent)
         parent = os.getpid()
         generation.write(folder / "expected-request.json", python_prepared.expected_request(intent))
         generation.write(folder / "owner-input.json", {"parent_pid": parent, "argv": command, "python_hexversion": sys.hexversion})
+        selected = None
+        if profile == python_provider.ORIGIN_PROFILE:
+            frozen = python_selection.freeze(project / 'entry.py')
+            line = next(index for index, text in enumerate(PREFIX.splitlines(), 1) if text.startswith('def workload('))
+            selected = python_selection.Selection(frozen, 'workload', line)
+            generation.write(folder / 'expected-origin.json', {'path_hex': frozen.path.hex(), 'sha256': frozen.sha256,
+                'device': frozen.device, 'inode': frozen.inode, 'mtime_ns': frozen.mtime_ns, 'mode': frozen.mode,
+                'qualname': selected.qualname, 'line': selected.line, 'python_version': sys.hexversion,
+                'optimisation': python_prepared.optimisation(intent), 'plain': plain})
+            expected_origin_sha256 = generation.capture.file_digest(folder / 'expected-origin.json')
         result = generation.execute(command, root, environment, folder / "owner", timeout=45, record_process=True)
         generation.write(folder / "owner-result.json", {"returncode": result.returncode,
                          "stdout_sha256": hashlib.sha256(result.stdout).hexdigest(), "stderr_sha256": hashlib.sha256(result.stderr).hexdigest()})
@@ -195,12 +217,30 @@ def attempt(root: Path, folder: Path, case: str, plain: bool, interpreter: dict,
                             "consumer owner receipt differs from its independently constructed command")
     owner = python_execution.Owner(known["pid"], parent, tuple(command), result.returncode, sys.hexversion)
     execution = python_execution.read(intent, launch, owner, catalogue)
+    origin_coverage, origin_refusals = None, []
+    if selected is not None:
+        coverage, = python_selection.verify(execution.journal, (selected,), python_version=sys.hexversion,
+                                            optimisation=python_prepared.optimisation(intent), plain=plain)
+        origin_coverage = {'source_sha256': selected.source.sha256, 'qualname': selected.qualname,
+                           'line': selected.line, 'matches': [
+            {'root': match.root, 'execution': match.execution, 'member': match.member, 'sdk': match.sdk}
+            for match in coverage.matches]}
+        for name, changed, options in (
+                ('origin-source-inode', replace(selected, source=replace(selected.source, inode=selected.source.inode + 1)), {}),
+                ('origin-source-bytes', replace(selected, source=replace(selected.source, content=b'changed')), {}),
+                ('origin-unexecuted-name', replace(selected, qualname='unexecuted'), {}),
+                ('origin-lane', selected, {'plain': not plain})):
+            expect_refusal(lambda: python_selection.verify(execution.journal, (changed,), **{
+                'python_version': sys.hexversion, 'optimisation': python_prepared.optimisation(intent),
+                'plain': plain, **options}), name, origin_refusals)
+        python_provider.require(generation.capture.file_digest(folder / 'expected-origin.json') == expected_origin_sha256,
+                                'caller-owned pre-launch origin facts changed')
     expected = b"raw\x00\xff|" + CASES[case][2] + b"\n"
     python_provider.require((result.returncode, result.stdout, result.stderr) == (0, expected, b"err\x00\xfe\n"),
                             "Python application differs from the independent complete channel/state oracle")
     if plain:
         python_provider.require(not bodies, "plain Python application emitted OTLP")
-        receipt, checked, refused = None, None, []
+        receipt, checked, refused = None, None, origin_refusals
     else:
         checked = python_telemetry.decode(bodies, execution, service, {1: "entry.workload"},
                                           ExportTraceServiceRequest, ExportMetricsServiceRequest)
@@ -208,23 +248,29 @@ def attempt(root: Path, folder: Path, case: str, plain: bool, interpreter: dict,
         python_provider.require(checked["code_calls"] == {1: CASES[case][3]} and checked["code_errors"] == {1: CASES[case][4]}
                                 and checked["roots"] == 1, "Python actual calls differ from the independent workload oracle")
         python_health.read(intent.runtime, execution, python_health.policy_digest(intent.policy), receipt)
-        refused = controls(intent, launch, owner, catalogue, execution, bodies, service, receipt)
+        refused = origin_refusals + controls(intent, launch, owner, catalogue, execution, bodies, service, receipt)
     python_provider.require(generation.manifest(project) == before and python_inputs.artefacts(root, tools) == catalogue,
                             "Python source or frozen provider/installed inputs changed during execution")
     value = {"case": case, "plain": plain, "owner_pid": owner.pid, "parent_pid": parent,
              "application_pid": execution.application_pid, "sdk_pid": execution.sdk_pid,
              "launch_id": execution.launch_id, "source_unchanged": True, "inputs_unchanged": True,
              "stdout_hex": result.stdout.hex(), "stderr_hex": result.stderr.hex(), "received": receipt,
-             "decoded": checked, "altered_evidence_refused": refused, "source_origin": "unavailable"}
+             "decoded": checked, "altered_evidence_refused": refused,
+             "source_origin": "selected-source-bound" if selected is not None else "unavailable"}
+    if selected is not None:
+        value['origin_coverage'] = origin_coverage
+        value['expected_origin_sha256'] = expected_origin_sha256
     generation.write(folder / "checked.json", value)
     return value
 
 
-def run(root: Path, report: Path) -> dict:
+def run(root: Path, report: Path, profile: str = python_provider.INPUT_PROFILE) -> dict:
     """Qualify one selected interpreter against a private, initially mutable SDK."""
     report.mkdir(mode=0o700)
     report = report.resolve(strict=True)
     tools = {"python": Path(sys.executable).absolute()}
+    version = python_provider.profile_version(profile)
+    protocols = python_provider.probe_protocols(root, report, tools, generation.execute, profile)
     probe = generation.execute([sys.executable, "-I", "-S", "-B", "-c",
         "import json,sys;print(json.dumps({'version':sys.version,'cache_tag':sys.implementation.cache_tag,'argv0':sys.orig_argv[0]}))"],
         root, generation.capture.environment(report, tools, "metadata", root), report / "interpreter", max_output_bytes=4096)
@@ -238,7 +284,7 @@ def run(root: Path, report: Path) -> dict:
     project.mkdir()
     (project / "entry.py").write_text("raise AssertionError('preparation must not run the app')\n")
     environment = generation.capture.environment(primer, tools, "primer", root)
-    prepare(root, primer, project, environment, interpreter, "http://127.0.0.1:4318", "primer", True)
+    prepare(root, primer, project, environment, interpreter, "http://127.0.0.1:4318", "primer", True, profile)
     catalogue = python_inputs.artefacts(root, tools)
     generation.write(report / "input-catalogue.json", catalogue)
     rows = []
@@ -248,7 +294,7 @@ def run(root: Path, report: Path) -> dict:
             pair.mkdir()
             for plain in (True, False):
                 rows.append(attempt(root, pair / ("baseline" if plain else "instrumented"), case, plain,
-                                    interpreter, catalogue, tools))
+                                    interpreter, catalogue, tools, profile))
     python_provider.require(python_inputs.artefacts(root, tools) == catalogue, "final Python SDK catalogue differs")
     result = {"schema_version": 1, "kind": "oteleq.python-prepared-runtime-qualification", "interpreter": interpreter,
               "python_hexversion": sys.hexversion, "attempts": rows, "input_catalogue_sha256": generation.identity(catalogue),
@@ -256,6 +302,10 @@ def run(root: Path, report: Path) -> dict:
               "altered_evidence_refusals": sum(len(row["altered_evidence_refused"]) for row in rows),
               "source_profile_status": "blocked", "source_origin": "unavailable",
               "scope": "Prepared execution1/journal1/descriptor2/health2/SDK1 and local OTLP accounting for fixed synchronous workloads. Source binding, per-action attribution, live controls, generated suites and shipping artefacts are not qualified."}
+    if version == 2:
+        result.update(schema_version=2, profile=profile, protocols=protocols,
+                      source_profile_status='fixed-selected-workloads-qualified', source_origin='selected-source-bound',
+                      scope='Explicit prepared execution2/journal2/descriptor2/health2/SDK1; caller-frozen source reads, compiler roots, ordinary selected first executions and SDK code joins in both lanes, complete literal workload outcomes and actual local OTLP accounting. Per-action attribution, live controls, generated suites, broader dependency closure and shipping artefacts remain unqualified.')
     generation.write(report / "report.json", result)
     return result
 
@@ -264,10 +314,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--otelc-root", type=Path, required=True)
     parser.add_argument("--report-dir", type=Path, required=True)
+    parser.add_argument("--profile", choices=(python_provider.INPUT_PROFILE, python_provider.ORIGIN_PROFILE),
+                        default=python_provider.INPUT_PROFILE)
     args = parser.parse_args()
     root = args.otelc_root.resolve(strict=True)
     generation.source_outside(args.report_dir, root, REPO)
-    result = run(root, args.report_dir)
+    result = run(root, args.report_dir, args.profile)
     print(json.dumps({"report": str(args.report_dir / "report.json"), "actual_application_launches": result["actual_application_launches"],
                       "source_profile_status": result["source_profile_status"]}))
 

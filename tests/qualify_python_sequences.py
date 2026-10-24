@@ -17,7 +17,7 @@ from sequence_qualification import CONTROL_VERDICTS
 
 def prepare(cli: Path, provider: Path, folder: Path, *, steps: int = 2,
             methods: tuple[str, ...] = METHODS, compact: bool = False,
-            padding: bool = False, rebound: bool = False) -> Path:
+            padding: bool = False, rebound: bool = False, python_profile: str | None = None) -> Path:
     """Freeze real package imports, independent construction and concrete calls."""
     assert steps in (1, 2, 32) and sum((compact, padding, rebound)) <= 1
     folder.mkdir()
@@ -28,7 +28,11 @@ def prepare(cli: Path, provider: Path, folder: Path, *, steps: int = 2,
     assert not compact or methods == ("identity",)
     text = COMPACT_SOURCE if compact else BUDGET_SOURCE if padding else REBOUND_SOURCE if rebound else SOURCE
     (package / "state.py").write_text(text)
-    text = 'schema_version=1\nlanguages=["python"]\n[adapters.python]\nimport_roots=["src"]\n[functions]\ninclude='
+    text = 'schema_version=1\nlanguages=["python"]\n[adapters.python]\nimport_roots=["src"]\n'
+    if python_profile is not None:
+        assert python_profile == 'python-native-origins-v2'
+        text += 'backend="prepared"\nprofile="python-native-origins-v2"\n'
+    text += '[functions]\ninclude='
     text += json.dumps([function(method) for method in methods]) + "\n"
     for method in methods:
         text += '\n[[fixtures]]\nfunction=' + json.dumps(function(method)) + '\ncases=[[7]]\n'

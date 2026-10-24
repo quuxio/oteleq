@@ -52,6 +52,8 @@ import project_tests
 import python_project
 import python_provider
 import python_inputs
+import python_launch
+import python_prepared
 import shrinking
 import sequences
 import typed_capture
@@ -454,6 +456,8 @@ def configure_entry_context(entry, discovered, configuration, snapshot, excluded
         configure_go_context(entry, discovered, configuration)
     if language == "python" and "backend" in adapters["python"]:
         entry["python_backend"] = adapters["python"]["backend"]
+    if language == "python" and "profile" in adapters["python"]:
+        entry["python_profile"] = adapters["python"]["profile"]
     if language == "python" and not excluded and adapters["python"]["import_roots"]:
         try:
             entry["python_import"] = python_project.context(snapshot, entry["path"], adapters["python"]["import_roots"])
@@ -698,8 +702,8 @@ def generator_identity():
         'native_discover.cpp', 'native_context.py', 'native_workers.py', 'native_workspace.py',
         'owned_workspace.py', 'preconditions.py', 'project_tests.py', 'project_runner.py',
         'python_provider.py', 'python_inputs.py', 'python_prepared.py', 'python_journal.py',
-        'python_code.py', 'python_code_match.py', 'python_origin.py',
-        'python_execution.py', 'python_health.py', 'python_telemetry.py')})
+        'python_code.py', 'python_code_match.py', 'python_origin.py', 'python_selection.py',
+        'python_execution.py', 'python_health.py', 'python_telemetry.py', 'python_launch.py')})
     files["host-python"] = capture.file_digest(Path(sys.executable))
     files["observer:otelc_capture.py"] = capture.file_digest(Path(capture.__file__))
     files["host-version"] = sys.version
@@ -904,6 +908,8 @@ def execute_capture_build(command, cwd, environment, folder, timeout):
 
 
 def build_command(root, project, entry, driver, config, tools, env, folder, scratch, lane, *, prepared_runtime=None, java_context=None):
+    if python_provider.enabled(entry):
+        raise ValueError("Python prepared execution requires its owned launch context")
     language = entry["language"]
     prefix = [root / "target/debug/quux-otelc", "--config", config, "--language", language]
     if language in ("c", "cpp"):
@@ -1014,9 +1020,12 @@ def baseline_receipt(entry, folder, bodies):
 
 
 def qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, decoder, *, extra_channels=None,
-                    capture_complete=True, prepared_runtime=None, action_session=None, case=None):
+                    capture_complete=True, prepared_runtime=None, python_runtime=None, action_session=None, case=None):
     if errors or result.returncode:
         raise ValueError("application exit or OTLP capture failed; inspect retained stdout/stderr")
+    if python_provider.enabled(entry):
+        python_provider.require(python_provider.origin(entry) and python_runtime is not None,
+                                "missing verified generated Python execution")
     observation = folder / "observation"
     if not observation.is_file() or observation.stat().st_size > MAX_OUTPUT:
         raise ValueError("missing or oversized typed observation")
@@ -1032,6 +1041,9 @@ def qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, 
                                                bodies, service=service, trace_decoder=decoder)
     elif lane == "baseline":
         baseline_receipt(entry, folder, bodies)
+    elif python_provider.enabled(entry):
+        run, checked = python_runtime
+        witness = python_launch.witness(sys.modules[__name__], run, checked, folder, entry, bodies, service, decoder)
     elif node_source.enabled(entry):
         witness = node_telemetry.witness(folder, entry, bodies, service, decoder)
     elif prepared_runtime is not None:
@@ -1073,7 +1085,7 @@ def attempt(workspace, data, entry, case, lane, folder, decoder, *, http_fixture
 
 def attempt_policy(entry, endpoint, service, runtime):
     """Prepared providers consume the same original per-attempt service identity."""
-    if runtime is not None or node_source.enabled(entry):
+    if runtime is not None or node_source.enabled(entry) or python_provider.enabled(entry):
         return policy(entry, endpoint, service=service)
     return policy(entry, endpoint)
 
@@ -1130,6 +1142,7 @@ def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, ht
         env["NODE_OPTIONS"] = "--expose-gc"
         write(folder / "collection-controls.json", {"NODE_OPTIONS": "--expose-gc", "sequence": case["sequence"]})
     immutable = manifest(project)
+    python_run = None
     java_context = java_project.materialise(workspace, data, folder, project) if language == "java" else None
     receiver_options = attempt_receiver_options(entry, runtime)
     with retained_receiver(folder, receiver_options) as (endpoint, bodies, errors):
@@ -1143,6 +1156,10 @@ def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, ht
             prefix = [root / 'target/debug/quux-otelc', '--config', config, '--language', language]
             command = native_profile.build(sys.modules[__name__], workspace, data, entry, case,
                                            project, prefix, env, folder, lane)
+        elif python_provider.origin(entry):
+            python_run = python_launch.prepare(sys.modules[__name__], root, project, entry, driver,
+                                               tools, env, folder, config, lane, data["artefacts"][language])
+            command = python_prepared.expected_command(python_run.intent)
         else:
             options = attempt_build_options(runtime, java_context)
             command = build_command(root, project, entry, driver, config, tools, env, folder, scratch, lane, **options)
@@ -1170,13 +1187,18 @@ def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, ht
     action_options = {'action_session': options.get('interaction'), 'case': case} if java_actions.enabled(entry) else {}
     verification_options = {"java_context": java_context} if java_context is not None else {}
     verify_attempt_inputs(data, entry, project, folder, scratch, tools, immutable, runtime, launch, config, lane=lane, **verification_options)
+    python_checked = None
+    if python_run is not None:
+        python_checked = (python_run, python_launch.verify(sys.modules[__name__], python_run, entry, folder, result,
+                                                          data["artefacts"][language]))
     return qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, decoder,
-                           extra_channels=effect_channels, capture_complete=complete, prepared_runtime=runtime, **action_options)
+                           extra_channels=effect_channels, capture_complete=complete, prepared_runtime=runtime,
+                           python_runtime=python_checked, **action_options)
 
 
 def execution_options(entry, case, lane, folder, runtime, bodies, env, *, service=None):
     """Add only explicitly requested process recording and live host checkpoints."""
-    options = {"record_process": True} if runtime is not None or node_source.enabled(entry) else {}
+    options = {"record_process": True} if runtime is not None or node_source.enabled(entry) or python_provider.origin(entry) else {}
     if sequences.controls(entry):
         interaction = (node_live.Session(folder, case["sequence"], bodies, language=entry["language"], plain=lane == "baseline")
                        if node_source.enabled(entry)

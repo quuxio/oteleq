@@ -15,12 +15,12 @@ sys.path[:0] = [str(REPO / "adapters/generation"), str(REPO / "examples")]
 import python_prepared as prepared
 
 
-def fixture(root: Path):
+def fixture(root: Path, *, profile: str = prepared.provider.INPUT_PROFILE, entry: str = "entry.py"):
     sdk, project, runtime = root / "sdk", root / "project", root / "runtime"
     for directory in (sdk, project):
         directory.mkdir()
     runtime.mkdir(mode=0o700)
-    (project / "entry.py").write_text("raise AssertionError('metadata must not execute the app')\n")
+    (project / entry).write_text("raise AssertionError('metadata must not execute the app')\n")
     names = ["otelc/python_supervisor.py", "bin/quux-otelc", "ci/build_python_inputs.py",
              "requirements.txt", "requirements-dev.txt", "python", "policy.toml",
              "build/tools/python-inputs/" + "a" * 64 + "/otelc-python-inputs",
@@ -29,22 +29,23 @@ def fixture(root: Path):
         path = sdk / name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(name)
-    intent = prepared.Intent(sdk, project, runtime, Path("entry.py"), sdk, sdk / "python",
+    intent = prepared.Intent(sdk, project, runtime, Path(entry), sdk, sdk / "python",
                              {"version": "CPython test", "cache_tag": "cpython-test", "argv0": "/actual/framework/python"},
                              {"schema_version": 3}, sdk / "policy.toml", {"LANG": "C", "PYTHONPATH": "", "CREDENTIAL": "excluded"},
-                             False, ("--", "-c", "", "\U0001f680"))
+                             False, ("--", "-c", "", "\U0001f680"), profile=profile)
     original = prepared.expected_request(intent)
     plan = prepared.expected_plan(original)
     driver = sdk / "build/tools/python-inputs" / ("a" * 64) / "otelc-python-inputs"
     catalogue = {path.relative_to(sdk).as_posix(): prepared.capture.file_digest(path) for path in (driver, driver.parent / "build.json")}
     maintained = [sdk / "bin/quux-otelc", sdk / "otelc/python_supervisor.py", sdk / "ci/build_python_inputs.py",
                   sdk / "requirements.txt", sdk / "requirements-dev.txt"]
-    manifest = {"schema_version": 1, "kind": "otelc.python.prepared", "request_sha256": prepared.digest(original),
+    version = prepared.provider.profile_version(profile)
+    manifest = {"schema_version": version, "kind": "otelc.python.prepared", "request_sha256": prepared.digest(original),
                 "plan_sha256": prepared.digest(plan), "driver": prepared.file_identity(driver),
                 "build_manifest": prepared.file_identity(driver.parent / "build.json"),
                 "producer": list(map(prepared.file_identity, maintained)),
-                "entry": prepared.file_identity((project / "entry.py").resolve(strict=True)), "source_complete": False}
-    value = {"schema_version": 1, "kind": "otelc.python.command", "request": original, "plan": plan,
+                "entry": prepared.file_identity((project / entry).resolve(strict=True)), "source_complete": False}
+    value = {"schema_version": version, "kind": "otelc.python.command", "request": original, "plan": plan,
              "prepared": manifest, "command": prepared.expected_command(intent), "source_complete": False}
     for name, document in (("python-request.json", original), ("python-resolved-plan.json", plan), ("python-prepared.json", manifest)):
         path = runtime / name
@@ -54,6 +55,39 @@ def fixture(root: Path):
 
 
 class PythonPreparedTests(unittest.TestCase):
+    def test_dash_prefixed_source_entry_keeps_literal_intent_and_cannot_become_a_python_flag(self):
+        for profile in (prepared.provider.INPUT_PROFILE, prepared.provider.ORIGIN_PROFILE):
+            with self.subTest(profile=profile), tempfile.TemporaryDirectory() as temporary:
+                intent, value, catalogue = fixture(Path(temporary), profile=profile, entry='-entry.py')
+                prepared.verify(value, intent, catalogue)
+                self.assertEqual(value['request']['paths']['entry']['requested'], '-entry.py')
+                self.assertEqual(value['plan']['native_arguments'][0], './-entry.py')
+                changed = copy.deepcopy(value); changed['plan']['native_arguments'][0] = '-entry.py'
+                with self.assertRaises(ValueError):
+                    prepared.verify(changed, intent, catalogue)
+
+    def test_origin_profile_is_explicit_and_keeps_the_fixed_supervisor_recipe(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            intent, value, catalogue = fixture(Path(temporary), profile=prepared.provider.ORIGIN_PROFILE)
+            prepared.verify(value, intent, catalogue)
+            self.assertEqual([value[part]['schema_version'] for part in ('request', 'plan', 'prepared')], [2, 2, 2])
+            self.assertEqual(value['schema_version'], 2)
+            self.assertEqual(value['request']['profile'], prepared.provider.ORIGIN_PROFILE)
+            self.assertEqual(value['plan']['cwd'], str(intent.project.resolve()))
+            self.assertEqual(value['plan']['input_scope'], 'native-application-root-origins')
+            self.assertEqual(value['command'], prepared.expected_command(replace(intent, profile=prepared.provider.INPUT_PROFILE)))
+            for section in ('request', 'plan', 'prepared'):
+                changed = copy.deepcopy(value); changed[section]['schema_version'] = 1
+                with self.subTest(section=section), self.assertRaises(ValueError):
+                    prepared.verify(changed, intent, catalogue)
+            with self.assertRaises(ValueError):
+                prepared.verify(value, replace(intent, profile=prepared.provider.INPUT_PROFILE), catalogue)
+            for profile in ('unknown', True, None):
+                with self.subTest(profile=profile), self.assertRaises(ValueError):
+                    prepared.expected_request(replace(intent, profile=profile))
+                with self.assertRaises(ValueError):
+                    prepared.expected_plan({**value['request'], 'profile': profile})
+
     def test_fixed_recipe_keeps_absent_empty_environment_and_literal_arguments(self):
         with tempfile.TemporaryDirectory() as temporary:
             intent, value, catalogue = fixture(Path(temporary))

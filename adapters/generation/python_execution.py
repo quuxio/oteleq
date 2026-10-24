@@ -1,4 +1,4 @@
-"""Bind execution-1 records to the caller's actual owned supervisor and inputs."""
+"""Bind explicitly selected execution records to the actual owner and inputs."""
 
 from dataclasses import dataclass
 import os
@@ -8,6 +8,7 @@ import stat
 
 import python_code
 import python_journal
+import python_origin
 import python_prepared as prepared
 import python_provider as provider
 
@@ -34,7 +35,7 @@ class Execution:
     application_pid: int
     sdk_pid: int | None
     launch_id: str | None
-    journal: python_journal.Journal
+    journal: python_journal.Journal | python_origin.Journal
     descriptors: tuple[python_code.Descriptor, ...]
     final: dict
 
@@ -46,7 +47,8 @@ def pid(value: object) -> bool:
 
 def shared(owner: Owner, launch: dict) -> dict:
     """Reproduce only fixed supervisor identity and complete prepared digests."""
-    return {"schema_version": 1, "supervisor_pid": owner.pid, "parent_pid": owner.parent_pid,
+    return {"schema_version": provider.profile_version(launch["request"]["profile"]),
+            "supervisor_pid": owner.pid, "parent_pid": owner.parent_pid,
             "process_group": owner.pid, "request_sha256": prepared.digest(launch["request"]),
             "plan_sha256": prepared.digest(launch["plan"]), "prepared_sha256": prepared.digest(launch["prepared"])}
 
@@ -60,11 +62,16 @@ def verify_shared(value: dict, expected: dict, kind: str, fields: set[str]) -> N
 
 def native_command(value: object, launch: dict) -> None:
     """The recorded native recipe verifies fixed inputs; it never chooses argv."""
+    version = provider.profile_version(launch["request"]["profile"])
+    options = ["--origin-loader-root", launch["plan"]["cwd"]] if version == 2 else []
+    descriptor_index = 1 + len(options)
     provider.require(type(value) is list and all(type(item) is str for item in value)
-                     and len(value) == 4 + len(launch["plan"]["native_arguments"]), "invalid native Python command fields")
-    provider.require(re.fullmatch("[1-9][0-9]{0,9}", value[1]) is not None and 3 <= int(value[1]) <= 0x7fffffff,
+                     and len(value) == 4 + len(options) + len(launch["plan"]["native_arguments"]),
+                     "invalid native Python command fields")
+    inherited = value[descriptor_index]
+    provider.require(re.fullmatch("[1-9][0-9]{0,9}", inherited) is not None and 3 <= int(inherited) <= 0x7fffffff,
                      "invalid inherited Python journal descriptor")
-    expected = [launch["prepared"]["driver"]["path"], value[1], launch["plan"]["python"],
+    expected = [launch["prepared"]["driver"]["path"], *options, inherited, launch["plan"]["python"],
                 launch["plan"]["argv0"], *launch["plan"]["native_arguments"]]
     provider.require(value == expected, "native Python executable, flags or literal arguments differ")
 
@@ -101,14 +108,42 @@ def source_summary(row: python_journal.SourceRecord) -> dict:
             "inode": row.inode, "mtime_ns": row.mtime_ns}
 
 
+def origin_summary(journal: python_origin.Journal, intent: prepared.Intent,
+                   captured: python_journal.SourceRecord) -> dict:
+    """Rebuild J2 relations without accepting the producer's coverage summary."""
+    root = intent.project.resolve(strict=True)
+    roots = [row for row in journal.records if type(row) is python_origin.Root]
+    executions = [row for row in journal.records if type(row) is python_origin.Execution]
+    joins = [row for row in journal.records if type(row) is python_origin.Join]
+    entry = [row for row in roots if row.route == 1]
+    provider.require(journal.entry_expected and len(entry) == 1 and entry[0].input_sequence == captured.sequence,
+                     "Python native entry lacks its compiler origin")
+    provider.require(any(row.root == entry[0].identity and row.member == entry[0].descriptor.root and not row.edges
+                         for row in executions), "Python native entry lacks its module execution")
+    for row in roots:
+        path = Path(os.fsdecode(row.descriptor.record.path))
+        path = path if path.is_absolute() else root / path
+        provider.require(path.resolve(strict=True).is_relative_to(root), "Python compiler root is outside application scope")
+        provider.require(row.compiler_flags == 0 and row.optimisation == prepared.optimisation(intent),
+                         "Python compiler root flags or optimisation differ")
+    codes = {row.identity for row in journal.records if type(row) is python_journal.CodeRecord}
+    provider.require(not codes and not joins if intent.plain else codes == {row.sdk for row in joins},
+                     "Python lane SDK code-origin coverage differs")
+    return {"schema_version": 2, "scope_root": str(root),
+            "root_ids": [row.identity for row in roots], "execution_ids": [row.identity for row in executions],
+            "sdk_joins": [[row.sdk, row.origin] for row in joins], "failures": []}
+
+
 def entry_evidence(runtime: Path, intent: prepared.Intent, application: int, python_version: int) -> tuple:
     """Recompute the native entry summary and validate code graphs independently."""
     path = runtime / "python-inputs.journal"
-    journal = python_journal.read(path, application)
+    version = provider.profile_version(intent.profile)
+    journal = python_origin.read(path, application) if version == 2 else python_journal.read(path, application)
     entries = [row for row in journal.records if type(row) is python_journal.SourceRecord and row.kind == 1]
     imports = [row for row in journal.records if type(row) is python_journal.SourceRecord and row.kind == 3]
     codes = [row for row in journal.records if type(row) is python_journal.CodeRecord]
-    provider.require(journal.complete and len(entries) == 1, "native Python entry input is incomplete")
+    complete = journal.capture_complete if version == 2 else journal.complete
+    provider.require(complete and len(entries) == 1, "native Python entry input is incomplete")
     entry = intent.entry if intent.entry.is_absolute() else intent.project / intent.entry
     entry = entry.resolve(strict=True)
     actual = Path(os.fsdecode(entries[0].path))
@@ -121,6 +156,9 @@ def entry_evidence(runtime: Path, intent: prepared.Intent, application: int, pyt
                      "native Python entry bytes or opened-file identity differ")
     provider.require(all(row.python_version == python_version for row in codes), "native Python code interpreter differs")
     descriptors = tuple(python_code.decode(row) for row in codes)
+    if version == 2:
+        provider.require(all(row.descriptor.record.python_version == python_version for row in journal.records
+                             if type(row) is python_origin.Root), "Python compiler root interpreter differs")
     summary = {"phase": "complete", "python_finalized": journal.python_finalized,
                "capture_failures": journal.capture_failures, "journal_failures": journal.journal_failures,
                "journal": prepared.file_identity(path), "sources": list(map(source_summary, entries)),
@@ -128,6 +166,8 @@ def entry_evidence(runtime: Path, intent: prepared.Intent, application: int, pyt
                    {"id": row.identity, "path_hex": row.path.hex(), "sha256": row.sha256,
                     "offset": row.offset, "python_version": row.python_version, "descriptor_version": row.descriptor_version}
                    for row in codes]}
+    if version == 2:
+        summary["origins"] = origin_summary(journal, intent, captured)
     return journal, descriptors, summary
 
 
