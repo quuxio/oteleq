@@ -13,6 +13,7 @@ import filesystem_effects
 import http_effects
 import java_provider
 import java_profiles
+import java_actions
 import java_project
 import go_project
 import native_project
@@ -178,13 +179,13 @@ def adapters(value: Any) -> dict[str, Any]:
     if node is not None and node["backend"] == node_source.SOURCE and typed.get("backend", "source") != "source":
         raise ValueError("source-v1 uses adapters.node.typescript_compiler; legacy TypeScript backend must remain source")
     java = value.get("java", {})
-    keys(java, {"backend", "profile", "source_roots", "classpath"}, "adapters.java")
+    keys(java, {"backend", "profile", "source_roots", "classpath", "witness_profile"}, "adapters.java")
     java_provider.backend(java.get("backend", "legacy"))
     return {**{language: native_project.settings(value[language]) for language in ('c', 'cpp') if language in value},
             **({"node": node} if node is not None else {}),
             "rust": {"backend": backend},
             "typescript": {"backend": typescript_provider.backend(typed.get("backend", "source"))},
-            "java": {**java_profiles.settings(java), **java_project.settings(java)},
+            "java": {**java_profiles.settings(java), **java_project.settings(java), **java_actions.settings(java)},
             "python": python_provider.settings(python),
             "go": go_project.settings(value.get("go", {}))}
 

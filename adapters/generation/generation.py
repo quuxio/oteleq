@@ -1,6 +1,7 @@
 """External generated test workflow; Rust CLI/comparator with compiler-specific workers."""
 import argparse
 from collections.abc import Collection
+from contextlib import contextmanager
 import importlib.util
 import json
 import os
@@ -28,6 +29,10 @@ import java_live
 import java_control_receipt
 import java_provider
 import java_profiles
+import java_actions
+import java_action_bindings
+import java_action_run
+import java_action_telemetry
 import java_project
 import java_archive_context
 import java_telemetry
@@ -256,7 +261,9 @@ def discovery_tools(root: Path, language: str, adapters: dict) -> tuple[dict, di
         selected["java-modules"] = java_build.module_image(selected["java"])
         if adapters.get("java", {}).get("profile") == java_profiles.ARCHIVES:
             selected["javap"] = capture.tool_path(str(selected["java"].parent / "javap"))
-    qualified = (java_provider.artefacts(root, selected, adapters["java"].get("profile", java_profiles.STOCK))
+    action_options = ({'action': True} if language == 'java'
+                      and 'witness_profile' in java_actions.settings(adapters.get('java', {})) else {})
+    qualified = (java_provider.artefacts(root, selected, adapters["java"].get("profile", java_profiles.STOCK), **action_options)
                  if language == "java" and adapters.get("java", {}).get("backend") == "prepared"
                  else capture.artefacts(root, language, selected, rust_backend=rust_backend))
     return selected, qualified
@@ -440,6 +447,9 @@ def configure_entry_context(entry, discovered, configuration, snapshot, excluded
     if language == "java":
         entry["java_backend"] = adapters.get("java", {}).get("backend", "legacy")
         entry["java_profile"] = adapters.get("java", {}).get("profile", java_profiles.STOCK)
+        if "witness_profile" in adapters.get("java", {}):
+            entry[java_actions.FIELD] = adapters["java"]["witness_profile"]
+            java_actions.bind_static(entry)
     if language == "go":
         configure_go_context(entry, discovered, configuration)
     if language == "python" and "backend" in adapters["python"]:
@@ -681,7 +691,7 @@ def generator_identity():
     files.update({name: capture.file_digest(here / name) for name in (
         'java_project.py', 'java_classpath.py', 'java_archives.py', 'java_archive_context.py',
         'java_helper_binding.py', 'OteleqArchives.java',
-        'java_witness.py', 'java_action.py', 'java_action_session.py', 'java_action_receipt.py', 'java_action_bindings.py', 'java_handle_callers.py', 'OteleqRendezvous.java',
+        'java_witness.py', 'java_action.py', 'java_action_session.py', 'java_action_receipt.py', 'java_action_bindings.py', 'java_handle_callers.py', 'java_actions.py', 'java_action_launch.py', 'java_action_run.py', 'java_action_telemetry.py', 'OteleqRendezvous.java',
         'node_project.py', 'node_context.mjs', 'node_source_context.mjs', 'node_source_context.py', 'node_source.py', 'node_source_worker.py', 'node_launch.py', 'node_inputs.py', 'node_execution.py', 'node_telemetry.py',
         'node_live.py', 'node_control.py', 'node_control_receipt.py', 'node_checkpoint.mjs',
         'native_profile.py', 'native_project.py', 'native_dependencies.py', 'native_frontend.py',
@@ -933,10 +943,19 @@ def java_command(root, project, entry, driver, config, tools, env, folder, scrat
     classes = scratch / "classes"
     main = (entry["package"] + "." if entry["package"] else "") + "OteleqDriver"
     options = {"context": context} if context is not None else {}
-    java_build.build(project, [project / entry["path"], driver], main, tools["java"],
+    sources = [project / entry["path"], driver]
+    if java_actions.enabled(entry):
+        sources.append(driver.with_name("OteleqRendezvous.java"))
+    java_build.build(project, sources, main, tools["java"],
                      classes, folder, env, execute, **options)
     if java_provider.prepared(entry):
         java_provider.require(prepared_runtime is not None, "missing owned runtime context")
+        if java_actions.enabled(entry):
+            application = read(folder / java_launch.APPLICATION_FILE)
+            owner, _ = java_launch.target(entry, application, project)
+            declared, route = java_actions.declarations(entry, owner, list(application["bindings"]))
+            java_action_bindings.compile(root, project, folder, folder / "action-bindings", tools,
+                declared, env, execute, profile=entry[java_actions.FIELD], route=route)
         return java_launch.prepare(root, project, folder, tools, prepared_runtime, entry,
                                    tomllib.loads(config.read_text()), lane == "baseline", env, execute, **options)
     paths = os.pathsep.join(map(str, java_project.runtime_classpath(classes, context)))
@@ -995,7 +1014,7 @@ def baseline_receipt(entry, folder, bodies):
 
 
 def qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, decoder, *, extra_channels=None,
-                    capture_complete=True, prepared_runtime=None):
+                    capture_complete=True, prepared_runtime=None, action_session=None, case=None):
     if errors or result.returncode:
         raise ValueError("application exit or OTLP capture failed; inspect retained stdout/stderr")
     observation = folder / "observation"
@@ -1005,7 +1024,13 @@ def qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, 
     if len(result.stdout) + len(result.stderr) + observation.stat().st_size + sum(map(len, extra_channels.values())) > data["configuration"]["limits"]["max_capture_bytes"]:
         raise ValueError("case observation exceeds comparator channel budget")
     witness = None
-    if lane == "baseline":
+    if java_actions.enabled(entry):
+        java_provider.require(isinstance(action_session, java_action_run.Session), 'missing generated action host session')
+        if lane == 'baseline':
+            baseline_receipt(entry, folder, bodies)
+        witness = java_action_telemetry.qualify(prepared_runtime, folder, entry, case, action_session,
+                                               bodies, service=service, trace_decoder=decoder)
+    elif lane == "baseline":
         baseline_receipt(entry, folder, bodies)
     elif node_source.enabled(entry):
         witness = node_telemetry.witness(folder, entry, bodies, service, decoder)
@@ -1027,7 +1052,8 @@ def provider_stable(root, language, tools, expected, entry):
     if python_provider.enabled(entry):
         python_provider.require(python_inputs.artefacts(root, tools) == expected, "SDK or selected Python inputs changed")
     elif java_provider.prepared(entry):
-        java_provider.require(java_provider.artefacts(root, tools, entry.get("java_profile", java_profiles.STOCK)) == expected, "SDK or selected tools changed")
+        options = {'action': True} if java_actions.enabled(entry) else {}
+        java_provider.require(java_provider.artefacts(root, tools, entry.get("java_profile", java_profiles.STOCK), **options) == expected, "SDK or selected tools changed")
     elif node_source.enabled(entry):
         node_source.require(node_source.artefacts(root, tools) == expected, "SDK or selected Node tools changed")
     else:
@@ -1064,6 +1090,24 @@ def attempt_receiver_options(entry, runtime):
     return options
 
 
+@contextmanager
+def retained_receiver(folder, options):
+    """Stop the receiver before publishing raw receipt, including failed execution."""
+    records = None
+    try:
+        with capture.receiver(**options, response_path=folder / 'http-responses.json') as records:
+            yield records
+    except BaseException as error:
+        if records is not None:
+            try:
+                capture.retain_http(folder, records[1], records[2])
+            except Exception as audit:
+                error.add_note('OTLP receipt retention also failed: ' + str(audit))
+        raise
+    else:
+        capture.retain_http(folder, records[1], records[2])
+
+
 def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, http_fixtures, runtime):
     """Capture each lane with the same private source, effects and process budgets."""
     root, language = Path(data["otelc_root"]), entry["language"]
@@ -1088,7 +1132,7 @@ def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, ht
     immutable = manifest(project)
     java_context = java_project.materialise(workspace, data, folder, project) if language == "java" else None
     receiver_options = attempt_receiver_options(entry, runtime)
-    with capture.receiver(**receiver_options, response_path=folder / "http-responses.json") as (endpoint, bodies, errors):
+    with retained_receiver(folder, receiver_options) as (endpoint, bodies, errors):
         config = folder / "policy.toml"
         config.write_text(attempt_policy(entry, endpoint, service, runtime))
         if language == "typescript" and not node_source.enabled(entry):
@@ -1116,17 +1160,18 @@ def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, ht
             write(folder / "http-controls.json", {"declarations": http_effects.selected(data["configuration"]), "environment": bindings})
         with http_effects.observe(http_fixtures, folder, data["configuration"]["limits"]["max_capture_bytes"]) as requests:
             options = execution_options(entry, case, lane, folder, runtime, bodies, env, service=service)
-            result = execute(command, working_directory, env, folder, timeout=data["configuration"]["limits"]["case_timeout_ms"] / 1000,
-                             **options)
-    capture.retain_http(folder, bodies, errors)
+            with java_action_run.retained(options):
+                result = execute(command, working_directory, env, folder, timeout=data["configuration"]["limits"]["case_timeout_ms"] / 1000,
+                                 **options)
     effect_channels, complete = filesystem_effects.finish(effects, folder)
     request_channels, request_complete = http_effects.finish(requests)
     effect_channels.update(request_channels)
     complete &= request_complete
-    options = {"java_context": java_context} if java_context is not None else {}
-    verify_attempt_inputs(data, entry, project, folder, scratch, tools, immutable, runtime, launch, config, lane=lane, **options)
+    action_options = {'action_session': options.get('interaction'), 'case': case} if java_actions.enabled(entry) else {}
+    verification_options = {"java_context": java_context} if java_context is not None else {}
+    verify_attempt_inputs(data, entry, project, folder, scratch, tools, immutable, runtime, launch, config, lane=lane, **verification_options)
     return qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, decoder,
-                           extra_channels=effect_channels, capture_complete=complete, prepared_runtime=runtime)
+                           extra_channels=effect_channels, capture_complete=complete, prepared_runtime=runtime, **action_options)
 
 
 def execution_options(entry, case, lane, folder, runtime, bodies, env, *, service=None):
@@ -1139,6 +1184,11 @@ def execution_options(entry, case, lane, folder, runtime, bodies, env, *, servic
                                               service=service, method=entry["otelc_function"].split("(", 1)[0].rsplit(".", 1)[-1]))
         env.update(interaction.environment())
         options["interaction"] = interaction
+    if java_actions.enabled(entry):
+        interaction = java_action_run.Session(folder, runtime, entry, case, plain=lane == 'baseline',
+                                              metrics=options.get('interaction'))
+        env.update(interaction.environment())
+        options['interaction'] = interaction
     return options
 
 
@@ -1235,7 +1285,12 @@ def compare_with_fixtures(workspace, data, entry, case, destination, decoder, ht
                    "observer": "oteleq typed boundary codecs v1; captured globals/arguments and initial-state checks; name-only decoded invocation witness"}
     if sequences.controls(entry):
         typed_scope["observer"] += "; selected-function live metric collection/emission receipts validated"
+    if java_actions.enabled(entry):
+        typed_scope['observer'] = ('oteleq typed boundary codecs v1; generated Java private-handle action scopes, '
+                                   'compiler routes, original outcomes and decoded receipt; function metrics and final SDK health')
     typed_scope["gaps"] = [*scope["gaps"], "graph identities are local to each boundary; cross-boundary replacement, weakref and finalizer effects are unobserved"]
+    if java_actions.enabled(entry):
+        typed_scope['gaps'].append('otelc.action.wrapper/target counts are diagnostic role spans; function metrics count only selected-method calls')
     write(destination / TYPED_BUNDLE, {"typed_schema_version": 1, "scope": typed_scope, "cases": [typed_case]})
     if (destination / TYPED_BUNDLE).stat().st_size > 16 * 1024 * 1024:
         raise ValueError("typed bundle exceeds comparator input limit; lower repeats or capture budget")

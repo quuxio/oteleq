@@ -1,0 +1,213 @@
+{
+  "qualification_schema_version": 1,
+  "date": "2026-10-24",
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "scope_status": "qualified recorded synchronous generated private static and receiver action workflows on the frozen provider with clock and completion fixes",
+  "platform": {
+    "os": "macOS",
+    "architecture": "arm64",
+    "jdk": "21.0.12.1",
+    "execution_host_python": "3.12.15",
+    "additional_retained_reader_python": "3.14.8"
+  },
+  "runtime": {
+    "repository": "quuxio/oteleq",
+    "commit": "479f266fc68c082053c6632010963812efccbf88",
+    "source_archive_sha256": "5ba74d7b489bedc7ee28422deb9edf6c8364f0537b63755cde625b83630f21ab",
+    "source_files_preserved": 479,
+    "cli_sha256": "bbdd2f2c7fedf33a681d4ec58a1948029d32348d070c977f1bc3d6baea350a5b",
+    "generator_inputs_sha256": "9ca686eb0d60cfc5eaa081afbc741a5de3f4c1f90315e9bdb42d542517dd20de"
+  },
+  "verifier": {
+    "commit": "479f266fc68c082053c6632010963812efccbf88",
+    "qualifier_introduced_commit": "9edbb66f598862443a39b0134229933b21dd0991",
+    "entrypoint": "tests/qualify_java_generated_actions.py",
+    "retained_option": "--retained-only",
+    "qualifier_files_sha256": {
+      "qualify_java_generated_actions.py": "018b9092213d4133c2a71837f9de84f19478268c354ac8d6909cc418deddd36d",
+      "java_action_fixture.py": "250f8889318e9765ea5d5780f1dd229da66cc0ed6e0e08b04617797cf37817f3",
+      "java_action_audit.py": "7b86e2a443b20d2be98edc67bf00d2af86e14096cde62edb0d4c8d5fceec8ba2",
+      "java_action_faults.py": "39f4d4cb8b153cf1c39465935772f877001882243d942ee55f6733e071fe0936"
+    }
+  },
+  "provider": {
+    "repository": "quuxio/otelc",
+    "commit": "42258a4ff8d79682c552274f014b17348c9e05cb",
+    "base": "45b75643b13aa1b3a11db88d9d5fb84b018b2c94",
+    "delivery_status": "Merged SDK source tree is identical to the qualified candidate; source/mode/product compatibility verified",
+    "source_archive_sha256": "37e3eba0cca08a81033c172f604e7b11ef0717b5958eb2e066d86c7f36ef3280",
+    "source_files_preserved": 362,
+    "products": {
+      "build/tools/opentelemetry-javaagent-2.32.0.jar": {
+        "sha256": "f787eb6c7f3d18e69a431e108a15278d25ee37f83d68b678f621e063f3988f82",
+        "size": 26418479
+      },
+      "adapters/java/target/java-extension-0.2.0-SNAPSHOT.jar": {
+        "sha256": "09a28ff99d767030f44244070cc05f1c10b59f1c4859050e7de82d969ca27ac6",
+        "size": 155348
+      },
+      "adapters/java/target/java-extension-0.2.0-SNAPSHOT-helper-tool.jar": {
+        "sha256": "a275e01fde4726dc857e22dfa26948ef3e67dac2413209d9f178a1773b22404f",
+        "size": 265085
+      },
+      "adapters/java/target/java-extension-0.2.0-SNAPSHOT-bootstrap-patch.jar": {
+        "sha256": "56ba8c193b2999a188e67ad48c8678055dca8d9aac2f8bcea767f4c95ead31be",
+        "size": 8683
+      }
+    },
+    "all_products_preserved": true,
+    "merged_delivery": {
+      "commit": "217d4f2d5c4c44606e16272e19b682938e046027",
+      "tree": "36b861fe758c52443764cfb133d1c1d715cf989a",
+      "pull_request": "https://github.com/quuxio/otelc/pull/216",
+      "qualified_candidate_tree_equal": true,
+      "source_files_verified": 362,
+      "executable_modes_verified": true,
+      "runtime_products_verified": 4,
+      "compatibility_receipt_sha256": "edfff8c32e56fa9aeb30de87368829130e5479d2a51d7d30299aa51f45bc3b17",
+      "additional_application_launches": 0,
+      "scope": "Source-identical merged SDK compatibility; original captures retain their candidate identity and counts"
+    }
+  },
+  "tools_sha256": {
+    "java": "d7ab2ea6a7e731a8a2cee7d722046c9f7d8c5f184cd769b9954a392592337770",
+    "javac": "ab9b94d81dd22c843ef637be9aa2121253c6d4cfe2ba0a89a7bde5c0b9567945",
+    "java-modules": "f1053d4959235d6f3faaa28b74812b45a7a72463ba7edf29f1c7fb1a216c74e4",
+    "javap": "45e7ec2c0b002e6dc716651ede247ac1f2c25d4cc8cf37ee20591ddc439162ac"
+  },
+  "results": {
+    "completed_corpora": 2,
+    "reports": 38,
+    "distinct_application_launches": 160,
+    "complete_literal_boundary_graphs": 1128,
+    "instrumented_action_scopes": 188,
+    "instrumented_spans": 852,
+    "altered_evidence_refusals": 32,
+    "additional_applications_in_retained_reader_audits": 0
+  },
+  "corpora": [
+    {
+      "java_profile": "safe-methods-v1",
+      "reports": 19,
+      "distinct_application_launches": 80,
+      "complete_boundary_graphs": 564,
+      "action_scopes": 94,
+      "spans": 426,
+      "altered_evidence_refusals": 16,
+      "source_preserved": true,
+      "consumer_inputs_sha256": "9ca686eb0d60cfc5eaa081afbc741a5de3f4c1f90315e9bdb42d542517dd20de",
+      "sdk_input_map_sha256": "afb087a08ddf68acb355f236935d2a13e15cc0000f3b91b7d4350d45364669c2",
+      "sdk_input_files": 98,
+      "tool_files": 3,
+      "launch_identity_set_sha256": "c4808607029bb2e3af2da64daf8a8438e32990ba70eab635f7b4c76f7f623e61",
+      "qualification_sha256": "5715c67528431a5bdc325ce3a0a155a3473d332154d2433ad2db893f802e335c",
+      "input_manifest_sha256": "c150297552acbb4666f2e638956aedb7452a93dc1c4d853741d03d905278c9c5",
+      "route_manifest_sha256": "668e7ff5959087ef52eeae09d544fc9eebbec67e08d2e4959d4f58b5f37517ca",
+      "refusal_summary_sha256": "851f622d59e5e305b3b01ebffcf843081d338caca4fa53e3fb4efb6292aabc38",
+      "python_314_retained_audit_sha256": "c25e4101de608f972475da81ed21812f41f0421dfef53caf1fa79594bf1d22c4"
+    },
+    {
+      "java_profile": "archive-methods-v1",
+      "reports": 19,
+      "distinct_application_launches": 80,
+      "complete_boundary_graphs": 564,
+      "action_scopes": 94,
+      "spans": 426,
+      "altered_evidence_refusals": 16,
+      "source_preserved": true,
+      "consumer_inputs_sha256": "9ca686eb0d60cfc5eaa081afbc741a5de3f4c1f90315e9bdb42d542517dd20de",
+      "sdk_input_map_sha256": "12f6ddbc1b6db60fe1f1bcb063136a969ab489ad05b83ba361efc59725ee1950",
+      "sdk_input_files": 98,
+      "tool_files": 4,
+      "launch_identity_set_sha256": "d569ed6f471a3c235782b75c14fbe74537ffac27ddb81b00c55398ce7f7a54d4",
+      "qualification_sha256": "2f98acf7f80b4cdd8d3a8badd839a58e61991cdb6b914310906597e159b0c721",
+      "input_manifest_sha256": "bc7f4e5a82a8d769e7cc878ce92954720cb9c7474f530696c2940eed98c42db8",
+      "route_manifest_sha256": "c533a8b09c00917b70019b1f6264e52c1e53cff11c09029ec769d9b55f49a96f",
+      "refusal_summary_sha256": "851f622d59e5e305b3b01ebffcf843081d338caca4fa53e3fb4efb6292aabc38",
+      "python_314_retained_audit_sha256": "14a189e63e68b8ae51f28064d7f5c77cee51f22b1f5bd55e8eccecc7cc3195c0"
+    }
+  ],
+  "checked_behaviour": [
+    "Private static and declared receiver target calls through exact typed MethodHandles, with private factory setup outside the action",
+    "Four ordered receiver actions with recursive selected-method counts 1, 4, 1, 2, original exception class/message and returned-receiver aliases",
+    "Complete independently literal before/after/result graphs in every repeat and lane",
+    "All four initial collection/emission combinations in one unchanged application build/process per sequence",
+    "Generated suites, source-detached exports, frozen replay, unchanged/changed current-source promotion, scalar shrinking, reduced framework and replay routes",
+    "Same return with an intentional instrumented-only global mutation remains a failed equivalence test and shrinks from 7 to 0",
+    "Selected-JDK multi-release archive member resolution and a forced application/SDK helper package collision with independently reproduced relocation",
+    "Actual compiler/classes, host ready/release and control-history binding, decoded role/method trees, collected function metrics and final global health"
+  ],
+  "refusal_controls": [
+    "foreign-thread",
+    "foreign-attempt",
+    "foreign-retry",
+    "missing-method",
+    "unscoped-method",
+    "wrong-probe",
+    "unverified-route",
+    "role-metrics",
+    "missing-duration",
+    "missing-metrics",
+    "health-without-roles",
+    "wrong-binding-profile",
+    "wrong-outcome",
+    "foreign-process",
+    "coerced-version",
+    "missing-action"
+  ],
+  "detected_provider_defect": {
+    "provider_commit": "1b02dbc1db6c567cc684293e68d098e794546007",
+    "kind": "telemetry_witness_refusal",
+    "route": "source-detached Counter.run generated test",
+    "child_end_after_parent_ns": 3124,
+    "strict_parent_interval_check_preserved": true,
+    "raw_failure_proof_sha256": "66108c0e659074dfaf4fe8944f1e4a75784621a3f0954d81dc1621811979f8c4",
+    "fix_commit": "45b75643b13aa1b3a11db88d9d5fb84b018b2c94",
+    "independent_unchanged_production_clock_regressions_failed": 3,
+    "independent_fixed_java_tests_passed": 74,
+    "independently_rebuilt_provider_classes_matched": 76
+  },
+  "review": {
+    "consumer_verdict": "clear through reviewed integration, maintained qualification, publication and interval-diagnostic deltas",
+    "consumer_review_chain_sha256": {
+      "independent-review-49d8ff1.json": "c2cdad771922dc7615b916e456e6ea980dabb94e68f501c0ff0e61220e0bd9a0",
+      "independent-review-d53377e.json": "22debe006347f9c2ca2bdc5bb238a49d4c959fa2803e3a30334da502f5a1b3f4",
+      "independent-review-843eb9a.json": "98169257c95571ca81770e343c3a313b2155c740e328e1e9af34a4608ac3e3c6",
+      "independent-review-479f266.json": "7441cd97da253d0c73398e4a4fb324332421b08b7a6cf02a42ad1fd249f06e85"
+    },
+    "sdk_clock_component_review_sha256": "1bc81ea90e24c2f97364d5513ec673cbf8a8c39a17e86ea3bdfbdb1f90f12364",
+    "sdk_completion_component_review_sha256": "dc31445a66e1970921ff2e5eec5221757392493b5a7f9daf233eec332e838290",
+    "scope": "Recorded revisions and component boundaries; final publication review and merged-main delivery remain separate"
+  },
+  "validation": {
+    "full_gate_commit": "479f266fc68c082053c6632010963812efccbf88",
+    "generation_tests": 1090,
+    "rust_product_line_coverage_percent": 97.38,
+    "full_gate_result_sha256": "0e31bc873d33ddd1f88427c36b317c70bc42c03543fac85901ef5486835ae6bd",
+    "full_gate_log_sha256": "fbea18c7532d280f90aa507d19df412cf93a1855666ed0e615cac91772278672"
+  },
+  "limits": [
+    "Only the recorded synchronous private static and declared receiver fixture shapes are qualified",
+    "General Java build systems/modules, arbitrary object arguments/factories, asynchronous or virtual-thread attribution and shipping artefacts remain open",
+    "Other language invocation-scoped witnesses need separate implementation and qualification",
+    "Historical positive captures remain bounded to their actual executions; the later failed provider capture remains retained",
+    "All remaining requirements in docs/completion.md remain in force"
+  ],
+  "additional_provider_component": {
+    "kind": "original_completion_error_preservation",
+    "base": "45b75643b13aa1b3a11db88d9d5fb84b018b2c94",
+    "fix_commit": "42258a4ff8d79682c552274f014b17348c9e05cb",
+    "independent_java_tests_passed": 79,
+    "java_line_coverage_percent": 92.09,
+    "independent_unchanged_production_regressions_failed": 2,
+    "independently_rebuilt_provider_classes_matched": 76,
+    "actual_agent_tests_each_python_runtime": 2,
+    "python_runtimes": [
+      "3.12.15",
+      "3.14.8"
+    ],
+    "review_sha256": "dc31445a66e1970921ff2e5eec5221757392493b5a7f9daf233eec332e838290",
+    "scope": "Supported JDK completion stages preserve the original future/throwable without application formatting; custom stages, broader async attribution and task propagation remain outside this component"
+  }
+}

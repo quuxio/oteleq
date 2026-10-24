@@ -8,26 +8,26 @@ import java.nio.file.Path;
 
 /** Ordinary JDK harness channel shared byte-for-byte by the plain and SDK lanes. */
 final class OteleqRendezvous {
-  private static String setting(String name, int width) throws IOException {
-    String value = System.getenv(name);
+  private static java.lang.String setting(java.lang.String name, int width) throws IOException {
+    java.lang.String value = java.lang.System.getenv(name);
     if (value == null || !value.matches("[0-9a-f]{" + width + "}")) {
       throw new IOException("invalid private harness identity");
     }
     return value;
   }
 
-  static void awaitRelease(String action) throws IOException {
-    if (Thread.currentThread().isVirtual() || !action.matches("[0-9a-f]{64}")) {
+  static void awaitRelease(java.lang.String action) throws IOException {
+    if (java.lang.Thread.currentThread().isVirtual() || !action.matches("[0-9a-f]{64}")) {
       throw new IOException("unsupported harness action or thread");
     }
-    String socket = System.getenv("OTELEQ_ACTION_SOCKET");
+    java.lang.String socket = java.lang.System.getenv("OTELEQ_ACTION_SOCKET");
     if (socket == null || !Path.of(socket).isAbsolute()) {
       throw new IOException("missing private harness socket");
     }
-    String identity = setting("OTELEQ_ACTION_TOKEN", 32) + " "
+    java.lang.String identity = setting("OTELEQ_ACTION_TOKEN", 32) + " "
         + setting("OTELEQ_ACTION_CASE", 64) + " "
         + setting("OTELEQ_ACTION_ATTEMPT", 64) + " " + action + " "
-        + ProcessHandle.current().pid() + " " + Thread.currentThread().threadId() + "\n";
+        + java.lang.ProcessHandle.current().pid() + " " + java.lang.Thread.currentThread().threadId() + "\n";
     byte[] expected = ("2 release " + identity).getBytes(StandardCharsets.US_ASCII);
     try (SocketChannel channel = SocketChannel.open(StandardProtocolFamily.UNIX)) {
       channel.connect(UnixDomainSocketAddress.of(socket));

@@ -2,7 +2,7 @@
 
 Java can explicitly use the replacement otelc SDK's public prepared-launch API. This is a separate provider contract from the default pre-rebuild Java adapter. It runs the existing generated scalar and declared receiver workers; it does not require application SDK calls or source edits.
 
-The result is **equivalence over these tests and observations**. These are private diagnostic builds. Shipping artefacts, arbitrary Java projects and invocation-scoped telemetry attribution require separate work.
+The result is **equivalence over these tests and observations**. These are private diagnostic builds. Shipping artefacts and arbitrary Java projects require separate work. Invocation-scoped attribution uses the separately selected [private-handle action profile](java-action-witness.md), with its own exact-revision diagnostic qualification.
 
 ## Select the provider
 
