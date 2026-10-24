@@ -37,6 +37,7 @@ class GoCallerTests(unittest.TestCase):
         self.options = go_project.settings({"module_roots": ["."]})
         self.environment = {**os.environ, **go_project.environment(self.options),
                             "GOTOOLCHAIN": "local", "GOCACHE": str(REPO / "build/go-caller-cache")}
+        self.frontends = 0
 
     def execute(self, argv, cwd, env=None, *, input_data=None, max_output_bytes=None):
         result = subprocess.run(argv, cwd=cwd, env=env or self.environment, input=input_data,
@@ -60,8 +61,41 @@ class GoCallerTests(unittest.TestCase):
         return entry
 
     def discover(self, entry, execute=None):
+        self.frontends += 1
         return go_caller.discover(go_files.freeze(self.project), entry, self.go,
-                                  self.environment, execute or self.execute)
+                                  self.environment, execute or self.execute,
+                                  frontend_directory=self.root / ("frontend-" + str(self.frontends)))
+
+    def test_compiler_frontend_survives_the_original_cli_temporary_directory(self):
+        entry = self.materialise("package main\nfunc Add(value int)int{return value+1}\nfunc main(){}\n")
+        temporary = self.root / "temporary-cli-source.go"
+        source = go_caller.DISCOVERY.read_bytes()
+        temporary.write_bytes(source)
+        with patch.object(go_caller, "DISCOVERY", temporary):
+            caller = self.discover(entry)
+        temporary.unlink()
+        retained = self.root / "frontend-1/discover.go"
+        self.assertEqual(retained.read_bytes(), source)
+        self.assertIn(str(retained), caller.reads)
+        self.assertNotIn(str(temporary), caller.reads)
+        self.assertEqual(retained.stat().st_mode & 0o777, 0o600)
+        caller.verify()
+        retained.write_bytes(source + b"\n")
+        with self.assertRaisesRegex(ValueError, "compiler input changed"):
+            caller.verify()
+
+    def test_frontend_directory_cannot_replace_source_or_existing_evidence(self):
+        entry = self.materialise("package main\nfunc Add(value int)int{return value+1}\nfunc main(){}\n")
+        snapshot = go_files.freeze(self.project)
+        for directory in (Path("relative"), self.project / "frontend", self.root):
+            with self.subTest(directory=directory), self.assertRaises((ValueError, FileExistsError)):
+                go_caller.discover(snapshot, entry, self.go, self.environment, self.execute,
+                                   frontend_directory=directory)
+        caller = self.discover(entry)
+        with self.assertRaises(FileExistsError):
+            go_caller.discover(snapshot, entry, self.go, self.environment, self.execute,
+                               frontend_directory=self.root / "frontend-1")
+        caller.verify()
 
     def test_generated_main_rebinds_line_without_running_initialisers(self):
         sentinel = self.root / "initialiser-ran"
@@ -169,7 +203,8 @@ class GoCallerTests(unittest.TestCase):
                     go_caller.active_inputs(records, snapshot)
         with patch.object(go_caller.files, "MAX_TREE_BYTES", self.go.stat().st_size):
             with self.assertRaises(ValueError):
-                go_caller.discover(snapshot, entry, self.go, self.environment, self.execute)
+                go_caller.discover(snapshot, entry, self.go, self.environment, self.execute,
+                                   frontend_directory=self.root / "budget-frontend")
 
     def test_build_reader_refuses_rehashed_incomplete_active_input_denominators(self):
         original = self.root / "reader"

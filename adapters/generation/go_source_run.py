@@ -63,7 +63,8 @@ def prepare(workflow, root: Path, project: Path, entry: dict, tools: dict,
         require(result.returncode == 0, "Go public build/preparation failed; inspect retained compiler channels")
         return result
 
-    caller = go_caller.discover(original, entry, tools["go"], environment, execute)
+    caller = go_caller.discover(original, entry, tools["go"], environment, execute,
+                                frontend_directory=folder / "go-frontend")
     workflow.write(folder / "go-caller.json", {**caller.state(), "seal": caller.seal})
     settings = json.loads(execute([tools["go"], "mod", "edit", "-json"], module).stdout)
     modules = go_project.documents(execute([tools["go"], "list", "-m", "-mod=readonly", "-json", "all"], module).stdout)

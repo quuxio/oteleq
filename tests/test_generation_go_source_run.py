@@ -81,11 +81,12 @@ class GoSourceRunTests(unittest.TestCase):
                                             build_tags=source_run.go_project.canonical_tags(self.entry["go_options"]["build_tags"]))
         return self.built_intent
 
-    def discovery(self, original, entry, compiler, environment, execute):
+    def discovery(self, original, entry, compiler, environment, execute, *, frontend_directory):
         self.assertEqual(original.identities, self.original.identities)
         self.assertIs(entry, self.entry)
         self.assertEqual(compiler, self.tools["go"])
         self.assertIs(environment, self.environment)
+        self.assertEqual(frontend_directory, self.folder / "go-frontend")
         execute([compiler, "list", "-json"], self.project, input_data=b"literal compiler request")
         self.events.append("discovery")
         return self.caller

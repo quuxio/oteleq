@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 import json
+import os
 from pathlib import Path
 from typing import Callable
 
@@ -139,10 +140,22 @@ def source_package(records: list[dict], entry: dict, root: Path, target: str) ->
     return matches[0]
 
 
-def discover(original: files.Snapshot, entry: dict, go: Path, environment: dict, execute: Callable) -> Caller:
+def discover(original: files.Snapshot, entry: dict, go: Path, environment: dict, execute: Callable, *,
+             frontend_directory: Path) -> Caller:
     """Use compiler export data without running application initialisers or SDK code."""
     original.verify()
     require(go.is_absolute() and go.resolve(strict=True) == go, "Go caller compiler must be canonical")
+    require(frontend_directory.is_absolute()
+            and frontend_directory.parent.resolve(strict=True) == frontend_directory.parent
+            and not frontend_directory.is_relative_to(original.root)
+            and not original.root.is_relative_to(frontend_directory),
+            "Go caller frontend must be in an independent canonical directory")
+    frontend_directory.mkdir(mode=0o700)
+    frontend = frontend_directory / "discover.go"
+    _, _, source = files.file(DISCOVERY, keep=True)
+    descriptor = os.open(frontend, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(descriptor, "wb") as output:
+        output.write(source)
     target, source = package_target(entry)
     options = go_project.settings(entry["go_options"])
     env = {**environment, **go_project.environment(options), "GOTOOLCHAIN": "local",
@@ -165,7 +178,7 @@ def discover(original: files.Snapshot, entry: dict, go: Path, environment: dict,
         require(len(reads) <= files.MAX_FILES, "Go caller compiler read budget exceeded")
 
     retain(go)
-    retain(DISCOVERY)
+    retain(frontend)
     result = execute([go, "list", "-deps", "-export", "-compiled", "-json", "-mod=readonly", target],
                      original.root, env, max_output_bytes=files.MAX_METADATA_BYTES)
     go_project.check_result(result, "Go caller package discovery failed")
@@ -184,7 +197,7 @@ def discover(original: files.Snapshot, entry: dict, go: Path, environment: dict,
     request = {"files": [str(Path(package["Dir"]) / name) for name in sorted(package["GoFiles"])],
                "exports": exports, "import_path": package["ImportPath"],
                "go_version": "go" + package["Module"]["GoVersion"]}
-    result = execute([go, "run", DISCOVERY, "--", "--package"], DISCOVERY.parent, env,
+    result = execute([go, "run", frontend, "--", "--package"], frontend_directory, env,
                      input_data=json.dumps(request).encode(), max_output_bytes=files.MAX_METADATA_BYTES)
     go_project.check_result(result, "Go caller type checking failed")
     targets = selected_targets(json.loads(result.stdout), entry, source, original.root, package)
