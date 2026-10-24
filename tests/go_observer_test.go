@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -201,4 +202,192 @@ func TestCallsAndDeclarations(t *testing.T) {
 	if err != nil || !json.Valid(data) || !strings.Contains(string(data), `"value":"13"`) {
 		t.Fatal("missing complete capture", err, string(data))
 	}
+}
+
+func sequenceConfig() (configuration, string, string) {
+	models, name := schema()
+	number := typeName(reflect.TypeOf(amount(0)))
+	return configuration{Models: models, Receiver: "*" + name, MethodReceiver: "*" + name,
+		Parameters: []string{number}, FactoryParameters: []string{number}, Output: number,
+		FactoryArguments: []input{{"integer", "10"}},
+		Roots:            map[string]string{"receiver": "*" + name, "argument:0": number, "global:total": "*" + number}}, name, number
+}
+
+func sequenceValues(values ...string) []callInput {
+	result := []callInput{}
+	for index, value := range values {
+		result = append(result, callInput{ID: "step-" + strconv.Itoa(index), Action: "call", Arguments: []input{{"integer", value}}})
+	}
+	return result
+}
+
+func capturedNumber(t *testing.T, graph snapshot, root string, fields ...string) string {
+	t.Helper()
+	value := graph.Roots[root]
+	for _, field := range fields {
+		if value == nil {
+			t.Fatal("missing literal reference", root, field, value)
+		}
+		found := false
+		for _, node := range graph.Nodes {
+			if node.ID == value["node_id"] {
+				value, found = node.Fields[field], true
+				break
+			}
+		}
+		if !found {
+			t.Fatal("missing literal field", root, field)
+		}
+	}
+	return value["value"].(string)
+}
+
+func TestSequenceRetainsIntermediateMutationAndContinuesAfterPanic(t *testing.T) {
+	config, _, _ := sequenceConfig()
+	config.Sequence = sequenceValues("3", "-2", "4")
+	constructions := 0
+	var total amount
+	factory := reflect.ValueOf(func(seed amount) *sample { constructions++; return &sample{count: seed} })
+	target := reflect.ValueOf(func(receiver *sample, value amount) amount {
+		receiver.count += value
+		total += value
+		if value < 0 {
+			panic("known")
+		}
+		return receiver.count
+	})
+	encoded, err := json.Marshal(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "sequence.json")
+	t.Setenv("OTELEQ_OBSERVATION", path)
+	RunSequence(string(encoded), factory, target, Bind("global:total", reflect.ValueOf(&total)))
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var capture struct {
+		Version int           `json:"go_receiver_schema_version"`
+		Before  snapshot      `json:"before"`
+		Steps   []callCapture `json:"steps"`
+		Outcome callOutcome   `json:"outcome"`
+		After   snapshot      `json:"after"`
+	}
+	if json.Unmarshal(data, &capture) != nil || capture.Version != 3 || len(capture.Steps) != 3 || constructions != 1 || total != 5 {
+		t.Fatal("incomplete sequence", constructions, total, string(data))
+	}
+	for index, expected := range []struct{ before, after, global, outcome string }{{"10", "13", "3", "return"}, {"13", "11", "1", "error"}, {"11", "15", "5", "return"}} {
+		step := capture.Steps[index]
+		if step.ID != "step-"+strconv.Itoa(index) || step.Action != "call" || step.Outcome.Kind != expected.outcome ||
+			capturedNumber(t, step.Before, "receiver", "value", "count", "value") != expected.before ||
+			capturedNumber(t, step.After, "receiver", "value", "count", "value") != expected.after ||
+			capturedNumber(t, step.After, "global:total", "value") != expected.global {
+			t.Fatal("wrong intermediate value", index, step)
+		}
+	}
+	if !reflect.DeepEqual(capture.Before, capture.Steps[0].Before) || !reflect.DeepEqual(capture.After, capture.Steps[2].After) ||
+		!reflect.DeepEqual(capture.Outcome, capture.Steps[2].Outcome) {
+		t.Fatal("outer summary differs")
+	}
+}
+
+func TestSequenceBoundsValueCopiesAndValidationBeforeConstruction(t *testing.T) {
+	config, name, _ := sequenceConfig()
+	config.MethodReceiver = name
+	var total amount
+	constructions := 0
+	factory := reflect.ValueOf(func(seed amount) *sample { constructions++; return &sample{count: seed} })
+	target := reflect.ValueOf(func(receiver sample, value amount) amount {
+		receiver.count += value
+		total += value
+		return receiver.count
+	})
+	for _, count := range []int{1, 32} {
+		values := make([]string, count)
+		for index := range values {
+			values[index] = "3"
+		}
+		config.Sequence = sequenceValues(values...)
+		encoded, _ := json.Marshal(config)
+		path := filepath.Join(t.TempDir(), "sequence.json")
+		t.Setenv("OTELEQ_OBSERVATION", path)
+		runSequence(string(encoded), factory, target, []Root{Bind("global:total", reflect.ValueOf(&total))})
+		data, err := os.ReadFile(path)
+		if err != nil || !json.Valid(data) || !strings.Contains(string(data), `"value":"13"`) {
+			t.Fatal("value sequence failed", err)
+		}
+	}
+	if constructions != 2 || total != 99 {
+		t.Fatal("receiver was reconstructed or value calls lost", constructions, total)
+	}
+	for _, change := range []string{"empty", "many", "id", "action", "arguments", "signature", "nil-value", "path"} {
+		config.Sequence = sequenceValues("3")
+		switch change {
+		case "empty":
+			config.Sequence = nil
+		case "many":
+			config.Sequence = make([]callInput, 33)
+		case "id":
+			config.Sequence[0].ID = "other"
+		case "action":
+			config.Sequence[0].Action = "release"
+		case "arguments":
+			config.Sequence[0].Arguments = nil
+		}
+		encoded, _ := json.Marshal(config)
+		calls := constructions
+		selected := target
+		creator := factory
+		if change == "signature" {
+			selected = reflect.ValueOf(func() {})
+		}
+		if change == "nil-value" {
+			creator = reflect.ValueOf(func(amount) *sample { return nil })
+		}
+		path := filepath.Join(t.TempDir(), "sequence.json")
+		if change == "path" {
+			if err := os.WriteFile(path, nil, 0600); err != nil {
+				t.Fatal(err)
+			}
+		}
+		t.Setenv("OTELEQ_OBSERVATION", path)
+		refuses(t, func() {
+			runSequence(string(encoded), creator, selected, []Root{Bind("global:total", reflect.ValueOf(&total))})
+		})
+		if change != "nil-value" && change != "path" && constructions != calls {
+			t.Fatal("invalid schedule constructed application state", change)
+		}
+	}
+	refuses(t, func() { runSequence("not json", factory, target, nil) })
+}
+
+func TestSequenceVoidAndBoundedOutputFailures(t *testing.T) {
+	config, _, _ := sequenceConfig()
+	config.Sequence = sequenceValues("3")
+	config.Output = "void"
+	var total amount
+	factory := reflect.ValueOf(func(seed amount) *sample { return &sample{count: seed} })
+	target := reflect.ValueOf(func(receiver *sample, value amount) { receiver.count += value; total += value })
+	encoded, _ := json.Marshal(config)
+	path := filepath.Join(t.TempDir(), "void.json")
+	t.Setenv("OTELEQ_OBSERVATION", path)
+	runSequence(string(encoded), factory, target, []Root{Bind("global:total", reflect.ValueOf(&total))})
+	data, err := os.ReadFile(path)
+	if err != nil || !strings.Contains(string(data), `"kind":"undefined"`) {
+		t.Fatal("missing void outcome", err, string(data))
+	}
+	file, err := os.CreateTemp(t.TempDir(), "bounded")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+	output := captureStream{file: file, bytes: maxCapture}
+	refuses(t, func() { output.write([]byte("x")) })
+	output.bytes = 0
+	refuses(t, func() { output.value(make(chan int)) })
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	refuses(t, func() { output.write([]byte("x")) })
 }

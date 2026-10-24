@@ -18,6 +18,7 @@ import go_project
 import go_receivers
 import harness
 import policy
+import sequences
 import typed_capture
 
 SOURCE = r'''package counter
@@ -207,6 +208,74 @@ func (value *Counter) Read(amount int64)int64{if value==nil{return amount};retur
             self.assertNotIn(b"APP_CALLBACK", result.stderr)
             self.assertFalse(path.exists())
             shutil.rmtree(self.base / "private")
+
+    def test_ordered_worker_retains_one_receiver_and_every_intermediate_panic_boundary(self):
+        self.source.write_text(SOURCE.replace("value.pointer=&total;return value",
+                                              'value.pointer=&total;if amount<0{panic("known")};return value'))
+        entry = self.entry()
+        # This directly exercises the plain observer component. Public source
+        # provider negotiation and native ownership have separate qualification.
+        entry["sequence_configuration"] = sequences.validate([
+            {"action": "call", "arguments": "case"},
+            {"action": "call", "arguments": [-2], "expected_baseline": {"kind": "error", "category": "panic", "type": "go.string"}},
+            {"action": "call", "arguments": [4]}], policy.expected_baseline)
+        original = generation.manifest(self.snapshot)
+        result, path = self.worker(entry)
+        self.assertEqual((result.returncode, result.stdout, result.stderr), (0, b"", b""))
+        data = go_graph.boundaries(path.read_bytes(), entry)
+        self.assertEqual(len(data["steps"]), 3)
+        for index, (before, after, total) in enumerate(((10, 13, 3), (13, 11, 1), (11, 15, 5))):
+            step = data["steps"][index]
+            self.assertEqual((step["id"], step["action"], step["gaps"]), ("step-" + str(index), "call", []))
+            for boundary, expected in (("before", before), ("after", after)):
+                graph = step[boundary]
+                fields = self.node(graph, self.node(graph, graph["roots"]["receiver"])["value"])
+                self.assertEqual(self.node(graph, fields["value"])["value"]["value"], str(expected))
+            graph = step["after"]
+            global_value = self.node(graph, graph["roots"]["global:total"])["value"]
+            self.assertEqual(global_value["value"], str(total))
+            if index == 1:
+                self.assertEqual(step["outcome"]["category"], "panic")
+                self.assertEqual(step["outcome"]["graph"]["roots"]["error"]["value"], "6b6e6f776e")
+            else:
+                self.assertEqual(step["outcome"]["kind"], "return")
+                roots = step["outcome"]["graph"]["roots"]
+                self.assertEqual(roots["result"], roots["receiver"])
+        self.assertEqual(data["before"], data["steps"][0]["before"])
+        self.assertEqual(data["after"], data["steps"][-1]["after"])
+        self.assertEqual(generation.manifest(self.snapshot), original)
+        raw = json.loads(path.read_text())
+        for change in ("count", "id", "action", "step-fields", "schema", "before", "outcome", "field"):
+            changed = copy.deepcopy(raw)
+            if change == "count": changed["steps"].pop()
+            elif change == "id": changed["steps"][1]["id"] = "step-0"
+            elif change == "action": changed["steps"][1]["action"] = "release"
+            elif change == "step-fields": changed["steps"][1]["extra"] = True
+            elif change == "schema": changed["go_receiver_schema_version"] = 2
+            elif change == "before": changed["before"] = changed["steps"][1]["before"]
+            elif change == "outcome": changed["outcome"] = changed["steps"][1]["outcome"]
+            else: changed["steps"][1]["after"]["roots"].pop("receiver")
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                go_graph.boundaries(json.dumps(changed).encode(), entry)
+        with self.assertRaises(ValueError):
+            go_graph.boundaries(path.read_bytes(), {key: value for key, value in entry.items() if key != "sequence_configuration"})
+
+    def test_sequence_capture_budget_failure_cannot_return_a_complete_observation(self):
+        source = SOURCE.replace('import "math"', 'import "math"\nimport "strings"')
+        source = source.replace('label:"\\xff\\x00é😀"', 'label:strings.Repeat("x",8192)')
+        self.source.write_text(source)
+        entry = self.entry()
+        entry["sequence_configuration"] = [{"action": "call", "arguments": "case"}] * 32
+        original = generation.manifest(self.snapshot)
+        result, path = self.worker(entry)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(result.stdout, b"")
+        self.assertIn(b"Go receiver fixture or observation is unavailable", result.stderr)
+        self.assertNotIn(b"APP_CALLBACK", result.stderr)
+        self.assertLessEqual(path.stat().st_size, 3 * 262144 + 1024)
+        with self.assertRaises(ValueError):
+            go_graph.boundaries(path.read_bytes(), entry)
+        self.assertEqual(generation.manifest(self.snapshot), original)
 
     def test_missing_rebound_or_unreachable_storage_cannot_qualify(self):
         entry = self.entry()

@@ -73,10 +73,12 @@ def configure(entry: dict, value: list[dict], coerce: Callable) -> None:
     """Requested unavailable adapters remain named inventory blockers."""
     language = entry["language"]
     receiver = "cpp_receiver" if language == "cpp" else "receiver_fixture"
-    if language not in ("python", "javascript", "typescript", "java", "cpp") or receiver not in entry:
-        raise ValueError("sequences require a declared Python/C++/Java/JavaScript/TypeScript receiver fixture")
-    if language in ("python", "java", "cpp") and any(step["action"] != "call" for step in value):
-        label = {"python": "Python", "cpp": "C++", "java": "Java"}[language]
+    if language not in ("python", "javascript", "typescript", "java", "cpp", "go") or receiver not in entry:
+        raise ValueError("sequences require a declared Python/C++/Go/Java/JavaScript/TypeScript receiver fixture")
+    if language == "go" and entry.get("go_backend") != "source-v1":
+        raise ValueError("Go receiver sequences require the explicit source-v1 backend")
+    if language in ("python", "java", "cpp", "go") and any(step["action"] != "call" for step in value):
+        label = {"python": "Python", "cpp": "C++", "java": "Java", "go": "Go"}[language]
         raise ValueError(label + " receiver sequences currently support call actions only")
     if any("metrics" in step for step in value):
         configure_controls(entry, value)

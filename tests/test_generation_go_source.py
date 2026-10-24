@@ -169,6 +169,16 @@ class GoSourceTests(unittest.TestCase):
         source.bind(legacy, self.root, self.workspace, self.tools, self.execute)
         self.assertNotIn("go_provider", legacy)
 
+    def test_sequence_profile_admits_only_bounded_uncontrolled_receiver_calls(self):
+        entry = {"receiver_fixture": {}, "sequence_configuration": [{"action": "call", "arguments": "case"}]}
+        source.sequence_profile(entry)
+        for steps in ([], {}, [entry["sequence_configuration"][0]] * 33, [{"action": "release"}],
+                      [{"action": "call", "metrics": {"collection": True, "emission": True}}]):
+            with self.subTest(steps=steps), self.assertRaises(ValueError):
+                source.sequence_profile({**entry, "sequence_configuration": steps})
+        with self.assertRaises(ValueError):
+            source.sequence_profile({"sequence_configuration": [{"action": "call"}]})
+
     def test_tagged_protocol_is_explicit_and_cannot_reuse_an_untagged_probe(self):
         self.entry["go_options"]["build_tags"] = ["feature", "tools", "\u03c0"]
         source.bind(self.entry, self.root, self.workspace, self.tools, self.execute)

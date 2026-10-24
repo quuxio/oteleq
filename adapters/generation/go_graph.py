@@ -159,9 +159,30 @@ def boundaries(raw: bytes, entry: dict) -> dict:
     """Decode a complete private observer envelope into shared boundary graphs."""
     require(len(raw) <= 3*262144+1024, "capture budget exceeded")
     capture = strict_json(raw)
-    require(type(capture) is dict and set(capture) == {"go_receiver_schema_version", "before", "outcome", "after"}
-            and type(capture["go_receiver_schema_version"]) is int and capture["go_receiver_schema_version"] == 2,
+    ordered = "sequence_configuration" in entry
+    fields = {"go_receiver_schema_version", "before", "outcome", "after"} | ({"steps"} if ordered else set())
+    require(type(capture) is dict and set(capture) == fields
+            and type(capture["go_receiver_schema_version"]) is int
+            and capture["go_receiver_schema_version"] == (3 if ordered else 2),
             "unsupported receiver envelope")
+    if ordered:
+        steps, declared = capture["steps"], entry["sequence_configuration"]
+        require(type(steps) is list and 1 <= len(steps) == len(declared) <= 32, "incomplete receiver sequence")
+        for index, (step, action) in enumerate(zip(steps, declared)):
+            require(type(step) is dict and set(step) == {"id", "action", "before", "outcome", "after"}
+                    and step["id"] == "step-" + str(index) and step["action"] == action["action"] == "call",
+                    "invalid receiver action")
+        require(capture["before"] == steps[0]["before"]
+                and all(capture[name] == steps[-1][name] for name in ("outcome", "after")),
+                "receiver sequence contradicts its outer boundaries")
+    result = boundary(capture, entry)
+    if ordered:
+        result["steps"] = [{"id": step["id"], "action": "call", "gaps": [], **boundary(step, entry)} for step in steps]
+    return result
+
+
+def boundary(capture: dict, entry: dict) -> dict:
+    """Apply the same closed storage codec at each independently retained call."""
     outcome = capture["outcome"]
     require(type(outcome) is dict and set(outcome) == {"kind", "value"}
             and outcome["kind"] in ("return", "error"), "invalid outcome")

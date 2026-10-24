@@ -91,7 +91,7 @@ def span_record(span, selected: set[str], nodes: dict) -> tuple:
     return key, error_type
 
 
-def traces(bodies: list, run, service: str, decoder) -> tuple[dict, list, dict]:
+def traces(bodies: list, run, service: str, decoder, *, calls: int = 1) -> tuple[dict, list, dict]:
     """Require complete selected call trees, including every declared factory root."""
     selected = {target.name for target in run.caller.targets}
     names, roots, nodes, spans = Counter(), Counter(), {}, []
@@ -105,14 +105,18 @@ def traces(bodies: list, run, service: str, decoder) -> tuple[dict, list, dict]:
         if not span.parent_span_id:
             roots[span.name] += 1
         spans.append(span)
-    require(set(names) == selected and roots == Counter({name: 1 for name in selected}),
+    target_name = run.caller.targets[0].name
+    require(type(calls) is int and 1 <= calls <= 32
+            and set(names) == selected and roots == Counter({name: calls if name == target_name else 1 for name in selected}),
             "Go invocation roots differ from the generated target/factory calls")
     capture.trace_roots(nodes)
-    root_spans = {span.name: span for span in spans if not span.parent_span_id}
-    target = root_spans[run.caller.targets[0].name]
-    require(all(span.end_time_unix_nano <= target.start_time_unix_nano
-                for name, span in root_spans.items() if name != target.name),
+    root_spans = [span for span in spans if not span.parent_span_id]
+    targets = sorted((span for span in root_spans if span.name == target_name), key=lambda span: span.start_time_unix_nano)
+    require(all(span.end_time_unix_nano <= targets[0].start_time_unix_nano
+                for span in root_spans if span.name != target_name),
             "Go source factory did not complete before the selected call")
+    require(all(first.end_time_unix_nano <= second.start_time_unix_nano for first, second in zip(targets, targets[1:])),
+            "Go selected root calls are not serial")
     by_id = {capture.span_identity(span): span for span in spans}
     for key, parent in nodes.items():
         if parent is not None:
@@ -228,7 +232,7 @@ def metrics(bodies: list, run, service: str, names: dict, errors: dict) -> int:
     return points
 
 
-def witness(run, bodies: list, service: str, decoder, *, folder: Path | None = None) -> dict | None:
+def witness(run, bodies: list, service: str, decoder, *, folder: Path | None = None, calls: int = 1) -> dict | None:
     """Keep actual owned SDK health separate from local downstream receipt."""
     run.verify()
     if run.prepared.intent.plain:
@@ -236,7 +240,7 @@ def witness(run, bodies: list, service: str, decoder, *, folder: Path | None = N
         return None
     require(all(route in (capture.TRACE_PATH, "/v1/metrics") and type(body) is bytes and bool(body)
                 for route, body in bodies), "unknown Go telemetry route or empty body")
-    names, spans, errors = traces(bodies, run, service, decoder)
+    names, spans, errors = traces(bodies, run, service, decoder, calls=calls)
     points = metrics(bodies, run, service, names, errors)
     received = {"trace_batches": sum(route == capture.TRACE_PATH for route, _ in bodies),
                 "metric_batches": sum(route == "/v1/metrics" for route, _ in bodies),

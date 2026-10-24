@@ -43,6 +43,15 @@ def configure(entry: dict, options: dict) -> None:
         entry["otelc_runtime_function"] = entry["go_context"]["import_path"] + "." + entry["name"]
 
 
+def sequence_profile(entry: dict) -> None:
+    """Admit bounded ordinary calls while live control integration is incomplete."""
+    if "sequence_configuration" in entry:
+        steps = entry["sequence_configuration"]
+        require("receiver_fixture" in entry and type(steps) is list and 1 <= len(steps) <= 32
+                and all(type(step) is dict and step.get("action") == "call" and "metrics" not in step for step in steps),
+                "Go source-v1 requires 1..32 ordinary calls; live metrics require separate integration")
+
+
 def configuration(entry: dict, endpoint: str, service: str) -> dict:
     """Supply the complete common policy, including selected factory declarations."""
     require(enabled(entry) and "go_context" in entry, "explicit source-v1 module entry required")
@@ -198,7 +207,7 @@ def bind(entry: dict, root: Path, workspace: Path, tools: dict, execute: Callabl
         return
     try:
         require("go_context" in entry, "source-v1 currently requires explicit module_roots")
-        require("sequence_configuration" not in entry, "Go source-v1 live/action schedules need separate integration")
+        sequence_profile(entry)
         tags = go_project.canonical_tags(entry["go_options"]["build_tags"])
         protocols = probe_protocols(root, workspace, tools, execute, build_tags=tags)
         folder = workspace / DIRECTORY / "capabilities" / entry["id"]

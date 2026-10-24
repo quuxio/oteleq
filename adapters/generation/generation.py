@@ -1068,7 +1068,7 @@ def qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, 
     witness = None
     if go_source.enabled(entry):
         go_source.require(isinstance(go_runtime, go_source_run.Run), "missing owned Go source execution")
-        witness = go_telemetry.witness(go_runtime, bodies, service, decoder, folder=folder)
+        witness = go_telemetry.witness(go_runtime, bodies, service, decoder, folder=folder, calls=sequences.call_count(entry))
         if lane == "baseline":
             baseline_receipt(entry, folder, bodies)
     elif java_actions.enabled(entry):

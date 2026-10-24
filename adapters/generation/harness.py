@@ -674,7 +674,8 @@ def go_driver(entry, args, source):
     source = (go_project.rename_entrypoint(source, entry["go_main_renames"]) if "go_main_renames" in entry
               else rename_main(source, entry["file_functions"], "go"))
     if "receiver_fixture" in entry:
-        return go_receivers.driver(entry, args, source)
+        sequence = sequences.concrete(entry, args, concrete_arguments) if "sequence_configuration" in entry else None
+        return go_receivers.driver(entry, args, source, sequence)
     position = entry["package_end"]
     imports = '\nimport (__oteleq_fmt "fmt"; __oteleq_os "os"; __oteleq_math "math"; __oteleq_reflect "reflect")\n'
     raw = source.encode()

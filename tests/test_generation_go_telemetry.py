@@ -117,6 +117,35 @@ class GoTelemetryTests(unittest.TestCase):
     def witness(self, run, traces, metrics):
         return telemetry.witness(run, bodies(traces, metrics), SERVICE, ExportTraceServiceRequest)
 
+    def test_declared_serial_calls_have_exact_roots_and_one_preceding_factory(self):
+        run, traces, metrics = fixture(factory=True)
+        spans = traces.resource_spans[0].scope_spans[0].spans
+        second = spans.add()
+        second.CopyFrom(spans[0])
+        second.trace_id, second.span_id = b"u" * 16, b"s" * 8
+        second.start_time_unix_nano, second.end_time_unix_nano = 300, 400
+        for metric in metrics.resource_metrics[0].scope_metrics[0].metrics:
+            values = metric.histogram.data_points if metric.name == telemetry.DURATION else metric.sum.data_points
+            for point in values:
+                if telemetry.attributes(point.attributes).get("function") == FUNCTION:
+                    if metric.name == telemetry.CALLS:
+                        point.as_int = 2
+                    elif metric.name == telemetry.DURATION:
+                        point.count, point.sum = 2, .01
+                        point.bucket_counts[4] = 2
+        health = run.session.execution.health
+        health["probe_accounting"].update(function_started="3", function_ended="3")
+        health["trace_exports"]["exported_spans"] = "3"
+        actual = telemetry.witness(run, bodies(traces, metrics), SERVICE, ExportTraceServiceRequest, calls=2)
+        self.assertEqual(actual["functions"], {FUNCTION: 2, FACTORY: 1})
+        self.assertEqual(actual["spans"], 3)
+        for calls in (True, 0, 1, 3, 33):
+            with self.subTest(calls=calls), self.assertRaises(ValueError):
+                telemetry.witness(run, bodies(traces, metrics), SERVICE, ExportTraceServiceRequest, calls=calls)
+        second.start_time_unix_nano = 150
+        with self.assertRaisesRegex(ValueError, "not serial"):
+            telemetry.witness(run, bodies(traces, metrics), SERVICE, ExportTraceServiceRequest, calls=2)
+
     def test_exact_normal_recursive_factory_and_error_receipts_join_health(self):
         for options in ({}, {"recursive": True}, {"factory": True}, {"recursive": True, "failed": True}):
             with self.subTest(options=options):
