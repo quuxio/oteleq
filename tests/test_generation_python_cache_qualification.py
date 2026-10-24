@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / 'adapters/generation'), str(ROOT / 'examples')]
 import generation
 import python_cache
-from python_cache_qualification import CacheInputs, file_facts
+from python_cache_qualification import CacheInputs, cache_paths, file_facts
 import qualify_python_caches as qualifier
 
 CONFIGURATION = {'adapters': {'python': {'backend': 'prepared', 'profile': 'python-native-cache-origins-v3'}}}
@@ -24,6 +24,20 @@ SOURCE = b'def selected(value:int)->int:return value+1\n'
 
 
 class PythonCacheQualificationTests(unittest.TestCase):
+    def test_independent_catalogue_accounts_for_other_tags_without_prefix_collisions_or_links(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            inputs, _, _, _ = self.fixture(Path(temporary).resolve())
+            directory = inputs.root / '__pycache__'
+            other = directory / 'target.other-tag.opt-2.pyc'; other.write_bytes(b'other frozen cache')
+            neighbour = directory / 'target.extra.other-tag.pyc'; neighbour.write_bytes(b'not this source')
+            self.assertIn(other, cache_paths(inputs.root, inputs.sources))
+            self.assertNotIn(neighbour, cache_paths(inputs.root, inputs.sources))
+            with self.assertRaises(AssertionError):
+                inputs.verify_originals()
+            other.unlink(); other.symlink_to(neighbour)
+            with self.assertRaises(AssertionError):
+                cache_paths(inputs.root, inputs.sources)
+
     def test_repeated_retained_comparisons_use_the_exact_public_verdict_and_preserve_receipts(self):
         expected = {'verdict': 'equivalent_observed', 'scope': {'language': 'python'}}
         complete = subprocess.CompletedProcess([], 0, json.dumps(expected).encode(), b'')
@@ -53,6 +67,8 @@ class PythonCacheQualificationTests(unittest.TestCase):
         context = python_cache.prepare(generation, source, workspace, contents, CONFIGURATION)
         data = {'configuration': CONFIGURATION, 'source_manifest': contents, 'source': str(source),
                 'python_cache_context_manifest': context}
+        data['source_sha256'] = generation.identity({'source': generation.identity(contents),
+                                                    'python_cache_context': context})
         generation.write(workspace / 'plan.json', data)
         attempt = root / 'attempt'; attempt.mkdir(); project = attempt / 'project'
         shutil.copytree(workspace / 'snapshot', project)
@@ -154,7 +170,7 @@ class PythonCacheQualificationTests(unittest.TestCase):
 
     def test_original_or_private_byte_timestamp_mode_and_inode_changes_cannot_hide(self):
         for fault in ('original-source-time', 'original-cache-inode', 'snapshot-mode', 'private-cache-bytes',
-                      'context-bytes', 'context-facts', 'manifest-inventory'):
+                      'context-bytes', 'context-facts', 'manifest-inventory', 'plan-source-hash'):
             with self.subTest(fault=fault), tempfile.TemporaryDirectory() as temporary:
                 inputs, workspace, attempt, facts = self.fixture(Path(temporary).resolve())
                 cached = next(iter(inputs.caches))
@@ -176,9 +192,12 @@ class PythonCacheQualificationTests(unittest.TestCase):
                     plan = generation.read(workspace / 'plan.json')
                     plan['python_cache_context_manifest'] = generation.manifest(path.parent)
                     generation.write(workspace / 'plan.json', plan)
-                else:
+                elif fault == 'manifest-inventory':
                     path = workspace / 'plan.json'; changed = generation.read(path)
                     changed['python_cache_context_manifest']['extra'] = '0' * 64; generation.write(path, changed)
+                else:
+                    path = workspace / 'plan.json'; changed = generation.read(path)
+                    changed['source_sha256'] = '0' * 64; generation.write(path, changed)
                 with self.assertRaises(AssertionError):
                     inputs.verify_originals(); inputs.verify_workspace(workspace)
                     inputs.frozen_caches(attempt, {'python_profile': 'python-native-cache-origins-v3'}, facts)

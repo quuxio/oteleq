@@ -3,9 +3,9 @@
 from dataclasses import dataclass
 import ast
 import hashlib
-import importlib.util
 import os
 from pathlib import Path
+import re
 
 import generation
 import python_selection
@@ -26,6 +26,22 @@ def check_private(path: Path, content: bytes, expected: dict) -> None:
     assert all(facts[key] == expected[key] for key in ('sha256', 'size', 'mtime_ns', 'mode')), str(path)
 
 
+def cache_paths(root: Path, sources: dict[str, bytes]) -> set[Path]:
+    """Account independently for all ordinary source-associated cache tags/optimisations."""
+    result = set()
+    for name in sources:
+        source = root / name; directory = source.parent / '__pycache__'
+        if not directory.exists() and not directory.is_symlink():
+            continue
+        assert directory.is_dir() and not directory.is_symlink() and directory == directory.resolve(strict=True)
+        pattern = re.compile(re.escape(source.stem) + r'\.[A-Za-z0-9_-]+(?:\.opt-[0-9]+)?\.pyc')
+        for path in directory.iterdir():
+            if pattern.fullmatch(path.name):
+                assert path.is_file() and not path.is_symlink() and path == path.resolve(strict=True)
+                result.add(path)
+    return result
+
+
 @dataclass(frozen=True)
 class CacheInputs:
     """Literal sources and stock-compiler cache files frozen before planning."""
@@ -40,9 +56,9 @@ class CacheInputs:
     def capture(cls, root: Path, sources: dict[str, bytes]) -> 'CacheInputs':
         """Require literal fixture sources and use the stock runtime's cache path."""
         assert root == root.resolve(strict=True)
-        assert sources and all((root / name).read_bytes() == raw for name, raw in sources.items())
-        paths = [Path(importlib.util.cache_from_source(str(root / name))) for name in sources]
-        cached = {p.relative_to(root).as_posix(): p.read_bytes() for p in paths if p.exists()}
+        assert sources and all((root / name).is_file() and not (root / name).is_symlink()
+                               and (root / name).read_bytes() == raw for name, raw in sources.items())
+        cached = {p.relative_to(root).as_posix(): p.read_bytes() for p in sorted(cache_paths(root, sources))}
         return cls(root, dict(sources), cached, {n: file_facts(root / n) for n in sources},
                    {n: file_facts(root / n) for n in cached})
 
@@ -54,8 +70,7 @@ class CacheInputs:
         """Do not count restored bytes with changed timestamps or inodes as preserved."""
         for names, expected in ((self.sources, self.source_facts), (self.caches, self.cache_facts)):
             assert all(file_facts(self.root / name) == expected[name] for name in names)
-        expected_paths = {Path(importlib.util.cache_from_source(str(self.root / name))) for name in self.sources}
-        assert {p.relative_to(self.root).as_posix() for p in expected_paths if p.exists()} == set(self.caches)
+        assert {p.relative_to(self.root).as_posix() for p in cache_paths(self.root, self.sources)} == set(self.caches)
 
     def verify_workspace(self, workspace: Path) -> None:
         """Check the complete sealed context against independently captured fixture facts."""
@@ -67,6 +82,9 @@ class CacheInputs:
         assert metadata == {'schema_version': 1, 'sources': self.source_facts, 'caches': self.cache_facts}
         assert set(plan['python_cache_context_manifest']) == {'context.json', *('files/' + n for n in self.caches)}
         assert generation.manifest(directory) == plan['python_cache_context_manifest']
+        assert plan['source_sha256'] == generation.identity({
+            'source': generation.identity(plan['source_manifest']),
+            'python_cache_context': plan['python_cache_context_manifest']})
         for name, raw in self.sources.items():
             check_private(workspace / 'snapshot' / name, raw, self.source_facts[name])
         for name, raw in self.caches.items():

@@ -35,6 +35,28 @@ The generated observer freezes the expected target and source factory bodies thr
 
 ## Qualification still required
 
+Maintainers can reproduce the complete diagnostic workflow corpus with the portable driver. It creates its own application fixtures and uses a matching owned SDK copy. The default `all` component covers the ordinary-loader matrix, package receivers/factories, recursion, exceptions, filesystem/HTTP effects, replay, unittest, detached suites, reduction and fresh current-source promotion:
+
+```sh
+make generation-python-cache-workflows-otelc \
+  PYTHON=/path/to/complete/python/environment/bin/python \
+  OTELC_ROOT=/path/to/owned/otelc-copy \
+  REPORT_DIR=/new/external/cache-workflow-evidence
+```
+
+Use `GENERATION_ARGS='--component receivers'` or `GENERATION_ARGS='--component effects'` for a new individual corpus. Retained-only audits require a separate new output directory, preserve the original operation/process records and do not repeat target applications or deliberate input mutations:
+
+```sh
+/path/to/complete/python/environment/bin/python -B \
+  tests/qualify_python_cached_workflows.py \
+  --otelc-root /path/to/owned/otelc-copy \
+  --cli /path/to/original/quux-oteleq \
+  --report-dir /path/to/original/cache-workflow-evidence \
+  --recheck --audit-dir /new/external/cache-workflow-audit
+```
+
+Pass the same `--component` when auditing an individual corpus. Source/cache facts, historical source bodies, full raw/typed graphs, exact command receipts, consumed-input/code joins, ownership, health, decoded OTLP and every comparison are checked separately. Copied shrink originals remain observations of earlier launches and are not counted as new applications.
+
 The maintained ordinary-loader corpus uses an independent scalar return and complete raw/typed graph oracle in every repeat and lane. It captures literal source/cache facts before planning, retains native/SDK/health/OTLP evidence and recomputes each comparison. It covers timestamp, checked-hash and unchecked-hash caches, an accepted older unchecked body, missing/stale caches and invalid-magic fallback. Use a matching owned SDK copy and a new external output directory:
 
 ```sh

@@ -150,6 +150,7 @@ def recheck(folder: Path, cli: Path, provider: Path, catalogue: dict) -> dict:
         workspace = Path((root / 'plan.stdout').read_text().strip()); inputs.verify_workspace(workspace)
         report = root / 'comparison/report.json'; assert check_report(report, mode) == 4
         data = generation.read(report); assert data['workspace'] == str(workspace)
+        assert data['source_sha256'] == generation.read(workspace / 'plan.json')['source_sha256']
         entry, = [e for e in data['inventory'] if e['status'] == 'ready']
         case = data['cases'][0]
         bundle = report.parent / case['case'] / 'typed-bundle.json'
