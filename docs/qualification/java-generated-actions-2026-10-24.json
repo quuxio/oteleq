@@ -1,0 +1,178 @@
+{
+  "qualification_schema_version": 1,
+  "date": "2026-10-24",
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "scope_status": "qualified recorded synchronous generated private static and receiver action workflows on the frozen clock-fix provider",
+  "platform": {
+    "os": "macOS",
+    "architecture": "arm64",
+    "jdk": "21.0.12.1",
+    "execution_host_python": "3.12.15",
+    "additional_retained_reader_python": "3.14.8"
+  },
+  "runtime": {
+    "repository": "quuxio/oteleq",
+    "commit": "d53377e7940714147a63288e5a91c25d25123dba",
+    "source_archive_sha256": "b4dc1c276f8ce08d60062071369f56bdafb3f585224f5dde0131397110b4d317",
+    "source_files_preserved": 478,
+    "cli_sha256": "7b1d9ec313b7aee2982a8b746bf6c1103dbb1dd6dca0dbee79b40f2cf2571885",
+    "generator_inputs_sha256": "54015dc91ca08c2727e9077a4166447110d68b001aa538c079c9bfa10bdd7dd8"
+  },
+  "verifier": {
+    "commit": "9edbb66f598862443a39b0134229933b21dd0991",
+    "entrypoint": "tests/qualify_java_generated_actions.py",
+    "retained_option": "--retained-only",
+    "qualifier_files_sha256": {
+      "qualify_java_generated_actions.py": "018b9092213d4133c2a71837f9de84f19478268c354ac8d6909cc418deddd36d",
+      "java_action_fixture.py": "250f8889318e9765ea5d5780f1dd229da66cc0ed6e0e08b04617797cf37817f3",
+      "java_action_audit.py": "7b86e2a443b20d2be98edc67bf00d2af86e14096cde62edb0d4c8d5fceec8ba2",
+      "java_action_faults.py": "39f4d4cb8b153cf1c39465935772f877001882243d942ee55f6733e071fe0936"
+    }
+  },
+  "provider": {
+    "repository": "quuxio/otelc",
+    "commit": "45b75643b13aa1b3a11db88d9d5fb84b018b2c94",
+    "base": "1b02dbc1db6c567cc684293e68d098e794546007",
+    "delivery_status": "recorded candidate; final merged-provider compatibility is separate",
+    "source_archive_sha256": "5e1e79af0adf0f5ad3fc831ee533988e2a09aa38a618330c59546334d65fad73",
+    "source_files_preserved": 362,
+    "products": {
+      "build/tools/opentelemetry-javaagent-2.32.0.jar": {
+        "sha256": "f787eb6c7f3d18e69a431e108a15278d25ee37f83d68b678f621e063f3988f82",
+        "size": 26418479
+      },
+      "adapters/java/target/java-extension-0.2.0-SNAPSHOT.jar": {
+        "sha256": "914bf44aa625bcea604ef202d5b6c4cfd7b26c7b35c35a7e0bac192f14879b71",
+        "size": 155045
+      },
+      "adapters/java/target/java-extension-0.2.0-SNAPSHOT-helper-tool.jar": {
+        "sha256": "a275e01fde4726dc857e22dfa26948ef3e67dac2413209d9f178a1773b22404f",
+        "size": 265085
+      },
+      "adapters/java/target/java-extension-0.2.0-SNAPSHOT-bootstrap-patch.jar": {
+        "sha256": "56ba8c193b2999a188e67ad48c8678055dca8d9aac2f8bcea767f4c95ead31be",
+        "size": 8683
+      }
+    },
+    "all_products_preserved": true
+  },
+  "tools_sha256": {
+    "java": "d7ab2ea6a7e731a8a2cee7d722046c9f7d8c5f184cd769b9954a392592337770",
+    "javac": "ab9b94d81dd22c843ef637be9aa2121253c6d4cfe2ba0a89a7bde5c0b9567945",
+    "java-modules": "f1053d4959235d6f3faaa28b74812b45a7a72463ba7edf29f1c7fb1a216c74e4",
+    "javap": "45e7ec2c0b002e6dc716651ede247ac1f2c25d4cc8cf37ee20591ddc439162ac"
+  },
+  "results": {
+    "completed_corpora": 2,
+    "reports": 38,
+    "distinct_application_launches": 160,
+    "complete_literal_boundary_graphs": 1128,
+    "instrumented_action_scopes": 188,
+    "instrumented_spans": 852,
+    "altered_evidence_refusals": 32,
+    "additional_applications_in_retained_reader_audits": 0
+  },
+  "corpora": [
+    {
+      "java_profile": "safe-methods-v1",
+      "reports": 19,
+      "distinct_application_launches": 80,
+      "complete_boundary_graphs": 564,
+      "action_scopes": 94,
+      "spans": 426,
+      "altered_evidence_refusals": 16,
+      "source_preserved": true,
+      "consumer_inputs_sha256": "54015dc91ca08c2727e9077a4166447110d68b001aa538c079c9bfa10bdd7dd8",
+      "sdk_input_map_sha256": "0cda6897b8d3c9ee1221c374640a0d2e2f426b8b3713d3d9bb99017878c5ea35",
+      "sdk_input_files": 98,
+      "tool_files": 3,
+      "launch_identity_set_sha256": "f6b324144d96e0b5aa9c6de3b08ad7c5282f8cead90c426d57a5b26c0bf00c93",
+      "qualification_sha256": "8551a3923b573afc9d438aa943b6aab49e2bae9d12735d1f92cc343fe4ab8b06",
+      "input_manifest_sha256": "f83a7cf72e4d862b7864422ec280f51674be8cfbb4acc0fce7909c0133b8a602",
+      "route_manifest_sha256": "4b5eab57f7b5a08bfa8a03e27226a11fa52eb19a6c8e598c92cfa23d28a330e8",
+      "refusal_summary_sha256": "851f622d59e5e305b3b01ebffcf843081d338caca4fa53e3fb4efb6292aabc38",
+      "python_314_retained_audit_sha256": "01fd5918aaefb4e8d0500b2dd8c4b63fa769b2500874c9a566970e1fdae2a832"
+    },
+    {
+      "java_profile": "archive-methods-v1",
+      "reports": 19,
+      "distinct_application_launches": 80,
+      "complete_boundary_graphs": 564,
+      "action_scopes": 94,
+      "spans": 426,
+      "altered_evidence_refusals": 16,
+      "source_preserved": true,
+      "consumer_inputs_sha256": "54015dc91ca08c2727e9077a4166447110d68b001aa538c079c9bfa10bdd7dd8",
+      "sdk_input_map_sha256": "9d65b8b4838b50d29a5cf4ac6716203f77b94b5d4068b21f7b4d182789abebb1",
+      "sdk_input_files": 98,
+      "tool_files": 4,
+      "launch_identity_set_sha256": "1c0fed774dbf9ec9fa0cef213f8481dc2fad4313c08f0057c2ab9152a189262e",
+      "qualification_sha256": "f998f0feb73c1f1473012258630303731942f182a3f73b42645ce48f412d873b",
+      "input_manifest_sha256": "2d51f1c108c872672f94a085265d7591dfcc93114196740c3d63fffeb2f85645",
+      "route_manifest_sha256": "1704a47336f6aa994334cce06e3016e51e64c3341a7e0675583cedbdc683a1bc",
+      "refusal_summary_sha256": "851f622d59e5e305b3b01ebffcf843081d338caca4fa53e3fb4efb6292aabc38",
+      "python_314_retained_audit_sha256": "ceec2585bf716aba7b1a1af7efef87986297d12177236d4318d172b341799f90"
+    }
+  ],
+  "checked_behaviour": [
+    "Private static and declared receiver target calls through exact typed MethodHandles, with private factory setup outside the action",
+    "Four ordered receiver actions with recursive selected-method counts 1, 4, 1, 2, original exception class/message and returned-receiver aliases",
+    "Complete independently literal before/after/result graphs in every repeat and lane",
+    "All four initial collection/emission combinations in one unchanged application build/process per sequence",
+    "Generated suites, source-detached exports, frozen replay, unchanged/changed current-source promotion, scalar shrinking, reduced framework and replay routes",
+    "Same return with an intentional instrumented-only global mutation remains a failed equivalence test and shrinks from 7 to 0",
+    "Selected-JDK multi-release archive member resolution and a forced application/SDK helper package collision with independently reproduced relocation",
+    "Actual compiler/classes, host ready/release and control-history binding, decoded role/method trees, collected function metrics and final global health"
+  ],
+  "refusal_controls": [
+    "foreign-thread",
+    "foreign-attempt",
+    "foreign-retry",
+    "missing-method",
+    "unscoped-method",
+    "wrong-probe",
+    "unverified-route",
+    "role-metrics",
+    "missing-duration",
+    "missing-metrics",
+    "health-without-roles",
+    "wrong-binding-profile",
+    "wrong-outcome",
+    "foreign-process",
+    "coerced-version",
+    "missing-action"
+  ],
+  "detected_provider_defect": {
+    "provider_commit": "1b02dbc1db6c567cc684293e68d098e794546007",
+    "kind": "telemetry_witness_refusal",
+    "route": "source-detached Counter.run generated test",
+    "child_end_after_parent_ns": 3124,
+    "strict_parent_interval_check_preserved": true,
+    "raw_failure_proof_sha256": "66108c0e659074dfaf4fe8944f1e4a75784621a3f0954d81dc1621811979f8c4",
+    "fix_commit": "45b75643b13aa1b3a11db88d9d5fb84b018b2c94",
+    "independent_unchanged_production_clock_regressions_failed": 3,
+    "independent_fixed_java_tests_passed": 74,
+    "independently_rebuilt_provider_classes_matched": 76
+  },
+  "review": {
+    "consumer_verdict": "clear_source_integration_and_qualification_tools",
+    "consumer_review_sha256": "22debe006347f9c2ca2bdc5bb238a49d4c959fa2803e3a30334da502f5a1b3f4",
+    "sdk_component_review_sha256": "1bc81ea90e24c2f97364d5513ec673cbf8a8c39a17e86ea3bdfbdb1f90f12364",
+    "sdk_component_scope": "parent clock and synchronous exception safety; actual generated admission has the separate corpora above"
+  },
+  "validation": {
+    "full_gate_commit": "d53377e7940714147a63288e5a91c25d25123dba",
+    "generation_tests": 1089,
+    "rust_product_line_coverage_percent": 97.38,
+    "full_gate_result_sha256": "0e69e78f705283df238c0310e7ff290c126504bfe0414da3577d36bd3df0ec38",
+    "full_gate_log_sha256": "d177274a82a89c8dc8760f992992710afaf9f55d4549c68ff2c63037d6ade1e1"
+  },
+  "limits": [
+    "Only the recorded synchronous private static and declared receiver fixture shapes are qualified",
+    "General Java build systems/modules, arbitrary object arguments/factories, asynchronous or virtual-thread attribution and shipping artefacts remain open",
+    "Other language invocation-scoped witnesses need separate implementation and qualification",
+    "Historical positive captures remain bounded to their actual executions; the later failed provider capture remains retained",
+    "All remaining requirements in docs/completion.md remain in force"
+  ]
+}

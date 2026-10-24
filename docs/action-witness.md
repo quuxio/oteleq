@@ -2,7 +2,7 @@
 
 ## Status
 
-This producer/consumer design has separately implemented [Java readers, private JDK harness and generated private-handle integration](java-action-witness.md). The explicit generated Java profile binds compiler probes, live host readiness, scoped traces and ordinary outcomes; its complete provider qualification remains open. Default generated profiles use a decoded, name-only invocation tree with source/binding guards. Neither route qualifies arbitrary concurrent activity, asynchronous migration or another shipping artefact. Existing qualification must retain its recorded scope.
+This producer/consumer design has separately implemented [Java readers, private JDK harness and generated private-handle integration](java-action-witness.md). The explicit generated Java profile binds compiler probes, live host readiness, scoped traces and ordinary outcomes, with [160-JVM diagnostic qualification](qualification/java-generated-actions-2026-10-24.json) for the recorded safe/archive workflows. Default generated profiles use a decoded, name-only invocation tree with source/binding guards. Neither route qualifies arbitrary concurrent activity, asynchronous migration or another shipping artefact. Existing qualification must retain its recorded scope.
 
 The proposed capability binds telemetry to one generated action using a compiler-identified wrapper, a live runtime context and a fresh scope ID. A process-wide nonce or a static wrapper ID alone cannot identify an invocation: another call can occur between arming and the intended action.
 

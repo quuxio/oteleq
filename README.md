@@ -83,7 +83,7 @@ Declared [Python ordered calls](docs/ordered-sequences.md#python-call-sequences)
 
 Rebuilt Python [provider negotiation and prepared-runtime readers](docs/python-prepared-provider.md) are available for integration work, including a separate fixed-workload process/health/OTLP qualification command and an explicit journal-2 relation reader. Relation consistency does not qualify a producer's source-origin mechanism. Selecting `adapters.python.backend = "prepared"` currently retains explicit source-origin blockers; generated Python execution continues to require its qualified legacy provider.
 
-The explicit [Java private-handle action profile](docs/java-action-witness.md#generated-private-handle-profile) connects generated callers, offline bindings, public preparation, host control, typed outcomes, decoded traces, function metrics and final SDK health. Complete provider qualification and broader archive-profile action coverage remain open. Default generated Java profiles retain their documented witness limits.
+The explicit [Java private-handle action profile](docs/java-action-witness.md#generated-private-handle-profile) connects generated callers, offline bindings, public preparation, host control, typed outcomes, decoded traces, function metrics and final SDK health. Its [160-JVM diagnostic qualification](docs/qualification/java-generated-actions-2026-10-24.json) covers the recorded safe/archive provider, retained workflows and four metric startup states. Broader Java build, object, asynchronous and shipping scope remains open. Default generated Java profiles retain their documented witness limits.
 
 ### Build
 
