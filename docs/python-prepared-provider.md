@@ -43,7 +43,7 @@ The health-2 reader reconstructs the public view from the separately retained SD
 
 ### Explicit origin-journal reader
 
-`python_origin.decode(data, actual_application_pid)` independently reads only journal 2 (`OTLCPY2\0`), with closed kinds 1-7. The default runtime reader selects journal 1 and refuses journal 2; only caller-owned explicit origin-profile intent selects the version-2 runtime route. Metadata negotiation and generated execution do not switch formats implicitly. `python_origin.read(path, pid)` additionally requires an owned, bounded, non-followed mode-0600 regular file after its owning process has stopped.
+`python_origin.decode(data, actual_application_pid)` independently reads journal 2 (`OTLCPY2\0`) by default, with closed kinds 1-7. The separate cache profile requires explicit `version=3` and its matching negotiated/prepared intent; metadata cannot switch the reader implicitly. The default runtime reader selects journal 1 and refuses journal 2; only caller-owned explicit origin-profile intent selects the version-2 runtime route. Metadata negotiation and generated execution do not switch formats implicitly. `python_origin.read(path, pid)` additionally requires an owned, bounded, non-followed mode-0600 regular file after its owning process has stopped.
 
 The reader checks consecutive records, exact terminal counts and data-byte totals, actual PID and consistent descriptor/interpreter/filesystem profiles. Each compiler root must reference an earlier source read, with unique root/transaction/read-token identities and a supported entry or ordinary `.py` loader route. Each first-execution identity follows a bounded sequence of direct code-valued `co_consts` edges. Paths and bytecode offsets must agree with that member. Aliased paths cannot give the same root/member a second execution identity.
 
@@ -77,7 +77,7 @@ Each attempt retains the actual supervisor PID and fixed argv, caller PID, appli
 
 The [exact-revision diagnostic record](qualification/python-generated-origins-2026-10-24.json) checks 424 actual application launches, 212 SDK processes and 108 independently recomputed comparisons across the two recorded runtimes. Current-origin capture covers the native script entry and ordinary source loaders inside the application root. Application cache-only loads, unsupported loaders, complete dependency closure, broader async/resource actions, live metric controls, per-action attribution and shipping qualification remain open. Missing origin, loss or truncation is a refusal. The full [completion checklist](completion.md) remains in scope.
 
-The separate [cache context route](python-cache-context.md) implements explicit profile-3 negotiation, private cache/timestamp preservation, both-lane selected cache-byte binding and retained context. Actual generated-workflow qualification is in progress. It keeps cache reads distinct from compilation of current source; the recorded source-only qualification above does not cover this candidate.
+The separate [cache context route](python-cache-context.md) has [488-launch diagnostic qualification](qualification/python-generated-caches-2026-10-24.json) for explicit profile 3, private cache/timestamp preservation, both-lane consumed-cache binding and generated/retained/promoted workflows. It keeps accepted cache bodies distinct from compilation of current source; the source-only qualification above remains separate. The default formats and input-only refusal are unchanged.
 
 ## Reproduce generated workflow qualification
 

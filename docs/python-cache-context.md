@@ -2,7 +2,7 @@
 
 <!-- markdownlint-disable MD013 -->
 
-Status: the explicit prepared cache route is implemented; actual generated-workflow qualification is in progress. The independent reader, private input catalogue, prepared transport and selected-input checks use journal 3. The separately qualified source-only route retains its existing contract. A cache binding does not establish that cached code came from the current source file.
+Status: the explicit prepared cache route has [488-launch exact-revision diagnostic qualification](qualification/python-generated-caches-2026-10-24.json) on Python 3.12/3.14. The independent reader, private input catalogue, prepared transport and selected-input checks use journal 3. The separately qualified source-only route retains its existing contract. A cache binding does not establish that cached code came from the current source file.
 
 ```toml
 [adapters.python]
@@ -10,7 +10,7 @@ backend = "prepared"
 profile = "python-native-cache-origins-v3"
 ```
 
-Use a matching pinned SDK candidate and complete interpreter environment. Missing protocols, changed inputs, unknown cache roots and incomplete execution evidence refuse the run. This candidate has no completed generated cache-workflow qualification record yet.
+Use the matching pinned SDK and complete interpreter environment identified in the record. Missing protocols, changed inputs, unknown cache roots and incomplete execution evidence refuse the run. The actual SDK is frozen `ce4cf74`; a separate static bridge verifies identical consumed Python/native/builder input bytes and modes at candidate `e8e5861`. That bridge starts no applications and does not claim new binary execution.
 
 ## Preserved contracts
 
@@ -33,7 +33,7 @@ The plan seals source-associated cache bytes and original file facts outside the
 
 The generated observer freezes the expected target and source factory bodies through the ordinary `SourceFileLoader.get_code` decision before executing their module. This operation is confined to the owned private copy and requires bytecode writes disabled. It can use an accepted cache or fall back to source without replacing cache files. The selected qualified name, declaration line and bound code must still match. Native input-to-code evidence independently checks the actual executing body and consumed bytes; the helper's expected code is not a substitute for that evidence. Source-only profiles retain direct source compilation for their expected body.
 
-## Qualification still required
+## Recorded qualification and reproduction
 
 Maintainers can reproduce the complete diagnostic workflow corpus with the portable driver. It creates its own application fixtures and uses a matching owned SDK copy. The default `all` component covers the ordinary-loader matrix, package receivers/factories, recursion, exceptions, filesystem/HTTP effects, replay, unittest, detached suites, reduction and fresh current-source promotion:
 
@@ -68,6 +68,8 @@ make generation-python-caches-otelc \
 
 Re-audit retained evidence without starting new applications by invoking `tests/qualify_python_caches.py` with the same `--otelc-root`, `--report-dir`, `--cli` and `--recheck`. This corpus alone does not qualify receivers, effects, retained suites or promotion.
 
-Use actual ordinary, checked-hash and unchecked-hash caches on both recorded Python runtimes. Cover unchanged cache use, invalid/stale cache source fallback, receivers/factories, exceptions, recursion, file/HTTP effects and retained/promoted/reduced routes. Include changed cache/source/file facts and equal-but-unrelated cache bytes as refusal controls. Preserve original failures and count actual applications separately from copied or re-audited observations.
+The record contains 244 actual applications and 122 SDK processes per runtime, with 48 reports and 62 recomputed comparisons. Its 496 retained observations across both runtimes include 8 copied shrink originals; these add no launches. Twelve deliberate input changes were refused before another application started. Ten altered comparison controls check incomplete or differing evidence. Raw journals, final health and decoded OTLP are checked separately from outcomes. Coverage measured the qualifier host; application, native and SDK launch commands had no coverage startup.
+
+The original timestamp preservation and older cache body failures remain recorded with their fixes. The failed audit and recipe count checks also remain in the record. Other loaders, dependency closure, async/resources, live controls, invocation attribution and shipping workloads require new qualification. Missing or unobserved dimensions cannot be treated as equality.
 
 This work advances the full [completion checklist](completion.md). It remains **equivalence over these tests and observations**, with shipping artefacts and broader language/build acceptance separate.
