@@ -64,7 +64,7 @@ With the matching prebuilt SDK and a selected full JDK, qualify the offline API 
 make generation-java-bindings-otelc OTELC_ROOT=/path/to/otelc REPORT_DIR=/path/to/new-report
 ```
 
-The retained qualification compiles a source fixture whose class initialiser leaves a sentinel if executed. It accepts the direct private target, refuses a wrong target descriptor and a reflected wrapper, and requires that sentinel to remain absent. No application is launched. This contributor command qualifies offline metadata only; complete generated-execution and shipping qualification remain open.
+The retained qualification compiles a source fixture whose class initialiser leaves a sentinel if executed. It accepts the direct private target, refuses a wrong target descriptor and a reflected wrapper, and requires that sentinel to remain absent. No application is launched. This contributor command qualifies offline metadata only; generated execution needs its separate provider qualification. Shipping qualification remains open.
 
 ## Explicit versioned reader
 
