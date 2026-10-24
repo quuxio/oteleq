@@ -49,7 +49,8 @@ def fixture(root: Path, *, plain: bool = False, profile: str = prepared.provider
               "process_group": SUPERVISOR, "request_sha256": prepared.digest(launch["request"]),
               "plan_sha256": prepared.digest(launch["plan"]), "prepared_sha256": prepared.digest(launch["prepared"])}
     write(intent.runtime / "python-supervisor-start.json", {**common, "kind": "otelc.python.supervisor"})
-    options = ['--origin-loader-root', launch['plan']['cwd']] if version == 2 else []
+    option = {2: '--origin-loader-root', 3: '--origin-loader-caches-root'}.get(version)
+    options = [option, launch['plan']['cwd']] if option is not None else []
     app = {**common, "kind": "otelc.python.application", "application_pid": APP,
            "sdk_pid": None if plain else SDK, "sdk_ready": not plain, "sdk_launch_id": None if plain else TOKEN,
            "native_command": [launch["prepared"]["driver"]["path"], *options, "3", launch["plan"]["python"],
@@ -67,7 +68,7 @@ def fixture(root: Path, *, plain: bool = False, profile: str = prepared.provider
     raw = frame(1, 1, source, os.fsencode(path))
     sources = [{"path_hex": os.fsencode(path).hex(), "sha256": hashlib.sha256(content).hexdigest(),
                 "device": info.st_dev, "inode": info.st_ino, "mtime_ns": info.st_mtime_ns}]
-    if version == 2:
+    if version >= 2:
         return origin_fixture(intent, launch, owner, catalogue, common, source, sources, path, plain)
     codes = []
     total = len(content)
@@ -117,10 +118,15 @@ def origin_fixture(intent, launch, owner, catalogue, common, source, sources, pa
                      (7, os.fsencode(path), python_origin.JOIN.pack(APP, 1, 91, 0, 0, 0, 0))])
         codes.append({'id': 1, 'path_hex': os.fsencode(path).hex(), 'sha256': hashlib.sha256(encoded).hexdigest(),
                       'offset': 0, 'python_version': VERSION, 'descriptor_version': 2})
-    journal = intent.runtime / 'python-inputs.journal'; write(journal, origin_wire(rows))
+    version = prepared.provider.profile_version(intent.profile)
+    raw = origin_wire(rows)
+    if version == 3:
+        # Fixture descriptors cannot contain the binary frame marker.
+        raw = raw.replace(python_origin.MAGIC, python_origin.CACHE_MAGIC)
+    journal = intent.runtime / 'python-inputs.journal'; write(journal, raw)
     evidence = {'phase': 'complete', 'python_finalized': True, 'capture_failures': 0, 'journal_failures': 0,
                 'journal': prepared.file_identity(journal), 'sources': sources, 'imports': [], 'codes': codes,
-                'origins': {'schema_version': 2, 'scope_root': str(intent.project.resolve()), 'root_ids': [77],
+                'origins': {'schema_version': version, 'scope_root': str(intent.project.resolve()), 'root_ids': [77],
                             'execution_ids': [90, 91], 'sdk_joins': [] if plain else [[1, 91]], 'failures': []}}
     final = {**common, 'kind': 'otelc.python.execution', 'phase': 'closed', 'plain': plain,
              'application': {'pid': APP, 'returncode': 0},

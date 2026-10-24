@@ -51,6 +51,7 @@ import policy as project_policy
 import project_tests
 import python_project
 import python_provider
+import python_cache
 import python_inputs
 import python_launch
 import python_prepared
@@ -607,6 +608,7 @@ def plan(args):
                                         excluded_roots=excluded_roots, **java_settings)
     contents = java_source_manifest(source, java_options, contents, excluded_roots=excluded_roots)
     snapshot = snapshot_source(source, workspace, contents)
+    python_context = python_cache.prepare(sys.modules[__name__], source, workspace, contents, configuration)
     native_profile.directories(snapshot, native_projects)
     java_project.directories(snapshot, java_options)
     tools, artefacts, inventory = inventory_tree(contents, root, snapshot, workspace, args, native_projects, java_context,
@@ -638,6 +640,10 @@ def plan(args):
         data["node_provider_manifest"] = manifest(workspace / node_source.DIRECTORY)
     if (workspace / python_provider.DIRECTORY).exists():
         data["python_provider_manifest"] = manifest(workspace / python_provider.DIRECTORY)
+    if python_context is not None:
+        data['python_cache_context_manifest'] = python_context
+        data['source_sha256'] = identity({'source': data['source_sha256'], 'python_cache_context': python_context})
+        python_cache.verify(sys.modules[__name__], workspace, data)
     write(workspace / PLAN_FILE, data)
     marker = read(workspace / OWNED_MARKER)
     marker["plan_sha256"] = identity(data)
@@ -702,7 +708,7 @@ def generator_identity():
         'native_discover.cpp', 'native_context.py', 'native_workers.py', 'native_workspace.py',
         'owned_workspace.py', 'preconditions.py', 'project_tests.py', 'project_runner.py',
         'python_provider.py', 'python_inputs.py', 'python_prepared.py', 'python_journal.py',
-        'python_code.py', 'python_code_match.py', 'python_origin.py', 'python_selection.py',
+        'python_code.py', 'python_code_match.py', 'python_origin.py', 'python_selection.py', 'python_cache.py',
         'python_execution.py', 'python_health.py', 'python_telemetry.py', 'python_launch.py')})
     files["host-python"] = capture.file_digest(Path(sys.executable))
     files["observer:otelc_capture.py"] = capture.file_digest(Path(capture.__file__))
@@ -737,6 +743,7 @@ def load_workspace(path, generated=False):
     java_provider.verify_probes(sys.modules[__name__], workspace, data)
     node_source.verify_probes(sys.modules[__name__], workspace, data)
     python_provider.verify_probes(sys.modules[__name__], workspace, data)
+    python_cache.verify(sys.modules[__name__], workspace, data)
     if generated and manifest(workspace / "tests") != read(workspace / GENERATED_MANIFEST):
         raise ValueError("generated suite or corpus changed; create a new plan")
     return workspace, data
@@ -806,7 +813,9 @@ if __name__=="__main__":unittest.main()
         for name in entry.get("go_context", {}).get("files", [entry["path"]]):
             target = preview / name
             target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(workspace / "snapshot" / name, target)
+            # The cache loader validates source timestamps and permissions too.
+            copy_source = shutil.copy2 if python_provider.cached(entry) else shutil.copyfile
+            copy_source(workspace / "snapshot" / name, target)
         harness.materialise(preview, entry, case["arguments"])
     write(workspace / GENERATED_MANIFEST, manifest(destination))
     (workspace / README_FILE).write_text("Generated scalar diagnostic suite. Boilerplate: MIT; application snapshot retains its original licence.\nRun: OTELEQ_PYTHON=/path/to/otelc/.venv/bin/python python3 -I -B tests/test_equivalence.py\nOr: quux-oteleq run --workspace . --report-dir /new/external/report\nEvery blocked selected callable fails the generated strict suite. No shipping-artefact or universal equivalence claim.\nKeep this whole workspace, or export-tests to a new destination.\n")
@@ -1129,6 +1138,7 @@ def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, ht
     shutil.copytree(workspace / "snapshot", project)
     if 'native_context' not in entry:
         shutil.copytree(workspace / "tests/harnesses" / case["id"], project, dirs_exist_ok=True)
+    cache_inputs = python_cache.materialise(sys.modules[__name__], workspace, data, project) if python_provider.cached(entry) else None
     driver = driver_path(project, entry)
     service = "oteleq-gen-" + uuid.uuid4().hex
     env = capture.environment(project, tools, service, root)
@@ -1158,7 +1168,8 @@ def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, ht
                                            project, prefix, env, folder, lane)
         elif python_provider.origin(entry):
             python_run = python_launch.prepare(sys.modules[__name__], root, project, entry, driver,
-                                               tools, env, folder, config, lane, data["artefacts"][language])
+                                               tools, env, folder, config, lane, data["artefacts"][language],
+                                               **({'caches': cache_inputs} if cache_inputs is not None else {}))
             command = python_prepared.expected_command(python_run.intent)
         else:
             options = attempt_build_options(runtime, java_context)
@@ -1386,7 +1397,8 @@ def retained_provider_directories(data):
                  ('java_provider_manifest' in data, java_provider.DIRECTORY),
                  ('node_provider_manifest' in data, node_source.DIRECTORY),
                  ('python_provider_manifest' in data, python_provider.DIRECTORY))
-    return [directory for present, directory in providers if present]
+    return [directory for present, directory in providers if present] + (
+        [python_cache.DIRECTORY] if 'python_cache_context_manifest' in data else [])
 
 
 def export_tests(args):

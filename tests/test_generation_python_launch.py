@@ -208,7 +208,7 @@ class PythonLaunchTests(unittest.TestCase):
     def test_witness_requires_declared_root_counts_and_separate_direct_health(self):
         with tempfile.TemporaryDirectory() as temporary:
             folder = Path(temporary).resolve()
-            run = SimpleNamespace(intent=SimpleNamespace(runtime=folder, policy={'schema_version': 3}))
+            run = SimpleNamespace(intent=SimpleNamespace(runtime=folder, policy={'schema_version': 3}, profile=launch.provider.ORIGIN_PROFILE))
             value = {'received': {'spans': 1}, 'functions': {'entry.workload': 1}}
             health = {'runtime_losses': {'incomplete': 0}, 'pending': 0}
             bodies = [('/v1/traces', traces().SerializeToString())]
@@ -237,7 +237,7 @@ class PythonLaunchTests(unittest.TestCase):
     def test_source_creation_must_finish_before_independent_selected_calls(self):
         with tempfile.TemporaryDirectory() as temporary:
             folder = Path(temporary).resolve()
-            run = SimpleNamespace(intent=SimpleNamespace(runtime=folder, policy={}))
+            run = SimpleNamespace(intent=SimpleNamespace(runtime=folder, policy={}, profile=launch.provider.ORIGIN_PROFILE))
             chosen = {**entry(), 'receiver_fixture': {'source_function': 'make_counter', 'line': 4}}
             message = traces(); scope = message.resource_spans[0].scope_spans[0]
             target = scope.spans[0]; target.start_time_unix_nano = 3; target.end_time_unix_nano = 4

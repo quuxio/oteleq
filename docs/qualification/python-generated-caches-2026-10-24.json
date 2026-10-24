@@ -1,0 +1,331 @@
+{
+  "qualification_schema_version": 1,
+  "date": "2026-10-24",
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "scope_status": "qualified recorded ordinary-loader cache and synchronous generated diagnostic workflows",
+  "platform": {
+    "os": "macOS",
+    "architecture": "arm64",
+    "python": [
+      "3.12.15",
+      "3.14.8"
+    ]
+  },
+  "runtime": {
+    "repository": "quuxio/oteleq",
+    "commit": "95d94aed4fa7e1319392cd8013003cefbcc76888",
+    "source_archive_sha256": "647baf330c0e5fa683b922b5c5a9ebb1bde2f1d275bcfa8bd77ebc779249b118",
+    "source_files": 494,
+    "cli_sha256": "1115d596eaf364535125a6ed964d4f138923ac0e26dff68d6203e59bb6ad83c0",
+    "exact_embedded_production_modules": [
+      "generation.py",
+      "python_cache.py",
+      "python_selection.py",
+      "python_provider.py",
+      "python_prepared.py",
+      "python_execution.py",
+      "python_launch.py",
+      "observe.py",
+      "harness.py"
+    ],
+    "runtime_sources_unchanged_in_driver": true
+  },
+  "verifier": {
+    "commit": "17b137b01c22617e2864cd8748b2a52558114f2f",
+    "source_archive_sha256": "60c5720f37316a42e5c7a4b0d57d76569ab4fdff9f560c3e298d98b628d14469",
+    "source_files_preserved": 501,
+    "entrypoint": "tests/qualify_python_cached_workflows.py",
+    "execution_command": "make generation-python-cache-workflows-otelc",
+    "retained_options": [
+      "--recheck",
+      "--audit-dir NEW_EXTERNAL_DIRECTORY"
+    ],
+    "components": [
+      "matrix",
+      "receivers",
+      "effects",
+      "all"
+    ],
+    "files_sha256": {
+      "tests/qualify_python_cached_workflows.py": "f539937e7ef33c35218dc011ce14538d781085ebe3d5a1435450ee2c3d76b76a",
+      "tests/python_cache_receiver_workflows.py": "27c834fb30e8cf7ac643a2f847f4e28002d23dbe6ecb367551225d567cb01a1b",
+      "tests/python_cache_effect_workflows.py": "666f627fc756ad1859c9d96828f1f40f22f004a84ba3e3eff1a646ca24be153d",
+      "tests/python_cache_qualification.py": "1b86bc48340fa019eeb7e218bc4b824042acde0230db260058489c3dcf9dbef7",
+      "tests/qualify_python_caches.py": "605268adf110eb33ac004c9f851be59dce7344e4449f5268bbc4c79549aca1aa",
+      "tests/qualify_python_generated_origins.py": "b434ecb417da26260ead212162eab29c89ef1d80f865eb2b4e7f2629e54c0b54",
+      "tests/python_sequence_fixture.py": "afed7529c9c25adb2fc0606ad97135044f9532ee1e4c2ac494cca4e1653bf623",
+      "tests/sequence_qualification.py": "d9ef1baf5ec8a6ce5c0a31ad3f125473c9ec313a7ce6c2adde260f69e83e7e9f",
+      "tests/python_origin_effect_workflows.py": "ad106b5aeba84fd8df306b6de17929ddca95b432dbe8bd358403e5e7e6a185d7"
+    }
+  },
+  "provider": {
+    "repository": "quuxio/otelc",
+    "commit": "ce4cf749279c1b4416ca79e18c194c8c908471f6",
+    "source_archive_sha256": "f15d9b9f2278988962f07828a013a77e33b84625d93592a2c60f12d7e74c8606",
+    "source_files": 389,
+    "profile": "python-native-cache-origins-v3",
+    "protocols": {
+      "request": 3,
+      "plan": 3,
+      "prepared": 3,
+      "command": 3,
+      "execution": 3,
+      "journal": 3,
+      "code": 2,
+      "health": 2,
+      "sdk": 1,
+      "code_comparisons": null,
+      "source_complete": false
+    },
+    "candidate_source_compatibility": {
+      "commit": "e8e5861615ded40ebc5c50d68482ad703abdd419",
+      "tree": "1250b1d1c2cf6ebaaedc2726376051d2e8c0838e",
+      "consumed_static_source_paths_each_runtime": 85,
+      "all_blob_bytes_and_executable_modes_identical": true,
+      "bridge_sha256": "c93291140b991b1fe3fa8f2e94571b7b85501ea431b6fdfff6c95c01317a0b93",
+      "new_target_or_binary_executions": 0,
+      "scope": "Static consumed Python/native/builder input compatibility only; actual products/execution remain the frozen ce4 evidence. No Go or whole-SDK admission."
+    }
+  },
+  "results": {
+    "completed_runtime_corpora": 2,
+    "actual_application_launches": 488,
+    "sdk_processes": 244,
+    "reports": 96,
+    "recomputed_comparisons": 124,
+    "complete_raw_and_typed_observations": 496,
+    "copied_original_observations": 8,
+    "prelaunch_input_mutation_refusals": 12,
+    "altered_comparison_refusals": 10,
+    "new_target_applications_in_retained_audits": 0
+  },
+  "corpora": [
+    {
+      "python": "3.12.15",
+      "python_hexversion": 51122160,
+      "result_sha256": "5d777cc006aafc754036c5d2ecf3b23db2edb52385a9ac5ab1d4dccdcf0e9a22",
+      "totals": {
+        "actual_application_launches": 244,
+        "sdk_processes": 122,
+        "reports": 48,
+        "complete_raw_and_typed_observations": 248,
+        "copied_original_observations": 4,
+        "recomputed_comparisons": 62,
+        "prelaunch_input_mutation_refusals": 6,
+        "altered_comparison_refusals": 5
+      },
+      "components": {
+        "effects": {
+          "actual_application_launches": 72,
+          "all_actual_start_records_accounted": true,
+          "artefact_class": "diagnostic",
+          "claim": "equivalence over these tests and observations",
+          "complete_raw_and_typed_observations": 72,
+          "copied_original_observations": 0,
+          "current_source_unchanged_changed_added_function": true,
+          "new_application_launches_in_audit": 0,
+          "operation_and_process_records_held": 159,
+          "prelaunch_input_mutation_refusals": 6,
+          "recomputed_comparisons": 18,
+          "reports": 14,
+          "scope": "Cached scalar domains/filesystem/HTTP/direct/export/current-source workflows, historical literal source/cache facts and prelaunch refusals. No shipping/full-project claim.",
+          "sdk_processes": 36
+        },
+        "matrix": {
+          "actual_application_launches": 32,
+          "artefact_class": "diagnostic",
+          "bindings": {
+            "checked": "cache-read",
+            "invalid-magic": "source-compiler",
+            "missing": "source-compiler",
+            "older-unchecked": "cache-read",
+            "stale-checked": "source-compiler",
+            "stale-timestamp": "source-compiler",
+            "timestamp": "cache-read",
+            "unchecked": "cache-read"
+          },
+          "claim": "equivalence over these tests and observations",
+          "cli_sha256": "1115d596eaf364535125a6ed964d4f138923ac0e26dff68d6203e59bb6ad83c0",
+          "complete_raw_and_typed_observations": 32,
+          "new_application_launches_in_audit": 0,
+          "operation_and_process_records_held": 88,
+          "recomputed_comparisons": 8,
+          "reports": 8,
+          "scope": "Ordinary timestamp/checked/unchecked caches, missing/stale/invalid-magic source fallback and accepted older unchecked code. Receiver/effect/retained/promoted workflows, broader loaders, shipping artefacts and full-project completion require separate qualification.",
+          "sdk_processes": 16
+        },
+        "receivers": {
+          "actual_application_launches": 140,
+          "all_selected_target_and_creator_cache_bound": true,
+          "altered_comparison_refusals": 5,
+          "artefact_class": "diagnostic",
+          "claim": "equivalence over these tests and observations",
+          "complete_raw_and_typed_observations": 144,
+          "copied_original_observations": 4,
+          "new_application_launches_in_audit": 0,
+          "operation_and_process_records_held": 309,
+          "recomputed_comparisons": 36,
+          "reports": 26,
+          "scope": "Synchronous cached package receivers/factories, ordered calls, recursion, exceptions and a real intermediate mutation; generated/replay/framework/detached/reduced routes. Broader loaders, live controls, async/resources, shipping and whole-project acceptance remain separate.",
+          "sdk_processes": 70,
+          "source_and_cache_facts_preserved": true
+        }
+      },
+      "provider_catalogue_sha256": {
+        "matrix": "810f287cb361b42426dd5ee23a9ac99a2df2f25d5da646b0e9bb09b5e6a80e95",
+        "receivers": "810f287cb361b42426dd5ee23a9ac99a2df2f25d5da646b0e9bb09b5e6a80e95",
+        "effects": "810f287cb361b42426dd5ee23a9ac99a2df2f25d5da646b0e9bb09b5e6a80e95"
+      }
+    },
+    {
+      "python": "3.14.8",
+      "python_hexversion": 51251440,
+      "result_sha256": "4e361c3fda69db91db56b1877e8592effa5f1a0f19977a9db8b822b682eb46be",
+      "totals": {
+        "actual_application_launches": 244,
+        "sdk_processes": 122,
+        "reports": 48,
+        "complete_raw_and_typed_observations": 248,
+        "copied_original_observations": 4,
+        "recomputed_comparisons": 62,
+        "prelaunch_input_mutation_refusals": 6,
+        "altered_comparison_refusals": 5
+      },
+      "components": {
+        "effects": {
+          "actual_application_launches": 72,
+          "all_actual_start_records_accounted": true,
+          "artefact_class": "diagnostic",
+          "claim": "equivalence over these tests and observations",
+          "complete_raw_and_typed_observations": 72,
+          "copied_original_observations": 0,
+          "current_source_unchanged_changed_added_function": true,
+          "new_application_launches_in_audit": 0,
+          "operation_and_process_records_held": 159,
+          "prelaunch_input_mutation_refusals": 6,
+          "recomputed_comparisons": 18,
+          "reports": 14,
+          "scope": "Cached scalar domains/filesystem/HTTP/direct/export/current-source workflows, historical literal source/cache facts and prelaunch refusals. No shipping/full-project claim.",
+          "sdk_processes": 36
+        },
+        "matrix": {
+          "actual_application_launches": 32,
+          "artefact_class": "diagnostic",
+          "bindings": {
+            "checked": "cache-read",
+            "invalid-magic": "source-compiler",
+            "missing": "source-compiler",
+            "older-unchecked": "cache-read",
+            "stale-checked": "source-compiler",
+            "stale-timestamp": "source-compiler",
+            "timestamp": "cache-read",
+            "unchecked": "cache-read"
+          },
+          "claim": "equivalence over these tests and observations",
+          "cli_sha256": "1115d596eaf364535125a6ed964d4f138923ac0e26dff68d6203e59bb6ad83c0",
+          "complete_raw_and_typed_observations": 32,
+          "new_application_launches_in_audit": 0,
+          "operation_and_process_records_held": 88,
+          "recomputed_comparisons": 8,
+          "reports": 8,
+          "scope": "Ordinary timestamp/checked/unchecked caches, missing/stale/invalid-magic source fallback and accepted older unchecked code. Receiver/effect/retained/promoted workflows, broader loaders, shipping artefacts and full-project completion require separate qualification.",
+          "sdk_processes": 16
+        },
+        "receivers": {
+          "actual_application_launches": 140,
+          "all_selected_target_and_creator_cache_bound": true,
+          "altered_comparison_refusals": 5,
+          "artefact_class": "diagnostic",
+          "claim": "equivalence over these tests and observations",
+          "complete_raw_and_typed_observations": 144,
+          "copied_original_observations": 4,
+          "new_application_launches_in_audit": 0,
+          "operation_and_process_records_held": 309,
+          "recomputed_comparisons": 36,
+          "reports": 26,
+          "scope": "Synchronous cached package receivers/factories, ordered calls, recursion, exceptions and a real intermediate mutation; generated/replay/framework/detached/reduced routes. Broader loaders, live controls, async/resources, shipping and whole-project acceptance remain separate.",
+          "sdk_processes": 70,
+          "source_and_cache_facts_preserved": true
+        }
+      },
+      "provider_catalogue_sha256": {
+        "matrix": "625e7dbf5b732b24c3931f6ec2dbf15b649583e85767c5508130f01f12b419c6",
+        "receivers": "625e7dbf5b732b24c3931f6ec2dbf15b649583e85767c5508130f01f12b419c6",
+        "effects": "625e7dbf5b732b24c3931f6ec2dbf15b649583e85767c5508130f01f12b419c6"
+      }
+    }
+  ],
+  "checked_behaviour": [
+    "Ordinary timestamp, checked-hash and unchecked-hash cache use; accepted older unchecked body; missing/stale/invalid-magic source fallback",
+    "Original and private source/cache bytes, bounded catalogues, timestamps, permissions, original identities and independently recomputed plan source hashes",
+    "Every observed cache root, including unexecuted roots, bound to independently frozen consumed cache bytes; selected target/creator and SDK code joins checked separately",
+    "Real package receivers/factories, own statics/globals/instance fields, aliases/cycles, recursion, exceptions and every ordered intermediate graph",
+    "Generated domains, complete independent raw and typed return/state/effect oracles, exact filesystem bytes/permissions and scripted HTTP requests/responses",
+    "Generated/replay/unittest/detached/reduced suites and fresh unchanged/changed/added-function source promotion with independent historical-stage inputs",
+    "Actual supervisor/application/SDK ownership, raw native journals/descriptors, direct final health and decoded OTLP signals",
+    "Exact route argv and terminal receipts; deliberately altered inputs refused before an additional process-start record; retained-only audits preserve original records and do not rerun mutations"
+  ],
+  "review": {
+    "portable_driver_and_original_full_corpus_review_sha256": "e80327fe15ba5c44b1b2b25b41bf1d9ec0e44aa2422bb98627ce3d6478e97e14",
+    "scope": "Reviewed implementation and retained original corpus; fresh corpus and final publication/delivery reviews recorded separately."
+  },
+  "validation": {
+    "full_gate_commit": "17b137b01c22617e2864cd8748b2a52558114f2f",
+    "full_gate_exit_code": 0,
+    "source_files_held": 501,
+    "full_gate_result_sha256": "f143bee742c7b3a9cb976c32f18a30c1d5a0a4937bd50125424984b80eae4c39",
+    "full_gate_log_sha256": "a841d069ee21638e2bdbe31616b13c7adc98a8d8d7b849121529ae99e0bf8051",
+    "generation_tests": 1178,
+    "rust_product_line_coverage_percent": 97.38,
+    "focused_python_tests_each_runtime": 216,
+    "makefile_tests": 8,
+    "qualification_targets_in_three_directory_modes": 44,
+    "scope": "The Python3.12 qualifier host is measured separately. Application/native/SDK launch recipes are unchanged and contain no host-coverage startup.",
+    "host_coverage_report_sha256": "97815a84c72156939d9bad2a5b70b5497d763641b827a65cdc1b7c58b1ae7dc3",
+    "host_qualifier_statement_coverage": {
+      "python_cache_effect_workflows.py": {
+        "statements": 194,
+        "missed": 0,
+        "percent": 100.0
+      },
+      "python_cache_receiver_workflows.py": {
+        "statements": 107,
+        "missed": 0,
+        "percent": 100.0
+      },
+      "python_cache_qualification.py": {
+        "statements": 92,
+        "missed": 0,
+        "percent": 100.0
+      },
+      "qualify_python_cached_workflows.py": {
+        "statements": 80,
+        "missed": 6,
+        "percent": 92.5
+      },
+      "qualify_python_caches.py": {
+        "statements": 153,
+        "missed": 25,
+        "percent": 83.660131
+      }
+    }
+  },
+  "preserved_failures": [
+    "d376 harness copy reset source timestamps; explicit cache-only copy2 and a failing-before/passing-after regression corrected it",
+    "622 expected-body direct compilation rejected valid older unchecked cache code; explicit write-disabled ordinary get_code corrected it, defaults unchanged",
+    "294 retained auditor expected equivalent instead of equivalent_observed; exact full public-response equality and repeatable read-only comparison corrected it",
+    "294 full gate found an obsolete42-target recipe expectation; every subsequently added target is explicitly tested in default, relative and spaced target directories",
+    "Earlier standalone observer/external audit commands omitted required module paths; corrected scoped runs preserve the original failures",
+    "A portable-audit regression exposed stock-tag-only cache accounting; the independent catalogue now checks all source-associated tags/optimisations, prefix collisions and links, while the original production input guard remains unchanged"
+  ],
+  "limits": [
+    "Only recorded CPython ordinary application-root source-loader/cache-return profiles are qualified; unsupported/sourceless/custom loaders and general dependency closure remain open",
+    "A consumed cache binding is not proof of compilation from current source; cache optimisation3 is unknown and the source-only defaults remain separate",
+    "General object arguments/factories, async/generator/resource actions, live Python metric controls and invocation-scoped attribution require separate work",
+    "First-execution identities are not invocation counts; health and decoded telemetry supply their separate observations",
+    "Generated diagnostic callers and native observers are part of the tested workload, not independent shipping-artefact proof",
+    "Other toolchain/platform/provider/callable/build profiles and complete interpreter/OS/import closure are outside this record",
+    "All 21 acceptance areas in docs/completion.md remain in force; full-project completion is not claimed"
+  ]
+}

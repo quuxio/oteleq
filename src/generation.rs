@@ -33,6 +33,10 @@ const RESOURCES: &[(&str, &str)] = &[
         include_str!("../adapters/generation/python_selection.py"),
     ),
     (
+        "python_cache.py",
+        include_str!("../adapters/generation/python_cache.py"),
+    ),
+    (
         "python_execution.py",
         include_str!("../adapters/generation/python_execution.py"),
     ),

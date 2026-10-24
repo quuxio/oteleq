@@ -26,6 +26,7 @@ BOOTSTRAP = (
     "root=Path(sys.argv[4]),entry=sys.argv[5],plain=sys.argv[6]=='plain',"
     "profile='python-native-origins-v2'),sort_keys=True))"
 )
+CACHE_BOOTSTRAP = BOOTSTRAP.replace(provider.ORIGIN_PROFILE, provider.CACHE_PROFILE)
 
 
 @dataclass(frozen=True)
@@ -37,6 +38,7 @@ class Run:
     selected: tuple[selection.Selection, ...]
     origin_sha256: str
     parent_pid: int
+    caches: tuple[selection.Source, ...] | None = None
 
 
 def selected_source(project: Path, entry: dict) -> tuple[selection.Selection, ...]:
@@ -69,17 +71,18 @@ def interpreter(workflow, python: Path, root: Path, environment: dict, folder: P
 
 def prepare(workflow, root: Path, project: Path, entry: dict, driver: Path,
             tools: dict, environment: dict, folder: Path, config: Path,
-            lane: str, catalogue: dict) -> Run:
+            lane: str, catalogue: dict, *, caches: tuple[selection.Source, ...] | None = None) -> Run:
     """Prepare through one fixed API bootstrap and verify its complete response."""
     provider.refuse_unbound(entry)
     provider.require(provider.origin(entry) and tools["python"] == Path(sys.executable).absolute(),
                      "origin execution requires the selected host Python spelling")
     provider.require(lane in ("baseline", "instrumented_on"), "unknown generated Python lane")
+    provider.require((caches is not None) == provider.cached(entry), 'Python cache execution lacks its caller-owned context')
     frozen = selected_source(project, entry)
     selected_python = interpreter(workflow, tools["python"], root, environment, folder)
     intent = prepared.Intent(root, project, folder / "python-runtime", driver.relative_to(project),
                              root, tools["python"], selected_python, tomllib.loads(config.read_text()),
-                             config, dict(environment), lane == "baseline", profile=provider.ORIGIN_PROFILE)
+                             config, dict(environment), lane == "baseline", profile=entry['python_profile'])
     prepared.optimisation(intent)
     expected = {"python_hexversion": sys.hexversion, "optimisation": prepared.optimisation(intent),
                 "plain": intent.plain, "parent_pid": os.getpid(), "selected": [
@@ -87,8 +90,13 @@ def prepare(workflow, root: Path, project: Path, entry: dict, driver: Path,
          "device": item.source.device, "inode": item.source.inode,
          "mtime_ns": item.source.mtime_ns, "mode": item.source.mode,
          "qualname": item.qualname, "line": item.line} for item in frozen]}
+    if caches is not None:
+        expected['caches'] = [{
+            'path_hex': item.path.hex(), 'sha256': item.sha256, 'device': item.device,
+            'inode': item.inode, 'mtime_ns': item.mtime_ns, 'mode': item.mode} for item in caches]
     workflow.write(folder / ORIGIN_FILE, expected)
-    command = [tools["python"], "-I", "-S", "-B", "-c", BOOTSTRAP, root, config,
+    bootstrap = CACHE_BOOTSTRAP if provider.cached(entry) else BOOTSTRAP
+    command = [tools["python"], "-I", "-S", "-B", "-c", bootstrap, root, config,
                intent.runtime, project, intent.entry, "plain" if intent.plain else "instrumented"]
     result = workflow.execute(command, root, environment, folder / "python-prepare", timeout=180,
                               max_output_bytes=prepared.MAX_METADATA)
@@ -98,8 +106,11 @@ def prepare(workflow, root: Path, project: Path, entry: dict, driver: Path,
     prepared.verify(launch, intent, catalogue)
     provider.require(python_inputs.artefacts(root, tools) == catalogue, "preparation changed frozen provider inputs")
     provider.require(selected_source(project, entry) == frozen, "preparation changed selected source facts")
+    if caches is not None:
+        provider.require(tuple(selection.freeze(Path(os.fsdecode(item.path))) for item in caches) == caches,
+                         'preparation changed frozen Python cache inputs')
     workflow.write(folder / LAUNCH_FILE, launch)
-    return Run(intent, launch, frozen, capture.file_digest(folder / ORIGIN_FILE), expected["parent_pid"])
+    return Run(intent, launch, frozen, capture.file_digest(folder / ORIGIN_FILE), expected["parent_pid"], caches)
 
 
 def verify(workflow, run: Run, entry: dict, folder: Path, result,
@@ -112,6 +123,10 @@ def verify(workflow, run: Run, entry: dict, folder: Path, result,
                                    prepared.expected_request(run.intent)), "caller-owned Python expected request changed")
     provider.require(selected_source(run.intent.project, entry) == run.selected,
                      "selected source changed during generated execution")
+    provider.require((run.caches is not None) == provider.cached(entry), 'Python cache execution context changed')
+    if run.caches is not None:
+        provider.require(tuple(selection.freeze(Path(os.fsdecode(item.path))) for item in run.caches) == run.caches,
+                         'Python cache inputs changed during generated execution')
     process = workflow.read(folder / "process.json")
     command = prepared.expected_command(run.intent)
     provider.require(type(process) is dict and set(process) == {"pid", "argv"}
@@ -119,7 +134,7 @@ def verify(workflow, run: Run, entry: dict, folder: Path, result,
     owner = python_execution.Owner(process["pid"], run.parent_pid, tuple(command), result.returncode, sys.hexversion)
     execution = python_execution.read(run.intent, run.launch, owner, catalogue)
     coverage = selection.verify(execution.journal, run.selected, python_version=sys.hexversion,
-                                optimisation=prepared.optimisation(run.intent), plain=run.intent.plain)
+                                optimisation=prepared.optimisation(run.intent), plain=run.intent.plain, caches=run.caches)
     labels = {entry["name"]: entry["otelc_function"]}
     creation = provider.creator(entry)
     if creation is not None:
@@ -132,10 +147,12 @@ def verify(workflow, run: Run, entry: dict, folder: Path, result,
                 functions[match.sdk] = labels[item.selection.qualname]
             matches.append({"root": match.root, "execution": match.execution,
                             "member": match.member, "sdk": match.sdk})
+            if run.caches is not None:
+                matches[-1]['input_binding'] = match.binding
         records.append({"qualname": item.selection.qualname, "line": item.selection.line,
                         "source_sha256": item.selection.source.sha256, "matches": matches})
     workflow.write(folder / "python-verified-origins.json", {
-        "source_origin": "selected-source-bound", "expected_sha256": run.origin_sha256,
+        "source_origin": 'selected-input-bound' if provider.cached(entry) else "selected-source-bound", "expected_sha256": run.origin_sha256,
         "supervisor_pid": owner.pid, "application_pid": execution.application_pid,
         "sdk_pid": execution.sdk_pid, "selected": records})
     return execution, functions
@@ -168,10 +185,13 @@ def witness(workflow, run: Run, checked: tuple, folder: Path, entry: dict,
     health = python_health.read(run.intent.runtime, execution, python_health.policy_digest(run.intent.policy),
                                 received["received"])
     workflow.write(folder / "python-verified-health.json", health)
-    workflow.write(folder / "python-verified-telemetry.json", {**received, "source_origin": "selected-source-bound"})
+    workflow.write(folder / "python-verified-telemetry.json", {**received, "source_origin":
+        'selected-input-bound' if provider.cached(entry) else "selected-source-bound"})
     raw = hashlib.sha256()
     for _, body in bodies:
         raw.update(body)
-    return {"decoder": "opentelemetry-proto traces/metrics and Python SDK health2; selected source origins2",
+    version = provider.profile_version(run.intent.profile)
+    return {"decoder": "opentelemetry-proto traces/metrics and Python SDK health2; selected source origins2" if version == 2 else
+            'opentelemetry-proto traces/metrics and Python SDK health2; selected source/cache inputs3',
             "raw_otlp_sha256": raw.hexdigest(), "functions": received["functions"],
             "spans": received["received"]["spans"], "losses": health["runtime_losses"], "pending": health["pending"]}

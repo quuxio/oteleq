@@ -14,6 +14,7 @@ MAX_METADATA = 256 * 1024
 SDK_LANGUAGES = {"c", "cpp", "rust", "python", "java", "javascript", "typescript", "go"}
 INPUT_PROFILE = "python-native-inputs-v1"
 ORIGIN_PROFILE = "python-native-origins-v2"
+CACHE_PROFILE = "python-native-cache-origins-v3"
 PROTOCOLS = {"schema_version": 1, "kind": "otelc.python.protocols",
              "request": 1, "plan": 1, "prepared": 1, "command": 1, "execution": 1,
              "journal": {"schema_version": 1, "record_kinds": [1, 2, 3, 4]},
@@ -26,6 +27,12 @@ ORIGIN_PROTOCOLS = {"schema_version": 2, "kind": "otelc.python.protocols", "prof
                     "code_comparisons": None, "source_complete": False,
                     "origin_scope": "native-entry-and-application-root-source-loaders"}
 ORIGIN_UNAVAILABLE = "both baseline and instrumented selected-source origin bindings are unavailable"
+CACHE_PROTOCOLS = {"schema_version": 3, "kind": "otelc.python.protocols", "profile": CACHE_PROFILE,
+                   "request": 3, "plan": 3, "prepared": 3, "command": 3, "execution": 3,
+                   "journal": {"schema_version": 3, "record_kinds": [1, 2, 3, 4, 5, 6, 7]},
+                   "code": {"written": 2, "readable": [2]}, "health": 2, "sdk": 1,
+                   "code_comparisons": None, "source_complete": False,
+                   "origin_scope": "native-entry-and-application-root-source-and-cache-loaders"}
 
 
 def require(condition: bool, reason: str) -> None:
@@ -36,8 +43,9 @@ def require(condition: bool, reason: str) -> None:
 
 def profile_version(profile: str) -> int:
     """Only explicit caller intent selects another protocol; metadata cannot."""
-    require(type(profile) is str and profile in (INPUT_PROFILE, ORIGIN_PROFILE), "unknown Python prepared profile")
-    return 2 if profile == ORIGIN_PROFILE else 1
+    versions = {INPUT_PROFILE: 1, ORIGIN_PROFILE: 2, CACHE_PROFILE: 3}
+    require(type(profile) is str and profile in versions, "unknown Python prepared profile")
+    return versions[profile]
 
 
 def settings(value: Any) -> dict:
@@ -64,7 +72,12 @@ def enabled(entry: dict) -> bool:
 
 def origin(entry: dict) -> bool:
     """Generated origin execution requires an explicit second-profile request."""
-    return enabled(entry) and entry.get("python_profile") == ORIGIN_PROFILE
+    return enabled(entry) and entry.get("python_profile") in (ORIGIN_PROFILE, CACHE_PROFILE)
+
+
+def cached(entry: dict) -> bool:
+    """Only caller-selected cache profiles admit preserved cache input bindings."""
+    return enabled(entry) and entry.get('python_profile') == CACHE_PROFILE
 
 
 def creator(entry: dict) -> str | None:
@@ -114,7 +127,7 @@ def same(value: Any, expected: Any) -> bool:
 
 def verify_protocols(value: Any, profile: str = INPUT_PROFILE) -> None:
     """Static journal/descriptor formats do not establish selected-code origin."""
-    expected = ORIGIN_PROTOCOLS if profile_version(profile) == 2 else PROTOCOLS
+    expected = {1: PROTOCOLS, 2: ORIGIN_PROTOCOLS, 3: CACHE_PROTOCOLS}[profile_version(profile)]
     require(type(value) is dict and same(value, expected), "unsupported public Python protocols")
 
 
@@ -140,10 +153,10 @@ def probe_protocols(root: Path, workspace: Path, tools: dict, execute: Callable,
                     profile: str = INPUT_PROFILE) -> dict:
     """Probe once with site hooks disabled, without build or application startup."""
     selected = profile_version(profile)
-    folder = workspace / DIRECTORY / ("protocol-origins-v2" if selected == 2 else "protocol")
+    folder = workspace / DIRECTORY / {1: 'protocol', 2: 'protocol-origins-v2', 3: 'protocol-cache-origins-v3'}[selected]
     receipt = folder / "response.json"
     require(not (workspace / DIRECTORY).is_symlink() and not folder.is_symlink(), "linked protocol directory")
-    argument = "profile=" + repr(profile) if selected == 2 else ""
+    argument = "profile=" + repr(profile) if selected >= 2 else ""
     bootstrap = ("import json,sys;sys.path.insert(0,sys.argv[1]);from otelc import prepared_python;"
                  "print(json.dumps(prepared_python.protocols(" + argument + "),sort_keys=True))")
     command = [tools["python"], "-I", "-S", "-B", "-c", bootstrap, root]
@@ -230,7 +243,7 @@ def refuse_unbound(entry: dict) -> None:
         probe = entry.get("python_provider")
         require(type(probe) is dict and probe.get("status") == 0
                 and type(probe.get("status")) is int, "missing successful frozen origin negotiation")
-        verify_protocols(probe.get("protocols"), ORIGIN_PROFILE)
+        verify_protocols(probe.get("protocols"), entry['python_profile'])
         endpoint, service = "http://127.0.0.1:4318", "oteleq-python-provider"
         require(probe.get("request") == policy(entry, endpoint, service), "frozen origin request differs")
         require(type(probe.get("stdout")) is str, "invalid frozen capability output")

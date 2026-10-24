@@ -102,7 +102,7 @@ def compare_receipt(path: Path, value: dict) -> None:
 
 
 def recheck_attempt(folder: Path, entry: dict, provider: Path, catalogue: dict, interpreter: dict,
-                    *, selection_builder=expected_selection) -> dict:
+                    *, selection_builder=expected_selection, cache_builder=None) -> dict:
     """Recompute source, owner, both signals and final health without new apps."""
     from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceRequest
 
@@ -112,7 +112,8 @@ def recheck_attempt(folder: Path, entry: dict, provider: Path, catalogue: dict, 
         # remains evidence for that original launch, not a new process.
         assert folder.parent.parent.name == 'original' and actual.is_dir()
         assert generation.manifest(folder) == generation.manifest(actual)
-        return recheck_attempt(actual, entry, provider, catalogue, interpreter, selection_builder=selection_builder)
+        return recheck_attempt(actual, entry, provider, catalogue, interpreter,
+                               selection_builder=selection_builder, cache_builder=cache_builder)
     lane = folder.name.split('-')[0]
     assert lane in ('baseline', 'instrumented_on')
     policy = tomllib.loads((folder / 'policy.toml').read_text())
@@ -124,14 +125,17 @@ def recheck_attempt(folder: Path, entry: dict, provider: Path, catalogue: dict, 
     environment.update(TMPDIR=str(folder / 'scratch'))
     info = generation.read(folder / 'python-interpreter.json')['observed']
     assert info == interpreter
+    assert (cache_builder is not None) == python_provider.cached(entry)
     intent = python_prepared.Intent(provider, project, folder / 'python-runtime',
         Path('_oteleq_generated/driver.py'), provider, tools['python'], info, policy,
-        folder / 'policy.toml', environment, lane == 'baseline', profile=python_provider.ORIGIN_PROFILE)
+        folder / 'policy.toml', environment, lane == 'baseline',
+        profile=entry.get('python_profile', python_provider.ORIGIN_PROFILE))
     facts, selected = selection_builder(folder, entry)
     assert facts['plain'] is intent.plain
     verified = generation.read(folder / 'python-verified-origins.json')
     run = python_launch.Run(intent, generation.read(folder / python_launch.LAUNCH_FILE), selected,
-                            verified['expected_sha256'], facts['parent_pid'])
+                            verified['expected_sha256'], facts['parent_pid'],
+                            cache_builder(folder, entry, facts) if cache_builder is not None else None)
     readonly = SimpleNamespace(read=generation.read, write=compare_receipt)
     result = subprocess.CompletedProcess([], 0)
     checked = python_launch.verify(readonly, run, entry, folder, result, catalogue)
