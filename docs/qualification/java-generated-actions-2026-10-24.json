@@ -35,7 +35,7 @@
     "repository": "quuxio/otelc",
     "commit": "42258a4ff8d79682c552274f014b17348c9e05cb",
     "base": "45b75643b13aa1b3a11db88d9d5fb84b018b2c94",
-    "delivery_status": "recorded candidate; final merged-provider compatibility is separate",
+    "delivery_status": "Merged SDK source tree is identical to the qualified candidate; source/mode/product compatibility verified",
     "source_archive_sha256": "37e3eba0cca08a81033c172f604e7b11ef0717b5958eb2e066d86c7f36ef3280",
     "source_files_preserved": 362,
     "products": {
@@ -56,7 +56,19 @@
         "size": 8683
       }
     },
-    "all_products_preserved": true
+    "all_products_preserved": true,
+    "merged_delivery": {
+      "commit": "217d4f2d5c4c44606e16272e19b682938e046027",
+      "tree": "36b861fe758c52443764cfb133d1c1d715cf989a",
+      "pull_request": "https://github.com/quuxio/otelc/pull/216",
+      "qualified_candidate_tree_equal": true,
+      "source_files_verified": 362,
+      "executable_modes_verified": true,
+      "runtime_products_verified": 4,
+      "compatibility_receipt_sha256": "edfff8c32e56fa9aeb30de87368829130e5479d2a51d7d30299aa51f45bc3b17",
+      "additional_application_launches": 0,
+      "scope": "Source-identical merged SDK compatibility; original captures retain their candidate identity and counts"
+    }
   },
   "tools_sha256": {
     "java": "d7ab2ea6a7e731a8a2cee7d722046c9f7d8c5f184cd769b9954a392592337770",
