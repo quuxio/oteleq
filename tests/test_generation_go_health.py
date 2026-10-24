@@ -1,6 +1,7 @@
 """Independent Go checkpoints cannot replace PID, selection or decoded receipt."""
 
 import copy
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -50,6 +51,18 @@ def qualify(value: dict, **options) -> dict:
 
 
 class GoProviderHealthTests(unittest.TestCase):
+    def test_policy_prepared_and_selection_digest_encodings_remain_distinct(self):
+        value = {"snow": "\u2603", "number": 1.0, "flag": True}
+        policy = b'{"flag": true, "number": 1.0, "snow": "\\u2603"}'
+        selection = b'{"flag":true,"number":1.0,"snow":"\\u2603"}'
+        self.assertEqual(provider.policy_digest(value), hashlib.sha256(policy).hexdigest())
+        self.assertEqual(provider.metadata_digest(value), hashlib.sha256(policy + b"\n").hexdigest())
+        self.assertEqual(provider.selection_digest(value), hashlib.sha256(selection).hexdigest())
+        self.assertEqual(len({provider.policy_digest(value), provider.metadata_digest(value),
+                              provider.selection_digest(value)}), 3)
+        with self.assertRaises(ValueError):
+            provider.metadata_digest({"invalid": float("nan")})
+
     def test_protocol_descriptor_is_closed_and_never_coerces_numbers_or_flags(self):
         descriptor = {"schema_version": 1, "kind": "otelc.go.protocols", "profile": "go-source-v1",
             "build": 2, "request": 1, "plan": 1, "prepared": 1, "command": 1,

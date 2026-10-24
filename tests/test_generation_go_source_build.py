@@ -1,0 +1,199 @@
+"""Source-build2 readers preserve caller inputs and never execute saved commands."""
+
+import copy
+from dataclasses import replace
+import json
+import os
+from pathlib import Path
+import shutil
+import sys
+import tempfile
+import unittest
+from unittest.mock import patch
+
+REPO = Path(__file__).resolve().parents[1]
+sys.path[:0] = [str(REPO / "adapters/generation"), str(REPO / "examples")]
+import go_build as build
+import go_files as files
+from go_provider import selection_digest
+
+
+def write(path: Path, value) -> None:
+    path.write_text(json.dumps(value, sort_keys=True, indent=2) + "\n")
+
+
+def fixture(base: Path) -> tuple:
+    """Literal compiler/selection fields; the fixture runs no target or tool."""
+    original, sdk, context, output, tools = [base / name for name in ("application", "installed-sdk", "qualified-context", "bundle", "tools")]
+    for path in (original, sdk, context, output, tools):
+        path.mkdir()
+    (original / "go.mod").write_text("module example.test/app\n\ngo 1.26.0\n")
+    (original / "app.go").write_text("package main\nfunc Add(value int)int{return value+1}\n")
+    (sdk / "go.mod").write_text("module io.quux.otelc/go\n")
+    (sdk / "runtime.go").write_text("package runtime\n")
+    (context / "context.go").write_text("package context\n")
+    identities = {}
+    for name in ("go", "weaver", "bundle"):
+        path = tools / name; path.write_bytes(("fixed-" + name).encode())
+        identities[name] = str(path); identities[name + "_sha256"] = files.identity(path)["sha256"]
+    for source, name in ((original, "private"), (sdk, "sdk"), (context, "context")):
+        shutil.copytree(source, output / name)
+    (output / "inspection").mkdir()
+    for name in ("plain", "instrumented"):
+        path = output / name; path.write_bytes(("fixed-" + name).encode()); path.chmod(0o700)
+    row = {"file": "app.go", "gap": "", "generic": False, "line": 2,
+        "name": "example.test/app.Add", "package": "example.test/app", "parameters": 1,
+        "receiver": "", "receiver_id": "", "results": [
+            {"error": False, "expression": "_unnamedRetVal0", "failure": "", "pointer": ""}],
+        "sha256": files.identity(original / "app.go")["sha256"], "symbol": "Add", "variadic": False}
+    inventory = {"schema_version": 1, "root": str(original), "target": ".", "main": "example.test/app",
+        "functions": [copy.deepcopy(row)], "types": [], "allocations": [],
+        "files": {"app.go": row["sha256"]}, "packages": {}, "compiler_inputs": {"app.go": row["sha256"]}}
+    selection = {"schema_version": 1, "kind": "otelc.go-source-selection", "main": "example.test/app",
+        "functions": [copy.deepcopy(row)], "types": [], "allocations": [], "releases": [],
+        "context": {"tasks": False, "http": False}, "source_complete": False}
+    selection["sha256"] = selection_digest(selection)
+    settings = {"Go": "1.26.0", "Module": {"Path": "example.test/app"}}
+    modules = [{"Path": "example.test/app", "Main": True, "GoVersion": "1.26.0"}]
+    intent = build.Intent(output, files.freeze(original), files.freeze(sdk), ".",
+        (build.Target("example.test/app.Add", "app.go", 2, 1),), identities, settings, modules, files.freeze(context))
+    commands = build.commands(intent)
+    write(output / "commands.json", commands)
+    for index in range(len(commands)):
+        (output / f"command-{index}.stdout").write_bytes(b"compiler channel\n")
+        (output / f"command-{index}.stderr").write_bytes(b"")
+    write(output / "command-10.stdout", settings)
+    write(output / "inspection/inventory.json", inventory)
+    receipt = {"schema_version": 2, "kind": "otelc.go-source-build", "root": str(original), "target": ".",
+        "selection": selection, "inputs": intent.original.identities,
+        "sdk_inputs": files.freeze(output / "sdk").identities,
+        "private_inputs": files.freeze(output / "private").identities,
+        "context_inputs": files.freeze(output / "context").identities,
+        "inventory": files.identity(output / "inspection/inventory.json"),
+        "plain": files.identity(output / "plain"), "instrumented": files.identity(output / "instrumented"),
+        "modules_before": modules, "modules_after": copy.deepcopy(modules), "settings": settings,
+        "toolchain": identities, "commands": commands, "source_complete": False,
+        "launch_inputs": intent.original.identities, "source_roster": ["app.go"]}
+    write(output / "build.json", receipt)
+    return intent, copy.deepcopy(receipt), inventory
+
+
+class GoSourceBuildTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.base = Path(self.temporary.name).resolve()
+        self.intent, self.receipt, self.inventory = fixture(self.base)
+
+    def publish(self):
+        write(self.intent.directory / "build.json", self.receipt)
+
+    def inventory_change(self):
+        write(self.intent.directory / "inspection/inventory.json", self.inventory)
+        self.receipt["inventory"] = files.identity(self.intent.directory / "inspection/inventory.json")
+        self.publish()
+
+    def test_complete_build_is_bound_without_compiler_or_target_execution(self):
+        with patch("subprocess.run", side_effect=AssertionError("reader executed a command")), \
+                patch("subprocess.Popen", side_effect=AssertionError("reader started a target")):
+            actual = build.read(self.intent)
+            actual.verify()
+        self.assertEqual(len(actual.evidence), 35)
+        self.assertEqual(actual.receipt["selection"]["functions"][0]["name"], "example.test/app.Add")
+
+    def test_malformed_identity_tool_or_command_cannot_select_another_program(self):
+        original = copy.deepcopy(self.receipt)
+        for key, value in (("schema_version", True), ("schema_version", 1), ("kind", "legacy"),
+                ("root", "/another"), ("target", "./other"), ("source_complete", 0),
+                ("toolchain", {**self.intent.toolchain, "go": "/never-read-or-executed"}),
+                ("plain", {**original["plain"], "size": True})):
+            self.receipt = {**original, key: value}; self.publish()
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                build.read(self.intent)
+        self.receipt = copy.deepcopy(original); self.receipt["commands"][0]["argv"][0] = "/never-executed"; self.publish()
+        with self.assertRaises(ValueError):
+            build.read(self.intent)
+
+    def test_command_log_and_compiler_output_are_preserved_after_acceptance(self):
+        for name in ("commands.json", "command-0.stdout", "command-1.stderr"):
+            actual = build.read(self.intent)
+            path = self.intent.directory / name; original = path.read_bytes()
+            path.write_bytes(original + b"changed")
+            with self.subTest(name=name), self.assertRaisesRegex(ValueError, "compiler evidence changed: " + name):
+                actual.verify()
+            path.write_bytes(original)
+        build.read(self.intent).verify()
+
+    def test_missing_extra_or_changed_source_inventory_refuses(self):
+        original = copy.deepcopy(self.inventory)
+        for change in ("main", "empty", "hash", "line", "file", "duplicate", "extra"):
+            self.inventory = copy.deepcopy(original)
+            if change == "main": self.inventory["main"] = "another/module"
+            elif change == "empty": self.inventory["compiler_inputs"] = {}
+            elif change == "hash": self.inventory["files"]["app.go"] = "f" * 64
+            elif change == "line": self.inventory["functions"][0]["line"] = True
+            elif change == "file": self.inventory["functions"][0]["file"] = []
+            elif change == "duplicate": self.inventory["functions"].append(self.inventory["functions"][0])
+            else: self.inventory["unknown"] = 0
+            self.inventory_change()
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                build.read(self.intent)
+
+    def test_rehashed_selection_cannot_change_caller_owned_declaration(self):
+        original = copy.deepcopy(self.receipt["selection"])
+        for key, value in (("name", "example.test/app.Other"), ("line", 2.0), ("parameters", True),
+                           ("generic", True), ("variadic", True), ("gap", "unsupported")):
+            selected = copy.deepcopy(original); selected["functions"][0][key] = value
+            selected["sha256"] = selection_digest({k: v for k, v in selected.items() if k != "sha256"})
+            self.receipt["selection"] = selected; self.publish()
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                build.read(self.intent)
+
+    def test_rehashed_sdk_context_or_program_copy_still_requires_expected_bytes(self):
+        receipt = copy.deepcopy(self.receipt)
+        for directory, name in (("sdk", "runtime.go"), ("context", "context.go"), ("private", "app.go")):
+            self.receipt = copy.deepcopy(receipt)
+            self.publish()
+            build.read(self.intent).verify()
+            path = self.intent.directory / directory / name; original = path.read_bytes()
+            path.write_bytes(original + b"changed")
+            self.receipt[directory + "_inputs"] = files.freeze(path.parent).identities; self.publish()
+            reason = {"sdk": "private SDK differs", "context": "context differs", "private": "changed original program data"}[directory]
+            with self.subTest(directory=directory), self.assertRaisesRegex(ValueError, reason):
+                build.read(self.intent)
+            path.write_bytes(original)
+        self.receipt = receipt
+        self.publish()
+        build.read(self.intent).verify()
+
+    def test_existing_module_and_language_settings_cannot_change(self):
+        original = copy.deepcopy(self.receipt)
+        for key in ("modules_before", "modules_after", "settings"):
+            self.receipt = copy.deepcopy(original)
+            if key == "settings": self.receipt[key]["Go"] = "1.27.0"
+            else: self.receipt[key][0]["Main"] = 1
+            self.publish()
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                build.read(self.intent)
+        self.receipt = original; self.publish()
+        write(self.intent.directory / "command-10.stdout", {**self.intent.settings, "Go": "1.27.0"})
+        with self.assertRaises(ValueError):
+            build.read(self.intent)
+        for graph in ([], [{"Path": "x"}, {"Path": "x"}], [None]):
+            with self.assertRaises(ValueError):
+                build.module_graph(graph)
+
+    def test_touched_original_binary_and_malformed_caller_intent_refuse(self):
+        actual = build.read(self.intent)
+        path = self.intent.original.root / "app.go"; original = path.stat()
+        os.utime(path, ns=(original.st_atime_ns, original.st_mtime_ns + 1_000_000))
+        with self.assertRaises(ValueError):
+            actual.verify()
+        for invalid in (replace(self.intent, target="-C"), replace(self.intent, targets=()),
+                        replace(self.intent, targets=(build.Target("x", "app.go", True, 1),))):
+            with self.assertRaises(ValueError):
+                build.validate_intent(invalid)
+
+
+if __name__ == "__main__":
+    unittest.main()

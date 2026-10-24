@@ -1,5 +1,6 @@
 """Closed rebuilt Go protocol negotiation, separate from runtime admission."""
 
+import hashlib
 import json
 from typing import Any
 
@@ -24,3 +25,18 @@ def verify_protocols(value: object) -> dict:
     """The caller selects the one supported profile before reading metadata."""
     require(type(value) is dict and same(value, PROTOCOLS), "unsupported public Go protocols")
     return value
+
+
+def policy_digest(value: dict) -> str:
+    """SDK health binds sorted default-separator policy JSON without a newline."""
+    return hashlib.sha256(json.dumps(value, sort_keys=True, allow_nan=False).encode()).hexdigest()
+
+
+def metadata_digest(value: dict) -> str:
+    """Prepared records bind sorted default-separator JSON and its terminal newline."""
+    return hashlib.sha256((json.dumps(value, sort_keys=True, allow_nan=False) + "\n").encode()).hexdigest()
+
+
+def selection_digest(value: dict) -> str:
+    """Compiler selections use compact sorted JSON without a terminal newline."""
+    return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()).hexdigest()
