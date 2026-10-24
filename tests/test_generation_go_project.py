@@ -246,6 +246,20 @@ func unused()*Unused{return nil}
         (self.module / go_project.COMMAND_DIRECTORY).rmdir()
         (self.module / go_project.OBSERVER_DIRECTORY).mkdir()
         self.assertIn("observer directory", self.discover(source)["functions"][0]["reason"])
+        (self.module / go_project.OBSERVER_DIRECTORY).rmdir()
+        (self.module / go_project.CONTROL_DIRECTORY).mkdir()
+        self.assertIn("control directory", self.discover(source)["functions"][0]["reason"])
+        (self.module / go_project.CONTROL_DIRECTORY).rmdir()
+        (self.module / go_project.CONTROL_DIRECTORY).symlink_to(self.base / "absent")
+        self.assertIn("control directory", self.discover(source)["functions"][0]["reason"])
+
+    def test_module_import_keeps_nested_module_and_package_bindings(self):
+        context = {"module_root": "services/api", "directory": "services/api/internal/counter",
+                   "import_path": "example.test/service/internal/counter"}
+        self.assertEqual(go_project.module_import(context), "example.test/service")
+        for name in ("example.test/foreign", "/internal/counter", ""):
+            with self.subTest(name=name), self.assertRaises(ValueError):
+                go_project.module_import({**context, "import_path": name})
 
     def test_invalid_project_context_keeps_each_syntactic_callable_visible(self):
         source = self.source("counter/api.go", "package counter\nfunc one(){}\nfunc two(){}\n")

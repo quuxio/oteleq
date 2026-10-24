@@ -2,11 +2,14 @@
 """Create a private Go worker gate before constructors, observations or calls."""
 
 from pathlib import Path
+import json
+
+import go_project
 
 ROOT_ENV = "OTELEQ_GO_CONTROL_ROOT"
 TOKEN_ENV = "OTELEQ_GO_CONTROL_TOKEN"
 WAIT_ENV = "OTELEQ_GO_CONTROL_WAIT_MS"
-HELPER = "zz_oteleq_rendezvous.go"
+HELPER = "rendezvous.go"
 
 SOURCE = r'''
 import (
@@ -18,7 +21,7 @@ import (
  __oteleq_gate_time "time"
 )
 
-func __oteleqAwaitGoHost(){
+func AwaitHost(){
  root:=__oteleq_gate_os.Getenv("OTELEQ_GO_CONTROL_ROOT")
  token:=__oteleq_gate_os.Getenv("OTELEQ_GO_CONTROL_TOKEN")
  text:=__oteleq_gate_os.Getenv("OTELEQ_GO_CONTROL_WAIT_MS")
@@ -70,15 +73,23 @@ def enabled(entry: dict) -> bool:
 
 
 def statement(entry: dict) -> str:
-    return "__oteleqAwaitGoHost();" if enabled(entry) else ""
+    return "__oteleq_gate.AwaitHost();" if enabled(entry) else ""
 
 
-def materialise(directory: Path, package: str) -> Path:
-    """Write one new helper in the actual caller package, never replace source."""
-    from go_hooks import identifier
-    if not identifier(package):
-        raise ValueError("invalid Go rendezvous package binding")
+def imports(entry: dict) -> str:
+    """Keep all helper builtins outside the application's lexical package."""
+    if not enabled(entry):
+        return ""
+    module = go_project.module_import(entry["go_context"])
+    return "\nimport __oteleq_gate " + json.dumps(module + "/" + go_project.CONTROL_DIRECTORY) + "\n"
+
+
+def materialise(project: Path, context: dict) -> Path:
+    """Create one private package, never add builtin calls to application scope."""
+    go_project.module_import(context)
+    directory = project / context["module_root"] / go_project.CONTROL_DIRECTORY
+    directory.mkdir()
     path = directory / HELPER
     with path.open("x") as output:
-        output.write("// Generated observer boilerplate is MIT licensed.\npackage " + package + "\n" + SOURCE)
+        output.write("// Generated observer boilerplate is MIT licensed.\npackage oteleqcontrol\n" + SOURCE)
     return path

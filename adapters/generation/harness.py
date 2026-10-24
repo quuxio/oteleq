@@ -677,7 +677,8 @@ def go_driver(entry, args, source):
         sequence = sequences.concrete(entry, args, concrete_arguments) if "sequence_configuration" in entry else None
         return go_receivers.driver(entry, args, source, sequence)
     position = entry["package_end"]
-    imports = '\nimport (__oteleq_fmt "fmt"; __oteleq_os "os"; __oteleq_math "math"; __oteleq_reflect "reflect")\n'
+    imports = ('\nimport (__oteleq_fmt "fmt"; __oteleq_os "os"; __oteleq_math "math"; __oteleq_reflect "reflect")\n'
+               + go_rendezvous.imports(entry))
     raw = source.encode()
     source = (raw[:position] + imports.encode() + raw[position:]).decode()
     declared = entry.get("go_parameter_types", entry["parameters"])
@@ -775,7 +776,7 @@ def go_materialise(project, entry, args, original):
         driver.write_text("package main\nimport __oteleq_target " + json.dumps(context["import_path"])
                           + "\nfunc main(){__oteleq_target." + go_project.BRIDGE + "()}\n")
     if go_rendezvous.enabled(entry):
-        go_rendezvous.materialise(project / context["directory"], context["package"])
+        go_rendezvous.materialise(project, context)
     return driver
 
 
@@ -833,6 +834,4 @@ def materialise(project, entry, args):
                 (generated / "node_sequence.mjs").write_bytes(Path(__file__).with_name("node_sequence.mjs").read_bytes())
                 (generated / "node_checkpoint.mjs").write_bytes(Path(__file__).with_name("node_checkpoint.mjs").read_bytes())
         driver.write_text(emit(entry, args, original))
-        if language == "go" and go_rendezvous.enabled(entry):
-            go_rendezvous.materialise(driver.parent, entry["go_package"])
     return driver

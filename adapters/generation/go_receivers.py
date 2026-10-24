@@ -5,6 +5,7 @@ from pathlib import Path, PurePosixPath
 import struct
 
 from go_project import OBSERVER_DIRECTORY
+import go_project
 import go_rendezvous
 
 OBSERVER = Path(__file__).with_name("go_observe.go").read_text()
@@ -172,12 +173,9 @@ def driver(entry: dict, arguments: list, source: str, sequence: list[dict] | Non
     """Call statically bound private source functions through an external helper."""
     require(("sequence_configuration" in entry) == (sequence is not None), "missing concrete sequence calls")
     context, fixture = entry["go_context"], entry["receiver_fixture"]
-    module_prefix = context["import_path"]
-    relative = PurePosixPath(context["directory"]).relative_to(context["module_root"])
-    if relative.as_posix() != ".":
-        module_prefix = module_prefix.removesuffix("/" + relative.as_posix())
-    helper = module_prefix + "/" + OBSERVER_DIRECTORY
-    imports = '\nimport (__oteleq_reflect "reflect"; __oteleq_observe ' + json.dumps(helper) + ')\n'
+    helper = go_project.module_import(context) + "/" + OBSERVER_DIRECTORY
+    imports = ('\nimport (__oteleq_reflect "reflect"; __oteleq_observe ' + json.dumps(helper) + ')\n'
+               + go_rendezvous.imports(entry))
     raw = source.encode()
     source = (raw[:entry["package_end"]] + imports.encode() + raw[entry["package_end"]:]).decode()
     owner = entry["receiver_class"]

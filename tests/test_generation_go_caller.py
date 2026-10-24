@@ -74,7 +74,7 @@ class GoCallerTests(unittest.TestCase):
         self.assertNotEqual(caller.targets[0].line, entry["line"])
         self.assertEqual(caller.targets[0].parameters, 1)
         self.assertEqual(caller.targets[0].receiver_id, "")
-        self.assertIn("zz_oteleq_rendezvous.go", caller.compiler_inputs)
+        self.assertIn("oteleq_generated_control/rendezvous.go", caller.compiler_inputs)
         self.assertFalse(sentinel.exists())
         caller.verify()
         toolchain = {"go": str(self.go), "go_sha256": caller.reads[str(self.go)][0]["sha256"]}
@@ -99,7 +99,7 @@ class GoCallerTests(unittest.TestCase):
         self.assertEqual([target.name for target in caller.targets],
                          ["example.test/caller/counter.Counter.Add", "example.test/caller/counter.New"])
         self.assertEqual([target.receiver_id for target in caller.targets], ["*Counter", ""])
-        self.assertEqual(len(caller.packages), 3)
+        self.assertEqual(len(caller.packages), 4)
         self.assertIn("oteleq_generated_cmd/main.go", caller.compiler_inputs)
         caller.verify()
 

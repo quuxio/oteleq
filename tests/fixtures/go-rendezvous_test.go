@@ -1,4 +1,4 @@
-package main
+package oteleqcontrol
 
 import (
 	"encoding/json"
@@ -25,7 +25,7 @@ func gateEnvironment(t *testing.T) string {
 }
 func gateTask() chan any {
 	done := make(chan any, 1)
-	go func() { defer func() { done <- recover() }(); __oteleqAwaitGoHost() }()
+	go func() { defer func() { done <- recover() }(); AwaitHost() }()
 	return done
 }
 func waitGate(t *testing.T, root string, done chan any) {

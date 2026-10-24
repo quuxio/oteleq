@@ -7,6 +7,7 @@ import string
 
 COMMAND_DIRECTORY = "oteleq_generated_cmd"
 OBSERVER_DIRECTORY = "oteleq_generated_observer"
+CONTROL_DIRECTORY = "oteleq_generated_control"
 BRIDGE = "OteleqGeneratedRun"
 ASCII_TAG = frozenset(string.ascii_letters + string.digits + "_.")
 
@@ -154,10 +155,10 @@ def load_package(source: Path, snapshot: Path, module: Path, go: Path, execute) 
                                for path in files}}
     if any("__oteleq" in path.read_text() or BRIDGE in path.read_text() for path in files):
         raise ValueError("generated Go observer name collides with package source")
-    if (module / COMMAND_DIRECTORY).exists():
-        raise ValueError("generated Go command directory collides with source")
-    if (module / OBSERVER_DIRECTORY).exists():
-        raise ValueError("generated Go observer directory collides with source")
+    for directory, kind in ((COMMAND_DIRECTORY, "command"), (OBSERVER_DIRECTORY, "observer"),
+                            (CONTROL_DIRECTORY, "control")):
+        if (module / directory).exists() or (module / directory).is_symlink():
+            raise ValueError("generated Go " + kind + " directory collides with source")
     return {"inventories": inventories, "context": context}
 
 
@@ -187,6 +188,25 @@ def worker_path(context: dict) -> str:
     if context["package"] == "main":
         return context["directory"]
     return str(Path(context["module_root"]) / COMMAND_DIRECTORY / "main.go")
+
+
+def module_import(context: dict) -> str:
+    """Recover the compiler-bound module path from its source package directory."""
+    for key in ("module_root", "directory"):
+        value = context[key]
+        if (type(value) is not str or not value or PurePosixPath(value).is_absolute()
+                or str(PurePosixPath(value)) != value or ".." in PurePosixPath(value).parts
+                or "\\" in value or ":" in value):
+            raise ValueError("Go caller context requires canonical source-relative directories")
+    relative = PurePosixPath(context["directory"]).relative_to(context["module_root"]).as_posix()
+    suffix = "" if relative == "." else "/" + relative
+    name = context["import_path"]
+    if type(name) is not str or not name or not name.endswith(suffix):
+        raise ValueError("Go source package differs from its module import path")
+    result = name.removesuffix(suffix) if suffix else name
+    if not result:
+        raise ValueError("Go module import path is empty")
+    return result
 
 
 def rename_entrypoint(source: str, positions: list[int]) -> str:
