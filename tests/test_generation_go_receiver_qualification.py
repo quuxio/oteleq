@@ -23,6 +23,75 @@ class GoReceiverQualificationTests(unittest.TestCase):
         with self.assertRaises(AssertionError):
             qualifier.policy_text(backend="unknown")
 
+    def test_tagged_fixture_keeps_literal_oracles_and_an_observably_wrong_alternative(self):
+        tags = ("feature", "tools", "\u03c0")
+        policy = tomllib.loads(qualifier.policy_text(backend="source-v1", build_tags=tags))
+        self.assertEqual(policy["adapters"]["go"]["build_tags"], list(tags))
+        self.assertEqual(policy["fixtures"], tomllib.loads(qualifier.policy_text())["fixtures"])
+        with self.assertRaises(AssertionError):
+            qualifier.policy_text(build_tags=tags)
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            workspace = root / "workspace"
+            workspace.mkdir()
+            (workspace / "plan.json").write_text(json.dumps({"inventory": [
+                {"name": "Counter." + name, "status": "ready"} for name in qualifier.METHODS]}))
+            with patch.object(qualifier, "command", return_value=str(workspace)):
+                qualifier.prepare(Path("cli"), Path("sdk"), root / "evidence", backend="source-v1", build_tags=tags)
+            for package in ("counter", "cmd"):
+                folder = root / "evidence/application" / package
+                self.assertTrue((folder / "api.go").read_text().startswith("//go:build feature && tools && \u03c0\n"))
+                alternative = (folder / "default.go").read_text()
+                self.assertTrue(alternative.startswith("//go:build !(feature && tools && \u03c0)\n"))
+                self.assertIn("value:seed+100,", alternative)
+
+    def test_tagged_oracle_refuses_other_tags_active_files_flags_helpers_and_logs(self):
+        tags = ("feature", "tools", "\u03c0")
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            build = folder / "go-build"
+            (build / "inspection").mkdir(parents=True)
+            (build / "private").mkdir()
+            pin = build / "private/otel.instrumentation.go"
+            pin.write_text("//go:build !feature\n")
+            commands = [{"argv": [name, "build", "-tags=feature,tools,\u03c0"]} for name in ("go", "weaver")]
+            evidence = {}
+            for name in ("commands.json", "command-0.stdout", "command-0.stderr", "command-1.stdout", "command-1.stderr"):
+                raw = b"literal compiler evidence"
+                (build / name).write_bytes(raw)
+                evidence[name] = {"size": len(raw), "sha256": hashlib.sha256(raw).hexdigest()}
+            receipt = {"schema_version": 5, "build_tags": list(tags), "commands": commands, "command_evidence": evidence}
+            inventory = {"schema_version": 2, "build_tags": list(tags), "compiler_inputs": {"counter/api.go": "source"}}
+            def publish():
+                (build / "build.json").write_text(json.dumps(receipt))
+                (build / "inspection/inventory.json").write_text(json.dumps(inventory))
+            publish()
+            qualifier.tagged_attempt(folder, "Read", tags)
+            original = copy.deepcopy(receipt), copy.deepcopy(inventory)
+            for change in ("build", "tags", "inspection", "active", "flag", "log", "pin"):
+                receipt, inventory = copy.deepcopy(original)
+                if change == "build": receipt["schema_version"] = 4
+                elif change == "tags": receipt["build_tags"] = ["tools"]
+                elif change == "inspection": inventory["schema_version"] = 1
+                elif change == "active": inventory["compiler_inputs"]["counter/default.go"] = "source"
+                elif change == "flag": receipt["commands"][-1]["argv"].pop()
+                elif change == "log": (build / "command-0.stderr").write_bytes(b"changed")
+                else: pin.write_text("//go:build tools\n")
+                publish()
+                with self.subTest(change=change), self.assertRaises(AssertionError):
+                    qualifier.tagged_attempt(folder, "Read", tags)
+                (build / "command-0.stderr").write_bytes(b"literal compiler evidence")
+                pin.write_text("//go:build !feature\n")
+
+    def test_complete_source_framework_has_a_separate_aggregate_budget(self):
+        output = "\n".join(json.dumps({"report": str(index)}) for index in range(9))
+        for backend, timeout in (("legacy", 900), ("source-v1", 3600)):
+            with patch.object(qualifier, "command", return_value=output) as execute, \
+                    patch.object(qualifier, "check_report", return_value=4) as check:
+                self.assertEqual(qualifier.framework(Path("workspace"), Path("folder"), "suite", backend=backend), 36)
+            self.assertEqual(execute.call_args.kwargs, {"expected": 1, "timeout": timeout})
+            self.assertEqual(check.call_count, 9)
+
     def test_source_receipt_requires_owned_native_pid_exact_functions_and_closed_witness(self):
         function = "example.test/receiver/counter.Counter.Read"
         case = {"function": "counter.api.Counter.Read"}

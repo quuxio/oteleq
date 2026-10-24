@@ -101,6 +101,8 @@ make generation-go-source-otelc \
 
 The command keeps the existing receiver corpus's complete literal field/alias/panic oracles and adds native ownership, exact selected target/factory receipt and copied-probe refusal checks. It creates fresh evidence and does not retry failed operations. Its separate execution must pass before being cited as a new qualification. The original 80-launch record also checks scalar/global outcomes and changed-source promotion with added library discovery.
 
+For the candidate tagged workflow, invoke `tests/qualify_go_receivers.py` with the same `--otelc-root`, `--report-dir` and `--cli` values, `--backend source-v1` and repeated `--build-tag NAME` arguments. The fixtures retain the complete field/result oracles and add an excluded alternative factory with a different value. Each tagged attempt also checks both compiler flags, the active source choice, the tooling import guard and every retained compiler channel identity. A completed run is required before claiming tagged receiver or retained-suite qualification.
+
 Live metric schedules, additional build/context recipes and richer source/dependency graphs require new integration and evidence. Broader Go builds, cgo/workspaces, asynchronous/resource actions, shipping artefacts and the [full completion checklist](completion.md) remain open.
 
 The intended result remains **equivalence over these tests and observations**.

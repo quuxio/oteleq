@@ -8,6 +8,9 @@ import sys
 
 from qualify_generation import command
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "adapters/generation"))
+import go_project
+
 
 SOURCE = r'''package counter
 import ("math";"runtime/debug")
@@ -47,7 +50,7 @@ def selected(name: str) -> str:
     return ("cmd.api.Counter." if name == "Main" else "counter.api.Counter.") + name
 
 
-def policy_text(methods: tuple[str, ...] = METHODS, *, backend: str = "legacy") -> str:
+def policy_text(methods: tuple[str, ...] = METHODS, *, backend: str = "legacy", build_tags: tuple[str, ...] = ()) -> str:
     """Explicit source selection and independent fixed construction inputs."""
     text = 'schema_version=1\nlanguages=["go"]\n[adapters.go]\nmodule_roots=["."]\n[functions]\ninclude=' + json.dumps([selected(name) for name in methods]) + '\n'
     for name in methods:
@@ -57,13 +60,17 @@ def policy_text(methods: tuple[str, ...] = METHODS, *, backend: str = "legacy") 
         if name == "Fail":
             text += 'expected_baseline={kind="error",category="panic",type="go.string"}\n'
     if backend == "source-v1":
-        text = text.replace('[adapters.go]\n', '[adapters.go]\nbackend="source-v1"\nbuild_timeout_ms=900000\n')
+        tags = go_project.canonical_tags(build_tags)
+        settings = 'backend="source-v1"\nbuild_timeout_ms=900000\n'
+        if tags:
+            settings += "build_tags=" + json.dumps(tags) + "\n"
+        text = text.replace('[adapters.go]\n', '[adapters.go]\n' + settings)
     else:
-        assert backend == "legacy"
+        assert backend == "legacy" and not build_tags
     return text
 
 
-def prepare(cli: Path, provider: Path, folder: Path, *, backend: str = "legacy") -> Path:
+def prepare(cli: Path, provider: Path, folder: Path, *, backend: str = "legacy", build_tags: tuple[str, ...] = ()) -> Path:
     folder.mkdir()
     source = folder / "application"
     (source / "counter").mkdir(parents=True)
@@ -72,8 +79,19 @@ def prepare(cli: Path, provider: Path, folder: Path, *, backend: str = "legacy")
     (source / "cmd").mkdir()
     (source / "cmd/api.go").write_text(SOURCE.replace("package counter", "package main")
                                       + "\nfunc main(){}\nfunc (value Counter) Main(amount Number)Counter{value.value+=amount;return value}\n")
+    if build_tags:
+        assert backend == "source-v1"
+        constraint = " && ".join(go_project.canonical_tags(build_tags))
+        for directory in ("counter", "cmd"):
+            path = source / directory / "api.go"
+            text = path.read_text()
+            path.write_text("//go:build " + constraint + "\n\n" + text)
+            # A compiler recipe that loses the tags selects a valid, observably
+            # wrong factory, rather than failing for a missing declaration.
+            (path.parent / "default.go").write_text("//go:build !(" + constraint + ")\n\n"
+                + text.replace("value:seed,", "value:seed+100,"))
     policy = folder / "equivalence.toml"
-    policy.write_text(policy_text(backend=backend))
+    policy.write_text(policy_text(backend=backend, build_tags=build_tags))
     workspace = Path(command([cli, "plan", "--source", source, "--otelc-root", provider,
                               "--workspace-parent", folder, "--config", policy], folder, "plan"))
     plan = json.loads((workspace / "plan.json").read_text())
@@ -177,7 +195,27 @@ def source_attempt(folder: Path, case: dict, attempt: dict, lane: str) -> None:
         assert witness == {name: receipt[name] for name in witness}
 
 
-def check_report(path: Path, expected_cases: int = 9, *, backend: str = "legacy") -> int:
+def tagged_attempt(folder: Path, method: str, tags: tuple[str, ...]) -> None:
+    """Require explicit paired flags and the independent active source choice."""
+    build = json.loads((folder / "go-build/build.json").read_text())
+    inventory = json.loads((folder / "go-build/inspection/inventory.json").read_text())
+    assert build["schema_version"] == 5 and build["build_tags"] == list(tags)
+    assert inventory["schema_version"] == 2 and inventory["build_tags"] == list(tags)
+    prefix = "cmd/" if method == "Main" else "counter/"
+    assert prefix + "api.go" in inventory["compiler_inputs"]
+    assert prefix + "default.go" not in inventory["compiler_inputs"]
+    assert (folder / "go-build/private/otel.instrumentation.go").read_text().startswith("//go:build !" + tags[0] + "\n")
+    for recipe in build["commands"][-2:]:
+        assert [word for word in recipe["argv"] if word.startswith("-tags=")] == ["-tags=" + ",".join(tags)]
+    evidence = build["command_evidence"]
+    assert set(evidence) == {"commands.json", *[f"command-{index}.{suffix}" for index in range(len(build["commands"]))
+                                              for suffix in ("stdout", "stderr")]}
+    for name, identity in evidence.items():
+        raw = (folder / "go-build" / name).read_bytes()
+        assert identity == {"size": len(raw), "sha256": hashlib.sha256(raw).hexdigest()}
+
+
+def check_report(path: Path, expected_cases: int = 9, *, backend: str = "legacy", build_tags: tuple[str, ...] = ()) -> int:
     """Each actual lane/repeat must satisfy an independent complete fixture oracle."""
     report = json.loads(path.read_text())
     assert report["source_preserved"] and not report["blocked"] and len(report["cases"]) == expected_cases
@@ -215,6 +253,8 @@ def check_report(path: Path, expected_cases: int = 9, *, backend: str = "legacy"
                 assert (folder / "stdout").read_bytes() == (folder / "stderr").read_bytes() == b""
                 if backend == "source-v1":
                     source_attempt(folder, case, attempt, lane)
+                    if build_tags:
+                        tagged_attempt(folder, method, build_tags)
                     continue
                 assert backend == "legacy"
                 if lane == "instrumented_on":
@@ -228,11 +268,12 @@ def check_report(path: Path, expected_cases: int = 9, *, backend: str = "legacy"
     return launches
 
 
-def framework(workspace: Path, folder: Path, label: str, *, backend: str = "legacy") -> int:
-    outputs = command([sys.executable, workspace / "tests/test_equivalence.py"], folder, label, expected=1)
+def framework(workspace: Path, folder: Path, label: str, *, backend: str = "legacy", build_tags: tuple[str, ...] = ()) -> int:
+    outputs = command([sys.executable, workspace / "tests/test_equivalence.py"], folder, label, expected=1,
+                      timeout=3600 if backend == "source-v1" else 900)
     reports = [json.loads(line) for line in outputs.splitlines()]
     assert len(reports) == 9
-    return sum(check_report(Path(item["report"]), 1, backend=backend) for item in reports)
+    return sum(check_report(Path(item["report"]), 1, backend=backend, build_tags=build_tags) for item in reports)
 
 
 def selected_case(plan: dict, corpus: list, name: str) -> dict:
@@ -338,22 +379,28 @@ def main() -> None:
     parser.add_argument("--report-dir", type=Path, required=True)
     parser.add_argument("--cli", type=Path, required=True)
     parser.add_argument("--backend", choices=("legacy", "source-v1"), default="legacy")
+    parser.add_argument("--build-tag", action="append", default=[], help="explicit source-v1 fixture tag; repeat for multiple names")
     args = parser.parse_args()
+    tags = go_project.canonical_tags(args.build_tag)
+    if tags and args.backend != "source-v1":
+        parser.error("tagged receiver qualification requires source-v1")
     provider, cli, folder = args.otelc_root.resolve(strict=True), args.cli.resolve(strict=True), args.report_dir.resolve()
     if folder.is_relative_to(provider) or folder.is_relative_to(Path(__file__).resolve().parents[1]):
         parser.error("report directory must be new and outside both repositories")
     folder.mkdir(mode=0o700)
     os.environ.update(OTELEQ_PYTHON=sys.executable, OTELEQ_CLI=str(cli))
     work = folder / "receivers"
-    workspace = prepare(cli, provider, work, backend=args.backend)
-    command([cli, "run", "--workspace", workspace, "--report-dir", work / "comparison"], work, "run", expected=1)
-    launches = check_report(work / "comparison/report.json", backend=args.backend)
-    launches += framework(workspace, work, "framework", backend=args.backend)
+    workspace = prepare(cli, provider, work, backend=args.backend, build_tags=tags)
+    command([cli, "run", "--workspace", workspace, "--report-dir", work / "comparison"], work, "run", expected=1,
+            timeout=3600 if args.backend == "source-v1" else 900)
+    launches = check_report(work / "comparison/report.json", backend=args.backend, build_tags=tags)
+    launches += framework(workspace, work, "framework", backend=args.backend, build_tags=tags)
     exported = work / "exported"
     command([cli, "export-tests", "--workspace", workspace, "--destination", exported, "--apply"], work, "export")
-    command([cli, "run", "--workspace", exported, "--report-dir", work / "export-comparison"], work, "export-run", expected=1)
-    launches += check_report(work / "export-comparison/report.json", backend=args.backend)
-    launches += framework(exported, work, "export-framework", backend=args.backend)
+    command([cli, "run", "--workspace", exported, "--report-dir", work / "export-comparison"], work, "export-run", expected=1,
+            timeout=3600 if args.backend == "source-v1" else 900)
+    launches += check_report(work / "export-comparison/report.json", backend=args.backend, build_tags=tags)
+    launches += framework(exported, work, "export-framework", backend=args.backend, build_tags=tags)
     corpus = json.loads((workspace / "tests/corpus.json").read_text())
     plan = json.loads((workspace / "plan.json").read_text())
     case = selected_case(plan, corpus, "Counter.InstanceDifference")
@@ -364,9 +411,9 @@ def main() -> None:
     assert shrink["reduced_arguments"] == [0] and shrink["status"] == "candidate_rule_minimal"
     paths = [work / "shrink/original/report.json", work / "shrink/confirmation/report.json",
              *[Path(item["report"]) for item in shrink["trials"]]]
-    launches += sum(check_report(path, 1, backend=args.backend) for path in paths)
+    launches += sum(check_report(path, 1, backend=args.backend, build_tags=tags) for path in paths)
     replay = json.loads(command([cli, "replay", "--workspace", shrink["workspace"], "--case", case["id"]], work, "replay", expected=1))
-    launches += check_report(Path(replay["report"]), 1, backend=args.backend)
+    launches += check_report(Path(replay["report"]), 1, backend=args.backend, build_tags=tags)
     if args.backend == "source-v1":
         refused = source_probe_guards(cli, workspace, work, case)
     else:
@@ -380,6 +427,7 @@ def main() -> None:
     unique = {hashlib.sha256(path.read_bytes()).hexdigest() for path in commands}
     assert len(unique) == launches
     result = {"claim": "equivalence over these tests and observations", "artefact_class": "diagnostic", "backend": args.backend,
+              "build_tags": list(tags),
               "cli_sha256": hashlib.sha256(cli.read_bytes()).hexdigest(), "cases": 9, "matching_cases": 6,
               "difference_controls": 3, "actual_application_launches": launches, "source_preserved": True,
               "prelaunch_source_refusals": controls, "retained_attempt_folders": len(commands), "unique_command_identities": len(unique),
