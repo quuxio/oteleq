@@ -28,7 +28,8 @@ def kernel(pid: int, deadline: float) -> dict:
     values = result.stdout.split()
     require(result.returncode == 0 and len(result.stdout) <= 256 and not result.stderr
             and len(values) == 3 and all(re.fullmatch(rb"[1-9][0-9]{0,9}", value) for value in values)
-            and all(1 < int(value) <= 0x7fffffff for value in values), "Go kernel process identity is unavailable")
+            and all(1 < int(values[index]) <= 0x7fffffff for index in (0, 2))
+            and 1 <= int(values[1]) <= 0x7fffffff, "Go kernel process identity is unavailable")
     record = dict(zip(("pid", "parent_pid", "process_group"), map(int, values)))
     require(record["pid"] == pid, "Go kernel returned another process")
     return record

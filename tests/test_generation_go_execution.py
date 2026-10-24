@@ -89,8 +89,22 @@ class GoExecutionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "completed before binding"):
             execution.bind(self.launch, self.owner)
 
+    def test_host_pid_one_binds_and_completes_both_lanes(self):
+        for plain in (False, True):
+            with self.subTest(plain=plain):
+                _, launch = preparation(self, plain=plain)
+                owner = replace(self.owner, parent_pid=1, command=tuple(launch.response["command"]))
+                supervisor, _ = starts(launch, owner)
+                started = execution.bind(launch, owner)
+                completion(launch, owner, supervisor)
+                checked = execution.finish(started, 0)
+                checked.verify()
+                self.assertEqual(checked.value["supervisor"]["parent_pid"], 1)
+
     def test_invalid_caller_pid_command_and_supervisor_exit_refuse(self):
         for owner in (replace(self.owner, pid=True), replace(self.owner, application_pid=303.0),
+                      replace(self.owner, pid=1), replace(self.owner, application_pid=1),
+                      *(replace(self.owner, parent_pid=value) for value in (True, 1.0, 0, -1, 0x80000000)),
                       replace(self.owner, parent_pid=101), replace(self.owner, application_pid=101),
                       replace(self.owner, command=(Path("/never-executed"),)),
                       replace(self.owner, command=("/never-executed",))):

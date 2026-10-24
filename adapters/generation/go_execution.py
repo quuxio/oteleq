@@ -78,7 +78,8 @@ def bind(launch: prepared.Prepared, owner: Owner) -> Started:
     """Check actual caller/kernel identities while the generated worker is paused."""
     require(type(launch) is prepared.Prepared and type(owner) is Owner
             and all(type(pid) is int and 1 < pid <= 0x7fffffff
-                    for pid in (owner.pid, owner.parent_pid, owner.application_pid))
+                    for pid in (owner.pid, owner.application_pid))
+            and type(owner.parent_pid) is int and 1 <= owner.parent_pid <= 0x7fffffff
             and len({owner.pid, owner.parent_pid, owner.application_pid}) == 3
             and type(owner.command) is tuple and all(type(value) is str for value in owner.command)
             and same(list(owner.command), prepared.command(launch.intent)),
