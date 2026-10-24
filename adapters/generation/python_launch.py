@@ -165,8 +165,21 @@ def witness(workflow, run: Run, checked: tuple, folder: Path, entry: dict,
     import python_telemetry
 
     execution, functions = checked
+    measurement = {}
+    if sequences.controls(entry):
+        import python_control_receipt
+        record = python_control_receipt.read(folder, entry, execution, run.intent.policy, bodies, plain=False)
+        final, _ = prepared.read(run.intent.runtime / "sdk/python-sdk-status.json")
+        selected = python_control_receipt.qualify(record, entry, bodies, execution, service, functions,
+                                                  trace_decoder, ExportMetricsServiceRequest, final)
+        measurement["measured"] = selected
+        workflow.write(folder / "python-verified-controls.json", {
+            "record_sha256": record["record_sha256"], "pid": execution.application_pid,
+            "sdk_pid": execution.sdk_pid, "launch_id": execution.launch_id,
+            "metric_calls": dict(selected[0]), "metric_errors": dict(selected[1]),
+            "collected_spans": len(selected[2])})
     received = python_telemetry.decode(bodies, execution, service, functions,
-                                       trace_decoder, ExportMetricsServiceRequest)
+                                       trace_decoder, ExportMetricsServiceRequest, **measurement)
     # The decoder above checks every resource and the origin-profile scope.
     # The legacy service_spans helper accepts a different SDK scope version.
     spans = [span for route, body in bodies if route == capture.TRACE_PATH

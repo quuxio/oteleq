@@ -1,0 +1,465 @@
+{
+  "qualification_schema_version": 1,
+  "date": "2026-10-24",
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "scope_status": "qualified recorded synchronous origin/cache live metric schedules across all four initial states",
+  "platform": {
+    "os": "macOS",
+    "architecture": "arm64",
+    "python": [
+      "3.12.15",
+      "3.14.8"
+    ]
+  },
+  "runtime": {
+    "repository": "quuxio/oteleq",
+    "commit": "7495d312f4a59e74b1926ddc3472d8b2034c2328",
+    "source_archive_sha256": "4e0748231dd9d1ed4e2b657fb6645d27fb52546787708b984b290fbf705a47be",
+    "source_files": 518,
+    "cli_sha256": "e6973a648d05897900a378d6f14195803698d2f67818b8e142d429293a69c5f3",
+    "production_sources_unchanged_in_verifier": true
+  },
+  "execution_drivers": [
+    {
+      "commit": "7495d312f4a59e74b1926ddc3472d8b2034c2328",
+      "source_archive_sha256": "4e0748231dd9d1ed4e2b657fb6645d27fb52546787708b984b290fbf705a47be",
+      "source_files": 518
+    }
+  ],
+  "verifier": {
+    "commit": "7495d312f4a59e74b1926ddc3472d8b2034c2328",
+    "source_archive_sha256": "4e0748231dd9d1ed4e2b657fb6645d27fb52546787708b984b290fbf705a47be",
+    "source_files": 518,
+    "files_sha256": {
+      "tests/qualify_python_controls.py": "7eece289016767f225972d5d77f663f92eeb9c434e2867fa501626128f0e843e",
+      "tests/python_live_qualification.py": "7d63ed9314146042290484d2d10f0ad6b4c80de90c9ae82d96f34372e7556ac7",
+      "tests/python_live_refusals.py": "43343c24dc6806eb3c69c9f50e87ec9d23bf448f9715b8c8a3a2cd3d60572d13",
+      "tests/python_sequence_fixture.py": "af3c4513669bbbecac3ff5ab44ee17d9b4347da972fcddfc4663914ed3bf37ba"
+    },
+    "entrypoint": "tests/qualify_python_controls.py",
+    "retained_options": [
+      "--retained-only",
+      "--audit-dir NEW_EXTERNAL_DIRECTORY"
+    ],
+    "audit_manager_sha256": "68451377b7109db0c4fabc2559bf82d664644d178ccb51846f141f31f0676e53",
+    "assembly_script_sha256": "dce28379561e2fb9db79015e34b6e349a5027dbc20bf50cb2cca4b320b11f39b",
+    "complete_receipt_sha256": "5a83e49facc08314611b58c1a157af770db6d58cbab5347c4c564c2a6e554ac7"
+  },
+  "provider": {
+    "repository": "quuxio/otelc",
+    "commit": "ce4cf749279c1b4416ca79e18c194c8c908471f6",
+    "source_archive_sha256": "f15d9b9f2278988962f07828a013a77e33b84625d93592a2c60f12d7e74c8606",
+    "source_files": 389,
+    "source_archive_and_both_copies_rechecked": true,
+    "profiles": [
+      "python-native-origins-v2",
+      "python-native-cache-origins-v3"
+    ],
+    "catalogues": {
+      "312": {
+        "entries_preserved": 1519,
+        "installed_files": 1421,
+        "native_tool_files": 11,
+        "tools": {
+          "tool-link:python": "42f2b28d8258c41a63374ac4365007738900f66a9b62a7eb1a2041a2e091d41b",
+          "tool:python": "c4e9f06cb179ae4b3728c748990fbbef7f30580ea42c0eb9c702ebc7c7861c89"
+        }
+      },
+      "314": {
+        "entries_preserved": 1519,
+        "installed_files": 1421,
+        "native_tool_files": 11,
+        "tools": {
+          "tool-link:python": "2d831a37080f22a6cb263b9fd10bc07b8dd5171693f808d7d243b1701607b2dc",
+          "tool:python": "1860df605473e659fb393abbec47ef75a187b07777c0acf4322b9a1a1f057a08"
+        }
+      }
+    }
+  },
+  "results": {
+    "completed_configurations": 16,
+    "actual_application_launches": 3008,
+    "sdk_processes": 1504,
+    "reports": 608,
+    "complete_raw_and_typed_observations": 3072,
+    "copied_original_observations": 64,
+    "recomputed_comparisons": 768,
+    "altered_comparison_refusals": 80,
+    "altered_live_evidence_refusals": 144,
+    "new_application_launches_during_audit": 0
+  },
+  "corpora": [
+    {
+      "python": "3.12.15",
+      "profile": "python-native-origins-v2",
+      "startup": "both-on",
+      "totals": {
+        "actual_application_launches": 188,
+        "sdk_processes": 94,
+        "reports": 38,
+        "complete_raw_and_typed_observations": 192,
+        "copied_original_observations": 4,
+        "recomputed_comparisons": 48,
+        "altered_comparison_refusals": 5,
+        "altered_live_evidence_refusals": 9,
+        "new_application_launches_during_audit": 0
+      },
+      "execution_driver_commit": "7495d312f4a59e74b1926ddc3472d8b2034c2328",
+      "execution_result_sha256": "2a1897387be5acb0d85d7e1ab845855ffc671d80cfbed6eb24fc19b6f125f94f",
+      "final_audit_result_sha256": "db62597d421fc0ac806637e63e44994fb9bac56ee95352747bfb441a3bcdca5d",
+      "qualification_sha256": "78214cdf954506008487ec1bf892a484fbe4cd99003e9a9ef8833d72b9df14c0",
+      "provider_catalogue_sha256": "fa57b955ab4018503e6a4246796efd1f0cb3d6ef02de49ba2085d695cd47f785",
+      "original_evidence_files_held": 13808
+    },
+    {
+      "python": "3.12.15",
+      "profile": "python-native-origins-v2",
+      "startup": "collection-off",
+      "totals": {
+        "actual_application_launches": 188,
+        "sdk_processes": 94,
+        "reports": 38,
+        "complete_raw_and_typed_observations": 192,
+        "copied_original_observations": 4,
+        "recomputed_comparisons": 48,
+        "altered_comparison_refusals": 5,
+        "altered_live_evidence_refusals": 9,
+        "new_application_launches_during_audit": 0
+      },
+      "execution_driver_commit": "7495d312f4a59e74b1926ddc3472d8b2034c2328",
+      "execution_result_sha256": "cb829fb1324ddc600b22ab5165b31549b4194bac46d0a080299b209f634fcd5e",
+      "final_audit_result_sha256": "23a4630d0cc211cff74875d1afe350e8e12cc69b76d607d88155ab8ba0506374",
+      "qualification_sha256": "a6c57bb50a3f5b2572f076490dfb9b5914cad6ae4eb050f0f3d97b03e64b99de",
+      "provider_catalogue_sha256": "fa57b955ab4018503e6a4246796efd1f0cb3d6ef02de49ba2085d695cd47f785",
+      "original_evidence_files_held": 13808
+    },
+    {
+      "python": "3.12.15",
+      "profile": "python-native-origins-v2",
+      "startup": "emission-off",
+      "totals": {
+        "actual_application_launches": 188,
+        "sdk_processes": 94,
+        "reports": 38,
+        "complete_raw_and_typed_observations": 192,
+        "copied_original_observations": 4,
+        "recomputed_comparisons": 48,
+        "altered_comparison_refusals": 5,
+        "altered_live_evidence_refusals": 9,
+        "new_application_launches_during_audit": 0
+      },
+      "execution_driver_commit": "7495d312f4a59e74b1926ddc3472d8b2034c2328",
+      "execution_result_sha256": "39b0a624b9759b045ae29adc52726ae3029722943835f2fced9d34e90619ed44",
+      "final_audit_result_sha256": "4e4cad99eaacaaba9e87acc628b7e41e2e21b2e914b12484959f24796974fd2a",
+      "qualification_sha256": "1832f23d3487dc228e4e88672d24ded24bc8125289730d97ceacbc258652fc5a",
+      "provider_catalogue_sha256": "fa57b955ab4018503e6a4246796efd1f0cb3d6ef02de49ba2085d695cd47f785",
+      "original_evidence_files_held": 13808
+    },
+    {
+      "python": "3.12.15",
+      "profile": "python-native-origins-v2",
+      "startup": "both-off",
+      "totals": {
+        "actual_application_launches": 188,
+        "sdk_processes": 94,
+        "reports": 38,
+        "complete_raw_and_typed_observations": 192,
+        "copied_original_observations": 4,
+        "recomputed_comparisons": 48,
+        "altered_comparison_refusals": 5,
+        "altered_live_evidence_refusals": 9,
+        "new_application_launches_during_audit": 0
+      },
+      "execution_driver_commit": "7495d312f4a59e74b1926ddc3472d8b2034c2328",
+      "execution_result_sha256": "639d7c84a390ed4aef50dfaa045a06e43a1bb493f4575ff50413d05700eee1b0",
+      "final_audit_result_sha256": "de5ec950638a01ff27a7984d55994fc54dd07544635cb036909843d4c5daef7d",
+      "qualification_sha256": "3dd49f2324fb490e659b57b231095f1759a1d204469cccb18575dd241a86af50",
+      "provider_catalogue_sha256": "fa57b955ab4018503e6a4246796efd1f0cb3d6ef02de49ba2085d695cd47f785",
+      "original_evidence_files_held": 13713
+    },
+    {
+      "python": "3.12.15",
+      "profile": "python-native-cache-origins-v3",
+      "startup": "both-on",
+      "totals": {
+        "actual_application_launches": 188,
+        "sdk_processes": 94,
+        "reports": 38,
+        "complete_raw_and_typed_observations": 192,
+        "copied_original_observations": 4,
+        "recomputed_comparisons": 48,
+        "altered_comparison_refusals": 5,
+        "altered_live_evidence_refusals": 9,
+        "new_application_launches_during_audit": 0
+      },
+      "execution_driver_commit": "7495d312f4a59e74b1926ddc3472d8b2034c2328",
+      "execution_result_sha256": "d1c0fea0b6e9eff60d262482ed5916d678683104e6094576bc83151fe640df91",
+      "final_audit_result_sha256": "c8fe36e131ab60f92f74b68ae3df01d61744d821ac1296dc0dd1375fdbdf21b9",
+      "qualification_sha256": "c109cab1a3e9ddbd178e3f04af1f4afdc7be5d70ef8832fc05c6de4fa9e9e12a",
+      "provider_catalogue_sha256": "fa57b955ab4018503e6a4246796efd1f0cb3d6ef02de49ba2085d695cd47f785",
+      "original_evidence_files_held": 14212
+    },
+    {
+      "python": "3.12.15",
+      "profile": "python-native-cache-origins-v3",
+      "startup": "collection-off",
+      "totals": {
+        "actual_application_launches": 188,
+        "sdk_processes": 94,
+        "reports": 38,
+        "complete_raw_and_typed_observations": 192,
+        "copied_original_observations": 4,
+        "recomputed_comparisons": 48,
+        "altered_comparison_refusals": 5,
+        "altered_live_evidence_refusals": 9,
+        "new_application_launches_during_audit": 0
+      },
+      "execution_driver_commit": "7495d312f4a59e74b1926ddc3472d8b2034c2328",
+      "execution_result_sha256": "f5093802ef113d27c8752f7f7d4ac00191b9e4325ecec4189ffbfd1865f3ea50",
+      "final_audit_result_sha256": "73e55d629e69b6028c4463ab30dd3271679aa80a5bbb12ee3e41634cf2f62e03",
+      "qualification_sha256": "75f3877582e6d84e40c44cb00b07068d27b63078fb2bfeb3b039c38bf988024a",
+      "provider_catalogue_sha256": "fa57b955ab4018503e6a4246796efd1f0cb3d6ef02de49ba2085d695cd47f785",
+      "original_evidence_files_held": 14211
+    },
+    {
+      "python": "3.12.15",
+      "profile": "python-native-cache-origins-v3",
+      "startup": "emission-off",
+      "totals": {
+        "actual_application_launches": 188,
+        "sdk_processes": 94,
+        "reports": 38,
+        "complete_raw_and_typed_observations": 192,
+        "copied_original_observations": 4,
+        "recomputed_comparisons": 48,
+        "altered_comparison_refusals": 5,
+        "altered_live_evidence_refusals": 9,
+        "new_application_launches_during_audit": 0
+      },
+      "execution_driver_commit": "7495d312f4a59e74b1926ddc3472d8b2034c2328",
+      "execution_result_sha256": "acc0ce684853ecc6258da84db7772891269d77ec9b689a8cafe2b83609dffce0",
+      "final_audit_result_sha256": "9d44715d95495c55c2e870722c24543b99defcd3a9d51fa0e9056b541ac2c354",
+      "qualification_sha256": "53d0006b7e4a43a42923dec90f22e153b9d2c8a101e4fd9199841d475277e9b1",
+      "provider_catalogue_sha256": "fa57b955ab4018503e6a4246796efd1f0cb3d6ef02de49ba2085d695cd47f785",
+      "original_evidence_files_held": 14211
+    },
+    {
+      "python": "3.12.15",
+      "profile": "python-native-cache-origins-v3",
+      "startup": "both-off",
+      "totals": {
+        "actual_application_launches": 188,
+        "sdk_processes": 94,
+        "reports": 38,
+        "complete_raw_and_typed_observations": 192,
+        "copied_original_observations": 4,
+        "recomputed_comparisons": 48,
+        "altered_comparison_refusals": 5,
+        "altered_live_evidence_refusals": 9,
+        "new_application_launches_during_audit": 0
+      },
+      "execution_driver_commit": "7495d312f4a59e74b1926ddc3472d8b2034c2328",
+      "execution_result_sha256": "72e5fd60d19172ffebc6da97643a9ae0104bcb80be5bc9ec7b468a296e71676d",
+      "final_audit_result_sha256": "3ab25ee3689947516f590955f903b7c48d547505c4df0bdf957b21971e57d056",
+      "qualification_sha256": "aff27fe250b8f3209270106db6b69fa92f717b9efb009e9cd3a4d6f0c9989b2c",
+      "provider_catalogue_sha256": "fa57b955ab4018503e6a4246796efd1f0cb3d6ef02de49ba2085d695cd47f785",
+      "original_evidence_files_held": 14117
+    },
+    {
+      "python": "3.14.8",
+      "profile": "python-native-origins-v2",
+      "startup": "both-on",
+      "totals": {
+        "actual_application_launches": 188,
+        "sdk_processes": 94,
+        "reports": 38,
+        "complete_raw_and_typed_observations": 192,
+        "copied_original_observations": 4,
+        "recomputed_comparisons": 48,
+        "altered_comparison_refusals": 5,
+        "altered_live_evidence_refusals": 9,
+        "new_application_launches_during_audit": 0
+      },
+      "execution_driver_commit": "7495d312f4a59e74b1926ddc3472d8b2034c2328",
+      "execution_result_sha256": "166452a0286c32214885b4a0e6689458b54e2e2ca30cd5a1520930819c6d5682",
+      "final_audit_result_sha256": "bb5b5b667b58a4ccf177447079763dc6320e1f4cc630ec72b21d1cd48ccab78c",
+      "qualification_sha256": "d17fbe62261e3cf5b6732f10c40217902086e1afbda4a809190988ec7e0e1a1c",
+      "provider_catalogue_sha256": "c4cef2956fb44abddff2d7984517d5d02fb858d7a25b0b387c8ccf207a492d8e",
+      "original_evidence_files_held": 13808
+    },
+    {
+      "python": "3.14.8",
+      "profile": "python-native-origins-v2",
+      "startup": "collection-off",
+      "totals": {
+        "actual_application_launches": 188,
+        "sdk_processes": 94,
+        "reports": 38,
+        "complete_raw_and_typed_observations": 192,
+        "copied_original_observations": 4,
+        "recomputed_comparisons": 48,
+        "altered_comparison_refusals": 5,
+        "altered_live_evidence_refusals": 9,
+        "new_application_launches_during_audit": 0
+      },
+      "execution_driver_commit": "7495d312f4a59e74b1926ddc3472d8b2034c2328",
+      "execution_result_sha256": "f325a792fa015e8da157d39c9c651d2bc0557a3e2045eefb5467f5f7c0a4e20f",
+      "final_audit_result_sha256": "c89ab91b7c898ee3e9e269f5c34beb65f4373eb086914b935b1561ee09473e4a",
+      "qualification_sha256": "b4f8fe42a6fff7eec2cb066f12034bbf1fa7a0c4326571f02c1130fc11c2edda",
+      "provider_catalogue_sha256": "c4cef2956fb44abddff2d7984517d5d02fb858d7a25b0b387c8ccf207a492d8e",
+      "original_evidence_files_held": 13808
+    },
+    {
+      "python": "3.14.8",
+      "profile": "python-native-origins-v2",
+      "startup": "emission-off",
+      "totals": {
+        "actual_application_launches": 188,
+        "sdk_processes": 94,
+        "reports": 38,
+        "complete_raw_and_typed_observations": 192,
+        "copied_original_observations": 4,
+        "recomputed_comparisons": 48,
+        "altered_comparison_refusals": 5,
+        "altered_live_evidence_refusals": 9,
+        "new_application_launches_during_audit": 0
+      },
+      "execution_driver_commit": "7495d312f4a59e74b1926ddc3472d8b2034c2328",
+      "execution_result_sha256": "5a6dd0392420046717b8ec497a58b84e467b3187a546eeb50ce9bb24efc395ff",
+      "final_audit_result_sha256": "5559419f29139886561eb13334a88160e65fc15c5847bd0a7b6bcdd1510539b7",
+      "qualification_sha256": "e1f4b863b9d74f3a3690cc316706894bd8ff7c88c99c28bfc1975394b4d4381f",
+      "provider_catalogue_sha256": "c4cef2956fb44abddff2d7984517d5d02fb858d7a25b0b387c8ccf207a492d8e",
+      "original_evidence_files_held": 13808
+    },
+    {
+      "python": "3.14.8",
+      "profile": "python-native-origins-v2",
+      "startup": "both-off",
+      "totals": {
+        "actual_application_launches": 188,
+        "sdk_processes": 94,
+        "reports": 38,
+        "complete_raw_and_typed_observations": 192,
+        "copied_original_observations": 4,
+        "recomputed_comparisons": 48,
+        "altered_comparison_refusals": 5,
+        "altered_live_evidence_refusals": 9,
+        "new_application_launches_during_audit": 0
+      },
+      "execution_driver_commit": "7495d312f4a59e74b1926ddc3472d8b2034c2328",
+      "execution_result_sha256": "d97fc672f4b306e7ea40cf7cddb5e2d846894fa27e7ccc78032d61c275411225",
+      "final_audit_result_sha256": "3326f9b764c940a0f82a8bc43bc910dc6d03452c2593aeb7e4c5b2fa9cc2d9e5",
+      "qualification_sha256": "a394f6346a06764544873e7933a7332e6ee9459d3b70eb6bef7059a83a1b815d",
+      "provider_catalogue_sha256": "c4cef2956fb44abddff2d7984517d5d02fb858d7a25b0b387c8ccf207a492d8e",
+      "original_evidence_files_held": 13713
+    },
+    {
+      "python": "3.14.8",
+      "profile": "python-native-cache-origins-v3",
+      "startup": "both-on",
+      "totals": {
+        "actual_application_launches": 188,
+        "sdk_processes": 94,
+        "reports": 38,
+        "complete_raw_and_typed_observations": 192,
+        "copied_original_observations": 4,
+        "recomputed_comparisons": 48,
+        "altered_comparison_refusals": 5,
+        "altered_live_evidence_refusals": 9,
+        "new_application_launches_during_audit": 0
+      },
+      "execution_driver_commit": "7495d312f4a59e74b1926ddc3472d8b2034c2328",
+      "execution_result_sha256": "a12563fa77b11156d522d0f44516857b00de2e8aa06cbc5ee950e2bdbf934880",
+      "final_audit_result_sha256": "f00fb67028d818d090cf342f06625f5fea6ca0c2c2f83492b9c0e86e14579941",
+      "qualification_sha256": "d0f566222f12c78a360169d400affe29a806bbe65f9442f2979c8bd5e71700d5",
+      "provider_catalogue_sha256": "c4cef2956fb44abddff2d7984517d5d02fb858d7a25b0b387c8ccf207a492d8e",
+      "original_evidence_files_held": 14211
+    },
+    {
+      "python": "3.14.8",
+      "profile": "python-native-cache-origins-v3",
+      "startup": "collection-off",
+      "totals": {
+        "actual_application_launches": 188,
+        "sdk_processes": 94,
+        "reports": 38,
+        "complete_raw_and_typed_observations": 192,
+        "copied_original_observations": 4,
+        "recomputed_comparisons": 48,
+        "altered_comparison_refusals": 5,
+        "altered_live_evidence_refusals": 9,
+        "new_application_launches_during_audit": 0
+      },
+      "execution_driver_commit": "7495d312f4a59e74b1926ddc3472d8b2034c2328",
+      "execution_result_sha256": "0c3d9ee364b9a1d7bf447a169a5fd8ea72f176901b0a4b51085db56bd249f860",
+      "final_audit_result_sha256": "2d641b40216bce6005512c5934e699ffed78ff3c72527bc91fd0961f192edb8c",
+      "qualification_sha256": "139fa631c14d4c08a9499d1e1fe330c254827242abdd7eac22175346a9f1b03b",
+      "provider_catalogue_sha256": "c4cef2956fb44abddff2d7984517d5d02fb858d7a25b0b387c8ccf207a492d8e",
+      "original_evidence_files_held": 14211
+    },
+    {
+      "python": "3.14.8",
+      "profile": "python-native-cache-origins-v3",
+      "startup": "emission-off",
+      "totals": {
+        "actual_application_launches": 188,
+        "sdk_processes": 94,
+        "reports": 38,
+        "complete_raw_and_typed_observations": 192,
+        "copied_original_observations": 4,
+        "recomputed_comparisons": 48,
+        "altered_comparison_refusals": 5,
+        "altered_live_evidence_refusals": 9,
+        "new_application_launches_during_audit": 0
+      },
+      "execution_driver_commit": "7495d312f4a59e74b1926ddc3472d8b2034c2328",
+      "execution_result_sha256": "e8ab75e7790783ccb536156c39cb266bc739a3bfc66bdb359ab322591a3027f4",
+      "final_audit_result_sha256": "a64fba894c30384104e9bbf415eb5049b4e49a653539d3905ec1c41ed908cc93",
+      "qualification_sha256": "81a8e5ac40038ef1698d5b791d19b5d22dea1fb92624ba659e290826315595f4",
+      "provider_catalogue_sha256": "c4cef2956fb44abddff2d7984517d5d02fb858d7a25b0b387c8ccf207a492d8e",
+      "original_evidence_files_held": 14211
+    },
+    {
+      "python": "3.14.8",
+      "profile": "python-native-cache-origins-v3",
+      "startup": "both-off",
+      "totals": {
+        "actual_application_launches": 188,
+        "sdk_processes": 94,
+        "reports": 38,
+        "complete_raw_and_typed_observations": 192,
+        "copied_original_observations": 4,
+        "recomputed_comparisons": 48,
+        "altered_comparison_refusals": 5,
+        "altered_live_evidence_refusals": 9,
+        "new_application_launches_during_audit": 0
+      },
+      "execution_driver_commit": "7495d312f4a59e74b1926ddc3472d8b2034c2328",
+      "execution_result_sha256": "7362080daf333951b0846f5597228f9900a31ff9dc1d7c52e1f9ac3e9bea4486",
+      "final_audit_result_sha256": "9655ac5d01ddf5ff96bccf535e7d94a97c0329245b1622058490099db5d785a9",
+      "qualification_sha256": "1c01b6c5d8e8b0a118d008ffd53cc4a13b044ab06881d9ba6b2dc6fb59533f62",
+      "provider_catalogue_sha256": "c4cef2956fb44abddff2d7984517d5d02fb858d7a25b0b387c8ccf207a492d8e",
+      "original_evidence_files_held": 14116
+    }
+  ],
+  "observed": [
+    "Complete literal before/outcome/after receiver, alias/cycle, own-static and module-global graphs",
+    "Six declared methods, constructor/factory prefix, recursive calls and expected intermediate errors",
+    "Independent live collection/emission, full export-off holds, retained measurements and restored positive control",
+    "Actual supervisor/application/SDK identities, native origins, final SDK health and directly decoded OTLP",
+    "Generated, replayed, unittest, detached/exported, reduced and original/changed current-source suites"
+  ],
+  "limits": [
+    "Synchronous diagnostic receiver calls only; explicit prepared profiles and recorded toolchains",
+    "Serial trace grouping is separate from per-action invocation cookies",
+    "Asynchronous/resource actions, arbitrary roots/loaders/build graphs and general dependency closure remain open",
+    "No shipping-artefact, whole-language, exhaustive input/schedule or full-project completion claim"
+  ],
+  "historical_failures": [
+    "Initial development smoke/configuration failures remain separate from these sixteen completed configurations",
+    "The earlier729f2c2 full gate failed two CLI tests;5fd7a06 fixes the lazy telemetry import and passes",
+    "The old5fd runtime completed12 configurations but failed314-origin/emission-off checkpoint capture;3 configurations were not admitted",
+    "Its failed configuration retains185 actual application starts/92SDK starts separately;749 fixes the hard-link ctime race and receives a fresh complete16-configuration matrix"
+  ]
+}

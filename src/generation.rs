@@ -65,6 +65,26 @@ const RESOURCES: &[(&str, &str)] = &[
         include_str!("../adapters/generation/python_launch.py"),
     ),
     (
+        "live_control.py",
+        include_str!("../adapters/generation/live_control.py"),
+    ),
+    (
+        "python_control.py",
+        include_str!("../adapters/generation/python_control.py"),
+    ),
+    (
+        "python_live.py",
+        include_str!("../adapters/generation/python_live.py"),
+    ),
+    (
+        "python_control_receipt.py",
+        include_str!("../adapters/generation/python_control_receipt.py"),
+    ),
+    (
+        "python_checkpoint.py",
+        include_str!("../adapters/generation/python_checkpoint.py"),
+    ),
+    (
         "project_tests.py",
         include_str!("../adapters/generation/project_tests.py"),
     ),

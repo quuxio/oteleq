@@ -71,6 +71,8 @@ Prepared [Java metric schedules](java-metric-controls.md) also derive actual sta
 
 Declared [Python call-only schedules](ordered-sequences.md#python-call-sequences) retain intermediate graphs and pin the original class/method identity. Their [150-launch qualification](qualification/python-sequences-2026-10-23.json) covers the recorded package/provider, with separate 81-launch single-call compatibility; broader actions remain unsupported.
 
+Explicit prepared Python origin/cache calls can request [live metric schedules](python-metric-controls.md). Their [3,008-launch diagnostic matrix](qualification/python-metric-controls-2026-10-24.json) checks both profiles on Python 3.12.15/3.14.8 and all four initial states, complete intermediate state and serial telemetry, independent collection/emission controls, retained measurements and generated/replayed/framework/detached/reduced/promoted routes. A legacy or input-only prepared profile refuses these schedules before application startup.
+
 ## Project policy and concrete fixtures
 
 Pass `--config /absolute/path/to/equivalence.toml` to `plan`. The [example policy](../examples/equivalence.toml) is executable. Unknown keys, unsupported schema/language IDs, duplicate selectors/cases and unsafe limits fail validation. A policy is at most 1 MiB. CLI `--language` and `--cases` override the corresponding policy values; CLI exclusions extend the policy exclusions.

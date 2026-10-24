@@ -99,7 +99,8 @@ def configuration(entry: dict, endpoint: str, service: str) -> dict:
                        "shutdown_timeout_ms": 10000},
             "sources": {"include": [entry["path"]], "exclude": []},
             "functions": {"include": functions, "exclude": []},
-            "metrics": {"collection": True, "emission": True,
+            "metrics": {**(entry["sequence_configuration"][0]["metrics"] if sequences.controls(entry)
+                           else {"collection": True, "emission": True}),
                         "histogram_boundaries_seconds": [1e-6, 1e-5, 1e-4, .001, .01, .1, 1.]},
             "traces": {"enabled": True, "sample_ratio": 1.0},
             "lifetimes": {"enabled": False, "include": [], "exclude": [],
