@@ -1,0 +1,167 @@
+{
+  "qualification_schema_version": 1,
+  "date": "2026-10-25",
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "platform": {
+    "os": "macOS",
+    "architecture": "ARM64",
+    "llvm": "22.1.8",
+    "python": "3.12.15",
+    "opentelemetry_cpp_sdk": "1.30.0"
+  },
+  "runtime": {
+    "commit": "05e3130735bb355cfc8a040c921cd6ffa161697b",
+    "tree": "a284c58dab8a59cac5ef909e07c780c293d4674b",
+    "source_archive_sha256": "6cbb4860aace9c606c2eaf102b3ebde199100da03ed0ccef2a11277dc8effa9d",
+    "cli_sha256": "f66667ea180a827b1d49b903b68e8d02a802b53019e24275f1bbd9fa3a0349af",
+    "qualifier_sha256": "0d13954ecd98d27db34d0c7a95d6e3dfc03193ce8c244135fdc3b91821fa82b9",
+    "provider_commit": "5476ce042126f0e9d40c22cc8959eb504e074ead",
+    "provider_source_archive_sha256": "82de511c80d19577c5523cf56e3246b84611cfff668d0b6846388fd1b690b05f",
+    "provider_products": {
+      "native-sdk-build.json": "6adddd72efb4f1c67cbc31b7c98d9f405763c286d2b3613693f2d86600c53043",
+      "libotelc_native_runtime.dylib": "64f3a79ece22123dadfc38b469eb6a1b3c91d9d3516c81d0221472bafa95c84e"
+    }
+  },
+  "profile": {
+    "backend": "prepared",
+    "native_provider": "native-owned-v1",
+    "build": 3,
+    "unit_recipe": 1,
+    "preparation": 1,
+    "target_languages": [
+      "c",
+      "cpp"
+    ],
+    "target_scope": "explicit same-language two-unit targets with declared signed-integer free functions and scalar globals/statics",
+    "collection": true,
+    "emission": true,
+    "traces": true,
+    "lifetimes": false,
+    "context": {
+      "tasks": false,
+      "http": false
+    },
+    "source_complete": false,
+    "exec_verified": false
+  },
+  "results": {
+    "applications": 100,
+    "sdk_processes": 50,
+    "unique_launch_ids": 100,
+    "reports": 26,
+    "actual_original_reports": 25,
+    "copied_original_reports": 1,
+    "observations": 104,
+    "copied_observations": 4,
+    "trace_http_requests": 50,
+    "metric_http_requests": 100,
+    "metric_points_joined_to_final_sdk_units": 200,
+    "prelaunch_refusals": 4,
+    "altered_evidence_refusals": 13,
+    "cases": [
+      {
+        "name": "c-o0",
+        "language": "c",
+        "optimisation": "-O0",
+        "verdict": "equivalent_observed",
+        "actual_application_launches": 28
+      },
+      {
+        "name": "cpp-o2",
+        "language": "cpp",
+        "optimisation": "-O2",
+        "verdict": "equivalent_observed",
+        "actual_application_launches": 28
+      },
+      {
+        "name": "c-state",
+        "language": "c",
+        "optimisation": "-O2",
+        "verdict": "different_observed",
+        "actual_application_launches": 44
+      }
+    ],
+    "source_preserved": true
+  },
+  "observations": [
+    "Complete literal before/after scalar globals/statics, results and unchanged raw application output",
+    "Generated standard-library unittest, direct execution, frozen replay and detached exported suites",
+    "Current-source promotion after a checkout copy/body change and discovery of an added selected function",
+    "Same-return instrumented-only global mutation, scalar reduction from 5 to 0 and fresh confirmation",
+    "Compiler-bound targets, original caller/tool facts and repeated dependency/existence-probe checks",
+    "Actual pre-exec application/supervisor parent, group and session; final SDK health and original start/release/completion records",
+    "Direct raw protobuf and successful downstream HTTP receipt joined to final SDK unit counters",
+    "Complete copied-report denominator joined to exactly one original four-launch report; copies counted separately"
+  ],
+  "preservation": {
+    "consumer_source_files": 617,
+    "provider_source_files": 449,
+    "provider_products": 2,
+    "other_held_go_provider_files": 500,
+    "other_held_weaver_source_files": 485,
+    "other_held_tooling_files": 6,
+    "original_evidence_files": 2150,
+    "dimensions": [
+      "bytes",
+      "device/inode",
+      "mode",
+      "size",
+      "mtime/ctime"
+    ],
+    "all_recorded_input_groups_held": {
+      "consumer": true,
+      "native_sdk": true,
+      "native_products": true,
+      "go_sdk": true,
+      "weaver_source": true,
+      "tooling": true,
+      "cli": true
+    },
+    "scope": "Original source and product facts checked before/after execution. Later documentation changes do not broaden the qualified runtime."
+  },
+  "validation": {
+    "full_local_gate": {
+      "exit_code": 0,
+      "seconds": 844.865,
+      "source_files_held": 617
+    },
+    "actual_corpus_seconds": 2607.189,
+    "independent_review": {
+      "sha256": "3cf9c612aadd52b688aff88b3a5efd1648f4e2400668708b2d4a40c731109eeb",
+      "reviewed_delta_files": 9,
+      "focused_tests": 32,
+      "skips": 0,
+      "scope": "Qualifier, receipt readers and exact source identities; independent review is separate from the actual SDK corpus."
+    },
+    "retained_only_audit": {
+      "sha256": "fb9892901e2902930afc42435bef0bc88113f7457b17cdd39a34c6064548b20e",
+      "seconds": 10.658,
+      "new_application_launches": 0
+    }
+  },
+  "retained_evidence": {
+    "root": "2026-10-25/native-prepared-qualification",
+    "execution": "exact-05e3130-02",
+    "status_sha256": "527342c6490fac12e8a570a4cb08f521dbd3104b75e10b6f6c232d755104ee0a",
+    "qualification_sha256": "0a3b7c3c6ce03ee5f99d1b96ec0a450b96c8e250fdeb0c261840f790b898902d",
+    "retained_audit": "retained-final-audit.json",
+    "original_failed_setup": "exact-05e3130-01: missing locked Markdown tools; refused before any SDK application. Original status/logs remain failed.",
+    "development_evidence": "Earlier dirty-snapshot component probes and failed caller/fixture/oracle experiments remain separate; this record does not recertify them."
+  },
+  "reproduction": {
+    "command": "make generation-native-project-otelc PYTHON=/absolute/path/to/python OTELC_ROOT=/absolute/path/to/matching/otelc NATIVE_BACKEND=prepared NATIVE_SDK_BUILD=/absolute/path/to/matching/otelc/build/context-sdk REPORT_DIR=/absolute/path/to/new-evidence",
+    "qualifier_commit": "05e3130735bb355cfc8a040c921cd6ffa161697b",
+    "min_free_bytes": 8589934592,
+    "scope": "Use the recorded frozen provider and genuine matching SDK products, or separately qualify changed provider/toolchain inputs. Select a new external output directory."
+  },
+  "remaining": [
+    "Recursive/exception generated and retained workflows",
+    "Receivers, mutable object arguments, ordered/resource actions and richer graphs",
+    "Live metric controls and invocation attribution",
+    "Separately negotiated object/resource lifetime profiles and task/HTTP context",
+    "General native build/dependency recipes and mixed-language project workflows",
+    "Other host/platform/toolchain qualifications",
+    "Actual shipping artefacts, performance/resource budgets and full eight-language completion checklist"
+  ]
+}

@@ -4,11 +4,13 @@
 
 An opt-in scalar project profile now consumes explicit C/C++ compilation-database targets through `plan`, `generate`, `run`, `replay`, `export-tests`, `shrink` and `clean`. It preserves actual per-unit flags and working directories, project-header callables and target-wide scalar state. The [exact-revision corpus](qualification/native-projects-2026-10-21.json) passes 64 real application launches across generated/detached suites, fixed replay and scalar reduction, including a same-return global-state difference and four refusal controls.
 
+The separate explicit [prepared provider](native-prepared-provider.md) has [100-launch qualification](qualification/native-prepared-projects-2026-10-25.json) against SDK `5476ce0`. That normal signed-integer free-function corpus adds current-source promotion, original ownership/file/health records and independent raw OTLP receipts, with four prelaunch and thirteen altered-evidence refusals. Its runtime/provider identities and limits are separate from the older default-provider record above.
+
 This work contributes to the [completion checklist](completion.md). It does not qualify arbitrary CMake, Meson or other native projects, and it is not shipping-artefact evidence.
 
 ## Usage
 
-Use an otelc build with the validated native object transformation interface (`object rename-main --help` must succeed), its matched compiler and the matching Clang development headers/libraries, `llvm-config`, `clang-scan-deps` and `llvm-objcopy`. The tested provider is the frozen otelc `58abcf5` candidate on macOS ARM64 with LLVM 22. This is compatibility evidence for that provider, not a claim about the SDK's replacement implementation, current main or a released product. Interface availability alone does not qualify another provider or platform.
+For the older default route, use an otelc build with the validated native object transformation interface (`object rename-main --help` must succeed), its matched compiler and the matching Clang development headers/libraries, `llvm-config`, `clang-scan-deps` and `llvm-objcopy`. That record tests frozen otelc `58abcf5` on macOS ARM64 with LLVM 22. For explicit replacement-SDK selection, use the separately qualified [prepared-provider configuration](native-prepared-provider.md#select-the-candidate) and matching SDK products. Neither record qualifies arbitrary current-main builds or released shipping artefacts. Interface availability alone does not qualify another provider or platform.
 
 Create a policy outside the application repository:
 
