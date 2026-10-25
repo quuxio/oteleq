@@ -722,13 +722,13 @@ def generator_identity():
         'node_live.py', 'node_control.py', 'node_control_receipt.py', 'node_checkpoint.mjs',
         'native_protocol.py', 'native_inputs.py', 'native_toolchain.py', 'native_sdk.py',
         'native_build.py', 'native_prepared.py', 'native_health.py', 'native_execution.py',
-        'native_session.py', 'native_telemetry.py', 'histogram_observation.py',
+        'native_session.py', 'native_telemetry.py',
         'native_profile.py', 'native_project.py', 'native_dependencies.py', 'native_frontend.py',
         'native_discover.cpp', 'native_context.py', 'native_workers.py', 'native_workspace.py',
         'owned_workspace.py', 'preconditions.py', 'project_tests.py', 'project_runner.py',
         'python_provider.py', 'python_inputs.py', 'python_prepared.py', 'python_journal.py',
         'python_code.py', 'python_code_match.py', 'python_origin.py', 'python_selection.py', 'python_cache.py',
-        'python_execution.py', 'python_health.py', 'python_telemetry.py', 'python_launch.py',
+        'python_execution.py', 'python_health.py', 'python_telemetry.py', 'python_launch.py', 'histogram_observation.py',
         'live_control.py', 'go_control.py', 'go_live.py', 'go_control_receipt.py', 'go_tooling.py', 'python_control.py', 'python_live.py', 'python_control_receipt.py', 'python_checkpoint.py')})
     files["host-python"] = capture.file_digest(Path(sys.executable))
     files["observer:otelc_capture.py"] = capture.file_digest(Path(capture.__file__))

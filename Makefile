@@ -215,6 +215,7 @@ generation-check: node-observer-check node-sequence-check node-source-context-ch
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/go_live.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/go_control_receipt.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/python_telemetry.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/histogram_observation.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/python_launch.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/live_control.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/python_control.py' --fail-under=80
@@ -273,7 +274,6 @@ generation-check: node-observer-check node-sequence-check node-source-context-ch
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/native_execution.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/native_session.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/native_telemetry.py' --fail-under=80
-	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/histogram_observation.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/cpp_receivers.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/cpp_worker.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/cpp_graph.py' --fail-under=80

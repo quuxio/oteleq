@@ -82,8 +82,8 @@ def metric_prefix(values, timestamp, bounds=BOUNDS):
     return message
 
 
-def execution(root, *, plain=False, collection=True, emission=True):
-    values = {'traces': {'enabled': True, 'sample_ratio': 1.0},
+def execution(root, *, plain=False, collection=True, emission=True, sample_ratio=1.0):
+    values = {'traces': {'enabled': True, 'sample_ratio': sample_ratio},
               'metrics': {'collection': collection, 'emission': emission, 'histogram_boundaries_seconds': BOUNDS}}
     with patch.dict(fixture.POLICY, values):
         launch, owner = start(root, plain=plain)
@@ -106,15 +106,29 @@ class NativeTelemetryTests(unittest.TestCase):
             trace, metric = messages()
             for group in (trace.resource_spans[0], metric.resource_metrics[0]):
                 group.resource.attributes[0].value.string_value = 'foreign-service'
+            payload = bodies(trace, metric)
             with self.assertRaises(ValueError):
-                receipt.witness(completed, bodies(trace, metric), 'foreign-service', (NAME, NAME))
+                receipt.witness(completed, payload, 'foreign-service', (NAME, NAME))
+
+    def test_complete_sampling_requires_exact_unit_probability(self):
+        payload = bodies()
+        for ratio in (1, 1.0):
+            with self.subTest(ratio=ratio), tempfile.TemporaryDirectory() as temporary:
+                completed = execution(Path(temporary).resolve(), sample_ratio=ratio)
+                self.assertEqual(receipt.witness(completed, payload, SERVICE, (NAME, NAME))['spans'], 3)
+        for ratio in (0., .5, math.nextafter(1., 0.)):
+            with self.subTest(ratio=ratio), tempfile.TemporaryDirectory() as temporary:
+                completed = execution(Path(temporary).resolve(), sample_ratio=ratio)
+                with self.assertRaisesRegex(ValueError, 'complete selected traces'):
+                    receipt.witness(completed, payload, SERVICE, (NAME, NAME))
 
     def test_impossible_histogram_sum_and_decreasing_cumulative_sum_refuse(self):
         trace, metric = messages()
         histogram = metric.resource_metrics[0].scope_metrics[0].metrics[1].histogram.data_points[0]
         histogram.sum = 1000
+        payload = bodies(trace, metric)
         with self.subTest(kind='impossible-single-sum'), self.assertRaises(ValueError):
-            receipt.metrics(bodies(trace, metric), 'cpp', SERVICE, {NAME: 3}, {NAME: 1}, BOUNDS, True)
+            receipt.metrics(payload, 'cpp', SERVICE, {NAME: 3}, {NAME: 1}, BOUNDS, True)
         trace, previous = messages(); _, current = messages()
         scope = current.resource_metrics[0].scope_metrics[0]
         for instrument in scope.metrics:
@@ -174,16 +188,17 @@ class NativeTelemetryTests(unittest.TestCase):
             self.assertEqual(saved['health']['metric_exports']['batches_succeeded'], '2')
 
     def test_plain_absence_and_all_fixed_metric_startups_keep_traces_independent(self):
+        payload = bodies()
         with tempfile.TemporaryDirectory() as temporary:
             completed = execution(Path(temporary).resolve(), plain=True)
             self.assertIsNone(receipt.witness(completed, [], SERVICE, (NAME, NAME)))
-            with self.assertRaises(ValueError): receipt.witness(completed, bodies(), SERVICE, (NAME, NAME))
+            with self.assertRaises(ValueError): receipt.witness(completed, payload, SERVICE, (NAME, NAME))
         for collection, emission in ((False, True), (True, False), (False, False)):
             with self.subTest(collection=collection, emission=emission), tempfile.TemporaryDirectory() as temporary:
                 completed = execution(Path(temporary).resolve(), collection=collection, emission=emission)
                 value = receipt.witness(completed, bodies()[:1], SERVICE, (NAME, NAME))
                 self.assertEqual(value['spans'], 3)
-                with self.assertRaises(ValueError): receipt.witness(completed, bodies(), SERVICE, (NAME, NAME))
+                with self.assertRaises(ValueError): receipt.witness(completed, payload, SERVICE, (NAME, NAME))
 
     def test_resource_scope_missing_or_duplicate_call_and_causal_corruption_refuse(self):
         for kind in ('resource', 'scope', 'missing', 'duplicate', 'foreign', 'parent', 'cycle', 'time', 'error', 'labels', 'dropped', 'flags'):
@@ -201,8 +216,9 @@ class NativeTelemetryTests(unittest.TestCase):
             elif kind == 'labels': labels(span.attributes, {'function': NAME})
             elif kind == 'dropped': span.dropped_events_count = 1
             else: span.flags = 0
+            payload = bodies(trace, metric)
             with self.subTest(kind=kind), self.assertRaises(ValueError):
-                receipt.traces(bodies(trace, metric), 'cpp', SERVICE, (NAME, NAME))
+                receipt.traces(payload, 'cpp', SERVICE, (NAME, NAME))
 
     def test_metric_types_cumulative_totals_and_histogram_integrity_refuse_changes(self):
         for kind in ('count', 'error', 'kind', 'unit', 'temporality', 'label', 'bounds', 'buckets', 'sum', 'extrema', 'exemplar', 'timestamp', 'duplicate'):
@@ -221,15 +237,17 @@ class NativeTelemetryTests(unittest.TestCase):
             elif kind == 'exemplar': histogram.exemplars.add(as_double=.01)
             elif kind == 'timestamp': histogram.start_time_unix_nano = 101
             else: scope.metrics[0].sum.data_points.add().CopyFrom(scope.metrics[0].sum.data_points[0])
+            payload = bodies(trace, metric)
             with self.subTest(kind=kind), self.assertRaises(ValueError):
-                receipt.metrics(bodies(trace, metric), 'cpp', SERVICE, {NAME: 3}, {NAME: 1}, BOUNDS, True)
+                receipt.metrics(payload, 'cpp', SERVICE, {NAME: 3}, {NAME: 1}, BOUNDS, True)
 
     def test_unknown_routes_malformed_payloads_roots_and_final_unit_changes_refuse(self):
         with tempfile.TemporaryDirectory() as temporary:
             completed = execution(Path(temporary).resolve())
+            payload = bodies()
             for roots in ((), [NAME], ('foreign',), (True,)):
                 with self.subTest(roots=roots), self.assertRaises(ValueError):
-                    receipt.witness(completed, bodies(), SERVICE, roots)
+                    receipt.witness(completed, payload, SERVICE, roots)
             for raw in ([('/unexpected', b'x')], [('/v1/traces', b'\xff')], [('/v1/traces', b'')]):
                 with self.subTest(raw=raw), self.assertRaises(ValueError):
                     receipt.witness(completed, raw, SERVICE, (NAME, NAME))
@@ -238,7 +256,7 @@ class NativeTelemetryTests(unittest.TestCase):
             path = completed.health.file.path; value = completed.health.value()
             value['metric_exports']['units_started'] = value['metric_exports']['units_succeeded'] = '4'
             write(path, value)
-            with self.assertRaises(ValueError): receipt.witness(completed, bodies(), SERVICE, (NAME, NAME))
+            with self.assertRaises(ValueError): receipt.witness(completed, payload, SERVICE, (NAME, NAME))
 
 
 if __name__ == '__main__':

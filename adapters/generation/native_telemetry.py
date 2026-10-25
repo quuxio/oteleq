@@ -1,6 +1,7 @@
 """Join native owned completion to independently decoded function traces and metrics."""
 
 from collections import Counter
+from collections.abc import Iterator
 import hashlib
 import json
 import math
@@ -12,6 +13,7 @@ from native_protocol import require
 import otelc_capture as capture
 
 SCOPE = 'io.quux.otelc.native'
+METRIC_PATH = '/v1/metrics'
 SDK_VERSION = '1.30.0'
 CALLS, ERRORS, DURATION = ('otelc.function.' + name for name in ('calls', 'errors', 'duration'))
 MAX_SPANS, MAX_POINTS, MAX_BYTES = 16384, 65536, 32 * 1024 * 1024
@@ -53,13 +55,11 @@ def decode(decoder, body: bytes):
         raise ValueError('native prepared provider: invalid OTLP protobuf') from error
 
 
-def traces(bodies: list, language: str, service: str, roots: tuple[str, ...]) -> tuple[dict, Counter, int]:
-    """Bind complete serial selected call trees, including recursive child calls."""
+def trace_values(bodies: list, language: str, service: str) -> Iterator:
+    """Decode only bound resources/scopes and retain every selected span."""
     from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceRequest
-    spans, nodes, errors = {}, {}, Counter()
-    selected = set(roots)
     for route, body in bodies:
-        if route != '/v1/traces':
+        if route != capture.TRACE_PATH:
             continue
         message = decode(ExportTraceServiceRequest, body)
         require(bool(message.resource_spans), 'empty native trace request')
@@ -69,19 +69,11 @@ def traces(bodies: list, language: str, service: str, roots: tuple[str, ...]) ->
             for instrumentation in group.scope_spans:
                 scope(instrumentation)
                 require(bool(instrumentation.spans), 'empty native trace scope')
-                for span in instrumentation.spans:
-                    key = capture.span_identity(span)
-                    labels = {'function': span.name}
-                    if span.status.code == 2:
-                        labels['error.type'] = 'exception'; errors[span.name] += 1
-                    require(key not in spans and len(spans) < MAX_SPANS and span.name in selected
-                            and span.kind == 1 and span.status.code in (0, 2) and not span.status.message
-                            and span.flags & 1 and attributes(span.attributes) == labels
-                            and not span.events and not span.links
-                            and span.dropped_attributes_count == span.dropped_events_count == span.dropped_links_count == 0,
-                            'invalid, dropped, excessive or unbound native function span')
-                    spans[key] = span
-                    nodes[key] = (span.trace_id, span.parent_span_id) if span.parent_span_id else None
+                yield from instrumentation.spans
+
+
+def causal_roots(spans: dict, nodes: dict, roots: tuple[str, ...]) -> None:
+    """Require ordered serial roots and complete, temporally contained children."""
     capture.trace_roots(nodes)
     ordered = sorted((span for span in spans.values() if not span.parent_span_id), key=lambda span: span.start_time_unix_nano)
     require(tuple(span.name for span in ordered) == roots
@@ -93,6 +85,26 @@ def traces(bodies: list, language: str, service: str, roots: tuple[str, ...]) ->
             require(owner.start_time_unix_nano <= child.start_time_unix_nano
                     <= child.end_time_unix_nano <= owner.end_time_unix_nano,
                     'native selected child lies outside its parent')
+
+
+def traces(bodies: list, language: str, service: str, roots: tuple[str, ...]) -> tuple[dict, Counter, int]:
+    """Bind complete serial selected call trees, including recursive child calls."""
+    spans, nodes, errors = {}, {}, Counter()
+    selected = set(roots)
+    for span in trace_values(bodies, language, service):
+        key = capture.span_identity(span)
+        labels = {'function': span.name}
+        if span.status.code == 2:
+            labels['error.type'] = 'exception'; errors[span.name] += 1
+        require(key not in spans and len(spans) < MAX_SPANS and span.name in selected
+                and span.kind == 1 and span.status.code in (0, 2) and not span.status.message
+                and span.flags & 1 and attributes(span.attributes) == labels
+                and not span.events and not span.links
+                and span.dropped_attributes_count == span.dropped_events_count == span.dropped_links_count == 0,
+                'invalid, dropped, excessive or unbound native function span')
+        spans[key] = span
+        nodes[key] = (span.trace_id, span.parent_span_id) if span.parent_span_id else None
+    causal_roots(spans, nodes, roots)
     return dict(Counter(span.name for span in spans.values())), errors, len(spans)
 
 
@@ -126,14 +138,11 @@ def point(metric, value, names: set[str], bounds: list) -> tuple:
     return (metric.name, function), (value.start_time_unix_nano, value.time_unix_nano, number, buckets, total, limits)
 
 
-def metrics(bodies: list, language: str, service: str, names: dict, errors: Counter,
-            bounds: list, enabled: bool) -> int:
-    """Retain all cumulative samples and join their final totals to actual spans."""
+def metric_values(bodies: list, language: str, service: str) -> Iterator:
+    """Keep decoding/resource checks separate from per-instrument accounting."""
     from opentelemetry.proto.collector.metrics.v1.metrics_service_pb2 import ExportMetricsServiceRequest
-    series, points = {}, 0
-    kinds = {CALLS: ('sum', '{call}'), ERRORS: ('sum', '{error}'), DURATION: ('histogram', 's')}
     for route, body in bodies:
-        if route != '/v1/metrics':
+        if route != METRIC_PATH:
             continue
         message = decode(ExportMetricsServiceRequest, body)
         require(bool(message.resource_metrics), 'empty native metric request')
@@ -143,18 +152,11 @@ def metrics(bodies: list, language: str, service: str, names: dict, errors: Coun
             for instrumentation in group.scope_metrics:
                 scope(instrumentation)
                 require(bool(instrumentation.metrics), 'empty native metric scope')
-                for metric in instrumentation.metrics:
-                    require(metric.name in kinds, 'unexpected native metric instrument')
-                    kind, unit = kinds[metric.name]
-                    data = getattr(metric, kind)
-                    require(metric.WhichOneof('data') == kind and metric.unit == unit
-                            and data.aggregation_temporality == 2 and bool(data.data_points),
-                            'invalid native metric kind, unit or temporality')
-                    for value in data.data_points:
-                        points += 1
-                        require(points <= MAX_POINTS, 'native metric point budget exceeded')
-                        key, sample = point(metric, value, set(names), bounds)
-                        series.setdefault(key, []).append(sample)
+                yield from instrumentation.metrics
+
+
+def cumulative_totals(series: dict, bounds: list) -> dict:
+    """Order exports without dropping any accepted histogram observation field."""
     totals = {}
     for key, samples in series.items():
         samples.sort()
@@ -165,6 +167,27 @@ def metrics(bodies: list, language: str, service: str, names: dict, errors: Coun
             for previous, sample in zip(samples, samples[1:]):
                 histogram_observation.cumulative_histogram(previous, sample, bounds)
         totals[key] = samples[-1][2]
+    return totals
+
+
+def metrics(bodies: list, language: str, service: str, names: dict, errors: Counter,
+            bounds: list, enabled: bool) -> int:
+    """Retain all cumulative samples and join their final totals to actual spans."""
+    series, points = {}, 0
+    kinds = {CALLS: ('sum', '{call}'), ERRORS: ('sum', '{error}'), DURATION: ('histogram', 's')}
+    for metric in metric_values(bodies, language, service):
+        require(metric.name in kinds, 'unexpected native metric instrument')
+        kind, unit = kinds[metric.name]
+        data = getattr(metric, kind)
+        require(metric.WhichOneof('data') == kind and metric.unit == unit
+                and data.aggregation_temporality == 2 and bool(data.data_points),
+                'invalid native metric kind, unit or temporality')
+        for value in data.data_points:
+            points += 1
+            require(points <= MAX_POINTS, 'native metric point budget exceeded')
+            key, sample = point(metric, value, set(names), bounds)
+            series.setdefault(key, []).append(sample)
+    totals = cumulative_totals(series, bounds)
     if enabled:
         wanted = {(metric, name): number for name, number in names.items() for metric in (CALLS, DURATION)}
         wanted.update({(ERRORS, name): number for name, number in errors.items()})
@@ -193,7 +216,7 @@ def witness(completed: native_execution.Execution, bodies: list, service: str,
             and policy['traces']['sample_ratio'] == 1.0,
             'native qualification requires complete selected traces')
     require(type(bodies) is list and len(bodies) <= 4096
-            and all(type(row) is tuple and len(row) == 2 and row[0] in ('/v1/traces', '/v1/metrics')
+            and all(type(row) is tuple and len(row) == 2 and row[0] in (capture.TRACE_PATH, METRIC_PATH)
                     and type(row[1]) is bytes and bool(row[1]) for row in bodies)
             and sum(len(raw) for _, raw in bodies) <= MAX_BYTES, 'invalid native telemetry route or capture budget')
     language = launch.intent.build.intent.language
@@ -218,8 +241,8 @@ def witness(completed: native_execution.Execution, bodies: list, service: str,
               'losses': {'function_lost': 0, 'metadata_errors': 0, 'queue_dropped': 0, 'diagnostic_dropped': 0},
               'pending': 0, 'sdk_pid': completed.started.owner.application_pid,
               'received': {'spans': spans, 'metric_points': points,
-                  'trace_requests': sum(route == '/v1/traces' for route, _ in bodies),
-                  'metric_requests': sum(route == '/v1/metrics' for route, _ in bodies)}, 'health': health}
+                  'trace_requests': sum(route == capture.TRACE_PATH for route, _ in bodies),
+                  'metric_requests': sum(route == METRIC_PATH for route, _ in bodies)}, 'health': health}
     completed.verify()
     if folder is not None:
         (folder / 'native-verified-telemetry.json').write_text(json.dumps(result, indent=2, allow_nan=False) + '\n')

@@ -45,6 +45,10 @@ const RESOURCES: &[(&str, &str)] = &[
         include_str!("../adapters/generation/python_health.py"),
     ),
     (
+        "histogram_observation.py",
+        include_str!("../adapters/generation/histogram_observation.py"),
+    ),
+    (
         "python_telemetry.py",
         include_str!("../adapters/generation/python_telemetry.py"),
     ),
@@ -211,10 +215,6 @@ const RESOURCES: &[(&str, &str)] = &[
     (
         "native_session.py",
         include_str!("../adapters/generation/native_session.py"),
-    ),
-    (
-        "histogram_observation.py",
-        include_str!("../adapters/generation/histogram_observation.py"),
     ),
     (
         "native_telemetry.py",
@@ -601,6 +601,18 @@ const RESOURCES: &[(&str, &str)] = &[
         include_str!("../examples/otelc-resource-workloads.json"),
     ),
 ];
+
+#[cfg(test)]
+mod resource_tests {
+    use super::RESOURCES;
+    use std::collections::BTreeSet;
+
+    #[test]
+    fn embedded_resource_names_are_unique() {
+        let names: BTreeSet<_> = RESOURCES.iter().map(|(name, _)| name).collect();
+        assert_eq!(names.len(), RESOURCES.len());
+    }
+}
 
 pub fn launch(args: &[String]) -> Result<i32, String> {
     let parent = Path::new("/tmp")
