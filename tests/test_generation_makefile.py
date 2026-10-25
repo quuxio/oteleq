@@ -168,6 +168,18 @@ class QualificationRecipeTests(unittest.TestCase):
         self.assertIn('--otelc-root "/tmp/provider" --report-dir "/tmp/evidence"', result.stdout)
         self.assertNotIn('cargo build', result.stdout)
 
+    def test_native_lifetime_recipe_retains_its_reader_and_runtime_module_floors(self):
+        result = subprocess.run(['make', '--no-print-directory', '-n', 'native-lifetime-check',
+            'PYTHON=/selected/python'], cwd=ROOT, capture_output=True, text=True, check=True)
+        for module in ('native_lifetime_build', 'native_lifetime_inventory', 'native_prepared',
+                       'native_execution', 'native_health'):
+            self.assertIn("--include='*/" + module + ".py' --fail-under=80", result.stdout)
+        for suite in ('test_generation_native_lifetime_build', 'test_generation_native_lifetime_execution',
+                      'test_generation_native_prepared', 'test_generation_native_execution'):
+            self.assertIn(suite, result.stdout)
+        self.assertNotIn('cargo build', result.stdout)
+        self.assertNotIn('native-provider.coverage', result.stdout)
+
     def test_help_names_the_http_qualification_target(self):
         result = subprocess.run(["make", "help"], cwd=ROOT, capture_output=True, text=True, check=True)
         self.assertIn("generation-http-otelc Qualify scripted HTTP", result.stdout)

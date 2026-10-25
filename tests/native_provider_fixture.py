@@ -80,11 +80,15 @@ def toolchain(root: Path, *, language: str = 'cpp', mutate=None):
     return value, queries
 
 
-def sdk(root: Path, *, language: str = 'cpp'):
+def sdk(root: Path, *, language: str = 'cpp', source_profile: str = 'function-v2'):
     tools, _ = toolchain(root, language=language)
     source = root / 'sdk'
+    abis = {'function-v2': ('function_abi.h',),
+            'object-v1': ('function_abi.h', 'object_abi.h'),
+            'resource-v1': ('function_abi.h', 'object_abi.h', 'resource_abi.h')}
     names = ('adapters/native/CMakeLists.txt', 'adapters/native/launcher/CMakeLists.txt',
-             'adapters/native/src/runtime.cpp', 'adapters/native/include/runtime.h', 'native/llvm/function_abi.h',
+             'adapters/native/src/runtime.cpp', 'adapters/native/include/runtime.h',
+             *('native/llvm/' + name for name in abis[source_profile]),
              'adapters/native/gate/ExecGate.c', 'native/llvm/OtelcPass.cpp')
     for name in names:
         path = source / name; path.parent.mkdir(parents=True, exist_ok=True); path.write_text('unit source ' + name)
@@ -97,11 +101,12 @@ def sdk(root: Path, *, language: str = 'cpp'):
         '-DCMAKE_C_COMPILER=' + str(tools.directory / 'clang'), '-DCMAKE_CXX_COMPILER=' + str(tools.directory / 'clang++'),
         '-DOTELC_LAUNCH_COVERAGE=OFF']
     value = {'schema_version': 1, 'kind': 'otelc.native-sdk-build', 'coverage': False, 'source_complete': False,
-        'sources': [identity(source / name) for name in names[:5]], 'toolchain': tools.metadata(),
+        'sources': [identity(source / name) for name in names[:-2]], 'toolchain': tools.metadata(),
         'build_tools': [identity(path) for path in (cmake, ninja)], 'library': identity(library),
         'commands': [command, [str(cmake), '--build', str(directory), '--target', 'otelc_native_runtime', '-j', '4']]}
     write(directory / 'native-sdk-build.json', value)
-    return native_sdk.capture(source, directory, tools, cmake=cmake, ninja=ninja, platform='linux')
+    return native_sdk.capture(source, directory, tools, cmake=cmake, ninja=ninja,
+                              platform='linux', source_profile=source_profile)
 
 
 def build(root: Path, *, language: str = 'cpp', count: int = 1):

@@ -14,6 +14,8 @@ EXPORTS = {'exporters_observed', 'unit', 'batches_started', 'batches_succeeded',
 FUNCTIONS = {'registered', 'started', 'ended', 'active', 'lost', 'invalid', 'metadata_errors', 'closed'}
 SPANS = {'processors_observed', 'batch_processors_observed', 'sampled_started',
          'sampled_ended', 'sampled_active', 'queue_pending', 'queue_dropped', 'queue_evidence'}
+LIFETIMES = {'types', 'admitted', 'completed', 'live', 'ending', 'censored', 'lost',
+             'duplicates', 'invalid', 'closing', 'closed'}
 
 
 def count(value: object) -> int:
@@ -38,9 +40,26 @@ def exporter(value: dict, unit: str) -> None:
             'native unobserved exporter has counters')
 
 
-def validate(value: dict, *, language: str, pid: int, policy: str, selection: str) -> dict:
+def lifetime(value: dict, kind: str) -> None:
+    """Final shutdown separates completed lifetimes from censored observations."""
+    pending = 'destroying' if kind == 'object' else 'releasing'
+    fields(value, LIFETIMES | {pending}, 'lifetime health')
+    counters = {name: count(value[name]) for name in LIFETIMES - {'closing', 'closed'} | {pending}}
+    require(value['closing'] is True and value['closed'] is True
+            and all(counters[name] == 0 for name in ('live', pending, 'ending', 'lost', 'duplicates', 'invalid'))
+            and counters['admitted'] == counters['completed'] + counters['censored']
+            and (counters['types'] > 0 or counters['admitted'] == 0),
+            'native lifetime accounting is incomplete')
+
+
+def validate(value: dict, *, language: str, pid: int, policy: str, selection: str,
+             lifetime_kind: str | None = None) -> dict:
     """Require the recorded native final checkpoint, not a legacy health substitute."""
-    fields(value, FIELDS, 'final health')
+    require(lifetime_kind is None or type(lifetime_kind) is str and
+            (lifetime_kind, language) in (('object', 'cpp'), ('resource', 'c')),
+            'native lifetime health does not match the caller profile')
+    extra = {lifetime_kind + '_accounting'} if lifetime_kind is not None else set()
+    fields(value, FIELDS | extra, 'final health')
     expected = {'schema_version': 1, 'kind': 'otelc.runtime-health', 'language': language,
                 'scope': 'sdk_pipeline', 'pid': pid, 'policy_sha256': policy,
                 'selection_sha256': selection, 'phase': 'final', 'sdk_attached': True,
@@ -77,4 +96,6 @@ def validate(value: dict, *, language: str, pid: int, policy: str, selection: st
             and spans['queue_evidence'] == 'derived_after_shutdown', 'native trace pipeline is incomplete')
     exporter(value['trace_exports'], 'spans')
     exporter(value['metric_exports'], 'metric_points')
+    if lifetime_kind is not None:
+        lifetime(value[lifetime_kind + '_accounting'], lifetime_kind)
     return value

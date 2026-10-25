@@ -174,9 +174,10 @@ def alias_inputs(names: tuple[Path, ...], dependencies: tuple[inputs.File, ...])
     return aliases
 
 
-def freeze(sdk: SDK, project: Path, output: Path, language: str, recipe: dict,
-           dependencies: tuple[tuple[Path, ...], ...], policy: dict, *, aliases: tuple[Path, ...] = ()) -> Intent:
-    """Producer metadata may confirm a closed caller intent; it cannot select inputs."""
+def freeze_context(sdk: SDK, project: Path, output: Path, language: str, recipe: dict,
+                   dependencies: tuple[tuple[Path, ...], ...], policy: dict, *,
+                   aliases: tuple[Path, ...] = ()) -> Intent:
+    """Hold shared unit inputs; each profile must also validate its own policy."""
     require(language in ('c', 'cpp') and canonical(str(project), directory=True) == project and project != Path('/'),
             'invalid native unit application root')
     require(output.is_absolute() and output == output.resolve() and output.parent == output.parent.resolve(strict=True)
@@ -192,7 +193,7 @@ def freeze(sdk: SDK, project: Path, output: Path, language: str, recipe: dict,
         require(len(paths) <= 10000, 'native unit input closure exceeds its budget')
     require(type(policy) is dict and same(policy.get('schema_version'), 3)
             and type(policy.get('languages')) is list and language in policy['languages']
-            and type(policy.get('lifetimes')) is dict and policy['lifetimes'].get('enabled') is False
+            and type(policy.get('lifetimes')) is dict and type(policy['lifetimes'].get('enabled')) is bool
             and same(policy.get('context'), {'tasks': False, 'http': False}), 'unsupported native unit policy')
     renamed = any(unit['rename_main'] for unit in recipe['units'])
     held = tuple(inputs.capture(path) for path in sorted(paths))
@@ -203,6 +204,19 @@ def freeze(sdk: SDK, project: Path, output: Path, language: str, recipe: dict,
         alias_inputs(aliases, held))
     result.verify()
     return result
+
+
+def function_policy(policy: dict) -> None:
+    """Shared context binding does not admit lifetimes through the build3 reader."""
+    require(type(policy) is dict and type(policy.get('lifetimes')) is dict
+            and policy['lifetimes'].get('enabled') is False, 'unsupported native unit policy')
+
+
+def freeze(sdk: SDK, project: Path, output: Path, language: str, recipe: dict,
+           dependencies: tuple[tuple[Path, ...], ...], policy: dict, *, aliases: tuple[Path, ...] = ()) -> Intent:
+    """Producer metadata may confirm a closed build3 intent; it cannot select inputs."""
+    function_policy(policy)
+    return freeze_context(sdk, project, output, language, recipe, dependencies, policy, aliases=aliases)
 
 
 def operation(label: str, directory: str, argv: list[str], product: Path, **extra) -> dict:
@@ -287,8 +301,8 @@ def compiler_inputs(intent: Intent, held: dict[str, inputs.File]) -> tuple[list[
         target, separator, words = raw.partition(':')
         require(target == 'otelc-inputs' and separator == ':', 'invalid native unit dependency target')
         paths = [Path(os.path.abspath(Path(row['directory']) / name.replace('$$', '$'))) for name in shlex.split(words)]
-        paths = [aliases.get(path, path) for path in paths]
-        require(len(paths) == len(set(paths)) and set(paths) == discovered[row['unit']],
+        paths = list(dict.fromkeys(aliases.get(path, path) for path in paths))
+        require(set(paths) == discovered[row['unit']],
                 'native per-unit compiler inputs differ from caller discovery')
         groups[row['label']] = [expected[str(path)].identity() for path in paths]
         found.update({str(path): expected[str(path)].identity() for path in paths})
@@ -313,6 +327,7 @@ class Build:
 
     def verify(self) -> None:
         """Recheck all original inputs and the complete product denominator."""
+        function_policy(self.intent.policy())
         self.intent.verify()
         expected = names(self.intent)
         require(type(self.files) is tuple and len(self.files) == len(expected)
@@ -325,6 +340,7 @@ class Build:
 def read(intent: Intent) -> Build:
     """Read a build3 response without executing producer-selected paths or commands."""
     require(type(intent) is Intent, 'native build3 requires its per-unit caller intent')
+    function_policy(intent.policy())
     intent.verify()
     require(native_build.file_set(intent.output) == names(intent), 'unexpected native unit build files')
     held = {name: inputs.capture(intent.output / name, maximum=inputs.MAX_RECORD if name.endswith('.json') else inputs.MAX_FILE,
