@@ -44,6 +44,8 @@ A separate uncommitted development snapshot exercises genuine SDK `b425d1f` thro
 
 ## Remaining integration and acceptance
 
+The [maintainer caller pipeline](native-lifetime-callers.md) now materialises compiler-bound scalar callers, obtains complete lifetime semantic facts before SDK compilation and repeats compiler input/search and semantic checks. Its genuine two-profile metadata probe starts no SDK builds or applications. This advances the caller integration below; public planning/runtime and retained-suite qualification remain open.
+
 1. Freeze caller-selected per-unit contexts and independently observed semantic type/construction/allocation sites before SDK compilation. Bind private VFS/neutral-driver assets without importing SDK renderers or trusting producer-selected paths.
 2. Connect the implemented build4/build5 readers to generated callers and the public planning/runtime path, retaining their complete commands, products, semantic expectations and compiler channels.
 3. Supply independently obtained frontend/tool facts from the application pipeline, preserving unsupported cases and compiler input/search probes before and after builds/execution. Type names and aggregate counts alone do not establish construction or resource pairing.

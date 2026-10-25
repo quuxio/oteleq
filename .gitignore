@@ -13,3 +13,4 @@ __pycache__/
 .native-caller.coverage
 .native-lifetime.coverage
 .native-lifetime-receipt.coverage
+.native-lifetime-caller.coverage
