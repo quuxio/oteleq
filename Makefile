@@ -29,6 +29,7 @@ DEPENDENCY_AUDIT_OUTPUT ?= $(CURDIR)/build/dependency-audit
 .PHONY: native-lifetime-receipt-check
 .PHONY: native-lifetime-caller-check
 .PHONY: native-lifetime-public-check
+.PHONY: native-lifetime-workflow-check
 .PHONY: generation-go-controls-otelc
 
 .PHONY: generation-project-tests-otelc generation-preconditions-otelc generation-domains-otelc generation-input-walks-otelc generation-retained-source-otelc generation-native-project-otelc generation-return-otelc generation-java-sequence-otelc generation-java-controls-otelc generation-java-project-otelc generation-java-archive-otelc generation-node-project-otelc
@@ -46,6 +47,7 @@ DEPENDENCY_AUDIT_OUTPUT ?= $(CURDIR)/build/dependency-audit
 .PHONY: help setup lint examples docs-check observer-check generation-check effect-qualification-check node-observer-check node-sequence-check java-observer-check go-observer-check cpp-observer-check generation-cpp-receiver-otelc generation-go-receiver-otelc generation-go-source-otelc generation-java-receiver-otelc generation-otelc generation-policy-otelc generation-rust-otelc rust-semantic-otelc generation-native-otelc generation-shrink-otelc generation-python-project-otelc generation-receiver-otelc generation-node-receiver-otelc generation-go-build-otelc generation-go-project-otelc generation-sequence-otelc generation-typescript-sequence-otelc generation-filesystem-otelc generation-http-otelc resource-otelc capture-otelc report core-check coverage check
 
 help:
+	@printf '%s\n' 'native-lifetime-workflow-check Check hosted native lifetime routes and literal qualification oracles'
 	@printf '%s\n' 'native-lifetime-public-check Check native lifetime configuration, caller tool discovery and public orchestration'
 	@printf '%s\n' 'native-lifetime-caller-check Check generated caller/compiler and independent lifetime frontend binding'
 	@printf '%s\n' 'native-lifetime-receipt-check Check prelaunch lifetime expectations, raw OTLP and final SDK units'
@@ -152,6 +154,7 @@ dependency-audit-check:
 docs-check: lint examples dependency-audit-check
 	$(MAKE) observer-check
 	$(MAKE) generation-check
+	$(MAKE) native-lifetime-workflow-check
 
 node-observer-check:
 	$(NODE) --test --experimental-test-coverage --test-coverage-include='adapters/generation/node_observe.mjs' --test-coverage-lines=80 --test-coverage-functions=80 --test-coverage-branches=80 tests/node_observer.test.mjs
@@ -212,6 +215,15 @@ native-lifetime-public-check:
 	$(PYTHON) -m coverage report --data-file=.native-lifetime-public.coverage --include='*/native_lifetime_frontend.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.native-lifetime-public.coverage --include='*/native_source.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.native-lifetime-public.coverage --include='*/native_source_run.py' --fail-under=80
+
+native-lifetime-workflow-check:
+	PYTHONPATH="$(CURDIR)/tests$${PYTHONPATH:+:$${PYTHONPATH}}" $(PYTHON) -m coverage run --data-file=.native-lifetime-workflow.coverage --include='*/qualify_native_lifetimes.py,*/native_lifetime_audit.py,*/native_lifetime_otlp.py,*/native_lifetime_refusals.py,*/native_prepared_otlp.py' -m unittest test_generation_native_lifetime_workflow test_generation_native_lifetime_promotion test_generation_native_lifetime_audit test_generation_native_receipt_qualification -v
+	$(PYTHON) -m coverage report --data-file=.native-lifetime-workflow.coverage --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.native-lifetime-workflow.coverage --include='*/qualify_native_lifetimes.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.native-lifetime-workflow.coverage --include='*/native_lifetime_audit.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.native-lifetime-workflow.coverage --include='*/native_lifetime_otlp.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.native-lifetime-workflow.coverage --include='*/native_lifetime_refusals.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.native-lifetime-workflow.coverage --include='*/native_prepared_otlp.py' --fail-under=80
 
 native-caller-check:
 	PYTHONPATH="$(CURDIR)/tests$${PYTHONPATH:+:$${PYTHONPATH}}" $(PYTHON) -m coverage run --data-file=.native-caller.coverage --include='*/native_unit_caller.py,*/native_workers.py,*/native_frontend.py' -m unittest test_generation_native_callers test_generation_native_workers test_generation_native_frontend -v

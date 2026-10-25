@@ -1,0 +1,142 @@
+{
+  "decoder": "independent native lifetime receipt with owned health1",
+  "raw_otlp_sha256": "959e2a0477a1688df34bb28e6c88a07b95fb37af0ff95e492fde27fc4333ceff",
+  "caller_intent": {
+    "path": "/home/runner/work/_temp/native-lifetime-evidence/c-completed/comparison/c2f6b54699b743e6eeff-0/instrumented_on-0/expected-lifetimes.json",
+    "resolved_path": "/home/runner/work/_temp/native-lifetime-evidence/c-completed/comparison/c2f6b54699b743e6eeff-0/instrumented_on-0/expected-lifetimes.json",
+    "sha256": "8406884cc5412afe9e2374e3537286bb418b739f3b97cc0a8bb59ad4ed13b7b1",
+    "size": 2079,
+    "device": 66305,
+    "inode": 9700733,
+    "mode": 33152,
+    "uid": 1001,
+    "gid": 1001,
+    "mtime_ns": 1792940507279960046,
+    "ctime_ns": 1792940507280013025,
+    "links": 1
+  },
+  "functions": {
+    "src/app.c::selected": 1
+  },
+  "spans": 2,
+  "lifetimes": [
+    {
+      "type_usr": "c:@S@Item",
+      "name": "Item",
+      "creation_path": [
+        0
+      ],
+      "release_path": [
+        0
+      ],
+      "complete": true,
+      "exception_exit": null,
+      "instance": "1",
+      "boundary": "free_entry",
+      "duration_ns": 20992,
+      "trace_id": "9aaf79c2d873bb7e25ae20d8ce510bcf",
+      "span_id": "1b188db2c511d790",
+      "creation_trace_id": "815338d588cbb8db5a56e6ac45fe280f",
+      "creation_span_id": "3046be70f68e0942"
+    }
+  ],
+  "metric_points": 12,
+  "sdk_pid": 10856,
+  "scope": "Declared synchronous serial selected call trees; no general action/thread attribution",
+  "health": {
+    "controls": {
+      "collection": true,
+      "effective_emission_off": false,
+      "emission": true,
+      "pid": 10856,
+      "schema_version": 1
+    },
+    "diagnostics": {
+      "dropped": "0"
+    },
+    "downstream_receipt": "unavailable",
+    "function_accounting": {
+      "active": "0",
+      "closed": true,
+      "ended": "1",
+      "invalid": "0",
+      "lost": "0",
+      "metadata_errors": "0",
+      "registered": "1",
+      "started": "1"
+    },
+    "kind": "otelc.runtime-health",
+    "language": "c",
+    "lifecycle": {
+      "flush": "succeeded",
+      "shutdown": "succeeded"
+    },
+    "metric_exports": {
+      "batches_failed": "0",
+      "batches_pending": "0",
+      "batches_started": "3",
+      "batches_succeeded": "3",
+      "exporters_observed": 1,
+      "unit": "metric_points",
+      "units_failed": "0",
+      "units_started": "12",
+      "units_succeeded": "12"
+    },
+    "metric_flush": {
+      "attempts": "1",
+      "failed_attempts": "0"
+    },
+    "otlp_partial_rejection": "unavailable",
+    "phase": "final",
+    "pid": 10856,
+    "policy_sha256": "d128a53af682005bdee886dd77ff9cd53b0980ab25fd95f221c2800ee8915d37",
+    "resource_accounting": {
+      "admitted": "1",
+      "censored": "0",
+      "closed": true,
+      "closing": true,
+      "completed": "1",
+      "duplicates": "0",
+      "ending": "0",
+      "invalid": "0",
+      "live": "0",
+      "lost": "0",
+      "releasing": "0",
+      "types": "1"
+    },
+    "schema_version": 1,
+    "scope": "sdk_pipeline",
+    "sdk_attached": true,
+    "selection_sha256": "b240c087052f2287aed929e6a88cb26935ee314456eeecb6025ec797bc813f1a",
+    "source_complete": false,
+    "span_accounting": {
+      "batch_processors_observed": 1,
+      "processors_observed": 1,
+      "queue_dropped": "0",
+      "queue_evidence": "derived_after_shutdown",
+      "queue_pending": "0",
+      "sampled_active": "0",
+      "sampled_ended": "2",
+      "sampled_started": "2"
+    },
+    "trace_exports": {
+      "batches_failed": "0",
+      "batches_pending": "0",
+      "batches_started": "1",
+      "batches_succeeded": "1",
+      "exporters_observed": 1,
+      "unit": "spans",
+      "units_failed": "0",
+      "units_started": "2",
+      "units_succeeded": "2"
+    }
+  },
+  "losses": {
+    "function_lost": 0,
+    "lifetime_lost": 0,
+    "metadata_errors": 0,
+    "queue_dropped": 0,
+    "diagnostic_dropped": 0
+  },
+  "pending": 0
+}

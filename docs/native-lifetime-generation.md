@@ -53,6 +53,8 @@ This establishes equivalence over the declared application tests and observation
 
 ## Contributor checks and remaining qualification
 
+The separate [hosted workflow driver](native-lifetime-workflows.md) builds a fixed noncoverage SDK and exercises actual public generated/framework/replayed/detached/reduced routes in one Linux job, with literal return/state/errno oracles and original source/product facts. Its hosted execution is pending. A successful development run does not replace the remaining independent raw lifetime audit or broader profile qualification.
+
 ```sh
 make native-lifetime-public-check PYTHON=/absolute/path/to/python
 ```

@@ -1,0 +1,699 @@
+{
+  "artefact_class": "diagnostic",
+  "blocked": [],
+  "cases": [
+    {
+      "argument_types": [
+        "int"
+      ],
+      "arguments": [
+        5
+      ],
+      "arguments_requested": [
+        5
+      ],
+      "case": "c2f6b54699b743e6eeff-0",
+      "comparison": {
+        "cases": [
+          {
+            "case_id": "c2f6b54699b743e6eeff-0",
+            "contract": {
+              "case_id": "c2f6b54699b743e6eeff-0",
+              "expected_baseline": {
+                "kind": "return"
+              },
+              "fixture_sha256": "8eb50387cd3f1bbcbdd0b3bab039d431437333c777ef0ff7155074b3da11cf43",
+              "function_id": "src/app.c::selected",
+              "observation_schema_version": 1,
+              "required_roots": [
+                "global:state",
+                "global:observed_errno"
+              ]
+            },
+            "execution": {
+              "baseline_attempts": 2,
+              "case_id": "c2f6b54699b743e6eeff-0",
+              "differences": [],
+              "instrumented_attempts": 2,
+              "reasons": [],
+              "verdict": "equivalent_observed"
+            },
+            "pairs": [
+              {
+                "baseline_attempt": 0,
+                "comparison": {
+                  "differences": [],
+                  "initial_differences": [],
+                  "reasons": [],
+                  "verdict": "equivalent_observed"
+                },
+                "instrumented_attempt": 0
+              },
+              {
+                "baseline_attempt": 0,
+                "comparison": {
+                  "differences": [],
+                  "initial_differences": [],
+                  "reasons": [],
+                  "verdict": "equivalent_observed"
+                },
+                "instrumented_attempt": 1
+              },
+              {
+                "baseline_attempt": 1,
+                "comparison": {
+                  "differences": [],
+                  "initial_differences": [],
+                  "reasons": [],
+                  "verdict": "equivalent_observed"
+                },
+                "instrumented_attempt": 0
+              }
+            ],
+            "reasons": [],
+            "verdict": "equivalent_observed"
+          }
+        ],
+        "claim": "equivalence over these tests and observations",
+        "comparison": "exact byte channels and typed boundary graphs; repeated independent attempts; producer-supplied decoded instrumentation witness",
+        "scope": {
+          "artefact_class": "diagnostic",
+          "baseline_artefact_sha256": "ff1c7d01929fadd497a6931413fef37b05c3188446bb741085f655602678fafb",
+          "channels": [
+            "stdout",
+            "stderr"
+          ],
+          "gaps": [
+            "scalar corpus; business preconditions and branch exhaustiveness not established",
+            "diagnostic access/entrypoint helpers; not shipping artefact evidence",
+            "artefact digests aggregate diagnostic inputs and qualified tools/adapters; emitted runtime compiler/loader outputs are outside those digests",
+            "no undeclared network, imported-module globals or concurrent-schedule qualification",
+            "exception traceback/stack and Java/C++ extra exception fields are unobserved",
+            "compiler sysroots and OS libraries are outside content identity",
+            "trusted local execution; no hostile-code sandbox",
+            "live metric controls and exporter-fault scenarios are unobserved",
+            "filesystem effects are unobserved",
+            "HTTP fixture effects are unobserved",
+            "graph identities are local to each boundary; cross-boundary replacement, weakref and finalizer effects are unobserved"
+          ],
+          "instrumented_artefact_sha256": "96d6feb9b21de112b8a9fb6ea7b6ec8b2765be71bf80575a3e1d2d8886d9ff92",
+          "language": "c",
+          "observer": "oteleq typed boundary codecs v1; compiler-bound native scalar caller; independent declared lifetime expectations and complete raw lifetime/function receipt",
+          "policy_sha256": "f1fd88f7fa002079bab43f94a0c23d858f010823a960f0ca6c6a4d4d6b832699",
+          "source_sha256": "f1da18bb97c79a5b181fbf065f6e48a22ff4bbc4324635560e248dcebd5dbbec"
+        },
+        "typed_schema_version": 1,
+        "verdict": "equivalent_observed"
+      },
+      "exit_code": 0,
+      "function": "selected"
+    }
+  ],
+  "claim": "equivalence over these tests and observations",
+  "configuration": {
+    "adapters": {
+      "c": {
+        "backend": "prepared",
+        "build_timeout_ms": 180000,
+        "compilation_database": "build/compile_commands.json",
+        "lifetimes": {
+          "exclude": [],
+          "include": [
+            "Item"
+          ],
+          "max_live": 4096
+        },
+        "profile": "native-resources-owned-v1",
+        "sdk_build": "/home/runner/work/_temp/native-lifetime-sdk",
+        "targets": [
+          {
+            "link_flags": [
+              "-pthread"
+            ],
+            "name": "application",
+            "units": [
+              {
+                "source": "src/app.c"
+              },
+              {
+                "source": "src/keep.c"
+              }
+            ]
+          }
+        ]
+      },
+      "go": {
+        "build_tags": [],
+        "build_timeout_ms": 180000,
+        "module_roots": []
+      },
+      "java": {
+        "backend": "legacy"
+      },
+      "python": {
+        "import_roots": []
+      },
+      "rust": {
+        "backend": "compiler"
+      },
+      "typescript": {
+        "backend": "source"
+      }
+    },
+    "effects": {
+      "filesystem": []
+    },
+    "fixtures": [
+      {
+        "cases": [
+          [
+            5
+          ]
+        ],
+        "domains": [
+          {
+            "kind": "integer",
+            "maximum": 5,
+            "minimum": 0
+          }
+        ],
+        "expected_baseline": {
+          "kind": "return"
+        },
+        "function": "selected*",
+        "language": "c",
+        "lifetimes": [
+          {
+            "complete": true,
+            "creation_path": [
+              0
+            ],
+            "exception_exit": null,
+            "release_path": [
+              0
+            ],
+            "type": "Item"
+          }
+        ],
+        "source": "src/app.c"
+      }
+    ],
+    "functions": {
+      "exclude": [],
+      "include": [
+        "selected*"
+      ]
+    },
+    "generation": {
+      "cases_per_function": 3,
+      "seed": 20261008
+    },
+    "languages": [
+      "c"
+    ],
+    "limits": {
+      "baseline_repeats": 2,
+      "case_timeout_ms": 60000,
+      "instrumented_repeats": 2,
+      "max_capture_bytes": 262144
+    },
+    "schema_version": 1,
+    "sources": {
+      "exclude": [],
+      "include": [
+        "**"
+      ]
+    }
+  },
+  "configuration_sha256": "cc9378de64d0909868edf0086bf57aa1090885f9603fb94f7535b3357d97ba8d",
+  "exit_code": 0,
+  "inventory": [
+    {
+      "binding_capture_offset": 0,
+      "column": 6,
+      "declaration_only": true,
+      "expected_baseline": {
+        "kind": "return"
+      },
+      "file_functions": [],
+      "generation_seed": 20261008,
+      "globals": [
+        {
+          "declarations": [
+            {
+              "source_file": "src/app.c",
+              "source_offset": 61,
+              "unit": "4b433ef28f025c087511de9121819aee88891580f100d09d84ced733c5849253"
+            }
+          ],
+          "definition": true,
+          "expression": "state",
+          "internal": false,
+          "name": "state",
+          "private": false,
+          "source_file": "src/app.c",
+          "source_offset": 61,
+          "symbol": "state",
+          "type": "int",
+          "unit": "4b433ef28f025c087511de9121819aee88891580f100d09d84ced733c5849253"
+        },
+        {
+          "declarations": [
+            {
+              "source_file": "src/app.c",
+              "source_offset": 73,
+              "unit": "4b433ef28f025c087511de9121819aee88891580f100d09d84ced733c5849253"
+            }
+          ],
+          "definition": true,
+          "expression": "observed_errno",
+          "internal": false,
+          "name": "observed_errno",
+          "private": false,
+          "source_file": "src/app.c",
+          "source_offset": 73,
+          "symbol": "observed_errno",
+          "type": "int",
+          "unit": "4b433ef28f025c087511de9121819aee88891580f100d09d84ced733c5849253"
+        }
+      ],
+      "id": "22904d0b6a1e616791a3",
+      "language": "c",
+      "line": 4,
+      "name": "keep_item",
+      "native_backend": "prepared",
+      "native_context": {
+        "language": "c"
+      },
+      "native_kind": "FunctionDecl",
+      "native_options": {
+        "backend": "prepared",
+        "build_timeout_ms": 180000,
+        "compilation_database": "build/compile_commands.json",
+        "lifetimes": {
+          "exclude": [],
+          "include": [
+            "Item"
+          ],
+          "max_live": 4096
+        },
+        "profile": "native-resources-owned-v1",
+        "sdk_build": "/home/runner/work/_temp/native-lifetime-sdk",
+        "targets": [
+          {
+            "link_flags": [
+              "-pthread"
+            ],
+            "name": "application",
+            "units": [
+              {
+                "source": "src/app.c"
+              },
+              {
+                "source": "src/keep.c"
+              }
+            ]
+          }
+        ]
+      },
+      "otelc_function": "keep_item",
+      "otelc_runtime_function": "include/item.h::keep_item",
+      "output": "void",
+      "package": "",
+      "package_end": null,
+      "parameters": [
+        "Item *"
+      ],
+      "parser": "matched Clang project inventory",
+      "path": "include/item.h",
+      "reason": "method, lambda or external callable needs a fixture",
+      "source_file": "include/item.h",
+      "source_offset": 77,
+      "source_sha256": "4a9d4ab3e9735e1135e96ff9f54feb728ec2e4d8867300415214db839dce8955",
+      "status": "excluded",
+      "symbol": "keep_item",
+      "target": "application",
+      "unit": "4b433ef28f025c087511de9121819aee88891580f100d09d84ced733c5849253"
+    },
+    {
+      "binding_capture_offset": 0,
+      "column": 5,
+      "declaration_only": false,
+      "expected_baseline": {
+        "kind": "return"
+      },
+      "file_functions": [],
+      "generation_seed": 20261008,
+      "globals": [
+        {
+          "declarations": [
+            {
+              "source_file": "src/app.c",
+              "source_offset": 61,
+              "unit": "4b433ef28f025c087511de9121819aee88891580f100d09d84ced733c5849253"
+            }
+          ],
+          "definition": true,
+          "expression": "state",
+          "internal": false,
+          "name": "state",
+          "private": false,
+          "source_file": "src/app.c",
+          "source_offset": 61,
+          "symbol": "state",
+          "type": "int",
+          "unit": "4b433ef28f025c087511de9121819aee88891580f100d09d84ced733c5849253"
+        },
+        {
+          "declarations": [
+            {
+              "source_file": "src/app.c",
+              "source_offset": 73,
+              "unit": "4b433ef28f025c087511de9121819aee88891580f100d09d84ced733c5849253"
+            }
+          ],
+          "definition": true,
+          "expression": "observed_errno",
+          "internal": false,
+          "name": "observed_errno",
+          "private": false,
+          "source_file": "src/app.c",
+          "source_offset": 73,
+          "symbol": "observed_errno",
+          "type": "int",
+          "unit": "4b433ef28f025c087511de9121819aee88891580f100d09d84ced733c5849253"
+        }
+      ],
+      "id": "c2f6b54699b743e6eeff",
+      "input_cases": [
+        [
+          5
+        ]
+      ],
+      "input_domains": [
+        {
+          "kind": "integer",
+          "maximum": 5,
+          "minimum": 0
+        }
+      ],
+      "language": "c",
+      "lifetime_expectations": [
+        {
+          "complete": true,
+          "creation_path": [
+            0
+          ],
+          "exception_exit": null,
+          "release_path": [
+            0
+          ],
+          "type": "Item"
+        }
+      ],
+      "line": 5,
+      "name": "selected",
+      "native_backend": "prepared",
+      "native_context": {
+        "language": "c"
+      },
+      "native_kind": "FunctionDecl",
+      "native_lifetime_sources": {
+        "exclude": [],
+        "include": [
+          "build/compile_commands.json",
+          "include/item.h",
+          "src/app.c",
+          "src/keep.c"
+        ]
+      },
+      "native_options": {
+        "backend": "prepared",
+        "build_timeout_ms": 180000,
+        "compilation_database": "build/compile_commands.json",
+        "lifetimes": {
+          "exclude": [],
+          "include": [
+            "Item"
+          ],
+          "max_live": 4096
+        },
+        "profile": "native-resources-owned-v1",
+        "sdk_build": "/home/runner/work/_temp/native-lifetime-sdk",
+        "targets": [
+          {
+            "link_flags": [
+              "-pthread"
+            ],
+            "name": "application",
+            "units": [
+              {
+                "source": "src/app.c"
+              },
+              {
+                "source": "src/keep.c"
+              }
+            ]
+          }
+        ]
+      },
+      "otelc_function": "selected",
+      "otelc_runtime_function": "src/app.c::selected",
+      "output": "int",
+      "package": "",
+      "package_end": null,
+      "parameters": [
+        "int"
+      ],
+      "parser": "matched Clang project inventory",
+      "path": "src/app.c",
+      "reason": "",
+      "source_file": "src/app.c",
+      "source_offset": 95,
+      "source_sha256": "53477e87a3800c9a227103dd82d1a60fcf7df4f6d2901792a1d953f0a9b37b28",
+      "status": "ready",
+      "symbol": "selected",
+      "target": "application",
+      "unit": "4b433ef28f025c087511de9121819aee88891580f100d09d84ced733c5849253"
+    },
+    {
+      "binding_capture_offset": 0,
+      "column": 6,
+      "declaration_only": true,
+      "expected_baseline": {
+        "kind": "return"
+      },
+      "file_functions": [],
+      "generation_seed": 20261008,
+      "globals": [
+        {
+          "declarations": [
+            {
+              "source_file": "src/app.c",
+              "source_offset": 61,
+              "unit": "4b433ef28f025c087511de9121819aee88891580f100d09d84ced733c5849253"
+            }
+          ],
+          "definition": true,
+          "expression": "state",
+          "internal": false,
+          "name": "state",
+          "private": false,
+          "source_file": "src/app.c",
+          "source_offset": 61,
+          "symbol": "state",
+          "type": "int",
+          "unit": "4b433ef28f025c087511de9121819aee88891580f100d09d84ced733c5849253"
+        },
+        {
+          "declarations": [
+            {
+              "source_file": "src/app.c",
+              "source_offset": 73,
+              "unit": "4b433ef28f025c087511de9121819aee88891580f100d09d84ced733c5849253"
+            }
+          ],
+          "definition": true,
+          "expression": "observed_errno",
+          "internal": false,
+          "name": "observed_errno",
+          "private": false,
+          "source_file": "src/app.c",
+          "source_offset": 73,
+          "symbol": "observed_errno",
+          "type": "int",
+          "unit": "4b433ef28f025c087511de9121819aee88891580f100d09d84ced733c5849253"
+        }
+      ],
+      "id": "dc0e9deedea396417e3f",
+      "language": "c",
+      "line": 4,
+      "name": "keep_item",
+      "native_backend": "prepared",
+      "native_context": {
+        "language": "c"
+      },
+      "native_kind": "FunctionDecl",
+      "native_options": {
+        "backend": "prepared",
+        "build_timeout_ms": 180000,
+        "compilation_database": "build/compile_commands.json",
+        "lifetimes": {
+          "exclude": [],
+          "include": [
+            "Item"
+          ],
+          "max_live": 4096
+        },
+        "profile": "native-resources-owned-v1",
+        "sdk_build": "/home/runner/work/_temp/native-lifetime-sdk",
+        "targets": [
+          {
+            "link_flags": [
+              "-pthread"
+            ],
+            "name": "application",
+            "units": [
+              {
+                "source": "src/app.c"
+              },
+              {
+                "source": "src/keep.c"
+              }
+            ]
+          }
+        ]
+      },
+      "otelc_function": "keep_item",
+      "otelc_runtime_function": "include/item.h::keep_item",
+      "output": "void",
+      "package": "",
+      "package_end": null,
+      "parameters": [
+        "Item *"
+      ],
+      "parser": "matched Clang project inventory",
+      "path": "include/item.h",
+      "reason": "method, lambda or external callable needs a fixture",
+      "source_file": "include/item.h",
+      "source_offset": 77,
+      "source_sha256": "4a9d4ab3e9735e1135e96ff9f54feb728ec2e4d8867300415214db839dce8955",
+      "status": "excluded",
+      "symbol": "keep_item",
+      "target": "application",
+      "unit": "8f37c1b85e08d0fb68a5bd82ee44dfcc7d0611e321e2bf25961154a391647304"
+    },
+    {
+      "binding_capture_offset": 0,
+      "column": 6,
+      "declaration_only": false,
+      "expected_baseline": {
+        "kind": "return"
+      },
+      "file_functions": [],
+      "generation_seed": 20261008,
+      "globals": [
+        {
+          "declarations": [
+            {
+              "source_file": "src/app.c",
+              "source_offset": 61,
+              "unit": "4b433ef28f025c087511de9121819aee88891580f100d09d84ced733c5849253"
+            }
+          ],
+          "definition": true,
+          "expression": "state",
+          "internal": false,
+          "name": "state",
+          "private": false,
+          "source_file": "src/app.c",
+          "source_offset": 61,
+          "symbol": "state",
+          "type": "int",
+          "unit": "4b433ef28f025c087511de9121819aee88891580f100d09d84ced733c5849253"
+        },
+        {
+          "declarations": [
+            {
+              "source_file": "src/app.c",
+              "source_offset": 73,
+              "unit": "4b433ef28f025c087511de9121819aee88891580f100d09d84ced733c5849253"
+            }
+          ],
+          "definition": true,
+          "expression": "observed_errno",
+          "internal": false,
+          "name": "observed_errno",
+          "private": false,
+          "source_file": "src/app.c",
+          "source_offset": 73,
+          "symbol": "observed_errno",
+          "type": "int",
+          "unit": "4b433ef28f025c087511de9121819aee88891580f100d09d84ced733c5849253"
+        }
+      ],
+      "id": "fb42a5022cb4a80fb0b8",
+      "language": "c",
+      "line": 2,
+      "name": "keep_item",
+      "native_backend": "prepared",
+      "native_context": {
+        "language": "c"
+      },
+      "native_kind": "FunctionDecl",
+      "native_options": {
+        "backend": "prepared",
+        "build_timeout_ms": 180000,
+        "compilation_database": "build/compile_commands.json",
+        "lifetimes": {
+          "exclude": [],
+          "include": [
+            "Item"
+          ],
+          "max_live": 4096
+        },
+        "profile": "native-resources-owned-v1",
+        "sdk_build": "/home/runner/work/_temp/native-lifetime-sdk",
+        "targets": [
+          {
+            "link_flags": [
+              "-pthread"
+            ],
+            "name": "application",
+            "units": [
+              {
+                "source": "src/app.c"
+              },
+              {
+                "source": "src/keep.c"
+              }
+            ]
+          }
+        ]
+      },
+      "otelc_function": "keep_item",
+      "otelc_runtime_function": "src/keep.c::keep_item",
+      "output": "void",
+      "package": "",
+      "package_end": null,
+      "parameters": [
+        "Item *"
+      ],
+      "parser": "matched Clang project inventory",
+      "path": "src/keep.c",
+      "reason": "",
+      "source_file": "src/keep.c",
+      "source_offset": 23,
+      "source_sha256": "d90ad03b8be49d6a8fc420b8b793490b978cb7ac9bf96c7b9b3374ba252a20ab",
+      "status": "excluded",
+      "symbol": "keep_item",
+      "target": "application",
+      "unit": "8f37c1b85e08d0fb68a5bd82ee44dfcc7d0611e321e2bf25961154a391647304"
+    }
+  ],
+  "owned_source_exclusions": [],
+  "schema_version": 1,
+  "source_preserved": true,
+  "source_sha256": "f1da18bb97c79a5b181fbf065f6e48a22ff4bbc4324635560e248dcebd5dbbec",
+  "workspace": "/home/runner/work/_temp/native-lifetime-evidence/c-completed/oteleq-run-edcqgxmf"
+}

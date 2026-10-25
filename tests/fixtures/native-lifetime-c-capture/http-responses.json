@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "scope": "server response headers; client acknowledgement is not observed",
+  "clock": "monotonic_ns",
+  "events": [
+    {
+      "path": "/v1/metrics",
+      "status": 200,
+      "body_index": 0,
+      "request_started_ns": 424936961957,
+      "body_received_ns": 424937204399,
+      "response_started_ns": 424937205601,
+      "headers_written_ns": 424937302235,
+      "headers_write_failed": false,
+      "handler_finished_ns": 424937305470
+    },
+    {
+      "path": "/v1/traces",
+      "status": 200,
+      "body_index": 1,
+      "request_started_ns": 424937676884,
+      "body_received_ns": 424937773609,
+      "response_started_ns": 424937774220,
+      "headers_written_ns": 424937882411,
+      "headers_write_failed": false,
+      "handler_finished_ns": 424937884524
+    },
+    {
+      "path": "/v1/metrics",
+      "status": 200,
+      "body_index": 2,
+      "request_started_ns": 424938181398,
+      "body_received_ns": 424938252864,
+      "response_started_ns": 424938253255,
+      "headers_written_ns": 424938292644,
+      "headers_write_failed": false,
+      "handler_finished_ns": 424938294096
+    }
+  ],
+  "unrecorded_events": 0
+}

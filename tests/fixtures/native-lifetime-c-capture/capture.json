@@ -1,0 +1,20 @@
+{
+  "run": 40204568942,
+  "head": "aa19bd27414e0099424111804a5c073b5e406f7f",
+  "artifact_sha256": "b9b382f95fb9351be22af2700f4b010f4a2c046cab09af7f9e77846511cc11ba",
+  "scope": "Exact unchanged archived C transport, policy, prelaunch and final-health records. Original runner paths remain data; no filesystem identity recertification.",
+  "files": {
+    "policy.toml": "e15f081f92402f5f75535402a45a6d37accbae7aa8bd75c3180f2acfc4f0ce1f",
+    "http-capture.json": "13270c489befcf3f6fd933beeb180898d2ac0e023b895e01681d6b71b919c7bd",
+    "http-responses.json": "cf092d51da2a557ed2a72231a794f2ba267c0b5a70650a0eda60690f08b3277b",
+    "otlp-0.protobuf": "b0d974008be32e6069e2cbf5a82d95d7d9f7385be8c2ae1ba37ec258c466508d",
+    "otlp-1.protobuf": "0912f5260a57029bc914e5c8d806bdb34d5b287f8b3255fba77d33d00ec94084",
+    "otlp-2.protobuf": "dfb00c4648f3caaa31808fdfded117e871765bd2358461312a29810b5e23b3c0",
+    "expected-lifetimes-before-build.json": "2d6d65d34d38580a3519f48e8a95f09838fd9439450d318647000a58e193fe1f",
+    "expected-lifetimes.json": "8406884cc5412afe9e2374e3537286bb418b739f3b97cc0a8bb59ad4ed13b7b1",
+    "native-runtime/native-request.json": "7238157f24e2dba1592b161a46a8892127b9800bf011bac7aad293e4eb4a1e3e",
+    "native-runtime/native-application-start.json": "a2d0998f05c6b72df19cd501fc87e9e4ccab43a5fef132fd80477b48a791dcf1",
+    "native-runtime/app/health.json": "bdc24cc7f69f52ff9efa905b758763c60daae54ef2a72db35a9e4f91e25e28b3",
+    "native-verified-lifetimes.json": "6ca3fe3fd58a7151a21aeb398a0072d6c2ea8c30ec522042091a11270754ba9b"
+  }
+}

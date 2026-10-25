@@ -1,0 +1,457 @@
+{
+  "cases": [
+    {
+      "baseline": [
+        {
+          "execution": {
+            "capture_complete": true,
+            "channels": {
+              "stderr": [],
+              "stdout": []
+            },
+            "source_sha256_after": "f1da18bb97c79a5b181fbf065f6e48a22ff4bbc4324635560e248dcebd5dbbec",
+            "source_sha256_before": "f1da18bb97c79a5b181fbf065f6e48a22ff4bbc4324635560e248dcebd5dbbec",
+            "termination": {
+              "code": 0,
+              "kind": "exit"
+            },
+            "witness": null
+          },
+          "observation": {
+            "after": {
+              "nodes": [],
+              "roots": {
+                "global:observed_errno": {
+                  "bits": 32,
+                  "kind": "integer",
+                  "signed": true,
+                  "type": "c.int",
+                  "value": "10"
+                },
+                "global:state": {
+                  "bits": 32,
+                  "kind": "integer",
+                  "signed": true,
+                  "type": "c.int",
+                  "value": "12"
+                }
+              }
+            },
+            "before": {
+              "nodes": [],
+              "roots": {
+                "global:observed_errno": {
+                  "bits": 32,
+                  "kind": "integer",
+                  "signed": true,
+                  "type": "c.int",
+                  "value": "0"
+                },
+                "global:state": {
+                  "bits": 32,
+                  "kind": "integer",
+                  "signed": true,
+                  "type": "c.int",
+                  "value": "7"
+                }
+              }
+            },
+            "case_id": "c2f6b54699b743e6eeff-0",
+            "fixture": {
+              "status": "ready"
+            },
+            "fixture_sha256": "8eb50387cd3f1bbcbdd0b3bab039d431437333c777ef0ff7155074b3da11cf43",
+            "function_id": "src/app.c::selected",
+            "gaps": [],
+            "observation_schema_version": 1,
+            "outcome": {
+              "graph": {
+                "nodes": [],
+                "roots": {
+                  "global:observed_errno": {
+                    "bits": 32,
+                    "kind": "integer",
+                    "signed": true,
+                    "type": "c.int",
+                    "value": "10"
+                  },
+                  "global:state": {
+                    "bits": 32,
+                    "kind": "integer",
+                    "signed": true,
+                    "type": "c.int",
+                    "value": "12"
+                  },
+                  "result": {
+                    "bits": 32,
+                    "kind": "integer",
+                    "signed": true,
+                    "type": "c.int",
+                    "value": "42"
+                  }
+                }
+              },
+              "kind": "return"
+            }
+          }
+        },
+        {
+          "execution": {
+            "capture_complete": true,
+            "channels": {
+              "stderr": [],
+              "stdout": []
+            },
+            "source_sha256_after": "f1da18bb97c79a5b181fbf065f6e48a22ff4bbc4324635560e248dcebd5dbbec",
+            "source_sha256_before": "f1da18bb97c79a5b181fbf065f6e48a22ff4bbc4324635560e248dcebd5dbbec",
+            "termination": {
+              "code": 0,
+              "kind": "exit"
+            },
+            "witness": null
+          },
+          "observation": {
+            "after": {
+              "nodes": [],
+              "roots": {
+                "global:observed_errno": {
+                  "bits": 32,
+                  "kind": "integer",
+                  "signed": true,
+                  "type": "c.int",
+                  "value": "10"
+                },
+                "global:state": {
+                  "bits": 32,
+                  "kind": "integer",
+                  "signed": true,
+                  "type": "c.int",
+                  "value": "12"
+                }
+              }
+            },
+            "before": {
+              "nodes": [],
+              "roots": {
+                "global:observed_errno": {
+                  "bits": 32,
+                  "kind": "integer",
+                  "signed": true,
+                  "type": "c.int",
+                  "value": "0"
+                },
+                "global:state": {
+                  "bits": 32,
+                  "kind": "integer",
+                  "signed": true,
+                  "type": "c.int",
+                  "value": "7"
+                }
+              }
+            },
+            "case_id": "c2f6b54699b743e6eeff-0",
+            "fixture": {
+              "status": "ready"
+            },
+            "fixture_sha256": "8eb50387cd3f1bbcbdd0b3bab039d431437333c777ef0ff7155074b3da11cf43",
+            "function_id": "src/app.c::selected",
+            "gaps": [],
+            "observation_schema_version": 1,
+            "outcome": {
+              "graph": {
+                "nodes": [],
+                "roots": {
+                  "global:observed_errno": {
+                    "bits": 32,
+                    "kind": "integer",
+                    "signed": true,
+                    "type": "c.int",
+                    "value": "10"
+                  },
+                  "global:state": {
+                    "bits": 32,
+                    "kind": "integer",
+                    "signed": true,
+                    "type": "c.int",
+                    "value": "12"
+                  },
+                  "result": {
+                    "bits": 32,
+                    "kind": "integer",
+                    "signed": true,
+                    "type": "c.int",
+                    "value": "42"
+                  }
+                }
+              },
+              "kind": "return"
+            }
+          }
+        }
+      ],
+      "contract": {
+        "case_id": "c2f6b54699b743e6eeff-0",
+        "expected_baseline": {
+          "kind": "return"
+        },
+        "fixture_sha256": "8eb50387cd3f1bbcbdd0b3bab039d431437333c777ef0ff7155074b3da11cf43",
+        "function_id": "src/app.c::selected",
+        "observation_schema_version": 1,
+        "required_roots": [
+          "global:state",
+          "global:observed_errno"
+        ]
+      },
+      "corpus_sha256": "6ce98244a54ae8b66b6920020b1921882560886a9e26a172ba49a35085bb22f6",
+      "expected_functions": {
+        "src/app.c::selected": 1
+      },
+      "expected_spans": 1,
+      "instrumented_on": [
+        {
+          "execution": {
+            "capture_complete": true,
+            "channels": {
+              "stderr": [],
+              "stdout": []
+            },
+            "source_sha256_after": "f1da18bb97c79a5b181fbf065f6e48a22ff4bbc4324635560e248dcebd5dbbec",
+            "source_sha256_before": "f1da18bb97c79a5b181fbf065f6e48a22ff4bbc4324635560e248dcebd5dbbec",
+            "termination": {
+              "code": 0,
+              "kind": "exit"
+            },
+            "witness": {
+              "decoder": "independent native lifetime receipt with owned health1",
+              "functions": {
+                "src/app.c::selected": 1
+              },
+              "losses": {
+                "diagnostic_dropped": 0,
+                "function_lost": 0,
+                "lifetime_lost": 0,
+                "metadata_errors": 0,
+                "queue_dropped": 0
+              },
+              "pending": 0,
+              "raw_otlp_sha256": "959e2a0477a1688df34bb28e6c88a07b95fb37af0ff95e492fde27fc4333ceff",
+              "spans": 1
+            }
+          },
+          "observation": {
+            "after": {
+              "nodes": [],
+              "roots": {
+                "global:observed_errno": {
+                  "bits": 32,
+                  "kind": "integer",
+                  "signed": true,
+                  "type": "c.int",
+                  "value": "10"
+                },
+                "global:state": {
+                  "bits": 32,
+                  "kind": "integer",
+                  "signed": true,
+                  "type": "c.int",
+                  "value": "12"
+                }
+              }
+            },
+            "before": {
+              "nodes": [],
+              "roots": {
+                "global:observed_errno": {
+                  "bits": 32,
+                  "kind": "integer",
+                  "signed": true,
+                  "type": "c.int",
+                  "value": "0"
+                },
+                "global:state": {
+                  "bits": 32,
+                  "kind": "integer",
+                  "signed": true,
+                  "type": "c.int",
+                  "value": "7"
+                }
+              }
+            },
+            "case_id": "c2f6b54699b743e6eeff-0",
+            "fixture": {
+              "status": "ready"
+            },
+            "fixture_sha256": "8eb50387cd3f1bbcbdd0b3bab039d431437333c777ef0ff7155074b3da11cf43",
+            "function_id": "src/app.c::selected",
+            "gaps": [],
+            "observation_schema_version": 1,
+            "outcome": {
+              "graph": {
+                "nodes": [],
+                "roots": {
+                  "global:observed_errno": {
+                    "bits": 32,
+                    "kind": "integer",
+                    "signed": true,
+                    "type": "c.int",
+                    "value": "10"
+                  },
+                  "global:state": {
+                    "bits": 32,
+                    "kind": "integer",
+                    "signed": true,
+                    "type": "c.int",
+                    "value": "12"
+                  },
+                  "result": {
+                    "bits": 32,
+                    "kind": "integer",
+                    "signed": true,
+                    "type": "c.int",
+                    "value": "42"
+                  }
+                }
+              },
+              "kind": "return"
+            }
+          }
+        },
+        {
+          "execution": {
+            "capture_complete": true,
+            "channels": {
+              "stderr": [],
+              "stdout": []
+            },
+            "source_sha256_after": "f1da18bb97c79a5b181fbf065f6e48a22ff4bbc4324635560e248dcebd5dbbec",
+            "source_sha256_before": "f1da18bb97c79a5b181fbf065f6e48a22ff4bbc4324635560e248dcebd5dbbec",
+            "termination": {
+              "code": 0,
+              "kind": "exit"
+            },
+            "witness": {
+              "decoder": "independent native lifetime receipt with owned health1",
+              "functions": {
+                "src/app.c::selected": 1
+              },
+              "losses": {
+                "diagnostic_dropped": 0,
+                "function_lost": 0,
+                "lifetime_lost": 0,
+                "metadata_errors": 0,
+                "queue_dropped": 0
+              },
+              "pending": 0,
+              "raw_otlp_sha256": "a849ff5a639fb0503d9911c9e1b302e6caf60b7e361fdd26f24bc203aadf0f04",
+              "spans": 1
+            }
+          },
+          "observation": {
+            "after": {
+              "nodes": [],
+              "roots": {
+                "global:observed_errno": {
+                  "bits": 32,
+                  "kind": "integer",
+                  "signed": true,
+                  "type": "c.int",
+                  "value": "10"
+                },
+                "global:state": {
+                  "bits": 32,
+                  "kind": "integer",
+                  "signed": true,
+                  "type": "c.int",
+                  "value": "12"
+                }
+              }
+            },
+            "before": {
+              "nodes": [],
+              "roots": {
+                "global:observed_errno": {
+                  "bits": 32,
+                  "kind": "integer",
+                  "signed": true,
+                  "type": "c.int",
+                  "value": "0"
+                },
+                "global:state": {
+                  "bits": 32,
+                  "kind": "integer",
+                  "signed": true,
+                  "type": "c.int",
+                  "value": "7"
+                }
+              }
+            },
+            "case_id": "c2f6b54699b743e6eeff-0",
+            "fixture": {
+              "status": "ready"
+            },
+            "fixture_sha256": "8eb50387cd3f1bbcbdd0b3bab039d431437333c777ef0ff7155074b3da11cf43",
+            "function_id": "src/app.c::selected",
+            "gaps": [],
+            "observation_schema_version": 1,
+            "outcome": {
+              "graph": {
+                "nodes": [],
+                "roots": {
+                  "global:observed_errno": {
+                    "bits": 32,
+                    "kind": "integer",
+                    "signed": true,
+                    "type": "c.int",
+                    "value": "10"
+                  },
+                  "global:state": {
+                    "bits": 32,
+                    "kind": "integer",
+                    "signed": true,
+                    "type": "c.int",
+                    "value": "12"
+                  },
+                  "result": {
+                    "bits": 32,
+                    "kind": "integer",
+                    "signed": true,
+                    "type": "c.int",
+                    "value": "42"
+                  }
+                }
+              },
+              "kind": "return"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "scope": {
+    "artefact_class": "diagnostic",
+    "baseline_artefact_sha256": "ff1c7d01929fadd497a6931413fef37b05c3188446bb741085f655602678fafb",
+    "channels": [
+      "stdout",
+      "stderr"
+    ],
+    "gaps": [
+      "scalar corpus; business preconditions and branch exhaustiveness not established",
+      "diagnostic access/entrypoint helpers; not shipping artefact evidence",
+      "artefact digests aggregate diagnostic inputs and qualified tools/adapters; emitted runtime compiler/loader outputs are outside those digests",
+      "no undeclared network, imported-module globals or concurrent-schedule qualification",
+      "exception traceback/stack and Java/C++ extra exception fields are unobserved",
+      "compiler sysroots and OS libraries are outside content identity",
+      "trusted local execution; no hostile-code sandbox",
+      "live metric controls and exporter-fault scenarios are unobserved",
+      "filesystem effects are unobserved",
+      "HTTP fixture effects are unobserved",
+      "graph identities are local to each boundary; cross-boundary replacement, weakref and finalizer effects are unobserved"
+    ],
+    "instrumented_artefact_sha256": "96d6feb9b21de112b8a9fb6ea7b6ec8b2765be71bf80575a3e1d2d8886d9ff92",
+    "language": "c",
+    "observer": "oteleq typed boundary codecs v1; compiler-bound native scalar caller; independent declared lifetime expectations and complete raw lifetime/function receipt",
+    "policy_sha256": "f1fd88f7fa002079bab43f94a0c23d858f010823a960f0ca6c6a4d4d6b832699",
+    "source_sha256": "f1da18bb97c79a5b181fbf065f6e48a22ff4bbc4324635560e248dcebd5dbbec"
+  },
+  "typed_schema_version": 1
+}
