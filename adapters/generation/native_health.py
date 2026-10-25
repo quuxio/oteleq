@@ -54,7 +54,8 @@ def validate(value: dict, *, language: str, pid: int, policy: str, selection: st
     control = fields(value['controls'], {'schema_version', 'pid', 'collection', 'emission', 'effective_emission_off'}, 'controls')
     require(type(control['collection']) is type(control['emission']) is bool
             and same(control, {'schema_version': 1, 'pid': pid, 'collection': control['collection'],
-                              'emission': control['emission'], 'effective_emission_off': not control['emission']}),
+                              'emission': control['emission'],
+                              'effective_emission_off': not (control['collection'] and control['emission'])}),
             'native final metric controls differ')
     flush = fields(value['metric_flush'], {'attempts', 'failed_attempts'}, 'flush health')
     count(flush['attempts'])

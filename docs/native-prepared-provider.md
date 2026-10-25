@@ -22,6 +22,8 @@ The controller publishes one bound host acknowledgement, retains original start/
 
 `native_health` validates the closed native schema directly. It requires matching application PID, language, policy and selection, completed SDK shutdown and zero known function/queue/export losses. Unavailable counters cannot become invented zeroes. The public execution field `exec_verified=false` and `source_complete=false` remain visible; host release by itself is not proof of every executed image or source instruction.
 
+In a drained native final report, `effective_emission_off` is true when collection or emission is disabled. Preserve the native SDK's rule; other language providers can expose different status semantics. This field does not replace independent collection counts or downstream disabled-window checks.
+
 SDK exporter API batches and downstream HTTP requests are different observations. The official metric exporter can complete an empty API batch without an HTTP request. Independent receipt must compare the actual decoded metric points and spans to the corresponding unit counters, while retaining the separate API batch counters. A clean health report alone is not downstream receipt.
 
 ## Maintainer checks

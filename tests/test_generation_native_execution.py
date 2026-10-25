@@ -143,6 +143,21 @@ class NativeExecutionTests(unittest.TestCase):
 
 
 class NativeHealthTests(unittest.TestCase):
+    def test_final_effective_emission_is_off_when_either_native_control_is_disabled(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            launch, _ = start(Path(temporary).resolve())
+            original = health(launch)
+            options = {'language': 'cpp', 'pid': 23, 'policy': original['policy_sha256'],
+                       'selection': original['selection_sha256']}
+            for collection, emission in ((True, True), (False, True), (True, False), (False, False)):
+                value = copy.deepcopy(original)
+                value['controls'].update(collection=collection, emission=emission,
+                                         effective_emission_off=not (collection and emission))
+                with self.subTest(collection=collection, emission=emission):
+                    native_health.validate(value, **options)
+                    value['controls']['effective_emission_off'] = not value['controls']['effective_emission_off']
+                    with self.assertRaises(ValueError): native_health.validate(value, **options)
+
     def test_complete_health_is_checked_without_substituting_unavailable_counters(self):
         with tempfile.TemporaryDirectory() as temporary:
             launch, _ = start(Path(temporary).resolve())
