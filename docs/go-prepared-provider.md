@@ -24,6 +24,8 @@ Planning freezes the public SDK entrypoint, Go runtime/inspector sources, host P
 
 The independent Go OTLP reader checks exact service/SDK resources and scopes, selected call trees and factory ordering, cumulative function/error metrics and duration histograms. Disabled lifetime hooks permit only their two explicit zero live gauges. Actual final SDK health, owned native PID and downstream receipt remain separate evidence in `go-verified-telemetry.json`; the comparator receives only its six supported witness fields. Missing signals, unknown data, changed inputs or failed lifecycle checks cannot qualify a case. The linked qualification names the exact SDK, consumer, platform, observations and remaining limits; these checks do not qualify another profile by themselves.
 
+The expected service must equal the frozen prepared policy before decoding. Duration samples retain counts, buckets, sums, extrema and their configured bounds. Exact rational ranges and bounded binary64 summation error check that these fields can describe the same observations. Cumulative samples retain earlier bucket counts and extrema; only newly added observations can change the sum. A count-only match cannot qualify an inconsistent histogram.
+
 ### Candidate tagged builds
 
 An explicit nonempty `adapters.go.build_tags` list selects build 5 and inspection 2. For example, add `build_tags = ["feature", "tools", "\u03c0"]` to the policy above. The source backend freezes sorted, distinct literal names, with at most 128 names and 256 UTF-8 bytes per name. The pinned Go inspector validates Unicode tag grammar; Python character categories do not define it. The legacy backend keeps its ASCII tag interface.

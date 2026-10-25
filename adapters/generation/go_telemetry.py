@@ -7,6 +7,7 @@ import math
 from pathlib import Path
 
 import go_health
+import histogram_observation
 import go_control_receipt
 from go_provider import policy_digest, require
 import otelc_capture as capture
@@ -147,12 +148,19 @@ def point(metric, value, names: set[str], bounds: list) -> tuple:
                 and sum(value.bucket_counts) == value.count and value.HasField("sum")
                 and math.isfinite(value.sum) and value.sum >= 0,
                 "invalid Go duration histogram")
+        require(value.HasField('min') and value.HasField('max') and math.isfinite(value.min)
+                and math.isfinite(value.max) and 0 <= value.min <= value.max,
+                'missing or invalid Go histogram extrema')
+        histogram_observation.histogram_range(value, bounds)
         count = value.count
+        sample = (value.start_time_unix_nano, value.time_unix_nano, count,
+                  tuple(value.bucket_counts), value.sum, (value.min, value.max), tuple(bounds))
     else:
         require(metric.sum.is_monotonic and value.WhichOneof("value") == "as_int" and value.as_int >= 0,
                 "invalid Go cumulative counter")
         count = value.as_int
-    return (metric.name, function, error_type), (value.start_time_unix_nano, value.time_unix_nano, count)
+        sample = (value.start_time_unix_nano, value.time_unix_nano, count)
+    return (metric.name, function, error_type), sample
 
 
 def live_gauge(metric) -> int:
@@ -193,6 +201,7 @@ def metric_values(bodies: list, run, service: str):
 
 
 def cumulative_totals(series: dict) -> dict:
+    """Retain complete histogram state while ordering independent export samples."""
     totals = {}
     for key, samples in series.items():
         samples.sort()
@@ -200,6 +209,11 @@ def cumulative_totals(series: dict) -> dict:
                 and len({sample[1] for sample in samples}) == len(samples)
                 and all(before[2] <= after[2] for before, after in zip(samples, samples[1:])),
                 "reset, duplicated or decreasing Go cumulative samples")
+        if key[0] == DURATION:
+            bounds = list(samples[0][6])
+            for previous, sample in zip(samples, samples[1:]):
+                require(sample[6] == previous[6], 'Go cumulative histogram boundaries changed')
+                histogram_observation.cumulative_histogram(previous, sample, bounds)
         totals[key] = samples[-1][2]
     return totals
 
@@ -253,6 +267,10 @@ def witness(run, bodies: list, service: str, decoder, *, folder: Path | None = N
             sequence: list[dict] | None = None) -> dict | None:
     """Keep actual owned SDK health separate from local downstream receipt."""
     run.verify()
+    intent = run.prepared.intent
+    require(type(service) is str and bool(service)
+            and service == intent.policy.get('resource', {}).get('service_name'),
+            'Go receipt service differs from prepared policy')
     controls = None
     if sequence is not None:
         require(folder is not None, "Go live witness requires its retained control record")
@@ -272,7 +290,6 @@ def witness(run, bodies: list, service: str, decoder, *, folder: Path | None = N
     received = {"trace_batches": sum(route == capture.TRACE_PATH for route, _ in bodies),
                 "metric_batches": sum(route == "/v1/metrics" for route, _ in bodies),
                 "spans": len(spans), "metric_points": points}
-    intent = run.prepared.intent
     health = go_health.qualify(run.session.execution.health, pid=run.session.started.owner.application_pid,
                                policy_sha256=policy_digest(intent.policy), selection_sha256=intent.build.receipt["selection"]["sha256"],
                                received=received, function_spans=len(spans), observer_completions=0, received_http_spans=0)

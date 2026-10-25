@@ -79,7 +79,7 @@ def fixture(*, recursive=False, factory=False, failed=False):
         point = calls.sum.data_points.add(start_time_unix_nano=1, time_unix_nano=1000, as_int=count)
         labels(point.attributes, {"function": name})
         point = duration.histogram.data_points.add(start_time_unix_nano=1, time_unix_nano=1000,
-                                                    count=count, sum=.005 * count)
+                                                    count=count, sum=.005 * count, min=.005, max=.005)
         point.explicit_bounds.extend(policy["metrics"]["histogram_boundaries_seconds"])
         point.bucket_counts.extend([0, 0, 0, 0, count, 0, 0, 0])
         labels(point.attributes, {"function": name})
@@ -114,6 +114,50 @@ def bodies(traces, metrics):
 
 
 class GoTelemetryTests(unittest.TestCase):
+    def test_service_argument_and_resources_cannot_replace_prepared_policy(self):
+        run, traces, metrics = fixture()
+        traces.resource_spans[0].resource.attributes[0].value.string_value = 'foreign-service'
+        metrics.resource_metrics[0].resource.attributes[0].value.string_value = 'foreign-service'
+        with self.assertRaises(ValueError):
+            telemetry.witness(run, bodies(traces, metrics), 'foreign-service', ExportTraceServiceRequest)
+
+    def test_impossible_duration_sum_and_cumulative_state_are_refused(self):
+        run, traces, metrics = fixture()
+        point = metrics.resource_metrics[0].scope_metrics[0].metrics[1].histogram.data_points[0]
+        point.sum = 1000
+        with self.subTest(kind='impossible-sum'), self.assertRaises(ValueError):
+            self.witness(run, traces, metrics)
+        _, _, metrics = fixture()
+        metric = metrics.resource_metrics[0].scope_metrics[0].metrics[1]
+        point = metric.histogram.data_points[0]
+        bounds = list(point.explicit_bounds)
+        point.count, point.sum, point.min, point.max = 3, .03, .01, .01
+        point.bucket_counts[4] = 3
+        key, first = telemetry.point(metric, point, {FUNCTION}, bounds)
+        point.count, point.sum, point.min, point.time_unix_nano = 6, .02, .0015, 2000
+        point.bucket_counts[4] = 6
+        _, second = telemetry.point(metric, point, {FUNCTION}, bounds)
+        with self.subTest(kind='decreasing-cumulative-sum'), self.assertRaises(ValueError):
+            telemetry.cumulative_totals({key: [first, second]})
+
+    def test_complete_cumulative_histograms_retain_rounding_extrema_and_bounds(self):
+        _, _, message = fixture()
+        metric = message.resource_metrics[0].scope_metrics[0].metrics[1]
+        point = metric.histogram.data_points[0]
+        bounds = list(point.explicit_bounds)
+        point.count, point.sum, point.min, point.max = 3, .1 + .1 + .1, .1, .1
+        point.bucket_counts[:] = [0, 0, 0, 0, 0, 3, 0, 0]
+        key, first = telemetry.point(metric, point, {FUNCTION}, bounds)
+        point.time_unix_nano = 2000
+        _, repeated = telemetry.point(metric, point, {FUNCTION}, bounds)
+        point.count, point.sum, point.time_unix_nano = 6, sum([.1] * 6), 3000
+        point.bucket_counts[5] = 6
+        _, current = telemetry.point(metric, point, {FUNCTION}, bounds)
+        self.assertEqual(telemetry.cumulative_totals({key: [current, repeated, first]}), {key: 6})
+        wrong_bounds = (*current[:6], tuple(bounds[:-1]))
+        with self.assertRaisesRegex(ValueError, 'boundaries'):
+            telemetry.cumulative_totals({key: [first, wrong_bounds]})
+
     def test_controlled_witness_reads_both_lanes_and_keeps_details_outside_comparator_fields(self):
         run, traces, metrics = fixture()
         sequence = [{"metrics": {"collection": True, "emission": True}}]

@@ -71,7 +71,9 @@ make generation-go-controls-otelc \
   GO_CONTROL_STARTUP=both-on
 ```
 
-Repeat with `collection-off`, `emission-off` and `both-off`. Every schedule includes all four flag pairs, an emitting positive control and a final collected panic while emission is disabled. Restoration must deliver the retained call, duration and error measurements. Raw decoded traces must retain the factory and all five selected calls throughout the schedule.
+Repeat serially with `collection-off`, `emission-off` and `both-off`. Every schedule includes all four flag pairs, an emitting positive control and a final collected panic while emission is disabled. Restoration must deliver the retained call, duration and error measurements. Raw decoded traces must retain the factory and all five selected calls throughout the schedule.
+
+Fresh runs check an 8 GiB free-space floor before each qualification command. Set `GO_CONTROL_MIN_FREE_BYTES` for another measured budget, or use the script's `--min-free-bytes` option directly. A low-space refusal retains a separate `*.storage-refusal.json`, starts no application for that operation and leaves the attempt incomplete. This is a check between commands, not a disk quota or reservation; one command and concurrent work can still consume space. Keep one startup corpus active at a time and reclaim only unreferenced terminal caches. Retained-only audits start no applications and do not enforce this fresh-run floor.
 
 The command exercises direct generation, replay, external unittest, detached export, scalar shrinking and current-source promotion. Promotion changes existing return values and discovers a newly added method. The retained audit recomputes comparisons, checks every named operation and separates copied shrink observations from actual application launches. `GENERATION_ARGS=--retained-only` audits an existing complete run into a new `AUDIT_DIR`, without starting applications. Interrupted or failed operations retain their original output and must be inspected before recovery.
 

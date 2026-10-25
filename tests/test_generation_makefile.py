@@ -98,11 +98,12 @@ class QualificationRecipeTests(unittest.TestCase):
     def test_go_control_recipe_retains_startup_and_separate_retained_audit(self):
         result = subprocess.run(['make', '--no-print-directory', '-n', 'generation-go-controls-otelc',
             'OTELC_ROOT=/tmp/provider', 'REPORT_DIR=/tmp/evidence', 'AUDIT_DIR=/tmp/go-audit',
-            'GO_CONTROL_STARTUP=both-off', 'GENERATION_ARGS=--retained-only'],
+            'GO_CONTROL_STARTUP=both-off', 'GO_CONTROL_MIN_FREE_BYTES=123456', 'GENERATION_ARGS=--retained-only'],
             cwd=ROOT, capture_output=True, text=True, check=True)
         self.assertIn('tests/qualify_go_controls.py', result.stdout)
         self.assertIn('--startup-state "both-off" --retained-only', result.stdout)
         self.assertIn('--audit-dir "/tmp/go-audit"', result.stdout)
+        self.assertIn('--min-free-bytes "123456"', result.stdout)
 
     def test_java_action_recipe_retains_explicit_profile_and_retained_only_mode(self):
         result = subprocess.run(['make', '--no-print-directory', '-n', 'generation-java-actions-otelc',

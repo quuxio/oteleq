@@ -15,6 +15,7 @@ import go_live_qualification as oracle
 import go_live_receipt as receipt
 import go_source
 import sequence_qualification as shared
+import qualification_storage
 from qualify_project_tests import command
 
 
@@ -286,7 +287,11 @@ def main(argv: list[str] | None = None) -> None:
         parser.add_argument('--' + name, type=Path, required=True)
     parser.add_argument('--startup-state', choices=fixture.STARTS, default='both-on')
     parser.add_argument('--retained-only', action='store_true')
+    parser.add_argument('--min-free-bytes', type=int, default=qualification_storage.MIN_FREE_BYTES,
+                        help='free-space floor checked before each new command (default: 8 GiB)')
     args = parser.parse_args(argv)
+    if args.min_free_bytes < 0:
+        parser.error('--min-free-bytes must be nonnegative')
     if sys.flags.optimize:
         parser.error('qualification requires assertions; disable Python optimisation')
     cli, provider, folder, destination = (value.resolve() for value in
@@ -301,7 +306,8 @@ def main(argv: list[str] | None = None) -> None:
     tools = {'go': Path(shutil.which('go') or '/missing-go'), 'python-host': Path(sys.executable).absolute()}
     catalogue = go_source.artefacts(provider, tools, backend='source-scope-v1')
     if not args.retained_only:
-        run(cli, provider, folder, args.startup_state, catalogue)
+        with qualification_storage.budget(args.min_free_bytes):
+            run(cli, provider, folder, args.startup_state, catalogue)
     result = audit(cli, provider, folder, destination, args.startup_state, catalogue)
     fixture.exact(go_source.artefacts(provider, tools, backend='source-scope-v1'), catalogue)
     write(destination / 'QUALIFICATION.json', result)

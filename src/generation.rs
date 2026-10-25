@@ -45,6 +45,10 @@ const RESOURCES: &[(&str, &str)] = &[
         include_str!("../adapters/generation/python_health.py"),
     ),
     (
+        "histogram_observation.py",
+        include_str!("../adapters/generation/histogram_observation.py"),
+    ),
+    (
         "python_telemetry.py",
         include_str!("../adapters/generation/python_telemetry.py"),
     ),

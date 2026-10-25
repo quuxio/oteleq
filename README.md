@@ -104,6 +104,8 @@ cargo build --locked
 
 Maintainers can use the checkout's [cold receipt archive/restore commands](docs/qualification-retention.md) to reduce completed qualification storage. Archived raw paths must be restored before existing retained verifiers run.
 
+Run the [Go live qualification](docs/go-metric-controls.md#qualify-generated-and-retained-suites) startup corpora serially. Fresh runs check an 8 GiB free-space floor between commands and retain an explicit incomplete refusal when headroom is low.
+
 ### Generate and run tests
 
 Build otelc's qualified adapters first. Use its locked Python environment, then create an external plan and use the workspace path printed by `plan`:

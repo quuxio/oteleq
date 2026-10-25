@@ -134,10 +134,12 @@ def record_fixture(folder: Path, start: str, plain: bool) -> tuple[Path, dict | 
             data.aggregation_temporality = 2
             if not histogram: data.is_monotonic = True
             for function, count in ((target, calls), ('example.test/live/counter.New', factory)):
+                if histogram and not count:
+                    continue
                 point = data.data_points.add(start_time_unix_nano=1, time_unix_nano=100 + len(bodies))
                 labels(point.attributes, {'function': function})
                 if histogram:
-                    point.count = count; point.sum = .01 * count
+                    point.count = count; point.sum = .01 * count; point.min = point.max = .01
                     point.explicit_bounds.extend([1e-6, 1e-5, 1e-4, .001, .01, .1, 1.0])
                     point.bucket_counts.extend([0, 0, 0, 0, count, 0, 0, 0])
                 else:
