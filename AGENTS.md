@@ -1,5 +1,7 @@
 # Repository guidance
 
+- Go live shrink archives retain bytes with new inode/link identities. Bind the copy to exactly one original report by all four launch IDs in the bounded actual-report registry; compare the complete archived file/directory/mode/digest denominator before checking original publisher facts. Never repair copied links, treat the archive as a new launch or accept an absent/ambiguous original. Preserve original failed audits.
+
 - Go live audit running metric attempts/successes are separately loaded atomics, not a drain proof. Retain both counters and check their chronological monotonicity through restoration and closed final health. Final attempts must equal successes and actual downstream request counts; every failure, disabled-window metric and missing retained measurement still refuses. Preserve original failed audit records when correcting an oracle.
 
 - The maintained source-scope Go live corpus checks complete literal graphs and all named generated/retained/promoted routes, including newly discovered methods and a restored intermediate mutation. Preserve raw startup `release` acknowledgements, plain absence of SDK configuration, the default-separator health policy digest and valid exemplars joined to collected trace roots. Keep failed original audits; a corrected retained-only audit must start no applications and preserve all original bytes/file facts. See docs/go-metric-controls.md.

@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shutil
 import sys
 import tempfile
 import unittest
@@ -193,6 +194,31 @@ def record_fixture(folder: Path, start: str, plain: bool) -> tuple[Path, dict | 
 
 
 class GoLiveRetainedReceiptTests(unittest.TestCase):
+    def test_archive_bytes_are_bound_without_recertifying_copied_publisher_inodes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            original, archived = root / 'original', root / 'archive'
+            original.mkdir()
+            sdk, witness = record_fixture(original, 'both-on', False)
+            shutil.copytree(original, archived)
+            receipt.identical_archive(original, archived)
+            self.assertEqual((original / 'go-runtime/oteleq-rendezvous/start.ready').stat().st_nlink, 2)
+            self.assertEqual((archived / 'go-runtime/oteleq-rendezvous/start.ready').stat().st_nlink, 1)
+            receipt.check(original, 'identity', 'both-on', False, witness, sdk)
+            with self.assertRaises(ValueError):
+                receipt.check(archived, 'identity', 'both-on', False, witness, sdk)
+            for kind in ('bytes', 'extra-file', 'extra-directory', 'mode', 'symlink'):
+                candidate = root / kind; shutil.copytree(original, candidate)
+                if kind == 'bytes': (candidate / 'http-capture.json').write_text('{}')
+                elif kind == 'extra-file': (candidate / 'extra').write_text('extra')
+                elif kind == 'extra-directory': (candidate / 'extra').mkdir()
+                elif kind == 'mode': (candidate / 'http-capture.json').chmod(0o600)
+                else:
+                    path = candidate / 'http-capture.json'; path.unlink(); path.symlink_to(original / 'http-capture.json')
+                with self.subTest(kind=kind), self.assertRaises(ValueError): receipt.identical_archive(original, candidate)
+            with self.assertRaises(ValueError): receipt.identical_archive(original, original)
+            with self.assertRaises(ValueError): receipt.identical_archive(root, original)
+
     def test_json_reader_refuses_duplicate_fields_and_nonfinite_values(self):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / 'record.json'

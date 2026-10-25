@@ -3,6 +3,7 @@
 import copy
 import json
 from pathlib import Path
+import shutil
 import tempfile
 import tomllib
 import unittest
@@ -134,6 +135,21 @@ def report_fixture(root: Path) -> Path:
 
 
 class GoLiveReportTests(unittest.TestCase):
+    def test_explicit_archive_uses_bound_original_receipts_after_every_byte_matches(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve(); original = root / 'original'; original.mkdir()
+            report = report_fixture(original)
+            archived = root / 'archive'; shutil.copytree(original, archived)
+            with patch.object(receipt, 'check') as runtime, patch.object(oracle.receivers, 'scope_attempt'):
+                self.assertEqual(oracle.check_report(archived / 'report.json', 2, start='both-on',
+                                                    provider=Path('sdk'), original=report), 8)
+            self.assertTrue(all(call.args[0].is_relative_to(original) for call in runtime.call_args_list))
+            target = archived / 'identity-0/typed-bundle.json'
+            target.write_text('{}')
+            with patch.object(receipt, 'check') as runtime, self.assertRaises(ValueError):
+                oracle.check_report(archived / 'report.json', 2, start='both-on', provider=Path('sdk'), original=report)
+            runtime.assert_not_called()
+
     def test_every_lane_repeat_and_complete_literal_graph_is_checked(self):
         with tempfile.TemporaryDirectory() as temporary:
             path = report_fixture(Path(temporary))
@@ -234,6 +250,24 @@ class GoLiveReceiptTests(unittest.TestCase):
 
 
 class GoLiveWorkflowTests(unittest.TestCase):
+    def test_archive_original_requires_unique_launch_ids_and_identical_complete_evidence(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve(); original = root / 'actual'; original.mkdir()
+            qualifier.write(original / 'report.json', {'cases': [{'case': 'case'}]})
+            for lane in ('baseline', 'instrumented_on'):
+                for repeat in range(2):
+                    runtime = original / 'case' / (lane + '-' + str(repeat)) / 'go-runtime'
+                    runtime.mkdir(parents=True)
+                    qualifier.write(runtime / 'go-application-start.json', {'launch_id': lane + str(repeat)})
+            archived = root / 'shrink/original'; archived.parent.mkdir(); shutil.copytree(original, archived)
+            paths = [original / 'report.json', archived / 'report.json']
+            self.assertEqual(qualifier.archived_original(paths, root), {paths[1]: paths[0]})
+            with self.assertRaises(ValueError): qualifier.archived_original(paths[:1], root)
+            duplicate = root / 'duplicate'; shutil.copytree(original, duplicate)
+            with self.assertRaises(ValueError): qualifier.archived_original([*paths, duplicate / 'report.json'], root)
+            qualifier.write(archived / 'report.json', {'cases': [{'case': 'case'}], 'edited': True})
+            with self.assertRaises(ValueError): qualifier.archived_original(paths, root)
+
     def test_comparison_controls_remove_unreachable_storage_and_freeze_panic_contract(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

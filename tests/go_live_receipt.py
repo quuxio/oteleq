@@ -4,6 +4,7 @@ from collections import Counter
 import hashlib
 import json
 import math
+import os
 from pathlib import Path
 import re
 import stat
@@ -45,6 +46,33 @@ def require(value: bool, message: str) -> None:
 def digest(path: Path) -> str:
     with path.open('rb') as stream:
         return hashlib.file_digest(stream, 'sha256').hexdigest()
+
+
+def identical_archive(original: Path, archived: Path) -> None:
+    """A copied report cannot stand in for its original publication file facts."""
+    def manifest(root: Path) -> dict:
+        require(root.is_absolute() and root.resolve(strict=True) == root and root.is_dir(),
+                'archive root is not a canonical directory')
+        result = {}
+        def failed(error):
+            raise error
+        for current, directories, files in os.walk(root, followlinks=False, onerror=failed):
+            for name in directories:
+                path = Path(current) / name
+                info = path.lstat()
+                require(not path.is_symlink() and stat.S_ISDIR(info.st_mode) and info.st_uid == os.getuid(),
+                        'archive contains a directory alias or foreign directory')
+                result[path.relative_to(root).as_posix() + '/'] = (None, None, info.st_mode)
+            for name in files:
+                path = Path(current) / name
+                info = path.lstat()
+                require(stat.S_ISREG(info.st_mode) and not path.is_symlink()
+                        and info.st_uid == os.getuid(), 'archive contains a special or foreign file')
+                result[path.relative_to(root).as_posix()] = (digest(path), info.st_size, info.st_mode)
+        return result
+    require(original != archived and not original.is_relative_to(archived)
+            and not archived.is_relative_to(original), 'archive and original must be distinct trees')
+    exact(manifest(archived), manifest(original))
 
 
 def identity(path: Path, expected: dict) -> None:

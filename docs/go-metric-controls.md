@@ -75,4 +75,6 @@ Repeat with `collection-off`, `emission-off` and `both-off`. Every schedule incl
 
 The command exercises direct generation, replay, external unittest, detached export, scalar shrinking and current-source promotion. Promotion changes existing return values and discovers a newly added method. The retained audit recomputes comparisons, checks every named operation and separates copied shrink observations from actual application launches. `GENERATION_ARGS=--retained-only` audits an existing complete run into a new `AUDIT_DIR`, without starting applications. Interrupted or failed operations retain their original output and must be inspected before recovery.
 
+The shrink archive is a byte copy with new filesystem identities. Its four launch IDs must identify one unique original report in the complete retained registry. Every archived file, directory, mode and byte digest must match that original before the audit uses the original publication/link facts. Missing or ambiguous originals, modified archives and extra entries refuse qualification. The archive is not recertified as a new execution, and its observations remain separate from actual launches.
+
 These are maintained qualification tools. Successful focused tests or one startup state do not qualify the complete matrix; published evidence must identify the actual source, SDK, tools and routes executed.

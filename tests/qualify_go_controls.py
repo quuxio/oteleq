@@ -205,6 +205,30 @@ def evidence_facts(folder: Path) -> dict:
     return result
 
 
+def archived_original(reports: list[Path], folder: Path) -> dict[Path, Path]:
+    """Bind the one shrink copy to actual launch IDs in the fixed report registry."""
+    archived = folder / 'shrink/original/report.json'
+    receipt.require(archived in reports, 'missing copied shrink report')
+
+    def identities(path: Path) -> tuple:
+        rows = receipt.read(path)['cases']
+        receipt.require(len(rows) == 1, 'copied shrink report needs one case')
+        case, = rows
+        return tuple(receipt.read(path.parent / case['case'] / (lane + '-' + str(repeat)) /
+                                  'go-runtime/go-application-start.json')['launch_id']
+                     for lane in ('baseline', 'instrumented_on') for repeat in range(2))
+
+    wanted = identities(archived)
+    matches = [path for path in reports if path != archived
+               and len(receipt.read(path)['cases']) == 1 and identities(path) == wanted]
+    receipt.require(len(matches) == 1 and all(path.is_relative_to(folder) for path in reports),
+                    'copied shrink report has no unique original launch evidence')
+    original, = matches
+    receipt.require(original.read_bytes() == archived.read_bytes(), 'copied shrink report changed')
+    receipt.identical_archive(original.parent, archived.parent)
+    return {archived: original}
+
+
 def audit(cli: Path, provider: Path, folder: Path, destination: Path, start: str, catalogue: dict) -> dict:
     """Recompute all comparisons; count copied observations separately from launches."""
     fixture.exact(receipt.read(folder / 'provider-inputs.json'), catalogue)
@@ -217,10 +241,13 @@ def audit(cli: Path, provider: Path, folder: Path, destination: Path, start: str
         (folder / 'current-changed.stdout').read_text().splitlines()) if 'report' in row}
     reports = sorted(folder.rglob('report.json'))
     receipt.require(len(reports) == 19 and len(changed_reports) == 3, 'incomplete retained report denominator')
+    archived = archived_original(reports, folder)
     starts, identities, observed, comparisons = set(), {}, 0, 0
     for path in reports:
         document = receipt.read(path)
-        observed += oracle.check_report(path, len(document['cases']), start=start, provider=provider, changed=path in changed_reports)
+        options = {'original': archived[path]} if path in archived else {}
+        observed += oracle.check_report(path, len(document['cases']), start=start, provider=provider,
+                                        changed=path in changed_reports, **options)
         for case in document['cases']:
             case_folder = path.parent / case['case']
             for lane in ('baseline', 'instrumented_on'):
