@@ -114,6 +114,7 @@ def check_report(path: Path, audit: Audit, *, mode: str, amount: int = 5, functi
     entry, = [entry for entry in entries if entry['otelc_function'] == cases.function(audit.language, function)]
     assert result['function'] == entry['otelc_function'] and result['case'] == entry['id'] + '-0'
     assert entry['native_backend'] == 'prepared' and entry['native_options']['profile'] == 'native-owned-v1'
+    assert entry['native_options']['sdk_source_profile'] == 'resource-v1'
     retained.same(entry['parameters'], ['int']); retained.same(entry['output'], 'int')
     assert len(entry['globals']) == 3 and {row['name'] for row in entry['globals']} == {'state', 'calls', 'depth'}
     configuration = cases.configuration(audit.language, mode, audit.start, audit.provider)

@@ -31,7 +31,7 @@ class NativeMetricWorkflowTests(unittest.TestCase):
         folder = parent / str(self.counter); folder.mkdir(parents=True)
         entries = [{'id': name, 'status': 'ready', 'language': audit.language, 'path': 'app.' + ('cpp' if audit.language == 'cpp' else 'c'),
             'otelc_function': cases.function(audit.language, name), 'parameters': ['int'], 'output': 'int',
-            'native_backend': 'prepared', 'native_options': {'profile': 'native-owned-v1'},
+            'native_backend': 'prepared', 'native_options': {'profile': 'native-owned-v1', 'sdk_source_profile': 'resource-v1'},
             'globals': [{'name': key, 'type': 'int'} for key in ('calls', 'depth', 'state')],
             'sequence_configuration': cases.configuration(audit.language, mode, audit.start, audit.provider)['fixtures'][0]['sequence']}
             for name, _ in contracts]

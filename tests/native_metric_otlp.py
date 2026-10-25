@@ -9,6 +9,7 @@ from opentelemetry.proto.collector.metrics.v1.metrics_service_pb2 import ExportM
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceRequest
 
 import native_prepared_otlp as wire
+import native_metric_histogram as feasible
 from native_prepared_otlp import require, same
 
 
@@ -81,18 +82,12 @@ def histogram(point) -> tuple:
         return point.count, tuple(point.bucket_counts), point.sum, 0., 0.
     require(point.HasField('min') and point.HasField('max') and math.isfinite(point.min)
             and math.isfinite(point.max) and 0 <= point.min <= point.max, 'missing histogram extrema')
-    tolerance = max(1e-15, abs(point.sum) * 1e-12)
-    require(point.min * point.count - tolerance <= point.sum <= point.max * point.count + tolerance,
-            'histogram sum differs from its count and extrema')
     occupied = [index for index, count in enumerate(point.bucket_counts) if count]
     require(occupied[0] == bisect.bisect_left(wire.BOUNDS, point.min)
             and occupied[-1] == bisect.bisect_left(wire.BOUNDS, point.max), 'histogram extrema differ from buckets')
-    lower = sum(count * (wire.BOUNDS[index - 1] if index else 0.)
-                for index, count in enumerate(point.bucket_counts))
-    upper = sum(count * (wire.BOUNDS[index] if index < len(wire.BOUNDS) else point.max)
-                for index, count in enumerate(point.bucket_counts))
-    require(lower - tolerance <= point.sum <= upper + tolerance, 'histogram sum lies outside its bucket ranges')
-    return point.count, tuple(point.bucket_counts), point.sum, point.min, point.max
+    result = point.count, tuple(point.bucket_counts), point.sum, point.min, point.max
+    feasible.sample(result, wire.BOUNDS)
+    return result
 
 
 def metrics(bodies: list, language: str, service: str, name: str, count: int, errors: int) -> int:
@@ -131,10 +126,7 @@ def metrics(bodies: list, language: str, service: str, name: str, count: int, er
             require(first[2][0] <= second[2][0] and (first[1] != second[1] or first == second),
                     'cumulative sample reset or contradictory duplicate')
             if instrument.endswith('.duration'):
-                old, new = first[2], second[2]
-                require(all(a <= b for a, b in zip(old[1], new[1])) and old[2] <= new[2]
-                        and (not old[0] or new[3] <= old[3] and new[4] >= old[4])
-                        and (old[0] != new[0] or old == new), 'cumulative histogram rewrote observations')
+                feasible.cumulative(first[2], second[2], wire.BOUNDS)
         require(rows[-1][2][0] == wanted[instrument], 'wrong independently expected function total')
     return points
 

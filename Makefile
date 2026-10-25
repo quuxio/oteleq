@@ -234,8 +234,9 @@ native-lifetime-workflow-check:
 
 .PHONY: native-metric-qualification-check
 native-metric-qualification-check:
-	PYTHONPATH="$(CURDIR)/tests$${PYTHONPATH:+:$${PYTHONPATH}}" $(PYTHON) -m coverage run --data-file=.native-metric-qualification.coverage --include='*/native_metric_cases.py,*/native_metric_frames.py,*/native_metric_health.py,*/native_metric_otlp.py,*/native_metric_receipt.py,*/native_metric_test_capture.py,*/native_metric_refusals.py,*/qualify_native_metrics.py' -m unittest test_generation_native_metric_qualification test_generation_native_metric_workflow test_generation_native_receipt_qualification -v
+	PYTHONPATH="$(CURDIR)/tests$${PYTHONPATH:+:$${PYTHONPATH}}" $(PYTHON) -m coverage run --data-file=.native-metric-qualification.coverage --include='*/native_metric_cases.py,*/native_metric_frames.py,*/native_metric_health.py,*/native_metric_otlp.py,*/native_metric_histogram.py,*/native_metric_receipt.py,*/native_metric_test_capture.py,*/native_metric_refusals.py,*/qualify_native_metrics.py' -m unittest test_generation_native_metric_qualification test_generation_native_metric_workflow test_generation_native_metric_histogram test_generation_native_receipt_qualification -v
 	$(PYTHON) -m coverage report --data-file=.native-metric-qualification.coverage --include='*/native_metric_cases.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.native-metric-qualification.coverage --include='*/native_metric_histogram.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.native-metric-qualification.coverage --include='*/native_metric_frames.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.native-metric-qualification.coverage --include='*/native_metric_health.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.native-metric-qualification.coverage --include='*/native_metric_otlp.py' --fail-under=80

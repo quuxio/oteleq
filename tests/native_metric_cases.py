@@ -69,7 +69,7 @@ def configuration(language: str, mode: str, start: str, sdk: Path) -> dict:
         'fixtures': [{'language': language, 'source': 'app.' + ('cpp' if language == 'cpp' else 'c'),
             'function': 'selected*', 'cases': [[5]],
             'domains': [{'kind': 'integer', 'minimum': 0, 'maximum': 5}], 'sequence': steps}],
-        'adapters': {language: {'backend': 'prepared', 'sdk_build': str(sdk)}}}
+        'adapters': {language: {'backend': 'prepared', 'sdk_build': str(sdk), 'sdk_source_profile': 'resource-v1'}}}
     if mode == 'recursive':
         extension = 'cpp' if language == 'cpp' else 'c'
         value['adapters'][language].update(compilation_database='build/compile_commands.json',

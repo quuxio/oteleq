@@ -17,6 +17,7 @@ languages = ["cpp"]
 [adapters.cpp]
 backend = "prepared"
 sdk_build = "/absolute/otelc/build/context-sdk"
+sdk_source_profile = "resource-v1"
 
 [limits]
 case_timeout_ms = 20000

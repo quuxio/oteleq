@@ -16,7 +16,7 @@ Promotion requires fresh execution of the original source and a relocated change
 
 ## Run one shard
 
-Use the reviewed SDK source revision `acb13d7735526448209df37b7e6b98e5717befdb`, matched LLVM 22 tools and an installed consumer from the exact candidate source. Both source checkouts must be clean. The SDK and evidence paths must be new external directories, with at least 8 GiB free before builds and each subsequent operation.
+Use the reviewed SDK source revision `acb13d7735526448209df37b7e6b98e5717befdb`, matched LLVM 22 tools and an installed consumer from the exact candidate source. The qualifier explicitly selects its three-header `resource-v1` SDK source closure while keeping lifetime instrumentation disabled. Both source checkouts must be clean. The SDK and evidence paths must be new external directories, with at least 8 GiB free before builds and each subsequent operation.
 
 ```sh
 python tests/qualify_native_metrics.py \

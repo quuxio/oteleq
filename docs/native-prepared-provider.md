@@ -24,6 +24,8 @@ build_timeout_ms = 180000
 
 `sdk_build` is optional and defaults to `build/prepared-sdk` under the selected otelc root. It must identify the existing matching SDK library and build record. The provider negotiates the complete build3 descriptor and independently checks the selected toolchain and SDK recipe. An unavailable or incompatible provider refuses; there is no legacy fallback. Build timeouts accept 1000 to 900000 milliseconds and remain separate from the application's case timeout.
 
+The default `sdk_source_profile = "function-v2"` retains the original single function-ABI source recipe. For a current SDK build that records the function, object and resource ABI headers, explicitly select `sdk_source_profile = "resource-v1"`. This binds all three original headers to the fixed SDK recipe; it does not enable lifetime instrumentation. The experimental object/resource execution profiles retain their required three-header source closure and cannot select `function-v2`. Unknown or mismatched source profiles refuse before application launch.
+
 Without a compilation database, each C11 or C++17 source unit is a separate standalone target with fixed `-O2`, exception and pthread settings. Linked application targets use the existing explicit compilation-database policy. Add these fields to the selected adapter table and declare its ordered targets:
 
 ```toml
