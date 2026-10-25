@@ -17,6 +17,7 @@ import java_actions
 import java_project
 import go_project
 import native_source
+import native_lifetime_policy
 import node_source
 import python_provider
 import preconditions
@@ -107,7 +108,7 @@ def fixture_cases(value: dict, label: str) -> list[list[Any]] | None:
 def fixture(value: Any, index: int) -> dict[str, Any]:
     """Validate concrete cases or independent domains without executing target code."""
     label = f"fixtures[{index}]"
-    keys(value, {"function", "source", "language", "cases", "expected_baseline", "domains", "preconditions", "receiver", "sequence"}, label)
+    keys(value, {"function", "source", "language", "cases", "expected_baseline", "domains", "preconditions", "receiver", "sequence", "lifetimes"}, label)
     function, source = value.get("function"), value.get("source", "**")
     if any(not isinstance(item, str) or not item.strip() for item in (function, source)):
         raise ValueError(f"{label} requires a function pattern and source pattern")
@@ -131,6 +132,10 @@ def fixture(value: Any, index: int) -> dict[str, Any]:
         result["receiver"] = receiver(value["receiver"])
     if "sequence" in value:
         result["sequence"] = sequences.fixture(value, expected_baseline)
+    if "lifetimes" in value:
+        if any(key in value for key in ('receiver', 'sequence')):
+            raise ValueError('native lifetime fixtures require their scalar caller profile')
+        result['lifetimes'] = native_lifetime_policy.expectations(value['lifetimes'], language)
     return result
 
 

@@ -51,6 +51,7 @@ import node_control_receipt
 import owned_workspace
 import native_profile
 import native_source
+import native_lifetime_policy
 import native_source_run
 import native_prepared
 import native_session as native_owned
@@ -341,6 +342,7 @@ def qualify_entry(entry, snapshot, count):
         return "blocked"
     try:
         node_project.require_callable(entry)
+        native_lifetime_policy.require_expectations(entry)
         if entry.get("go_shadowed_recovery", False):
             raise ValueError("shadowed Go panic/recover requires an observation fixture")
         qualify_inputs(entry, count)
@@ -524,6 +526,11 @@ def configure_fixture(entry, discovered, fixture):
         entry["input_domains"] = fixture["domains"]
     if "preconditions" in fixture:
         entry["input_preconditions"] = fixture["preconditions"]
+    if 'lifetimes' in fixture:
+        try:
+            native_lifetime_policy.bind(entry, fixture['lifetimes'])
+        except ValueError as error:
+            entry['reason'] = entry['reason'] or str(error)
     if "sequence" in fixture:
         try:
             sequences.configure(entry, fixture["sequence"], harness.concrete_arguments)
@@ -736,7 +743,7 @@ def generator_identity():
         'native_protocol.py', 'native_inputs.py', 'native_toolchain.py', 'native_sdk.py',
         'native_build.py', 'native_unit_build.py', 'native_lifetime_build.py', 'native_lifetime_inventory.py',
         'native_lifetime_intent.py', 'native_lifetime_metrics.py', 'native_lifetime_receipt.py',
-        'native_lifetime_caller.py',
+        'native_lifetime_caller.py', 'native_lifetime_frontend.py', 'native_lifetime_policy.py',
         'native_unit_caller.py', 'native_prepared.py', 'native_health.py', 'native_execution.py',
         'native_session.py', 'native_telemetry.py', 'native_source.py', 'native_source_run.py',
         'native_profile.py', 'native_project.py', 'native_dependencies.py', 'native_frontend.py',
@@ -797,6 +804,9 @@ def generation_case(entry, index, values):
         case["arguments_requested"] = entry["input_cases"][index]
     if "receiver_fixture" in entry:
         case["receiver_fixture"] = entry["receiver_fixture"]
+    if native_lifetime_policy.EXPECTATIONS in entry:
+        case[native_lifetime_policy.EXPECTATIONS] = native_lifetime_policy.expectations(
+            entry[native_lifetime_policy.EXPECTATIONS], entry['language'])
     if "sequence_configuration" in entry:
         case["sequence"] = sequences.concrete(entry, values, harness.concrete_arguments)
         case["expected_baseline"] = next(step["expected_baseline"] for step in reversed(case["sequence"]) if step["action"] == "call")
@@ -1090,8 +1100,7 @@ def qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, 
     witness = None
     if native_source.enabled(entry):
         native_source.require(isinstance(native_runtime, native_source_run.Run), 'missing owned native execution')
-        witness = native_telemetry.witness(native_runtime.session.execution, bodies, service,
-                                           (entry['otelc_runtime_function'],), folder=folder)
+        witness = native_runtime.witness(bodies, service, (entry['otelc_runtime_function'],), folder)
         if lane == 'baseline':
             baseline_receipt(entry, folder, bodies)
     elif go_source.enabled(entry):
@@ -1440,6 +1449,9 @@ def compare_with_fixtures(workspace, data, entry, case, destination, decoder, ht
     if java_actions.enabled(entry):
         typed_scope['observer'] = ('oteleq typed boundary codecs v1; generated Java private-handle action scopes, '
                                    'compiler routes, original outcomes and decoded receipt; function metrics and final SDK health')
+    if native_lifetime_policy.kind(entry) is not None:
+        typed_scope['observer'] = ('oteleq typed boundary codecs v1; compiler-bound native scalar caller; '
+                                   'independent declared lifetime expectations and complete raw lifetime/function receipt')
     typed_scope["gaps"] = [*scope["gaps"], "graph identities are local to each boundary; cross-boundary replacement, weakref and finalizer effects are unobserved"]
     if java_actions.enabled(entry):
         typed_scope['gaps'].append('otelc.action.wrapper/target counts are diagnostic role spans; function metrics count only selected-method calls')

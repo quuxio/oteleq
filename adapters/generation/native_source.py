@@ -7,6 +7,7 @@ from pathlib import Path
 import sys
 
 import native_inputs
+import native_lifetime_policy as lifetimes
 import native_prepared
 import native_project
 import native_protocol
@@ -35,17 +36,21 @@ def standalone_targets(language: str, compiler: Path, contents: dict) -> list[di
 
 def settings(value: dict) -> dict:
     """Freeze explicit provider selection while preserving default native recipes."""
-    allowed = {'compilation_database', 'targets', 'backend', 'profile', 'sdk_build', 'build_timeout_ms'}
+    allowed = {'compilation_database', 'targets', 'backend', 'profile', 'sdk_build', 'build_timeout_ms', 'lifetimes'}
     native_protocol.require(type(value) is dict and not set(value) - allowed, 'unsupported native adapter settings')
     project = native_project.settings({name: value[name] for name in ('compilation_database', 'targets') if name in value})
     backend = value.get('backend', 'legacy')
     native_protocol.require(type(backend) is str and backend in ('legacy', BACKEND), 'native backend must be legacy or prepared')
     if backend == 'legacy':
-        native_protocol.require(not set(value) & {'profile', 'sdk_build', 'build_timeout_ms'},
+        native_protocol.require(not set(value) & {'profile', 'sdk_build', 'build_timeout_ms', 'lifetimes'},
                                 'native prepared settings require backend=prepared')
         return project
-    native_protocol.require(value.get('profile', native_protocol.PROFILE) == native_protocol.PROFILE,
+    profile = value.get('profile', native_protocol.PROFILE)
+    native_protocol.require(type(profile) is str and profile in (native_protocol.PROFILE, *lifetimes.PROFILES),
                             'unsupported native prepared profile')
+    life = lifetimes.options(value.get('lifetimes')) if profile in lifetimes.PROFILES else None
+    native_protocol.require(life is not None or 'lifetimes' not in value,
+                            'native lifetime settings require their explicit profile')
     directory = value.get('sdk_build')
     if directory is not None:
         native_protocol.require(type(directory) is str and bool(directory) and '\0' not in directory
@@ -53,8 +58,9 @@ def settings(value: dict) -> dict:
                                 'native sdk_build requires an absolute caller-selected directory')
     timeout = value.get('build_timeout_ms', BUILD_TIMEOUT)
     native_protocol.require(type(timeout) is int and 1000 <= timeout <= 900000, 'invalid native build timeout')
-    return {**project, 'backend': BACKEND, 'profile': native_protocol.PROFILE,
-            'sdk_build': directory, 'build_timeout_ms': timeout}
+    return {**project, 'backend': BACKEND, 'profile': profile,
+            'sdk_build': directory, 'build_timeout_ms': timeout,
+            **({'lifetimes': life} if life is not None else {})}
 
 
 def selected(options: dict) -> bool:
@@ -72,6 +78,21 @@ def configure(entry: dict, options: dict) -> None:
     if entry['language'] in LANGUAGES and selected(options):
         entry.update(native_backend=BACKEND, native_options=options,
                      otelc_runtime_function=entry['path'] + '::' + entry['otelc_function'])
+        lifetimes.kind(entry)
+
+
+def build_version(options: dict) -> int:
+    """Each explicit profile negotiates its own source-build contract."""
+    profile = options.get('profile', native_protocol.PROFILE)
+    require(type(profile) is str and profile in (native_protocol.PROFILE, *lifetimes.PROFILES),
+            'unsupported native prepared profile')
+    return lifetimes.PROFILES[profile][2] if profile in lifetimes.PROFILES else 3
+
+
+def source_profile(options: dict) -> str:
+    """Current lifetime SDKs bind both object and resource ABI source headers."""
+    build_version(options)
+    return 'resource-v1' if options.get('profile') in lifetimes.PROFILES else 'function-v2'
 
 
 def selected_tools(root: Path, language: str) -> dict:
@@ -100,17 +121,26 @@ def artefacts(root: Path, language: str, tools: dict, options: dict) -> dict:
                             'native provider root must be canonical')
     directory = sdk_directory(root, options)
     library = 'libotelc_native_runtime.dylib' if sys.platform == 'darwin' else 'libotelc_native_runtime.so'
-    paths = {*native_sdk.source_paths(root), *native_prepared.producer_paths(root),
+    paths = {*native_sdk.source_paths(root, source_profile=source_profile(options)), *native_prepared.producer_paths(root),
              root / 'native/llvm/OtelcPass.cpp', root / 'adapters/native/gate/ExecGate.c',
              directory / 'native-sdk-build.json', directory / library}
+    extra_tools = []
+    if options.get('profile') in lifetimes.PROFILES:
+        kind = lifetimes.PROFILES[options['profile']][0]
+        stem = 'Object' if kind == 'object' else 'Resource'
+        paths.update((root / 'native/llvm' / (stem + 'Pass.cpp'),
+                      root / 'native/llvm' / (kind + '_pass.h'),
+                      root / 'native/clang' / ('Lifetimes.cpp' if kind == 'object' else 'Resources.cpp')))
+        if kind == 'resource':
+            extra_tools.append(tools['llvm-config'].parent / 'llvm-nm')
     result = {}
     for path in sorted(paths):
         held = native_inputs.capture(path)
         result[str(path)] = {'identity': held.gate_identity(), 'path_facts': list(held.path_facts)}
-    for path in tools.values():
+    for path in (*tools.values(), *extra_tools):
         held = native_inputs.capture(path, allow_links=True)
         result[str(path)] = {'identity': held.gate_identity(), 'path_facts': list(held.path_facts)}
-    return {'profile': native_protocol.PROFILE, 'files': result}
+    return {'profile': options.get('profile', native_protocol.PROFILE), 'files': result}
 
 
 def stable(root: Path, language: str, tools: dict, options: dict, expected: dict) -> None:
@@ -123,7 +153,8 @@ def sdk(root: Path, language: str, tools: dict, options: dict, folder: Path, exe
     """Read one caller-selected SDK against independently queried LLVM recipes."""
     compiler = tools['clang' if language == 'c' else 'clang++']
     toolchain = native_toolchain.capture(tools['llvm-config'], compiler, language, folder, execute)
-    return native_sdk.capture(root, sdk_directory(root, options), toolchain, cmake=tools['cmake'], ninja=tools['ninja'])
+    extra = {'source_profile': source_profile(options)} if options.get('profile') in lifetimes.PROFILES else {}
+    return native_sdk.capture(root, sdk_directory(root, options), toolchain, cmake=tools['cmake'], ninja=tools['ninja'], **extra)
 
 
 def cli(root: Path, tools: dict) -> list:
@@ -132,16 +163,17 @@ def cli(root: Path, tools: dict) -> list:
 
 
 def negotiate(workflow, root: Path, workspace: Path, language: str, tools: dict, options: dict, execute) -> None:
-    """Build3/unit-recipe1 availability must be established before generation."""
+    """The selected build3/4/5 descriptor must be established before generation."""
     folder = workspace / DIRECTORY / language
     folder.mkdir(parents=True, mode=0o700)
-    command = cli(root, tools) + ['native-protocols', '--build-version', '3']
+    version = build_version(options)
+    command = cli(root, tools) + ['native-protocols', '--build-version', str(version)]
     result = execute(command, root)
     record = {'command': list(map(str, command)), 'status': result.returncode,
               'stdout': result.stdout.decode('utf-8'), 'stderr': result.stderr.decode('utf-8')}
     workflow.write(folder / 'protocols.json', record)
     native_protocol.require(result.returncode == 0, 'public native protocol negotiation failed')
-    native_protocol.verify_protocols(capture.strict_json(result.stdout), build_version=3)
+    native_protocol.verify_protocols(capture.strict_json(result.stdout), build_version=version)
     sdk(root, language, tools, options, folder, execute).verify()
 
 
@@ -150,7 +182,7 @@ def configuration(entry: dict, endpoint: str, service: str) -> dict:
     native_protocol.require(enabled(entry), 'explicit native entry required')
     native_protocol.require(not any(key in entry for key in ('receiver_fixture', 'sequence_configuration')),
                             'prepared native receivers and action sequences require separate integration')
-    return {'schema_version': 3, 'languages': [entry['language']],
+    result = {'schema_version': 3, 'languages': [entry['language']],
             'resource': {'service_name': service},
             'export': {'endpoint': endpoint, 'interval_ms': 1000, 'timeout_ms': 1000, 'shutdown_timeout_ms': 10000},
             'sources': {'include': [entry['path']], 'exclude': []},
@@ -161,6 +193,8 @@ def configuration(entry: dict, endpoint: str, service: str) -> dict:
             'lifetimes': {'enabled': False, 'include': [], 'exclude': [], 'max_live': 4096, 'release_methods': ['close']},
             'context': {'tasks': False, 'http': False},
             'benchmark': {'iterations': 10000, 'samples': 15, 'warmup': 5}}
+    lifetimes.apply(entry, result)
+    return result
 
 
 def policy(entry: dict, endpoint: str, service: str) -> str:
@@ -188,6 +222,12 @@ def verify_probes(workflow, workspace: Path, data: dict) -> None:
                 'native entry differs from frozen provider settings')
             native_protocol.require(entry['status'] != 'ready' or 'native_context' in entry,
                                     'ready native entry has no frozen compiler context')
+            if lifetimes.kind(entry) is not None and entry['status'] == 'ready':
+                lifetimes.require_expectations(entry)
+                expected_sources = lifetimes.source_selection(data['native_projects'][language],
+                    data['configuration']['sources'], workflow.project_policy.selected)
+                native_protocol.require(native_protocol.same(entry.get(lifetimes.SOURCES), expected_sources),
+                                        'native lifetime source selection differs from its compiler context')
     directory = workspace / DIRECTORY
     expected = data.get('native_provider_manifest')
     if expected is None:
@@ -201,7 +241,8 @@ def verify_probes(workflow, workspace: Path, data: dict) -> None:
                 continue
             record = workflow.read(directory / language / 'protocols.json')
             tools = {name: Path(path) for name, path in data['tools'][language].items()}
+            version = build_version(options)
             native_protocol.require(record['status'] == 0
-                and record['command'] == list(map(str, cli(Path(data['otelc_root']), tools) + ['native-protocols', '--build-version', '3'])),
+                and record['command'] == list(map(str, cli(Path(data['otelc_root']), tools) + ['native-protocols', '--build-version', str(version)])),
                 'native protocol command differs from frozen tools')
-            native_protocol.verify_protocols(capture.strict_json(record['stdout']), build_version=3)
+            native_protocol.verify_protocols(capture.strict_json(record['stdout']), build_version=version)

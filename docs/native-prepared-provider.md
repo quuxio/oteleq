@@ -6,6 +6,8 @@ Status: bounded diagnostic qualification. Explicit C/C++ `backend = "prepared"` 
 
 ## Select the candidate
 
+The separate experimental [object/resource profiles](native-lifetime-generation.md) add explicit lifetime expectations and different build4/build5 contracts. Their workflow qualification is pending; the normal-call evidence below applies only to this function-only profile.
+
 Use the matching built SDK and LLVM 22 installation. Select each native language present in the source tree explicitly:
 
 ```toml

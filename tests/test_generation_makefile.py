@@ -199,6 +199,17 @@ class QualificationRecipeTests(unittest.TestCase):
         self.assertIn('test_generation_native_callers', result.stdout)
         self.assertNotIn('cargo build', result.stdout)
 
+    def test_native_lifetime_public_recipe_keeps_literal_boundaries_and_each_module_floor(self):
+        result = subprocess.run(['make', '--no-print-directory', '-n', 'native-lifetime-public-check',
+            'PYTHON=/selected/python'], cwd=ROOT, capture_output=True, text=True, check=True)
+        for module in ('native_lifetime_policy', 'native_lifetime_frontend', 'native_source', 'native_source_run'):
+            self.assertIn("--include='*/" + module + ".py' --fail-under=80", result.stdout)
+        for name in ('test_generation_native_lifetime_policy', 'test_generation_native_lifetime_frontend',
+                     'test_generation_native_lifetime_run', 'test_generation_native_source_run'):
+            self.assertIn(name, result.stdout)
+        self.assertNotIn('cargo build', result.stdout)
+        self.assertNotIn('--otelc-root', result.stdout)
+
     def test_help_names_the_http_qualification_target(self):
         result = subprocess.run(["make", "help"], cwd=ROOT, capture_output=True, text=True, check=True)
         self.assertIn("generation-http-otelc Qualify scripted HTTP", result.stdout)

@@ -177,6 +177,9 @@ def inventory(workflow, profiles: dict, root: Path, snapshot: Path, workspace: P
                 try:
                     native_workers.validate(profile, entry, harness.corpus(entry, args.cases)[0])
                     if native_source.enabled(entry):
+                        native_source.lifetimes.bind_sources(entry, profile, args.configuration['sources'],
+                                                            workflow.project_policy.selected)
+                        native_source.lifetimes.unique_target(entry, found, workflow.entry_identity)
                         native_source.configuration(entry, 'http://127.0.0.1:4318', 'oteleq-native-planning')
                 except ValueError as error:
                     entry.update(status='blocked', reason=str(error))
