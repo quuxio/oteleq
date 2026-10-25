@@ -15,6 +15,25 @@ test('all GitHub workflow files have valid YAML syntax', () => {
   }
 });
 
+test('native lifetime qualification uses the reviewed SDK and one owned hosted job', () => {
+  const workflow = yaml.load(readFileSync(new URL('../.github/workflows/native-lifetimes.yml', import.meta.url), 'utf8'));
+  assert.equal(workflow.permissions.contents, 'read');
+  const job = workflow.jobs['native-lifetimes'];
+  assert.equal(job['runs-on'], 'ubuntu-24.04');
+  const checkouts = job.steps.filter(step => step.uses?.startsWith('actions/checkout@'));
+  assert.equal(checkouts.length, 2);
+  assert.ok(checkouts.every(step => step.with['persist-credentials'] === false));
+  assert.equal(checkouts[1].with.repository, 'quuxio/otelc');
+  assert.equal(checkouts[1].with.ref, 'acb13d7735526448209df37b7e6b98e5717befdb');
+  const execute = job.steps.find(step => step.name === 'Build original SDK and exercise public lifetime workflows');
+  assert.match(execute.run, /tests\/qualify_native_lifetimes\.py/);
+  assert.doesNotMatch(execute.run, /--coverage/);
+  const retain = job.steps.find(step => step.name === 'Retain original qualification evidence and SDK build failures');
+  assert.equal(retain.if, 'always()');
+  assert.equal(retain.with['retention-days'], 7);
+  assert.ok(!Object.hasOwn(job, 'secrets'));
+});
+
 test('pip binary-only arguments require quoting in a YAML command scalar', () => {
   const command = 'python -m pip install --only-binary=:all: -r ci/requirements.txt';
   assert.throws(() => yaml.load(`run: ${command}\n`));

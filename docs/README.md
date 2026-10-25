@@ -13,6 +13,7 @@ Updated 25 October 2026, `quux-oteleq compare-workload` runs the Rust comparator
 | [Native lifetime telemetry receipt](native-lifetime-receipt.md) | Bind prelaunch caller expectations to complete raw lifetime/function telemetry |
 | [Native lifetime caller pipeline](native-lifetime-callers.md) | Bind generated caller/compiler contexts to independently obtained lifetime semantics |
 | [Generated native lifetime tests](native-lifetime-generation.md) | Configure experimental object/resource expectations and inspect public-route limits |
+| [Hosted native lifetime workflows](native-lifetime-workflows.md) | Build a fixed SDK and exercise genuine external tests in one original job |
 | [Go build bundles](go-build-bundles.md) | Retain matched executables, compiler evidence and detached replay |
 | [Go live metric schedules](go-metric-controls.md) | Declare same-process metric states and inspect the pending qualification boundary |
 | [Java compiler bindings](java-build-bundles.md) | Inspect actual source origins, JDK/compiler identities and retained class products |

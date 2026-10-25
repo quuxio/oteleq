@@ -210,6 +210,15 @@ class QualificationRecipeTests(unittest.TestCase):
         self.assertNotIn('cargo build', result.stdout)
         self.assertNotIn('--otelc-root', result.stdout)
 
+    def test_native_lifetime_workflow_recipe_runs_literal_oracles_without_sdk_work(self):
+        result = subprocess.run(['make', '--no-print-directory', '-n', 'native-lifetime-workflow-check',
+            'PYTHON=/selected/python'], cwd=ROOT, capture_output=True, text=True, check=True)
+        self.assertIn('test_generation_native_lifetime_workflow', result.stdout)
+        self.assertIn('--include=\'*/qualify_native_lifetimes.py\'', result.stdout)
+        self.assertIn('--data-file=.native-lifetime-workflow.coverage --fail-under=80', result.stdout)
+        self.assertNotIn('native_launch', result.stdout)
+        self.assertNotIn('cargo build', result.stdout)
+
     def test_help_names_the_http_qualification_target(self):
         result = subprocess.run(["make", "help"], cwd=ROOT, capture_output=True, text=True, check=True)
         self.assertIn("generation-http-otelc Qualify scripted HTTP", result.stdout)
