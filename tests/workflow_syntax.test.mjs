@@ -75,6 +75,8 @@ test('native metric workflows cover both languages and every startup state with 
   assert.equal(retain.with['retention-days'], 7);
   assert.match(retain.with.path, /native-metric-evidence/);
   assert.match(retain.with.path, /native-sdk-build.json/);
+  const sources = job.steps.find(step => step.name === 'Retain exact source archives and source status');
+  assert.match(sources.run, /cp consumer\/target\/debug\/quux-oteleq .*consumer-cli/);
   assert.ok(!Object.hasOwn(job, 'secrets'));
 });
 

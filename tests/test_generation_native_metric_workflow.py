@@ -3,7 +3,9 @@
 import copy
 import json
 from pathlib import Path
+import sys
 import tempfile
+import tomllib
 from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
@@ -18,6 +20,25 @@ class NativeMetricWorkflowTests(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory(); self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name).resolve(); self.counter = 0
+
+    def test_all_28_generated_configurations_pass_the_actual_public_policy_validator(self):
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'adapters/generation'))
+        import policy
+
+        count = 0
+        for language, modes in cases.MODES.items():
+            for mode in modes:
+                for start in cases.STARTS:
+                    with self.subTest(language=language, mode=mode, start=start):
+                        folder = self.root / (language + '-' + mode + '-' + start); folder.mkdir()
+                        _, config = cases.fixture(folder, language, mode, start, self.root / 'sdk')
+                        fixture, = policy.validate(tomllib.loads(config.read_text()))['fixtures']
+                        for index, step in enumerate(fixture['sequence']):
+                            expected = ({'kind': 'error', 'category': 'exception', 'type': 'cpp.std::runtime_error'}
+                                        if mode == 'error' and index == 1 else {'kind': 'return'})
+                            self.assertEqual(step['expected_baseline'], expected)
+                        count += 1
+        self.assertEqual(count, 28)
 
     def audit(self, language='c', start='11'):
         audit = SimpleNamespace(language=language, start=start, provider=self.root, records={})

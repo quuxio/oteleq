@@ -71,6 +71,9 @@ jobs:
         if: always()
         run: |
           mkdir -p "$RUNNER_TEMP/native-metric-evidence"
+          if test -f consumer/target/debug/quux-oteleq; then
+            cp consumer/target/debug/quux-oteleq "$RUNNER_TEMP/native-metric-evidence/consumer-cli"
+          fi
           git -C consumer archive --format=tar --output "$RUNNER_TEMP/native-metric-evidence/consumer-source.tar" HEAD
           git -C provider archive --format=tar --output "$RUNNER_TEMP/native-metric-evidence/provider-source.tar" HEAD
           git -C consumer status --porcelain > "$RUNNER_TEMP/native-metric-evidence/consumer-source-status.txt"

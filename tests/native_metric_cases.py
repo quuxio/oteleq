@@ -62,7 +62,8 @@ def source(language: str, mode: str, *, changed: bool = False) -> str:
 def configuration(language: str, mode: str, start: str, sdk: Path) -> dict:
     validate(language, mode, start)
     steps = [{'action': 'call', 'arguments': 'case', 'metrics': flags,
-              'expected_baseline': {'kind': 'error' if mode == 'error' and index == 1 else 'return'}}
+              'expected_baseline': ({'kind': 'error', 'category': 'exception', 'type': 'cpp.std::runtime_error'}
+                                    if mode == 'error' and index == 1 else {'kind': 'return'})}
              for index, flags in enumerate(schedule(start))]
     value = {'schema_version': 1, 'languages': [language],
         'limits': {'case_timeout_ms': 30000}, 'functions': {'include': ['selected*']},

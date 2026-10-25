@@ -38,6 +38,8 @@ sequence = [
 
 Select `languages = ["c"]` and `[adapters.c]` for a C source target. Each schedule has 1 to 32 calls and must include a collection-on/emission-on positive call. The first call can request any of the four states; its flags become the initial SDK policy before application execution. Every call currently uses the same concrete case arguments. Declare [independent baseline expectations](expected-returns.md) on individual calls where needed, including supported C++ errors.
 
+An expected C++ exception requires the complete declaration, for example `expected_baseline = { kind = "error", category = "exception", type = "cpp.std::runtime_error" }` on the throwing call. A bare error kind is invalid. The maintained qualifier validates all 28 generated workload/start configurations through the public policy reader before their fixture contracts are accepted by the component gate.
+
 Each disabled state is held for at least one full one-second export interval. The original case timeout includes these holds, transport queries and application calls. Increase it for longer schedules. A timeout is incomplete evidence and cannot become an equivalent result.
 
 ## Observations and receipt
