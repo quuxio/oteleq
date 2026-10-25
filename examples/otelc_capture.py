@@ -275,16 +275,36 @@ def file_digest(path: Path) -> str:
         os.close(descriptor)
 
 
+def path_within(path: Path, root: Path) -> bool:
+    """Recognise physical ancestry, including case aliases on macOS filesystems."""
+    path, root = path.resolve(), root.resolve()
+    if path.is_relative_to(root):
+        return True
+    try:
+        info = root.stat()
+    except FileNotFoundError:
+        return False
+    expected = info.st_dev, info.st_ino
+    for parent in (path, *path.parents):
+        try:
+            observed = parent.stat()
+        except FileNotFoundError:
+            continue
+        if (observed.st_dev, observed.st_ino) == expected:
+            return True
+    return False
+
+
 def temporary_parent(*source_roots):
     source_roots = tuple(root.resolve() for root in source_roots)
     # Reject configured source paths before tempfile probes them for writability.
     for variable in ("TMPDIR", "TEMP", "TMP"):
         if value := os.environ.get(variable):
             candidate = Path(value).resolve()
-            if any(candidate.is_relative_to(root) for root in source_roots):
+            if any(path_within(candidate, root) for root in source_roots):
                 raise ValueError("temporary directory must be outside both repositories; correct TMPDIR")
     parent = Path(tempfile.gettempdir()).resolve()
-    if any(parent.is_relative_to(root) for root in source_roots):
+    if any(path_within(parent, root) for root in source_roots):
         raise ValueError("temporary directory must be outside both repositories; correct TMPDIR")
     return parent
 
@@ -877,7 +897,7 @@ def go_caches(root: Path, workspace: Path, environment: dict, evidence: Path) ->
         environment.setdefault(variable, str(cache / name))
         path = Path(environment[variable])
         go_require(path.is_absolute() and path.resolve() == path and not path.is_symlink(), "cache location is linked or noncanonical")
-        go_require(not path.is_relative_to(workspace.resolve()) and not path.is_relative_to(root.resolve()), "cache must be outside application/provider sources")
+        go_require(not path_within(path, workspace) and not path_within(path, root), "cache must be outside application/provider sources")
         go_require(not path.exists() or path.is_dir(), "cache location must be a directory")
     environment["GOTOOLCHAIN"] = "local"
 

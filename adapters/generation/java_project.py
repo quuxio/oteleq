@@ -8,7 +8,7 @@ import shutil
 import java_classpath as classpath
 import java_archive_context as archive_context
 import owned_workspace
-from otelc_capture import tree_paths, walk_tree
+from otelc_capture import path_within, tree_paths, walk_tree
 
 DIRECTORY = "java-context"
 CONTEXT_FILE = "java-build-context.json"
@@ -127,7 +127,7 @@ def original_locations(data: dict) -> list[Path]:
 
 def protect_destination(destination: Path, locations: list[Path]) -> None:
     """Do not write into dependencies or recursively copy a workspace into itself."""
-    require(all(not destination.is_relative_to(path) for path in locations),
+    require(all(not path_within(destination, path) for path in locations),
             "generated outputs must be outside declared dependencies")
 
 
@@ -140,7 +140,7 @@ def prepare(source: Path, workspace: Path, options: dict, ignored: set[str], *,
     active = archive_context.enabled(options)
     origins = input_locations(source, options)
     protect_destination(workspace, origins)
-    require(not any(path.is_relative_to(workspace) for path in origins), "dependency is inside the owned workspace")
+    require(not any(path_within(path, workspace) for path in origins), "dependency is inside the owned workspace")
     root = workspace / DIRECTORY
     root.mkdir(mode=0o700)
     (root / "classpath").mkdir()

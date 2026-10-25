@@ -17,6 +17,7 @@ import uuid
 
 import discovery
 import go_project
+import go_cache
 import go_source
 import go_source_run
 import go_prepared
@@ -229,7 +230,7 @@ def execute(command, cwd, env=None, folder=None, timeout=60, input_data=None, *,
 
 def source_outside(path, *roots):
     candidate = path.resolve()
-    if any(candidate.is_relative_to(root.resolve()) for root in roots):
+    if any(capture.path_within(candidate, root) for root in roots):
         raise ValueError("generated outputs must be outside the source and otelc repositories")
     return candidate
 
@@ -604,6 +605,9 @@ def plan(args):
     if not source.is_dir() or not root.is_dir():
         raise ValueError("source and otelc root must be directories")
     configuration = plan_configuration(args)
+    cache = configuration["adapters"]["go"].get("build_cache")
+    if "go" in args.language and cache is not None:
+        go_cache.location(cache, [source, root])
     temporary = capture.temporary_parent(source, root)
     parent = source_outside(args.workspace_parent or temporary, source, root)
     java_options = configuration["adapters"]["java"] if "java" in args.language else {}
@@ -721,7 +725,7 @@ def decoder_files():
 
 def generator_identity():
     here = Path(__file__).parent
-    names = ("generation.py", "policy.py", "return_expectations.py", "filesystem_effects.py", "http_effects.py", "domains.py", "shrinking.py", "sequences.py", "typescript_provider.py", "python_project.py", "go_project.py", "go_provider.py", "go_files.py", "go_context.py", "go_context_sources.py", "go_context_APACHE.txt", "go_build.py", "go_caller.py", "go_source.py", "go_source_run.py", "go_telemetry.py", "go_hooks.py", "go_prepared.py", "go_health.py", "go_execution.py", "go_launch.py", "go_rendezvous.py", "go_rendezvous.go", "go_receivers.py", "go_graph.py", "go_observe.go", "node_receivers.py", "java_receivers.py", "java_build.py", "java_control.py", "java_profiles.py", "java_live.py", "java_control_receipt.py", "java_health.py", "java_launch.py", "java_provider.py", "java_telemetry.py", "OteleqCompile.java", "java_graph.py", "OteleqGraph.java", "cpp_models.py", "cpp_receivers.py", "cpp_worker.py", "cpp_graph.py", "cpp_observe.hpp", "native_names.py", "discovery.py", "harness.py", "observe.py", "node_observe.mjs", "node_sequence.mjs", "typed_capture.py", "discover.mjs", "discover.go", "Discover.java")
+    names = ("generation.py", "policy.py", "return_expectations.py", "filesystem_effects.py", "http_effects.py", "domains.py", "shrinking.py", "sequences.py", "typescript_provider.py", "python_project.py", "go_project.py", "go_storage.py", "go_cache.py", "go_provider.py", "go_files.py", "go_context.py", "go_context_sources.py", "go_context_APACHE.txt", "go_build.py", "go_caller.py", "go_source.py", "go_source_run.py", "go_telemetry.py", "go_hooks.py", "go_prepared.py", "go_health.py", "go_execution.py", "go_launch.py", "go_rendezvous.py", "go_rendezvous.go", "go_receivers.py", "go_graph.py", "go_observe.go", "node_receivers.py", "java_receivers.py", "java_build.py", "java_control.py", "java_profiles.py", "java_live.py", "java_control_receipt.py", "java_health.py", "java_launch.py", "java_provider.py", "java_telemetry.py", "OteleqCompile.java", "java_graph.py", "OteleqGraph.java", "cpp_models.py", "cpp_receivers.py", "cpp_worker.py", "cpp_graph.py", "cpp_observe.hpp", "native_names.py", "discovery.py", "harness.py", "observe.py", "node_observe.mjs", "node_sequence.mjs", "typed_capture.py", "discover.mjs", "discover.go", "Discover.java")
     files = {name: capture.file_digest(here / name) for name in names}
     files.update({name: capture.file_digest(here / name) for name in (
         'java_project.py', 'java_classpath.py', 'java_archives.py', 'java_archive_context.py',
@@ -1255,6 +1259,7 @@ def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, ht
         elif go_source.enabled(entry):
             go_run = go_source_run.prepare(sys.modules[__name__], root, project, entry, tools, env, folder,
                                            config, lane, wait_ms=data["configuration"]["limits"]["case_timeout_ms"],
+                                           protected_roots=(workspace, Path(data["source"])),
                                            **({"sequence": case["sequence"], "bodies": bodies} if sequences.controls(entry) else {}))
             command = go_prepared.command(go_run.prepared.intent)
         elif python_provider.origin(entry):
@@ -1518,7 +1523,7 @@ def export_tests(args):
     workspace, data = load_workspace(args.workspace, generated=True)
     destination = args.destination.resolve()
     java_project.protect_destination(destination, java_project.original_locations(data))
-    if destination.exists() or destination.is_relative_to(workspace) or workspace.is_relative_to(destination):
+    if destination.exists() or capture.path_within(destination, workspace) or capture.path_within(workspace, destination):
         raise ValueError("export destination must be new and independent of the workspace")
     providers = retained_provider_directories(data)
     if not args.apply:

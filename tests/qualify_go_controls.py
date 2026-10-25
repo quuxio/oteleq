@@ -14,7 +14,9 @@ import go_live_fixture as fixture
 import go_live_qualification as oracle
 import go_live_receipt as receipt
 import go_source
+import go_cache
 import sequence_qualification as shared
+import qualification_storage
 from qualify_project_tests import command
 
 
@@ -75,7 +77,8 @@ def framework(workspace: Path, folder: Path, name: str, count: int = len(fixture
     return shared.framework(workspace, folder, name, count, check_report)
 
 
-def run(cli: Path, provider: Path, folder: Path, start: str, catalogue: dict) -> None:
+def run(cli: Path, provider: Path, folder: Path, start: str, catalogue: dict, *, min_free_bytes: int = 0,
+        cache_max_bytes: int = go_cache.DEFAULT_MAX_BYTES) -> None:
     """Exercise every maintained route without changing the original application."""
     folder.mkdir(mode=0o700)
     write(folder / 'provider-inputs.json', catalogue)
@@ -84,7 +87,8 @@ def run(cli: Path, provider: Path, folder: Path, start: str, catalogue: dict) ->
     inputs = oracle.make_source(cases / 'application')
     write(folder / 'independent-inputs.json', inputs)
     config = cases / 'equivalence.toml'
-    config.write_text(fixture.policy(start))
+    cache = go_cache.settings({'directory': str(folder / 'compiler-cache'), 'max_bytes': cache_max_bytes})
+    config.write_text(fixture.policy(start, min_free_bytes=min_free_bytes, build_cache=cache))
     workspace = shared.plan_generate(cli, provider, cases, cases / 'application', config, set(fixture.FUNCTIONS))
     check_report = partial(oracle.check_report, start=start, provider=provider)
     run_framework = partial(framework, check_report=check_report)
@@ -205,6 +209,30 @@ def evidence_facts(folder: Path) -> dict:
     return result
 
 
+def archived_original(reports: list[Path], folder: Path) -> dict[Path, Path]:
+    """Bind the one shrink copy to actual launch IDs in the fixed report registry."""
+    archived = folder / 'shrink/original/report.json'
+    receipt.require(archived in reports, 'missing copied shrink report')
+
+    def identities(path: Path) -> tuple:
+        rows = receipt.read(path)['cases']
+        receipt.require(len(rows) == 1, 'copied shrink report needs one case')
+        case, = rows
+        return tuple(receipt.read(path.parent / case['case'] / (lane + '-' + str(repeat)) /
+                                  'go-runtime/go-application-start.json')['launch_id']
+                     for lane in ('baseline', 'instrumented_on') for repeat in range(2))
+
+    wanted = identities(archived)
+    matches = [path for path in reports if path != archived
+               and len(receipt.read(path)['cases']) == 1 and identities(path) == wanted]
+    receipt.require(len(matches) == 1 and all(path.is_relative_to(folder) for path in reports),
+                    'copied shrink report has no unique original launch evidence')
+    original, = matches
+    receipt.require(original.read_bytes() == archived.read_bytes(), 'copied shrink report changed')
+    receipt.identical_archive(original.parent, archived.parent)
+    return {archived: original}
+
+
 def audit(cli: Path, provider: Path, folder: Path, destination: Path, start: str, catalogue: dict) -> dict:
     """Recompute all comparisons; count copied observations separately from launches."""
     fixture.exact(receipt.read(folder / 'provider-inputs.json'), catalogue)
@@ -217,10 +245,13 @@ def audit(cli: Path, provider: Path, folder: Path, destination: Path, start: str
         (folder / 'current-changed.stdout').read_text().splitlines()) if 'report' in row}
     reports = sorted(folder.rglob('report.json'))
     receipt.require(len(reports) == 19 and len(changed_reports) == 3, 'incomplete retained report denominator')
+    archived = archived_original(reports, folder)
     starts, identities, observed, comparisons = set(), {}, 0, 0
     for path in reports:
         document = receipt.read(path)
-        observed += oracle.check_report(path, len(document['cases']), start=start, provider=provider, changed=path in changed_reports)
+        options = {'original': archived[path]} if path in archived else {}
+        observed += oracle.check_report(path, len(document['cases']), start=start, provider=provider,
+                                        changed=path in changed_reports, **options)
         for case in document['cases']:
             case_folder = path.parent / case['case']
             for lane in ('baseline', 'instrumented_on'):
@@ -259,7 +290,15 @@ def main(argv: list[str] | None = None) -> None:
         parser.add_argument('--' + name, type=Path, required=True)
     parser.add_argument('--startup-state', choices=fixture.STARTS, default='both-on')
     parser.add_argument('--retained-only', action='store_true')
+    parser.add_argument('--min-free-bytes', type=int, default=qualification_storage.MIN_FREE_BYTES,
+                        help='free-space floor checked between commands and during Go builds (default: 8 GiB)')
+    parser.add_argument('--cache-max-bytes', type=int, default=go_cache.DEFAULT_MAX_BYTES,
+                        help='shared disposable SDK cache bound between builds (default: 1 GiB)')
     args = parser.parse_args(argv)
+    if args.min_free_bytes < 0:
+        parser.error('--min-free-bytes must be nonnegative')
+    if not 1024 ** 2 <= args.cache_max_bytes <= 2 ** 63 - 1:
+        parser.error('--cache-max-bytes must be from 1048576 to 9223372036854775807')
     if sys.flags.optimize:
         parser.error('qualification requires assertions; disable Python optimisation')
     cli, provider, folder, destination = (value.resolve() for value in
@@ -274,7 +313,9 @@ def main(argv: list[str] | None = None) -> None:
     tools = {'go': Path(shutil.which('go') or '/missing-go'), 'python-host': Path(sys.executable).absolute()}
     catalogue = go_source.artefacts(provider, tools, backend='source-scope-v1')
     if not args.retained_only:
-        run(cli, provider, folder, args.startup_state, catalogue)
+        with qualification_storage.budget(args.min_free_bytes):
+            run(cli, provider, folder, args.startup_state, catalogue,
+                min_free_bytes=args.min_free_bytes, cache_max_bytes=args.cache_max_bytes)
     result = audit(cli, provider, folder, destination, args.startup_state, catalogue)
     fixture.exact(go_source.artefacts(provider, tools, backend='source-scope-v1'), catalogue)
     write(destination / 'QUALIFICATION.json', result)

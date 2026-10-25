@@ -106,6 +106,8 @@ cargo build --locked
 
 Maintainers can use the checkout's [cold receipt archive/restore commands](docs/qualification-retention.md) to reduce completed qualification storage. Archived raw paths must be restored before existing retained verifiers run.
 
+Run the [Go live qualification](docs/go-metric-controls.md#qualify-generated-and-retained-suites) startup corpora serially. Fresh runs check an 8 GiB free-space floor between commands and during source-provider build commands, and share a disposable SDK cache bounded to 1 GiB between builds. Retained caller exports and module inputs remain separate. Low space stops the affected operation and retains an explicit incomplete refusal. Ordinary source-provider suites can declare their own [build storage floor](docs/go-build-bundles.md#build-settings-and-runtime-controls) and optional [bounded SDK cache](docs/go-build-bundles.md#bounded-sdk-compiler-cache).
+
 ### Generate and run tests
 
 Build otelc's qualified adapters first. Use its locked Python environment, then create an external plan and use the workspace path printed by `plan`:

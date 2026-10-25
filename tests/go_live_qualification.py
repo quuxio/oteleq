@@ -50,9 +50,11 @@ def contract(value: dict, method: str, case: str) -> None:
 
 
 def check_report(path: Path, count: int, *, start: str, provider: Path,
-                 changed: bool = False) -> int:
+                 changed: bool = False, original: Path | None = None) -> int:
     """Check every value, alias, call, control and raw receipt in all four repeats."""
     report = receipt.read(path)
+    if original is not None:
+        receipt.identical_archive(original.parent, path.parent)
     receipt.require(report['source_preserved'] is True and report['blocked'] == []
                     and len(report['cases']) == count, 'incomplete generated report')
     fixture.exact(report['claim'], 'equivalence over these tests and observations')
@@ -96,7 +98,11 @@ def check_report(path: Path, count: int, *, start: str, provider: Path,
                     'source_sha256_before': report['source_sha256'], 'source_sha256_after': report['source_sha256'],
                     'termination': {'kind': 'exit', 'code': 0}, 'witness': execution['witness']})
                 fixture.exact([row['metrics'] for row in case['sequence']], list(fixture.states(start)))
-                receipt.check(target, method, start, lane == 'baseline', execution['witness'], provider)
-                receivers.scope_attempt(target, ())
+                # copytree archives preserve bytes, not original inode/link
+                # identity. Only an independently bound original can supply
+                # physical publisher facts; every archived byte matched above.
+                evidence = original.parent / case['case'] / (lane + '-' + str(repeat)) if original else target
+                receipt.check(evidence, method, start, lane == 'baseline', execution['witness'], provider)
+                receivers.scope_attempt(evidence, ())
     fixture.exact(report['exit_code'], int('transient' in (functions[name] for name in selected)))
     return observed

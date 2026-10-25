@@ -13,6 +13,8 @@ PYTHON_CONTROL_STARTUP ?= both-on
 PYTHON_CONTROL_PROFILE ?= python-native-origins-v2
 GO_SOURCE_BACKEND ?= source-v1
 GO_CONTROL_STARTUP ?= both-on
+GO_CONTROL_MIN_FREE_BYTES ?= 8589934592
+GO_CONTROL_CACHE_MAX_BYTES ?= 1073741824
 AUDIT_DIR ?= $(REPORT_DIR)-audit
 MARKDOWNLINT ?= ./ci/markdownlint/node_modules/.bin/markdownlint
 DEPENDENCY_AUDIT_OUTPUT ?= $(CURDIR)/build/dependency-audit
@@ -148,8 +150,9 @@ node-sequence-check:
 	$(NODE) --test --experimental-test-coverage --test-coverage-include='adapters/generation/node_checkpoint.mjs' --test-coverage-lines=80 --test-coverage-functions=80 --test-coverage-branches=80 tests/node_checkpoint.test.mjs
 
 effect-qualification-check:
-	$(PYTHON) -m coverage run --data-file=.effect-qualification.coverage --include='*/effect_qualification.py' -m unittest discover -s tests -p 'test_generation_*qualification.py'
+	$(PYTHON) -m coverage run --data-file=.effect-qualification.coverage --include='*/effect_qualification.py,*/qualification_storage.py' -m unittest discover -s tests -p 'test_generation_*qualification.py'
 	$(PYTHON) -m coverage report --data-file=.effect-qualification.coverage --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.effect-qualification.coverage --include='*/qualification_storage.py' --fail-under=80
 
 java-observer-check:
 	$(PYTHON) ci/java_coverage.py check
@@ -215,6 +218,8 @@ generation-check: node-observer-check node-sequence-check node-source-context-ch
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/go_caller.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/go_source.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/go_source_run.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/go_storage.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/go_cache.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/go_telemetry.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/go_hooks.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/go_prepared.py' --fail-under=80
@@ -476,7 +481,7 @@ generation-go-source-otelc:
 generation-go-controls-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_go_controls.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --audit-dir "$(AUDIT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" --startup-state "$(GO_CONTROL_STARTUP)" $(GENERATION_ARGS)
+	$(PYTHON) tests/qualify_go_controls.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --audit-dir "$(AUDIT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" --min-free-bytes "$(GO_CONTROL_MIN_FREE_BYTES)" --cache-max-bytes "$(GO_CONTROL_CACHE_MAX_BYTES)" --startup-state "$(GO_CONTROL_STARTUP)" $(GENERATION_ARGS)
 
 generation-go-project-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"

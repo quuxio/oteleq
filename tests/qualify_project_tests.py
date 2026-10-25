@@ -8,6 +8,8 @@ import shutil
 import subprocess
 import sys
 
+import qualification_storage
+
 from precondition_fixture_oracle import LANGUAGES, SEQUENCES, source
 from project_fixture_oracle import STAGES, TEXT_VALUES, check_suite
 from qualify_preconditions import fixture
@@ -27,6 +29,7 @@ def command(arguments: list, folder: Path, name: str, expected: int = 0,
     """A started operation is never silently relaunched after partial evidence."""
     marker = folder / (name + ".started.json")
     assert not marker.exists(), "inspect an incomplete operation before any recovery: " + name
+    qualification_storage.check(folder, name)
     write(marker, {"argv": list(map(str, arguments)), "expected_exit": expected})
     result = subprocess.run(list(map(str, arguments)), capture_output=True, check=False,
                             env=None if environment is None else {**os.environ, **environment})
