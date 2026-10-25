@@ -62,9 +62,8 @@ def call_trees(spans: dict, steps: list[dict]) -> list[list]:
     return groups
 
 
-def witness(completed, session: native_live.Session, bodies: list, service: str,
-            roots: tuple[str, ...], folder: Path):
-    """Every prefix, off window, retained measurement and final SDK unit must agree."""
+def inputs(completed, session: native_live.Session, bodies: list, service: str) -> dict:
+    """Verify the owned session and complete bounded transport before decoding."""
     require(type(session) is native_live.Session and completed.started is session.started,
             'native live receipt has no matching owned session')
     completed.verify(); session.verify()
@@ -78,13 +77,58 @@ def witness(completed, session: native_live.Session, bodies: list, service: str,
                     and type(row[1]) is bytes and bool(row[1]) for row in bodies)
             and sum(len(raw) for _, raw in bodies) <= telemetry.MAX_BYTES,
             'native live service or telemetry capture budget differs')
+    return policy
+
+
+def export_progress(snapshots: list[dict], final: dict) -> None:
+    """Exporter counters must retain every earlier checkpoint's completed work."""
+    for previous, current in zip(snapshots, snapshots[1:] + [final], strict=True):
+        for section in ('trace_exports', 'metric_exports'):
+            for key in ('batches_started', 'batches_succeeded', 'units_started', 'units_succeeded'):
+                require(int(current[section][key]) >= int(previous[section][key]),
+                        'native exporter counters moved backwards')
+
+
+def disabled_window(before: dict, after: dict, indices: list[int]) -> None:
+    """A suppressed export interval has no metric bodies or exporter progress."""
+    require(not indices and after['held_ns'] >= native_live.INTERVAL_MS * 1_000_000
+            and before['health']['metric_exports'] == after['settled']['metric_exports'],
+            'native disabled window emitted metrics, changed exports or was too short')
+
+
+def after_checkpoint(before: dict, after: dict, requested: dict, pid: int,
+                     bodies: list, health, total: int) -> None:
+    """Validate the settled call and its literal receiver window before counting it."""
+    for name in ('status', 'flush', 'settled_flush'):
+        checked_status(after[name], pid, requested)
+    health(after['health'], requested, total)
+    health(after['settled'], requested, total)
+    require(type(after['held_ns']) is int and after['held_ns'] >= 0,
+            'native off-state duration is invalid')
+    require(type(after['cursor']) is int and before['cursor'] <= after['cursor'] <= len(bodies),
+            'native after cursor differs')
+    indices = [i for i in range(before['cursor'], after['cursor']) if bodies[i][0] == '/v1/metrics']
+    require(same(after['metric_bodies'], indices), 'native metric window evidence differs')
+    if not all(requested.values()):
+        disabled_window(before, after, indices)
+
+
+def complete_sampling(policy: dict) -> None:
+    """Full receipt requires an exact numeric sampling ratio of one."""
+    ratio = policy['traces']['sample_ratio']
+    require(policy['traces']['enabled'] is True and type(ratio) in (int, float)
+            and (same(ratio, 1) or same(ratio, 1.)), 'native live traces require complete sampling')
+
+
+def witness(completed, session: native_live.Session, bodies: list, service: str,
+            roots: tuple[str, ...], folder: Path):
+    """Every prefix, off window, retained measurement and final SDK unit must agree."""
+    policy = inputs(completed, session, bodies, service)
     if completed.started.launch.intent.plain:
         require(not bodies and completed.health is None and session.client is None,
                 'plain native schedule emitted SDK evidence')
         return None
-    require(policy['traces']['enabled'] is True
-            and type(policy['traces']['sample_ratio']) in (int, float)
-            and policy['traces']['sample_ratio'] == 1., 'native live traces require complete sampling')
+    complete_sampling(policy)
     language = completed.started.launch.intent.context().language
     graph, _ = telemetry.function_graph(telemetry.trace_values(bodies, language, service), roots)
     from otelc_capture import strict_json
@@ -131,22 +175,9 @@ def witness(completed, session: native_live.Session, bodies: list, service: str,
             calls.update(span.name for span in group)
             errors.update(span.name for span in group if span.status.code == 2)
         total += len(group)
-        for name in ('status', 'flush', 'settled_flush'):
-            checked_status(after[name], session.record['pid'], requested)
-        health(after['health'], requested, total)
-        health(after['settled'], requested, total)
-        require(type(after['held_ns']) is int and after['held_ns'] >= 0,
-                'native off-state duration is invalid')
-        require(type(after['cursor']) is int and before['cursor'] <= after['cursor'] <= len(bodies),
-                'native after cursor differs')
-        indices = [i for i in range(before['cursor'], after['cursor']) if bodies[i][0] == '/v1/metrics']
-        require(same(after['metric_bodies'], indices), 'native metric window evidence differs')
+        after_checkpoint(before, after, requested, session.record['pid'], bodies, health, total)
         if all(requested.values()):
             visible_calls, visible_errors = calls.copy(), errors.copy()
-        else:
-            require(not indices and after['held_ns'] >= native_live.INTERVAL_MS * 1_000_000
-                    and before['health']['metric_exports'] == after['settled']['metric_exports'],
-                    'native disabled window emitted metrics, changed exports or was too short')
         prefix(after['cursor'])
         flags = requested
     restored = fields(session.record['restored'], {'history', 'flush', 'health', 'cursor'}, 'native restored state')
@@ -160,11 +191,7 @@ def witness(completed, session: native_live.Session, bodies: list, service: str,
     require(statuses == session.statuses <= native_live.MAX_STATUSES, 'native response denominator differs')
     final = completed.health.value()
     checked_status(final['controls'], session.record['pid'], flags_on)
-    for previous, current in zip(snapshots, snapshots[1:] + [final], strict=True):
-        for section in ('trace_exports', 'metric_exports'):
-            for key in ('batches_started', 'batches_succeeded', 'units_started', 'units_succeeded'):
-                require(int(current[section][key]) >= int(previous[section][key]),
-                        'native exporter counters moved backwards')
+    export_progress(snapshots, final)
     points = telemetry.metrics(bodies, language, service, dict(calls), errors,
                                 policy['metrics']['histogram_boundaries_seconds'], True)
     names = dict(Counter(span.name for span in graph.values()))

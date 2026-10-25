@@ -93,10 +93,15 @@ def configure(entry: dict, value: list[dict], coerce: Callable) -> None:
     if (entry["language"] == "typescript" and any(step["action"] == "collect" for step in value)
             and entry.get("typescript_backend") not in ("source", "native")):
         raise ValueError("TypeScript collection requires an explicitly selected emitter")
+    configure_arguments(entry, value, coerce)
+    entry["sequence_configuration"] = copy.deepcopy(value)
+
+
+def configure_arguments(entry: dict, value: list[dict], coerce: Callable) -> None:
+    """Check explicit call arguments before retaining a receiver schedule."""
     for step in value:
         if step["action"] == "call" and step["arguments"] != "case":
             require_arguments(entry, step["arguments"], coerce(entry, step["arguments"]))
-    entry["sequence_configuration"] = copy.deepcopy(value)
 
 
 def configure_controls(entry: dict, value: list[dict]) -> None:

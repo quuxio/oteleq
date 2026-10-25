@@ -98,6 +98,19 @@ class Signals:
 
 
 class NativeControlReceiptTests(unittest.TestCase):
+    def test_complete_sampling_keeps_exact_numeric_one_and_refuses_nearby_or_boolean_values(self):
+        for ratio in (1, 1.):
+            receipt.complete_sampling({'traces': {'enabled': True, 'sample_ratio': ratio}})
+        for ratio in (True, False, 0, 1 << 4096, .9999999999999999, 1.0000000000000002, '1', None,
+                      float('nan'), float('inf')):
+            policy = {'traces': {'enabled': True, 'sample_ratio': ratio}}
+            with self.subTest(ratio=ratio), self.assertRaises(ValueError):
+                receipt.complete_sampling(policy)
+        for enabled in (False, 1):
+            policy = {'traces': {'enabled': enabled, 'sample_ratio': 1.}}
+            with self.subTest(enabled=enabled), self.assertRaises(ValueError):
+                receipt.complete_sampling(policy)
+
     def capture(self, base, *, error_steps=(2,), plain=False):
         value = Fixture(Path(base).resolve(), error_steps=error_steps, plain=plain)
         self.addCleanup(value.close)

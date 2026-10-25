@@ -50,8 +50,10 @@ class NativeControlTests(unittest.TestCase):
                            ('emission', 0), ('effective_emission_off', 0), ('extra', 1)):
             changed = status(); changed[key] = value
             with self.subTest(key=key, value=value), self.assertRaises(ValueError): control.status(changed, 23)
-        with self.assertRaises(ValueError): control.status(status(effective=True), 23)
-        with self.assertRaises(ValueError): control.status(status(), True)
+        inconsistent = status(effective=True)
+        with self.assertRaises(ValueError): control.status(inconsistent, 23)
+        valid = status()
+        with self.assertRaises(ValueError): control.status(valid, True)
 
     def test_running_health_keeps_queues_unknown_and_rejects_bad_identity_losses_and_active_work(self):
         options = {'pid': 23, 'language': 'cpp', 'policy': 'a' * 64, 'selection': 'b' * 64}
@@ -76,7 +78,8 @@ class NativeControlTests(unittest.TestCase):
             with self.subTest(path=path), self.assertRaises(ValueError): control.running_health(changed, **options)
         for key, value in (('language', 'rust'), ('pid', True), ('policy', 'A' * 64), ('selection', 'bad')):
             changed = {**options, key: value}
-            with self.subTest(key=key), self.assertRaises(ValueError): control.running_health(running(), **changed)
+            checkpoint = running()
+            with self.subTest(key=key), self.assertRaises(ValueError): control.running_health(checkpoint, **changed)
 
     def test_running_exports_can_be_in_flight_without_inventing_success(self):
         value = running()
@@ -124,13 +127,17 @@ class NativeControlTests(unittest.TestCase):
 
     def test_wrong_setters_drifting_flags_and_unsettled_barriers_refuse(self):
         client = control.Client(Path('/private/runtime/control.json'), 23, ())
+        requested = {'collection': False, 'emission': True}
         for replies in ([status(), status(False, False)],
                         [status(False, True, False), status(True, True)]):
+            deadline = time.monotonic() + 5
             with self.subTest(replies=replies), patch.object(control.Client, 'request', side_effect=replies), \
                     patch.object(control.time, 'sleep'), self.assertRaises(ValueError):
-                client.switch({'collection': False, 'emission': True}, time.monotonic() + 5)
-        with patch.object(control.Client, 'request', return_value=status(False, True, False)), self.assertRaises(ValueError):
-            client.switch({'collection': False, 'emission': True}, time.monotonic() - 1)
+                client.switch(requested, deadline)
+        unsettled = status(False, True, False)
+        expired = time.monotonic() - 1
+        with patch.object(control.Client, 'request', return_value=unsettled), self.assertRaises(ValueError):
+            client.switch(requested, expired)
         for value in ({}, {'collection': 1, 'emission': True}, None):
             with self.subTest(value=value), self.assertRaises(ValueError): client.switch(value, 5)
 

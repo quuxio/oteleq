@@ -112,10 +112,12 @@ class NativeSequenceTests(unittest.TestCase):
         original = json.loads(payload([frame()]))
         for key, new in (('schema_version', True), ('kind', 'other'), ('frames', []), ('hidden', 1)):
             changed = copy.deepcopy(original); changed[key] = new
-            with self.subTest(key=key), self.assertRaises(ValueError): sequence.decode(json.dumps(changed).encode(), value)
+            raw = json.dumps(changed).encode()
+            with self.subTest(key=key), self.assertRaises(ValueError): sequence.decode(raw, value)
         for key, new in (('id', 'step-1'), ('raw_hex', 'aa BB'), ('raw_hex', ''), ('raw_hex', 'ABC'), ('hidden', 1)):
             changed = copy.deepcopy(original); changed['frames'][0][key] = new
-            with self.subTest(key=key, new=new), self.assertRaises(ValueError): sequence.decode(json.dumps(changed).encode(), value)
+            raw = json.dumps(changed).encode()
+            with self.subTest(key=key, new=new), self.assertRaises(ValueError): sequence.decode(raw, value)
         with self.assertRaises(ValueError): sequence.decode(b'', value)
 
     def test_host_container_preserves_original_files_and_enforces_case_budget(self):

@@ -1331,11 +1331,7 @@ def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, ht
 def execution_options(entry, case, lane, folder, runtime, bodies, env, *, service=None, python_session=None, go_session=None, native_session=None):
     """Add only explicitly requested process recording and live host checkpoints."""
     if native_source.enabled(entry):
-        native_source.require(isinstance(native_session, native_owned.Session),
-                                               'missing native owned session')
-        if sequences.controls(entry):
-            env.update(native_session.environment())
-        return {'record_process': True, 'interaction': native_session}
+        return native_execution_options(entry, native_session, env)
     if go_source.enabled(entry):
         expected = go_source_run.go_live.Session if sequences.controls(entry) else go_source_run.go_launch.Session
         go_source.require(isinstance(go_session, expected), "missing native Go ready/release or live session")
@@ -1359,6 +1355,14 @@ def execution_options(entry, case, lane, folder, runtime, bodies, env, *, servic
         env.update(interaction.environment())
         options['interaction'] = interaction
     return options
+
+
+def native_execution_options(entry, session, env):
+    """Bind native process recording to its prepared owner and optional checkpoints."""
+    native_source.require(isinstance(session, native_owned.Session), 'missing native owned session')
+    if sequences.controls(entry):
+        env.update(session.environment())
+    return {'record_process': True, 'interaction': session}
 
 
 def attempt_build_options(runtime, context):
