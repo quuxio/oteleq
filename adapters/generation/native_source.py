@@ -180,8 +180,11 @@ def negotiate(workflow, root: Path, workspace: Path, language: str, tools: dict,
 def configuration(entry: dict, endpoint: str, service: str) -> dict:
     """Specify every common policy default without importing the producer."""
     native_protocol.require(enabled(entry), 'explicit native entry required')
-    native_protocol.require(not any(key in entry for key in ('receiver_fixture', 'sequence_configuration')),
-                            'prepared native receivers and action sequences require separate integration')
+    native_protocol.require('receiver_fixture' not in entry and 'cpp_receiver' not in entry,
+                            'prepared native receivers require separate integration')
+    if 'sequence_configuration' in entry:
+        import native_sequence
+        native_sequence.configuration(entry, entry['sequence_configuration'])
     result = {'schema_version': 3, 'languages': [entry['language']],
             'resource': {'service_name': service},
             'export': {'endpoint': endpoint, 'interval_ms': 1000, 'timeout_ms': 1000, 'shutdown_timeout_ms': 10000},
@@ -194,6 +197,8 @@ def configuration(entry: dict, endpoint: str, service: str) -> dict:
             'context': {'tasks': False, 'http': False},
             'benchmark': {'iterations': 10000, 'samples': 15, 'warmup': 5}}
     lifetimes.apply(entry, result)
+    if 'sequence_configuration' in entry:
+        result['metrics'].update(entry['sequence_configuration'][0]['metrics'])
     return result
 
 

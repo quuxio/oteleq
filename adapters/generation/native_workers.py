@@ -140,11 +140,41 @@ static int __oteleq_read(FILE* out,unsigned long long (*read)(unsigned char*),co
   fputc('\n',out);return 1;
 }
 '''
+    if 'sequence_configuration' in entry:
+        return controlled_driver(entry, support, declarations, state, invoke)
     return (support + declarations + 'int main(void){\n' +
             'const char* path=getenv("OTELEQ_OBSERVATION");if(!path)return 90;\n' +
             'FILE* out=fopen(path,"wb");if(!out)return 90;unsigned char buffer[8];\n' +
             '__oteleq_abi(out);fputs("before\\n",out);\n' + state + invoke +
             '\nfputs("after\\n",out);\n' + state + 'return fclose(out)!=0;}\n')
+
+
+def controlled_driver(entry: dict, support: str, declarations: str, state: str, invoke: str) -> str:
+    """Keep each call's original scalar frame private until its after checkpoint."""
+    import native_sequence
+
+    native_sequence.configuration(entry, entry['sequence_configuration'])
+    header = Path(__file__).with_name('native_rendezvous.h').read_text()
+    # Preserve errno across observer output, checkpoints and frame publication.
+    support = support.replace('read(buffer)!=size)return 0;',
+                              'read(buffer)!=size)return 0;int saved=errno;')
+    support = support.replace("fputc('\\n',out);return 1;", "fputc('\\n',out);errno=saved;return 1;")
+    invoke = invoke.replace('if(!__oteleq_error(out,error))return 91;',
+                            'int saved=errno;if(!__oteleq_error(out,error))return 91;errno=saved;')
+    buffer = 'unsigned char buffer[8];' if harness.scalar_type(entry['output']) == 'void' else ''
+    frame = ('static int __oteleq_frame(FILE* out){\n' + buffer + 'int initial=errno;\n' +
+             '__oteleq_abi(out);fputs("before\\n",out);\n' + state + '\nerrno=initial;\n' + invoke +
+             '\nint ended=errno;fputs("after\\n",out);\n' + state + '\nerrno=ended;return 0;}\n')
+    calls = []
+    for index in range(len(entry['sequence_configuration'])):
+        text = str(index)
+        calls.append('if(!__oteleq_native_checkpoint("before-' + text + '"))return 93;\n' +
+                     '{FILE* out=__oteleq_native_frame(' + text + ');if(!out)return 90;\n' +
+                     'int result=__oteleq_frame(out);int saved=errno;int closed=fclose(out);errno=saved;\n' +
+                     'if(result)return result;if(closed)return 90;}\n' +
+                     'if(!__oteleq_native_checkpoint("after-' + text + '"))return 93;\n')
+    return header + '\n' + support + declarations + frame + 'int main(void){\n' + ''.join(calls) + \
+        'return __oteleq_native_checkpoint("finish")?0:93;}\n'
 
 
 def checked_snapshot(project: Path, prepared: dict) -> None:

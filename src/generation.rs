@@ -13,6 +13,30 @@ const ADAPTER_BOOTSTRAP: &str = concat!(
 
 const RESOURCES: &[(&str, &str)] = &[
     (
+        "native_control.py",
+        include_str!("../adapters/generation/native_control.py"),
+    ),
+    (
+        "native_rendezvous.py",
+        include_str!("../adapters/generation/native_rendezvous.py"),
+    ),
+    (
+        "native_rendezvous.h",
+        include_str!("../adapters/generation/native_rendezvous.h"),
+    ),
+    (
+        "native_sequence.py",
+        include_str!("../adapters/generation/native_sequence.py"),
+    ),
+    (
+        "native_live.py",
+        include_str!("../adapters/generation/native_live.py"),
+    ),
+    (
+        "native_control_receipt.py",
+        include_str!("../adapters/generation/native_control_receipt.py"),
+    ),
+    (
         "python_journal.py",
         include_str!("../adapters/generation/python_journal.py"),
     ),

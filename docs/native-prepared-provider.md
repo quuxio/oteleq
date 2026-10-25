@@ -8,6 +8,8 @@ Status: bounded diagnostic qualification. Explicit C/C++ `backend = "prepared"` 
 
 The separate experimental [object/resource profiles](native-lifetime-generation.md) add explicit lifetime expectations and different build4/build5 contracts. Their workflow qualification is pending; the normal-call evidence below applies only to this function-only profile.
 
+Experimental [native live metric schedules](native-metric-controls.md) connect explicit free-function calls to private checkpoints, independent flags, original per-call scalar frames and a direct raw-telemetry reader. Their genuine SDK and retained-workflow qualification is pending; the fixed-state corpus does not qualify them.
+
 Use the matching built SDK and LLVM 22 installation. Select each native language present in the source tree explicitly:
 
 ```toml
@@ -92,7 +94,7 @@ In a drained native final report, `effective_emission_off` is true when collecti
 
 SDK exporter API batches and downstream HTTP requests are different observations. The official metric exporter can complete an empty API batch without an HTTP request. Independent receipt must compare the actual decoded metric points and spans to the corresponding unit counters, while retaining the separate API batch counters. A clean health report alone is not downstream receipt.
 
-`native_telemetry` supplies that independent reader for fixed startup states. It binds complete serial function roots and their recursive trees, exceptions, source-qualified names, native resource/scope labels and cumulative call/error/duration metrics. Final function/span/metric-point unit counters must match actual decoded receipt. The native SDK resource identifies the official C++ SDK even for C applications; this candidate binds version 1.30.0. Collection-off, emission-off and combined startup states require absent measurements while selected traces remain complete. Plain execution requires absent SDK telemetry. Live state changes and per-action attribution need separate integration and qualification.
+`native_telemetry` supplies that independent reader for fixed startup states. It binds complete serial function roots and their recursive trees, exceptions, source-qualified names, native resource/scope labels and cumulative call/error/duration metrics. Final function/span/metric-point unit counters must match actual decoded receipt. The native SDK resource identifies the official C++ SDK even for C applications; this candidate binds version 1.30.0. Collection-off, emission-off and combined startup states require absent measurements while selected traces remain complete. Plain execution requires absent SDK telemetry. Live schedules have the separate experimental integration above and need genuine qualification; per-action attribution remains open.
 
 The expected service name must match the frozen prepared policy before receipt is decoded. Duration histograms retain their complete cumulative state. Their sums must fit actual extrema and populated buckets, allowing bounded binary64 summation error. Later samples must retain earlier bucket counts and extrema; only newly added observations can change the sum. Python uses the same range arithmetic with its existing fixed boundaries.
 

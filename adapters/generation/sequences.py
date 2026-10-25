@@ -11,10 +11,12 @@ MAX_STEPS = 32
 
 
 def fixture(value: dict, expected_outcome: Callable) -> list[dict]:
-    """An action schedule always belongs to a declared independently built receiver."""
-    if "receiver" not in value:
-        raise ValueError("fixture.sequence requires a declared receiver")
-    return validate(value["sequence"], expected_outcome)
+    """Free-function schedules require explicit metric states on unchanged inputs."""
+    result = validate(value["sequence"], expected_outcome)
+    if "receiver" not in value and any(step['action'] != 'call' or step['arguments'] != 'case'
+                                        or 'metrics' not in step for step in result):
+        raise ValueError("fixture.sequence requires a declared receiver or controlled native case calls")
+    return result
 
 
 def validate(value: Any, expected_outcome: Callable) -> list[dict]:
@@ -73,6 +75,11 @@ def collection(step: dict) -> dict:
 def configure(entry: dict, value: list[dict], coerce: Callable) -> None:
     """Requested unavailable adapters remain named inventory blockers."""
     language = entry["language"]
+    if language in ('c', 'cpp') and entry.get('native_backend') == 'prepared':
+        import native_sequence
+        native_sequence.configuration(entry, value)
+        entry['sequence_configuration'] = copy.deepcopy(value)
+        return
     receiver = "cpp_receiver" if language == "cpp" else "receiver_fixture"
     if language not in ("python", "javascript", "typescript", "java", "cpp", "go") or receiver not in entry:
         raise ValueError("sequences require a declared Python/C++/Go/Java/JavaScript/TypeScript receiver fixture")
