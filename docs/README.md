@@ -9,6 +9,8 @@ Updated 23 October 2026, `quux-oteleq compare-workload` runs the Rust comparator
 | [Declared domains](domain-generation.md) | Generate and freeze case values from independent scalar domains |
 | [Numeric preconditions](numeric-preconditions.md) | Keep declared relationships between generated scalar arguments |
 | [Complete input inspection](input-inspection.md) | Resolve unreadable source/dependency refusals and inspect qualification evidence |
+| [Native lifetime provider components](native-lifetime-provider.md) | Inspect explicit object/resource build, process and health contracts |
+| [Native lifetime telemetry receipt](native-lifetime-receipt.md) | Bind prelaunch caller expectations to complete raw lifetime/function telemetry |
 | [Go build bundles](go-build-bundles.md) | Retain matched executables, compiler evidence and detached replay |
 | [Go live metric schedules](go-metric-controls.md) | Declare same-process metric states and inspect the pending qualification boundary |
 | [Java compiler bindings](java-build-bundles.md) | Inspect actual source origins, JDK/compiler identities and retained class products |

@@ -180,6 +180,16 @@ class QualificationRecipeTests(unittest.TestCase):
         self.assertNotIn('cargo build', result.stdout)
         self.assertNotIn('native-provider.coverage', result.stdout)
 
+    def test_native_lifetime_receipt_recipe_has_four_independent_component_floors(self):
+        result = subprocess.run(['make', '--no-print-directory', '-n', 'native-lifetime-receipt-check',
+            'PYTHON=/selected/python'], cwd=ROOT, capture_output=True, text=True, check=True)
+        for module in ('native_lifetime_intent', 'native_lifetime_metrics', 'native_lifetime_receipt', 'native_telemetry'):
+            self.assertIn("--include='*/" + module + ".py' --fail-under=80", result.stdout)
+        self.assertIn('test_generation_native_lifetime_receipt', result.stdout)
+        self.assertIn('test_generation_native_telemetry', result.stdout)
+        self.assertNotIn('cargo build', result.stdout)
+        self.assertNotIn('.native-lifetime.coverage', result.stdout)
+
     def test_help_names_the_http_qualification_target(self):
         result = subprocess.run(["make", "help"], cwd=ROOT, capture_output=True, text=True, check=True)
         self.assertIn("generation-http-otelc Qualify scripted HTTP", result.stdout)

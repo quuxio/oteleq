@@ -87,11 +87,11 @@ def causal_roots(spans: dict, nodes: dict, roots: tuple[str, ...]) -> None:
                     'native selected child lies outside its parent')
 
 
-def traces(bodies: list, language: str, service: str, roots: tuple[str, ...]) -> tuple[dict, Counter, int]:
+def function_graph(values: Iterator, roots: tuple[str, ...]) -> tuple[dict, Counter]:
     """Bind complete serial selected call trees, including recursive child calls."""
     spans, nodes, errors = {}, {}, Counter()
     selected = set(roots)
-    for span in trace_values(bodies, language, service):
+    for span in values:
         key = capture.span_identity(span)
         labels = {'function': span.name}
         if span.status.code == 2:
@@ -105,7 +105,27 @@ def traces(bodies: list, language: str, service: str, roots: tuple[str, ...]) ->
         spans[key] = span
         nodes[key] = (span.trace_id, span.parent_span_id) if span.parent_span_id else None
     causal_roots(spans, nodes, roots)
+    return spans, errors
+
+
+def traces(bodies: list, language: str, service: str, roots: tuple[str, ...]) -> tuple[dict, Counter, int]:
+    """Retain the function-only complete trace and public return contract."""
+    spans, errors = function_graph(trace_values(bodies, language, service), roots)
     return dict(Counter(span.name for span in spans.values())), errors, len(spans)
+
+
+def histogram_sample(value, bounds: list) -> tuple:
+    """Keep every histogram field when sharing arithmetic between instruments."""
+    require(list(value.explicit_bounds) == bounds and len(value.bucket_counts) == len(bounds) + 1
+            and sum(value.bucket_counts) == value.count and value.HasField('sum')
+            and math.isfinite(value.sum) and value.sum >= 0 and not value.exemplars,
+            'invalid native duration histogram')
+    if value.count:
+        require(value.HasField('min') and value.HasField('max')
+                and math.isfinite(value.min) and math.isfinite(value.max)
+                and 0 <= value.min <= value.max, 'missing native histogram extrema')
+    histogram_observation.histogram_range(value, bounds)
+    return value.count, tuple(value.bucket_counts), value.sum, (value.min, value.max)
 
 
 def point(metric, value, names: set[str], bounds: list) -> tuple:
@@ -119,17 +139,7 @@ def point(metric, value, names: set[str], bounds: list) -> tuple:
             and 0 < value.start_time_unix_nano <= value.time_unix_nano,
             'invalid native metric labels or timestamps')
     if metric.name == DURATION:
-        require(list(value.explicit_bounds) == bounds and len(value.bucket_counts) == len(bounds) + 1
-                and sum(value.bucket_counts) == value.count and value.HasField('sum')
-                and math.isfinite(value.sum) and value.sum >= 0 and not value.exemplars,
-                'invalid native duration histogram')
-        if value.count:
-            require(value.HasField('min') and value.HasField('max')
-                    and math.isfinite(value.min) and math.isfinite(value.max)
-                    and 0 <= value.min <= value.max, 'missing native histogram extrema')
-        histogram_observation.histogram_range(value, bounds)
-        number = value.count
-        buckets, total, limits = tuple(value.bucket_counts), value.sum, (value.min, value.max)
+        number, buckets, total, limits = histogram_sample(value, bounds)
     else:
         require(metric.sum.is_monotonic and value.WhichOneof('value') == 'as_int'
                 and value.as_int >= 0 and not value.exemplars, 'invalid native cumulative counter')
@@ -155,7 +165,7 @@ def metric_values(bodies: list, language: str, service: str) -> Iterator:
                 yield from instrumentation.metrics
 
 
-def cumulative_totals(series: dict, bounds: list) -> dict:
+def cumulative_totals(series: dict, bounds: list, *, histogram: str = DURATION) -> dict:
     """Order exports without dropping any accepted histogram observation field."""
     totals = {}
     for key, samples in series.items():
@@ -163,7 +173,7 @@ def cumulative_totals(series: dict, bounds: list) -> dict:
         require(len({row[0] for row in samples}) == 1 and len({row[1] for row in samples}) == len(samples)
                 and all(first[2] <= second[2] for first, second in zip(samples, samples[1:])),
                 'reset, duplicate or decreasing native cumulative samples')
-        if key[0] == DURATION:
+        if key[0] == histogram:
             for previous, sample in zip(samples, samples[1:]):
                 histogram_observation.cumulative_histogram(previous, sample, bounds)
         totals[key] = samples[-1][2]
@@ -172,10 +182,15 @@ def cumulative_totals(series: dict, bounds: list) -> dict:
 
 def metrics(bodies: list, language: str, service: str, names: dict, errors: Counter,
             bounds: list, enabled: bool) -> int:
+    """Decode all resources/scopes before joining the selected function series."""
+    return function_metrics(metric_values(bodies, language, service), names, errors, bounds, enabled)
+
+
+def function_metrics(values: Iterator, names: dict, errors: Counter, bounds: list, enabled: bool) -> int:
     """Retain all cumulative samples and join their final totals to actual spans."""
     series, points = {}, 0
     kinds = {CALLS: ('sum', '{call}'), ERRORS: ('sum', '{error}'), DURATION: ('histogram', 's')}
-    for metric in metric_values(bodies, language, service):
+    for metric in values:
         require(metric.name in kinds, 'unexpected native metric instrument')
         kind, unit = kinds[metric.name]
         data = getattr(metric, kind)
