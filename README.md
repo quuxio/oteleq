@@ -37,6 +37,8 @@ Fixed diagnostic corpora also qualify [Python and Java executor context](docs/ei
 
 The [original-source Rust compiler corpus](docs/rust-build-bundles.md) qualifies four generated scalar cases through generated/exported suites and fixed completion/cancellation/unwind and aliased-module diagnostics: 108 candidate-provider launches, 24 legacy compatibility launches and 14 altered build-record refusals. General Cargo, generated async and receiver support remain open.
 
+The [native prepared-provider components](docs/native-prepared-provider.md) independently check C/C++ build and launch records, actual pre-exec OS ownership and final SDK health. Generator selection and downstream/generated workflow qualification remain open.
+
 The result is **equivalence over these tests and observations**. It is not a blanket proof that every function is identical.
 
 Declared [numeric argument preconditions](docs/numeric-preconditions.md), such as `start < end`, constrain automatic domain generation and scalar reduction. They remain frozen through generated suites and replay/export, and apply to every supported ordered method call. Their [912-launch qualification](docs/qualification/numeric-preconditions-2026-10-22.json) covers all eight scalar profiles, Java/Node ordered calls, all four retained routes, replay, reduction and 24 prelaunch refusals.

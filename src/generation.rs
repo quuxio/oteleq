@@ -177,6 +177,42 @@ const RESOURCES: &[(&str, &str)] = &[
         include_str!("../adapters/generation/native_profile.py"),
     ),
     (
+        "native_protocol.py",
+        include_str!("../adapters/generation/native_protocol.py"),
+    ),
+    (
+        "native_inputs.py",
+        include_str!("../adapters/generation/native_inputs.py"),
+    ),
+    (
+        "native_toolchain.py",
+        include_str!("../adapters/generation/native_toolchain.py"),
+    ),
+    (
+        "native_sdk.py",
+        include_str!("../adapters/generation/native_sdk.py"),
+    ),
+    (
+        "native_build.py",
+        include_str!("../adapters/generation/native_build.py"),
+    ),
+    (
+        "native_prepared.py",
+        include_str!("../adapters/generation/native_prepared.py"),
+    ),
+    (
+        "native_health.py",
+        include_str!("../adapters/generation/native_health.py"),
+    ),
+    (
+        "native_execution.py",
+        include_str!("../adapters/generation/native_execution.py"),
+    ),
+    (
+        "native_session.py",
+        include_str!("../adapters/generation/native_session.py"),
+    ),
+    (
         "native_project.py",
         include_str!("../adapters/generation/native_project.py"),
     ),

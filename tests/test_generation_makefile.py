@@ -11,6 +11,18 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class QualificationRecipeTests(unittest.TestCase):
+    def test_native_provider_components_have_a_focused_compiler_free_recipe(self):
+        result = subprocess.run(['make', '--no-print-directory', '-n', 'native-provider-check',
+            'PYTHON=/selected/python'], cwd=ROOT, capture_output=True, text=True, check=True)
+        self.assertIn('/selected/python -m coverage run', result.stdout)
+        for name in ('test_generation_native_prepared_inputs', 'test_generation_native_prepared_build',
+                     'test_generation_native_prepared', 'test_generation_native_execution', 'test_generation_native_session'):
+            self.assertIn(name, result.stdout)
+        self.assertIn('--data-file=.native-provider.coverage', result.stdout)
+        self.assertIn('--fail-under=80', result.stdout)
+        self.assertNotIn('cargo build', result.stdout)
+        self.assertNotIn('--otelc-root', result.stdout)
+
     def test_all_qualification_recipes_honour_default_relative_and_spaced_target_directories(self):
         targets = {}
         target = None
@@ -137,6 +149,7 @@ class QualificationRecipeTests(unittest.TestCase):
     def test_help_names_the_http_qualification_target(self):
         result = subprocess.run(["make", "help"], cwd=ROOT, capture_output=True, text=True, check=True)
         self.assertIn("generation-http-otelc Qualify scripted HTTP", result.stdout)
+        self.assertIn('native-provider-check Check native prepared readers and ownership', result.stdout)
         self.assertIn("generation-java-handles-otelc Qualify generated private-handle", result.stdout)
         self.assertIn("generation-project-tests-otelc Qualify current-source suites", result.stdout)
         self.assertIn("generation-preconditions-otelc Qualify numeric relations", result.stdout)
