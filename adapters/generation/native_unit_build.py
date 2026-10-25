@@ -139,6 +139,7 @@ class Intent:
     gate_source: inputs.File
     gate_compiler: inputs.File
     objcopy: inputs.File | None
+    aliases: tuple[inputs.File, ...]
 
     def recipe(self) -> dict:
         """Decode a new value; caller mutation cannot replace frozen intent."""
@@ -155,12 +156,26 @@ class Intent:
             held.verify()
         if self.objcopy is not None:
             self.objcopy.verify()
+        for held in self.aliases:
+            held.verify()
         require(recipe_paths(self.recipe(), self.project) <= {item.path for item in self.dependencies},
                 'native unit recipe contains an unfrozen input')
 
 
+def alias_inputs(names: tuple[Path, ...], dependencies: tuple[inputs.File, ...]) -> tuple[inputs.File, ...]:
+    """Only caller-discovered aliases of already frozen canonical inputs are usable."""
+    require(type(names) is tuple and len(names) <= 10000 and len(set(names)) == len(names),
+            'invalid native compiler alias denominator')
+    canonical = {item.path: item for item in dependencies}
+    aliases = tuple(inputs.capture(path, allow_links=True) for path in names)
+    require(all(item.resolved in canonical and item.sha256 == canonical[item.resolved].sha256
+                and item.facts == canonical[item.resolved].facts for item in aliases),
+            'native compiler alias does not bind an original caller input')
+    return aliases
+
+
 def freeze(sdk: SDK, project: Path, output: Path, language: str, recipe: dict,
-           dependencies: tuple[tuple[Path, ...], ...], policy: dict) -> Intent:
+           dependencies: tuple[tuple[Path, ...], ...], policy: dict, *, aliases: tuple[Path, ...] = ()) -> Intent:
     """Producer metadata may confirm a closed caller intent; it cannot select inputs."""
     require(language in ('c', 'cpp') and canonical(str(project), directory=True) == project and project != Path('/'),
             'invalid native unit application root')
@@ -180,10 +195,12 @@ def freeze(sdk: SDK, project: Path, output: Path, language: str, recipe: dict,
             and type(policy.get('lifetimes')) is dict and policy['lifetimes'].get('enabled') is False
             and same(policy.get('context'), {'tasks': False, 'http': False}), 'unsupported native unit policy')
     renamed = any(unit['rename_main'] for unit in recipe['units'])
+    held = tuple(inputs.capture(path) for path in sorted(paths))
     result = Intent(sdk, project, output, language, encoded(recipe), dependencies,
-        tuple(inputs.capture(path) for path in sorted(paths)), encoded(policy),
+        held, encoded(policy),
         inputs.capture(sdk.root / 'native/llvm/OtelcPass.cpp'), inputs.capture(sdk.root / 'adapters/native/gate/ExecGate.c'),
-        inputs.capture(sdk.toolchain.clang.resolved), inputs.capture(sdk.toolchain.directory / 'llvm-objcopy') if renamed else None)
+        inputs.capture(sdk.toolchain.clang.resolved), inputs.capture(sdk.toolchain.directory / 'llvm-objcopy') if renamed else None,
+        alias_inputs(aliases, held))
     result.verify()
     return result
 
@@ -261,6 +278,7 @@ def compiler_inputs(intent: Intent, held: dict[str, inputs.File]) -> tuple[list[
     """Compiler channels only confirm each independently discovered input set."""
     expected = {str(item.path): item for item in intent.dependencies}
     discovered = {unit['id']: set(group) for unit, group in zip(intent.recipe()['units'], intent.unit_dependencies)}
+    aliases = {item.path: item.resolved for item in intent.aliases}
     found, groups = {}, {}
     for row in commands(intent):
         if 'dependencies' not in row:
@@ -269,6 +287,7 @@ def compiler_inputs(intent: Intent, held: dict[str, inputs.File]) -> tuple[list[
         target, separator, words = raw.partition(':')
         require(target == 'otelc-inputs' and separator == ':', 'invalid native unit dependency target')
         paths = [Path(os.path.abspath(Path(row['directory']) / name.replace('$$', '$'))) for name in shlex.split(words)]
+        paths = [aliases.get(path, path) for path in paths]
         require(len(paths) == len(set(paths)) and set(paths) == discovered[row['unit']],
                 'native per-unit compiler inputs differ from caller discovery')
         groups[row['label']] = [expected[str(path)].identity() for path in paths]

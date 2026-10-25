@@ -48,7 +48,7 @@ def commands(recipe: dict, output: Path, sdk) -> list[dict]:
     return result
 
 
-def build(root: Path, *, tooling: bool = True):
+def build(root: Path, *, tooling: bool = True, alias: bool = False):
     """Reuse fixed SDK/plugin/gate fixtures; no fixture product is executable."""
     old = fixed.build(root, count=2)
     project, output, sdk = old.project, old.output, old.sdk
@@ -77,7 +77,11 @@ def build(root: Path, *, tooling: bool = True):
               'assets': [str(driver), str(augmented), str(overlay)] if tooling else [],
               'link': {'language': 'cpp', 'directory': str(project), 'flags': ['-pthread', '-lm']}}
     staged = root / 'staged-build'; output.rename(staged)
-    intent = native_unit_build.freeze(sdk, project, output, 'cpp', recipe, tuple(groups), fixed.POLICY)
+    logical = root / 'state-alias.h'
+    if alias:
+        logical.symlink_to(header)
+    intent = native_unit_build.freeze(sdk, project, output, 'cpp', recipe, tuple(groups), fixed.POLICY,
+                                     aliases=(logical,) if alias else ())
     staged.rename(output)
     for path in output.glob('*'):
         if path.name.startswith(('plain-', 'instrumented-')):
@@ -89,7 +93,8 @@ def build(root: Path, *, tooling: bool = True):
             (output / (row['label'] + '.' + channel)).write_bytes(b'')
         if 'dependencies' in row:
             index = next(index for index, unit in enumerate(units) if unit['id'] == row['unit'])
-            Path(row['dependencies']).write_text('otelc-inputs: ' + shlex.join(map(str, groups[index])) + '\n')
+            names = [logical if alias and path == header else path for path in groups[index]]
+            Path(row['dependencies']).write_text('otelc-inputs: ' + shlex.join(map(str, names)) + '\n')
     dependencies = {lane + '-' + unit['id']: [fixed.identity(path) for path in group]
                     for lane in ('plain', 'instrumented') for unit, group in zip(units, groups)}
     paths = {path for group in groups for path in group}

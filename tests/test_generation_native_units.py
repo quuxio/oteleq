@@ -18,6 +18,25 @@ import native_provider_fixture as fixed
 
 
 class NativeUnitBuildTests(unittest.TestCase):
+    def test_only_caller_frozen_header_aliases_can_confirm_canonical_inputs(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            intent = fixture.build(Path(temporary).resolve(), alias=True)
+            built = units.read(intent); built.verify()
+            self.assertEqual(len(intent.aliases), 1)
+            undeclared = replace(intent, aliases=())
+            with self.assertRaises(ValueError): units.read(undeclared)
+            path = intent.aliases[0].path
+            path.unlink(); path.symlink_to(intent.project / 'unit1.c')
+            with self.assertRaises(ValueError): built.verify()
+
+    def test_foreign_duplicate_or_non_tuple_caller_aliases_refuse(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            intent = fixture.build(Path(temporary).resolve())
+            foreign = Path(temporary).resolve() / 'foreign'; foreign.write_text('unrelated')
+            for names in ((foreign,), (foreign, foreign), [foreign]):
+                with self.subTest(names=names), self.assertRaises(ValueError):
+                    units.alias_inputs(names, intent.dependencies)
+
     def test_version_negotiation_keeps_build2_separate(self):
         value = {**native_protocol.PROTOCOLS, 'build': 3, 'unit_recipe': 1}
         self.assertEqual(native_protocol.verify_protocols(value, build_version=3), value)
