@@ -257,9 +257,12 @@ class NativeLifetimeWorkflowTests(TestCase):
 
     def test_caller_arguments_cannot_disagree_with_the_checked_input(self):
         audit, folder, entry, witness = self.audit_fixture()
-        qualifier.write(folder / 'native-caller/caller.json', {'entry': entry, 'arguments': [4]})
-        with self.assertRaises(AssertionError):
-            audit.attempt(self.root / 'report.json', folder, entry, 'baseline', witness, (5,))
+        for actual, expected in (([4], (5,)), ([False], (0,)), ([True], (1,)), ([0.0], (0,))):
+            qualifier.write(folder / 'native-caller/caller.json', {'entry': entry, 'arguments': actual})
+            with self.subTest(actual=actual), self.assertRaises(AssertionError):
+                audit.attempt(self.root / 'report.json', folder, entry, 'baseline', witness, expected)
+        qualifier.write(folder / 'native-caller/caller.json', {'entry': entry, 'arguments': [0]})
+        audit.attempt(self.root / 'report.json', folder, entry, 'baseline', witness, (0,))
 
     def test_dirty_pinned_sdk_refuses_before_initial_snapshot_or_build(self):
         provider = self.root / 'provider'; provider.mkdir()

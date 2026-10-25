@@ -105,7 +105,7 @@ class Audit:
         self.files = {}
 
     def attempt(self, report: Path, folder: Path, entry: dict, lane: str, witness,
-                arguments: tuple[int, ...]) -> None:
+                expected_arguments: tuple[int, ...]) -> None:
         original = self.registry.original(report)
         actual = original.parent / folder.relative_to(report.parent)
         runtime = actual / 'native-runtime'
@@ -118,7 +118,7 @@ class Audit:
         held = {'pid': application['pid'], 'folder': str(actual), 'plain': request['plain']}
         assert self.records.setdefault(request['launch_id'], held) == held
         caller = retained.read(actual / 'native-caller/caller.json')
-        assert caller['entry'] == entry and caller['arguments'] == list(arguments)
+        assert caller['entry'] == entry and arguments(caller['arguments']) == expected_arguments
         if lane == 'baseline':
             assert witness is None and not (runtime / 'app/health.json').exists()
             assert retained.read(actual / 'http-capture.json') == {'errors': [], 'bodies': []}
