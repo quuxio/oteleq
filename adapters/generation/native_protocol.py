@@ -34,10 +34,15 @@ def digest(value: Any) -> str:
 
 def verify_protocols(value: object, *, build_version: int = 2) -> dict:
     """Negotiate the complete current descriptor before any application launch."""
-    require(type(build_version) is int and build_version in (2, 3), 'unsupported native build version')
+    require(type(build_version) is int and build_version in (2, 3, 4, 5), 'unsupported native build version')
     expected = {**PROTOCOLS, 'build': build_version}
-    if build_version == 3:
+    if build_version in (3, 4, 5):
         expected['unit_recipe'] = 1
+    if build_version == 4:
+        expected.update(object_inventory=2, object_probe_abi='otelc.object.v1')
+    if build_version == 5:
+        expected.update(resource_inventory=1, resource_resolution=1,
+                        resource_probe_abi='otelc.resource.v1')
     require(type(value) is dict and same(value, expected), 'unsupported public native protocols')
     return value
 

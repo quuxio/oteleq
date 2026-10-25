@@ -169,8 +169,10 @@ cpp-observer-check:
 	$(PYTHON) ci/cpp_coverage.py
 
 native-provider-check:
-	PYTHONPATH="$(CURDIR)/tests$${PYTHONPATH:+:$${PYTHONPATH}}" $(PYTHON) -m coverage run --data-file=.native-provider.coverage --include='*/native_protocol.py,*/native_inputs.py,*/native_toolchain.py,*/native_sdk.py,*/native_build.py,*/native_unit_build.py,*/native_prepared.py,*/native_health.py,*/native_execution.py,*/native_session.py,*/native_telemetry.py,*/histogram_observation.py' -m unittest test_generation_native_prepared_inputs test_generation_native_prepared_build test_generation_native_units test_generation_native_prepared test_generation_native_execution test_generation_native_session test_generation_native_telemetry -v
+	PYTHONPATH="$(CURDIR)/tests$${PYTHONPATH:+:$${PYTHONPATH}}" $(PYTHON) -m coverage run --data-file=.native-provider.coverage --include='*/native_protocol.py,*/native_inputs.py,*/native_toolchain.py,*/native_sdk.py,*/native_build.py,*/native_unit_build.py,*/native_prepared.py,*/native_health.py,*/native_execution.py,*/native_session.py,*/native_telemetry.py,*/histogram_observation.py' -m unittest test_generation_native_prepared_inputs test_generation_native_prepared_build test_generation_native_units test_generation_native_lifetime_negotiation test_generation_native_prepared test_generation_native_execution test_generation_native_session test_generation_native_telemetry -v
 	$(PYTHON) -m coverage report --data-file=.native-provider.coverage --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.native-provider.coverage --include='*/native_protocol.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.native-provider.coverage --include='*/native_sdk.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.native-provider.coverage --include='*/native_unit_build.py' --fail-under=80
 	PYTHONPATH="$(CURDIR)/tests$${PYTHONPATH:+:$${PYTHONPATH}}" $(PYTHON) -m coverage run --append --data-file=.native-provider.coverage --include='*/native_source.py,*/native_source_run.py' -m unittest test_generation_native_source test_generation_native_source_run -v
 	$(PYTHON) -m coverage report --data-file=.native-provider.coverage --include='*/native_source.py' --fail-under=80

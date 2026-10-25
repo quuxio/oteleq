@@ -131,3 +131,5 @@ The full local gate passes on the executed revision. Its independent nine-file r
 ## Remaining integration
 
 Provider selection, compiler-bound callers, owned sessions and the native OTLP reader now have exact-revision generated, replayed, framework, detached, reduced and promoted normal-call evidence. Each new callable/build/observation profile needs its own execution, preservation and negative controls. Recursive/exception workflows, receivers, live collection/emission schedules, invocation attribution, automatic object lifetimes, task/HTTP context, broader build recipes and platform/shipping qualification remain open. The [project completion checklist](completion.md) remains the acceptance boundary.
+
+The separate [native lifetime integration](native-lifetime-provider.md) begins explicit build4/build5 protocol negotiation and SDK ABI source binding. Those components do not enable generated lifetime execution or broaden this build3 qualification.
