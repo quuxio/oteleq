@@ -735,6 +735,7 @@ def generator_identity():
         'node_live.py', 'node_control.py', 'node_control_receipt.py', 'node_checkpoint.mjs',
         'native_protocol.py', 'native_inputs.py', 'native_toolchain.py', 'native_sdk.py',
         'native_build.py', 'native_unit_build.py', 'native_lifetime_build.py', 'native_lifetime_inventory.py',
+        'native_lifetime_intent.py', 'native_lifetime_metrics.py', 'native_lifetime_receipt.py',
         'native_unit_caller.py', 'native_prepared.py', 'native_health.py', 'native_execution.py',
         'native_session.py', 'native_telemetry.py', 'native_source.py', 'native_source_run.py',
         'native_profile.py', 'native_project.py', 'native_dependencies.py', 'native_frontend.py',
