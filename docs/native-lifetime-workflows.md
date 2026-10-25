@@ -38,6 +38,8 @@ The workflow retains original evidence, SDK build logs/products and exact source
 
 The driver reads the public run envelope: top-level exit/source-preservation/blocker fields, the single ready inventory entry, and the case's nested comparator verdict. It binds the selected function and case identifier before checking observations. A later development run completed the corrected C comparison, then exposed the driver's earlier incorrect report-shape assumption. That failed driver run does not establish completion of the full corpus; its retained report supplies the regression shape.
 
+The complete unchanged C report and typed bundle from [run 40204568942](https://github.com/quuxio/oteleq/actions/runs/40204568942), consumer revision `aa19bd27414e0099424111804a5c073b5e406f7f`, are retained in `tests/fixtures/native-lifetime-workflow-c-report.json` and `tests/fixtures/native-lifetime-workflow-c-typed-bundle.json`. Their regression checks fixed byte hashes, the actual report envelope and all four captured observation repeats. Original filesystem/ownership auditing is mocked in that component regression; historical runner paths remain data and are not used as new input locations or product identities. The original downloaded archive has SHA-256 `b9b382f95fb9351be22af2700f4b010f4a2c046cab09af7f9e77846511cc11ba`.
+
 ```sh
 make native-lifetime-workflow-check PYTHON=/absolute/path/to/python
 ```

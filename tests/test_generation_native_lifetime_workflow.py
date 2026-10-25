@@ -138,6 +138,25 @@ class NativeLifetimeWorkflowTests(TestCase):
             with self.subTest(change=change), self.assertRaises(AssertionError):
                 qualifier.check_report(path, False, Mock())
 
+    def test_complete_captured_report_and_bundle_use_the_public_run_shape(self):
+        """Check unchanged archived observations; mock only original filesystem auditing."""
+        fixtures = Path(__file__).with_name('fixtures')
+        report = fixtures / 'native-lifetime-workflow-c-report.json'
+        bundle = fixtures / 'native-lifetime-workflow-c-typed-bundle.json'
+        self.assertEqual(qualifier.digest(report), '5aa4e704ace9dbe7d2934e2255bdb9bb2693b9c2ff87c2f23d0788d0e8fd845e')
+        self.assertEqual(qualifier.digest(bundle), 'b1e51d2727f25620a72e19c8ef91832658e31895828d3a0a7df10c1ecc1090a4')
+        document = json.loads(report.read_text())
+        location = self.root / 'captured/report.json'
+        records = {location: document,
+                   location.parent / document['cases'][0]['case'] / 'typed-bundle.json': json.loads(bundle.read_text())}
+        self.assertNotIn('verdict', document)
+        self.assertNotIn('entry', document['cases'][0])
+        audit = Mock()
+        with patch.object(qualifier.retained, 'read', side_effect=records.__getitem__):
+            self.assertEqual(qualifier.check_report(location, False, audit), 4)
+        self.assertEqual(audit.attempt.call_count, 4)
+        self.assertTrue(all(call.args[-1] == (5,) for call in audit.attempt.call_args_list))
+
     def test_full_route_driver_keeps_replay_detach_and_actual_shrink_report_set(self):
         calls = []
         def command(argv, folder, label, expected=0, **kwargs):
