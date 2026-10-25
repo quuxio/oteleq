@@ -3,8 +3,9 @@
 This corpus declares zero, one completed or one censored Item per synchronous
 scalar call, including normal destructor exit during outer unwinding and an
 exception leaving the destructor. The driver independently audits raw telemetry,
-closed final health, promotion and altered copies. Genuine whole-corpus,
-escaping-error, startup/live and broader qualification remain required.
+closed final health, promotion and altered copies. One std::runtime_error leaves
+the selected target and is caught by the generated caller. Genuine whole-corpus,
+broader errors, startup/live and wider qualification remain required.
 """
 
 import argparse
@@ -32,11 +33,11 @@ from otelc_capture import path_within
 CASES = (('c-completed', 'c', False), ('cpp-completed', 'cpp', False), ('c-state', 'c', True),
          ('c-zero', 'c', False), ('cpp-zero', 'cpp', False), ('c-censored', 'c', False),
          ('cpp-censored', 'cpp', False), ('cpp-unwind', 'cpp', False),
-         ('cpp-throwing-destructor', 'cpp', False))
+         ('cpp-throwing-destructor', 'cpp', False), ('cpp-target-error', 'cpp', False))
 CASE_MODES = {'c-completed': 'completed', 'cpp-completed': 'completed', 'c-state': 'completed',
               'c-zero': 'zero', 'cpp-zero': 'zero', 'c-censored': 'censored',
               'cpp-censored': 'censored', 'cpp-unwind': 'unwind',
-              'cpp-throwing-destructor': 'throwing-destructor'}
+              'cpp-throwing-destructor': 'throwing-destructor', 'cpp-target-error': 'target-error'}
 SDK_HEAD = 'acb13d7735526448209df37b7e6b98e5717befdb'
 PROFILES = {'c': 'native-resources-owned-v1', 'cpp': 'native-objects-owned-v1'}
 BASE_CALLS = (('selected', 42),)
@@ -97,6 +98,7 @@ def fixture(folder: Path, language: str, difference: bool, sdk: Path, *, mode: s
     acquire = ('{Item item(amount);keep_item(&item);state+=item.value;}' if language == 'cpp' else
                'struct Item *item=malloc(sizeof *item);if(!item)return -1;'
                'item->value=amount;keep_item(item);state+=item->value;free(item);')
+    mutation = 'if(getenv("OTELC_NATIVE_PLAN_FD"))state++;' if difference else ''
     if mode == 'zero':
         acquire = 'if(amount>0){' + acquire + '}'
     elif mode == 'censored':
@@ -106,8 +108,12 @@ def fixture(folder: Path, language: str, difference: bool, sdk: Path, *, mode: s
         acquire = 'try{Item item(amount);keep_item(&item);state+=item.value;throw amount;}catch(int){}'
     elif mode == 'throwing-destructor':
         acquire = 'try' + acquire + 'catch(int){}'
-    mutation = 'if(getenv("OTELC_NATIVE_PLAN_FD"))state++;' if difference else ''
+    elif mode == 'target-error':
+        acquire = ('{Item item(amount);keep_item(&item);state+=item.value;observed_errno=errno;' +
+                   mutation + 'throw std::runtime_error("failure-42");}')
+        mutation = ''
     (source / relative).write_text('#include <stdlib.h>\n#include <errno.h>\n#include "item.h"\n' +
+        ('#include <stdexcept>\n' if mode == 'target-error' else '') +
         'int state=7;int observed_errno=0;\nint selected(int amount){errno=ECHILD;' + acquire +
         'observed_errno=errno;' + mutation + 'return 42;}\n')
     compiler = os.environ.get('OTELC_CLANGXX' if language == 'cpp' else 'OTELC_CLANG')
@@ -245,7 +251,7 @@ def arguments(value: object) -> tuple[int, ...]:
 def check_report(path: Path, difference: bool, audit: Audit, *, expected: tuple[int, ...] = (5,),
                  function: str = 'selected', contracts: tuple[tuple[str, int], ...] = BASE_CALLS,
                  mode: str = 'completed') -> int:
-    """Equal-but-wrong returns, state, errno, missing repeats or receipt counts refuse."""
+    """Literal outcomes, state, errno, repeats and receipt counts must all agree."""
     report = retained.read(path)
     assert report['source_preserved'] is True and report['blocked'] == []
     assert report['claim'] == 'equivalence over these tests and observations'
@@ -282,8 +288,7 @@ def check_report(path: Path, difference: bool, audit: Audit, *, expected: tuple[
             retained.same(observed['gaps'], [])
             retained.same(observed['before'], {'roots': initial, 'nodes': []})
             retained.same(observed['after'], {'roots': after, 'nodes': []})
-            retained.same(observed['outcome'], {'kind': 'return', 'graph': {'roots': {
-                **after, 'result': scalar(language, dict(contracts)[function])}, 'nodes': []}})
+            retained.same(observed['outcome'], outcome(language, after, dict(contracts)[function], mode=mode))
             execution = attempt['execution']
             assert execution['capture_complete'] is True
             retained.same(execution['channels'], {'stdout': [], 'stderr': []})
@@ -291,6 +296,17 @@ def check_report(path: Path, difference: bool, audit: Audit, *, expected: tuple[
             audit.attempt(path, path.parent / result['case'] / (lane + '-' + str(index)),
                           entry, lane, execution['witness'], expected, function=function, mode=mode)
     return 4
+
+
+def outcome(language: str, after: dict, version: int, *, mode: str = 'completed') -> dict:
+    """Declare literal normal returns or the fixed C++ exception graph."""
+    if mode == 'target-error':
+        assert language == 'cpp'
+        return {'kind': 'error', 'category': 'exception', 'graph': {
+            'roots': {**after, 'error': {'kind': 'reference', 'node_id': 'n0'}},
+            'nodes': [{'id': 'n0', 'type': 'cpp.std::runtime_error', 'fields': {
+                'message': {'kind': 'bytes', 'type': 'cpp.what', 'hex': ('failure-' + str(version)).encode().hex()}}}]}}
+    return {'kind': 'return', 'graph': {'roots': {**after, 'result': scalar(language, version)}, 'nodes': []}}
 
 
 def framework(workspace: Path, folder: Path, label: str, difference: bool, audit: Audit,
@@ -304,7 +320,7 @@ def framework(workspace: Path, folder: Path, label: str, difference: bool, audit
 
 def promotion(cli: Path, workspace: Path, source: Path, folder: Path, language: str,
               difference: bool, audit: Audit, *, mode: str = 'completed') -> dict:
-    """Require fresh original/relocated builds, changed returns and a new callable."""
+    """Require fresh original/relocated builds, changed outcomes and a new callable."""
     folder.mkdir()
     original_facts = fixture_facts(source)
     bundle = folder / 'project-tests'
@@ -349,9 +365,15 @@ def promotion(cli: Path, workspace: Path, source: Path, folder: Path, language: 
     body = unit.read_text()
     assert body.count('return 42;') == 1
     updated = body.replace('return 42;', 'return 43;')
+    if mode == 'target-error':
+        assert body.count('"failure-42"') == 1
+        updated = updated.replace('"failure-42"', '"failure-43"')
     extra = updated[updated.index('int selected(int amount)'):].replace('int selected(', 'int selected_extra(', 1)
     assert extra.count('return 43;') == 1
-    unit.write_text(updated + '\n' + extra.replace('return 43;', 'return 44;'))
+    extra = extra.replace('return 43;', 'return 44;')
+    if mode == 'target-error':
+        extra = extra.replace('"failure-43"', '"failure-44"')
+    unit.write_text(updated + '\n' + extra)
     database = changed / 'build/compile_commands.json'
     commands = retained.read(database)
     for row in commands:
@@ -404,7 +426,7 @@ def exercise(cli: Path, provider: Path, sdk: Path, root: Path) -> dict:
         results.append({'name': name, 'language': language, 'difference': difference, 'mode': mode, 'promotion': promoted})
     refusal_results = audit.refusals(root / 'raw-evidence-refusals')
     summary = audit.finish()
-    assert summary['actual_application_records'] == 268 and summary['raw_lifetime_receipts'] == 134
+    assert summary['actual_application_records'] == 296 and summary['raw_lifetime_receipts'] == 148
     return {'claim': 'equivalence over these tests and observations', 'cases': results,
             'actual_application_launches': summary['actual_application_records'], 'audit': summary,
             'raw_evidence_refusals': refusal_results,
@@ -413,7 +435,7 @@ def exercise(cli: Path, provider: Path, sdk: Path, root: Path) -> dict:
                 cwd=Path(__file__).resolve().parents[1]).decode().strip(),
             'routes': ['generated', 'framework', 'replay', 'detached', 'scalar-reduction', 'current-source-promotion'],
             'remaining': ['genuine qualification of all declared boundary, raw-audit, refusal and promotion routes',
-                          'escaping target errors and all startup/live profiles', 'shipping, broader platforms and completion checklist'],
+                          'other target errors and all startup/live profiles', 'shipping, broader platforms and completion checklist'],
             'qualification_tier': 'genuine public workflow development; no broader profile admission'}
 
 

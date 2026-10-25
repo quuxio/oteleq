@@ -22,8 +22,8 @@ def write(folder: Path, name: str, value: object) -> None:
 
 def capture(folder: Path, language: str, mode: str) -> tuple[dict, dict]:
     """Copy an actual completed capture, then declare any adapted boundary input."""
-    assert language in ('c', 'cpp') and mode in ('completed', 'zero', 'censored', 'unwind', 'throwing-destructor')
-    assert mode not in ('unwind', 'throwing-destructor') or language == 'cpp'
+    assert language in ('c', 'cpp') and mode in ('completed', 'zero', 'censored', 'unwind', 'throwing-destructor', 'target-error')
+    assert mode not in ('unwind', 'throwing-destructor', 'target-error') or language == 'cpp'
     original = FIXTURES / ('native-lifetime-' + language + '-capture')
     shutil.copytree(original, folder)
     manifest = json.loads((original / 'capture.json').read_text())
@@ -42,6 +42,10 @@ def capture(folder: Path, language: str, mode: str) -> tuple[dict, dict]:
                    'exception_exit': mode == 'throwing-destructor' if language == 'cpp' and complete else None}
     trace = ExportTraceServiceRequest.FromString((folder / 'otlp-1.protobuf').read_bytes())
     scope = trace.resource_spans[0].scope_spans[0]
+    if mode == 'target-error':
+        function, = [span for span in scope.spans if span.name == entry['otelc_runtime_function']]
+        function.status.code = 2
+        function.attributes.add(key='error.type').value.string_value = 'exception'
     lifetime, = [span for span in scope.spans if span.name == 'Item lifetime']
     root, = [span for span in scope.spans if span.name == entry['otelc_runtime_function']]
     if mode == 'censored': lifetime.end_time_unix_nano = root.end_time_unix_nano + 1000000
@@ -62,6 +66,15 @@ def capture(folder: Path, language: str, mode: str) -> tuple[dict, dict]:
     for name in ('otlp-0.protobuf', 'otlp-2.protobuf'):
         message = ExportMetricsServiceRequest.FromString((folder / name).read_bytes())
         values = message.resource_metrics[0].scope_metrics[0].metrics
+        if mode == 'target-error':
+            calls = next(value for value in values if value.name == 'otelc.function.calls')
+            error = values.add(name='otelc.function.errors', unit='{error}')
+            error.sum.is_monotonic = True
+            error.sum.aggregation_temporality = 2
+            point = error.sum.data_points.add()
+            point.CopyFrom(calls.sum.data_points[0])
+            point.as_int = 1
+            point.attributes.add(key='error.type').value.string_value = 'exception'
         if mode == 'zero':
             kept = [value for value in values if not value.name.startswith('otelc.lifetime.')]
             del values[:]; values.extend(kept)
