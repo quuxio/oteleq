@@ -15,13 +15,17 @@ test('all GitHub workflow files have valid YAML syntax', () => {
   }
 });
 
-test('native lifetime qualification uses the reviewed SDK and one owned hosted job', () => {
+test('native lifetime qualification uses the reviewed SDK and explicit independent fixture jobs', () => {
   const workflow = yaml.load(readFileSync(new URL('../.github/workflows/native-lifetimes.yml', import.meta.url), 'utf8'));
   assert.equal(workflow.permissions.contents, 'read');
   for (const module of ['native_lifetime_audit', 'native_lifetime_cases', 'native_lifetime_otlp', 'native_lifetime_refusals', 'native_prepared_otlp']) {
     assert.ok(workflow.on.pull_request.paths.includes(`tests/${module}.py`));
   }
   const job = workflow.jobs['native-lifetimes'];
+  assert.equal(job.strategy['fail-fast'], false);
+  assert.equal(job.strategy['max-parallel'], 2);
+  assert.deepEqual(job.strategy.matrix.case, ['cpp-target-error', 'c-completed', 'cpp-completed', 'c-state', 'c-zero',
+    'cpp-zero', 'c-censored', 'cpp-censored', 'cpp-unwind', 'cpp-throwing-destructor']);
   assert.equal(job['runs-on'], 'ubuntu-24.04');
   const checkouts = job.steps.filter(step => step.uses?.startsWith('actions/checkout@'));
   assert.equal(checkouts.length, 2);
@@ -30,10 +34,14 @@ test('native lifetime qualification uses the reviewed SDK and one owned hosted j
   assert.equal(checkouts[1].with.ref, 'acb13d7735526448209df37b7e6b98e5717befdb');
   const execute = job.steps.find(step => step.name === 'Build original SDK and exercise public lifetime workflows');
   assert.match(execute.run, /tests\/qualify_native_lifetimes\.py/);
+  assert.match(execute.run, /--case '\$\{\{ matrix\.case \}\}'/);
   assert.doesNotMatch(execute.run, /--coverage/);
   const retain = job.steps.find(step => step.name === 'Retain original qualification evidence and SDK build failures');
   assert.equal(retain.if, 'always()');
   assert.equal(retain.with['retention-days'], 7);
+  assert.match(retain.with.name, /native-lifetimes-\$\{\{ matrix\.case \}\}/);
+  const sources = job.steps.find(step => step.name === 'Retain exact source archives and source status');
+  assert.match(sources.run, /cp consumer\/target\/debug\/quux-oteleq .*consumer-cli/);
   assert.ok(!Object.hasOwn(job, 'secrets'));
 });
 

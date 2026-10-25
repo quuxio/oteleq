@@ -44,6 +44,16 @@ BASE_CALLS = (('selected', 42),)
 PROMOTED_CALLS = (('selected', 43), ('selected_extra', 44))
 
 
+def select_cases(names: list[str] | None = None) -> tuple[tuple[str, str, bool], ...]:
+    """Keep the full corpus by default; explicit shards cannot add or repeat cases."""
+    if names is None:
+        return CASES
+    if (type(names) is not list or not names or any(type(name) is not str for name in names)
+            or len(names) != len(set(names)) or not set(names) <= set(CASE_MODES)):
+        raise ValueError('native lifetime shard requires distinct declared case names')
+    return tuple(row for row in CASES if row[0] in names)
+
+
 def command(argv: list, folder: Path, label: str, **options) -> str:
     """Expose stage timing without mixing SDK/application channels into driver output."""
     print(json.dumps({'phase': 'starting', 'case': folder.name, 'stage': label}), flush=True)
@@ -138,6 +148,9 @@ def fixture(folder: Path, language: str, difference: bool, sdk: Path, *, mode: s
                                'compilation_database': 'build/compile_commands.json',
                                'targets': [{'name': 'application', 'units': [{'source': name} for name in units],
                                             'link_flags': ['-pthread']}]}}}
+    if mode == 'target-error':
+        configuration['fixtures'][0]['expected_baseline'] = {
+            'kind': 'error', 'category': 'exception', 'type': 'cpp.std::runtime_error'}
     config = folder / 'generation.toml'
     config.write_text('\n'.join(key + '=' + toml(value) for key, value in configuration.items()) + '\n')
     return source, config
@@ -150,13 +163,14 @@ def scalar(language: str, value: int) -> dict:
 class Audit:
     """Count original launches once and retain copied-report and file identities."""
 
-    def __init__(self, root: Path, provider: Path):
+    def __init__(self, root: Path, provider: Path, *, case_names: list[str] | None = None):
+        self.cases = select_cases(case_names)
         self.registry = retained.Oracle(root, provider)
         self.records = {}
         self.files = {}
         self.contexts = {}
-        self.case_languages = {self.registry.root / name: language for name, language, _ in CASES}
-        self.case_modes = {self.registry.root / name: CASE_MODES[name] for name, _, _ in CASES}
+        self.case_languages = {self.registry.root / name: language for name, language, _ in self.cases}
+        self.case_modes = {self.registry.root / name: CASE_MODES[name] for name, _, _ in self.cases}
 
     def attempt(self, report: Path, folder: Path, entry: dict, lane: str, witness,
                 expected_arguments: tuple[int, ...], *, function: str = 'selected', mode: str = 'completed') -> None:
@@ -229,7 +243,7 @@ class Audit:
                 by_profile[profile] = raw_refusals.run(Path(context['folder']), context['entry'],
                                                        context['witness'], root / profile,
                                                        function=context['function'], mode=context['mode'])
-        assert set(by_profile) == {language + '-' + CASE_MODES[name] for name, language, _ in CASES}
+        assert set(by_profile) == {language + '-' + CASE_MODES[name] for name, language, _ in self.cases}
         assert all(value['count'] == 14 and value['new_application_launches'] == 0 for value in by_profile.values())
         return by_profile
 
@@ -275,6 +289,10 @@ def check_report(path: Path, difference: bool, audit: Audit, *, expected: tuple[
     assert entry['native_options']['profile'] == PROFILES[language]
     assert {row['name'] for row in entry['globals']} == {'state', 'observed_errno'}
     bundle = retained.read(path.parent / result['case'] / 'typed-bundle.json')['cases'][0]
+    baseline = ({'kind': 'error', 'category': 'exception', 'type': 'cpp.std::runtime_error'}
+                if mode == 'target-error' else {'kind': 'return'})
+    retained.same(entry['expected_baseline'], baseline)
+    retained.same(bundle['contract']['expected_baseline'], baseline)
     assert arguments(result['arguments']) == expected
     amount, = expected
     initial = {'global:state': scalar(language, 7), 'global:observed_errno': scalar(language, 0)}
@@ -387,9 +405,9 @@ def promotion(cli: Path, workspace: Path, source: Path, folder: Path, language: 
             'fresh_current_source': True, 'relocated_compilation_database': True}
 
 
-def exercise(cli: Path, provider: Path, sdk: Path, root: Path) -> dict:
-    audit = Audit(root, provider); results = []
-    for name, language, difference in CASES:
+def exercise(cli: Path, provider: Path, sdk: Path, root: Path, *, case_names: list[str] | None = None) -> dict:
+    audit = Audit(root, provider, case_names=case_names); results = []
+    for name, language, difference in audit.cases:
         folder = root / name; folder.mkdir()
         mode = CASE_MODES[name]; expected = lifetime_cases.expected(language, mode)['arguments']
         source, config = fixture(folder, language, difference, sdk, mode=mode)
@@ -426,14 +444,18 @@ def exercise(cli: Path, provider: Path, sdk: Path, root: Path) -> dict:
         results.append({'name': name, 'language': language, 'difference': difference, 'mode': mode, 'promotion': promoted})
     refusal_results = audit.refusals(root / 'raw-evidence-refusals')
     summary = audit.finish()
-    assert summary['actual_application_records'] == 296 and summary['raw_lifetime_receipts'] == 148
+    expected_launches = 28 * len(audit.cases) + 16 * sum(difference for _, _, difference in audit.cases)
+    assert summary['actual_application_records'] == expected_launches
+    assert summary['raw_lifetime_receipts'] == expected_launches // 2
     return {'claim': 'equivalence over these tests and observations', 'cases': results,
+            'selected_cases': [name for name, _, _ in audit.cases], 'complete_corpus': audit.cases == CASES,
             'actual_application_launches': summary['actual_application_records'], 'audit': summary,
             'raw_evidence_refusals': refusal_results,
             'consumer_cli_sha256': digest(cli), 'sdk_source': SDK_HEAD,
             'consumer_source': subprocess.check_output(['git', 'rev-parse', 'HEAD'],
                 cwd=Path(__file__).resolve().parents[1]).decode().strip(),
-            'routes': ['generated', 'framework', 'replay', 'detached', 'scalar-reduction', 'current-source-promotion'],
+            'routes': [route for route in ('generated', 'framework', 'replay', 'detached', 'scalar-reduction', 'current-source-promotion')
+                       if route != 'scalar-reduction' or any(difference for _, _, difference in audit.cases)],
             'remaining': ['genuine qualification of all declared boundary, raw-audit, refusal and promotion routes',
                           'other target errors and all startup/live profiles', 'shipping, broader platforms and completion checklist'],
             'qualification_tier': 'genuine public workflow development; no broader profile admission'}
@@ -445,8 +467,11 @@ def main() -> None:
     parser.add_argument('--sdk-build', type=Path, required=True)
     parser.add_argument('--report-dir', type=Path, required=True)
     parser.add_argument('--cli', type=Path, required=True)
+    parser.add_argument('--case', dest='case_names', action='append', choices=tuple(CASE_MODES),
+                        help='qualify only these named fixtures; omission selects the complete corpus')
     parser.add_argument('--min-free-bytes', type=int, default=qualification_storage.MIN_FREE_BYTES)
     args = parser.parse_args()
+    select_cases(args.case_names)
     provider, cli = args.otelc_root.resolve(strict=True), args.cli.resolve(strict=True)
     root, sdk = args.report_dir.resolve(), args.sdk_build.resolve()
     assert not root.exists() and not sdk.exists()
@@ -466,7 +491,7 @@ def main() -> None:
                      (sdk / 'native-sdk-build.json', sdk / 'libotelc_native_runtime.so')}
         assert retained.read(sdk / 'native-sdk-build.json')['coverage'] is False
         write(root / 'sdk-original-products.json', sdk_files)
-        result = exercise(cli, provider, sdk, root)
+        result = exercise(cli, provider, sdk, root, case_names=args.case_names)
         assert {str(path): source_facts(path) for path in map(Path, held)} == held
         assert {name: retained.identity(Path(name)) for name in sdk_files} == sdk_files
         write(root / 'qualification.json', result)

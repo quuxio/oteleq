@@ -51,6 +51,13 @@ class NativeLifetimeErrorTests(unittest.TestCase):
                                                           self.root / 'sdk', mode='target-error')
         self.assertFalse((self.root / 'invalid').exists())
 
+    def test_escaping_fixture_declares_the_error_expected_by_the_real_comparator(self):
+        folder = self.root / 'contract'; folder.mkdir()
+        _, config = driver.fixture(folder, 'cpp', False, self.root / 'sdk', mode='target-error')
+        fixture, = tomllib.loads(config.read_text())['fixtures']
+        self.assertEqual(fixture.get('expected_baseline'),
+                         {'kind': 'error', 'category': 'exception', 'type': 'cpp.std::runtime_error'})
+
     def test_literal_error_graph_matches_the_existing_public_observation_codec(self):
         after = {'global:state': {'kind': 'integer', 'type': 'cpp.int', 'value': '12', 'bits': 32, 'signed': True}}
         actual = typed_capture.scalar_error(b'std::runtime_error\tfailure-42', 'cpp', {},
@@ -120,6 +127,17 @@ class NativeLifetimeErrorTests(unittest.TestCase):
                     else: outcome['category'] = 'panic'
             driver.write(bundle_path, value)
             with self.subTest(change=change), self.assertRaises(ValueError):
+                driver.check_report(path, False, Mock(), mode='target-error')
+
+    def test_equal_error_lanes_cannot_repair_a_declared_return_contract(self):
+        path = self.report()
+        bundle_path = path.parent / 'selected-0/typed-bundle.json'
+        original = driver.retained.read(bundle_path)
+        for kind in ('return', 'any'):
+            value = copy.deepcopy(original)
+            value['cases'][0]['contract']['expected_baseline'] = {'kind': kind}
+            driver.write(bundle_path, value)
+            with self.subTest(kind=kind), self.assertRaises(ValueError):
                 driver.check_report(path, False, Mock(), mode='target-error')
 
     def test_promoted_errors_refuse_stale_messages_and_equal_normal_returns(self):
