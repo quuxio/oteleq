@@ -36,6 +36,8 @@ The driver exercises generated execution, the generated framework, replay and de
 
 The workflow retains original evidence, SDK build logs/products and exact source archives for seven days, including failed runs. Artifact names include both run and attempt IDs. A missing success summary or failed job remains incomplete evidence. Downloaded archives do not acquire the original job's filesystem identities and cannot silently recertify its products.
 
+The driver reads the public run envelope: top-level exit/source-preservation/blocker fields, the single ready inventory entry, and the case's nested comparator verdict. It binds the selected function and case identifier before checking observations. A later development run completed the corrected C comparison, then exposed the driver's earlier incorrect report-shape assumption. That failed driver run does not establish completion of the full corpus; its retained report supplies the regression shape.
+
 ```sh
 make native-lifetime-workflow-check PYTHON=/absolute/path/to/python
 ```

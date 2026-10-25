@@ -162,9 +162,18 @@ def arguments(value: object) -> tuple[int, ...]:
 def check_report(path: Path, difference: bool, audit: Audit, *, expected: tuple[int, ...] = (5,)) -> int:
     """Equal-but-wrong returns, state, errno, missing repeats or receipt counts refuse."""
     report = retained.read(path)
-    assert report['verdict'] == ('different_observed' if difference else 'equivalent_observed')
+    assert report['source_preserved'] is True and report['blocked'] == []
+    assert report['claim'] == 'equivalence over these tests and observations'
+    assert type(report['exit_code']) is int and report['exit_code'] == int(difference)
     assert len(report['cases']) == 1
-    result = report['cases'][0]; entry = result['entry']; language = entry['language']
+    result = report['cases'][0]
+    assert type(result['exit_code']) is int and result['exit_code'] == int(difference)
+    assert result['comparison']['verdict'] == ('different_observed' if difference else 'equivalent_observed')
+    entries = [entry for entry in report['inventory'] if entry['status'] == 'ready']
+    assert len(entries) == 1
+    entry, = entries; language = entry['language']
+    assert result['function'] == entry['otelc_function'] == ('selected(int)' if language == 'cpp' else 'selected')
+    assert result['case'] == entry['id'] + '-0'
     assert entry['native_options']['profile'] == PROFILES[language]
     assert {row['name'] for row in entry['globals']} == {'state', 'observed_errno'}
     bundle = retained.read(path.parent / result['case'] / 'typed-bundle.json')['cases'][0]

@@ -18,26 +18,31 @@ class NativeLifetimeWorkflowTests(TestCase):
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name).resolve()
 
-    def report(self, difference=False, *, amount=5):
-        entry = {'language': 'c', 'native_options': {'profile': qualifier.PROFILES['c']},
+    def report(self, difference=False, *, amount=5, language='c'):
+        function = 'selected(int)' if language == 'cpp' else 'selected'
+        entry = {'id': 'sample', 'status': 'ready', 'language': language, 'otelc_function': function,
+                 'native_options': {'profile': qualifier.PROFILES[language]},
                  'globals': [{'name': 'state'}, {'name': 'observed_errno'}]}
-        result = {'entry': entry, 'case': 'sample', 'arguments': [amount]}
-        value = {'verdict': 'different_observed' if difference else 'equivalent_observed', 'cases': [result]}
-        before = {'global:state': qualifier.scalar('c', 7), 'global:observed_errno': qualifier.scalar('c', 0)}
+        result = {'case': 'sample-0', 'arguments': [amount], 'function': function, 'exit_code': int(difference),
+                  'comparison': {'verdict': 'different_observed' if difference else 'equivalent_observed'}}
+        value = {'claim': 'equivalence over these tests and observations', 'exit_code': int(difference),
+                 'source_preserved': True, 'blocked': [], 'inventory': [entry], 'cases': [result]}
+        before = {'global:state': qualifier.scalar(language, 7), 'global:observed_errno': qualifier.scalar(language, 0)}
         bundle = {'contract': {'required_roots': list(before)}, 'baseline': [], 'instrumented_on': []}
         for lane in ('baseline', 'instrumented_on'):
-            after = {'global:state': qualifier.scalar('c', 7 + amount + int(difference and lane == 'instrumented_on')),
-                     'global:observed_errno': qualifier.scalar('c', errno.ECHILD)}
+            after = {'global:state': qualifier.scalar(language, 7 + amount + int(difference and lane == 'instrumented_on')),
+                     'global:observed_errno': qualifier.scalar(language, errno.ECHILD)}
             observation = {'gaps': [], 'before': {'roots': before, 'nodes': []},
                 'after': {'roots': after, 'nodes': []}, 'outcome': {'kind': 'return', 'graph': {
-                    'roots': {**after, 'result': qualifier.scalar('c', 42)}, 'nodes': []}}}
+                    'roots': {**after, 'result': qualifier.scalar(language, 42)}, 'nodes': []}}}
             attempt = {'observation': observation, 'execution': {'capture_complete': True,
                 'channels': {'stdout': [], 'stderr': []}, 'termination': {'kind': 'exit', 'code': 0}, 'witness': None}}
             bundle[lane] = [copy.deepcopy(attempt), copy.deepcopy(attempt)]
-        folder = self.root / (('different' if difference else 'matching') + '-' + str(amount))
-        (folder / 'sample').mkdir(parents=True)
+        folder = self.root / (('different' if difference else 'matching') +
+                              ('-cpp' if language == 'cpp' else '') + '-' + str(amount))
+        (folder / 'sample-0').mkdir(parents=True)
         qualifier.write(folder / 'report.json', value)
-        qualifier.write(folder / 'sample/typed-bundle.json', {'cases': [bundle]})
+        qualifier.write(folder / 'sample-0/typed-bundle.json', {'cases': [bundle]})
         return folder / 'report.json', bundle
 
     def test_completed_cpp_and_c_fixtures_have_explicit_independent_contracts(self):
@@ -73,15 +78,16 @@ class NativeLifetimeWorkflowTests(TestCase):
             qualifier.fixture(self.root, 'python', False, self.root / 'sdk')
 
     def test_known_return_state_and_errno_are_checked_in_every_repeat(self):
-        for difference in (False, True):
-            path, _ = self.report(difference)
-            audit = Mock()
-            self.assertEqual(qualifier.check_report(path, difference, audit), 4)
-            self.assertEqual(audit.attempt.call_count, 4)
+        for language in ('c', 'cpp'):
+            for difference in (False, True):
+                path, _ = self.report(difference, language=language)
+                audit = Mock()
+                self.assertEqual(qualifier.check_report(path, difference, audit), 4)
+                self.assertEqual(audit.attempt.call_count, 4)
 
     def test_equal_but_wrong_observations_and_missing_repeats_refuse(self):
         path, original = self.report()
-        bundle_path = path.parent / 'sample/typed-bundle.json'
+        bundle_path = path.parent / 'sample-0/typed-bundle.json'
         for change in ('return', 'state', 'errno', 'type', 'before', 'gaps', 'capture', 'repeats'):
             value = copy.deepcopy(original)
             for lane in ('baseline', 'instrumented_on'):
@@ -110,6 +116,27 @@ class NativeLifetimeWorkflowTests(TestCase):
             check.assert_called_once_with(report, True, audit, expected=(5,))
         with patch.object(qualifier, 'command', return_value='{}\n{}'), self.assertRaises(AssertionError):
             qualifier.framework(self.root, self.root, 'bad', False, Mock())
+
+    def test_actual_run_envelope_binds_exit_verdict_inventory_and_case_identity(self):
+        path, _ = self.report()
+        original = json.loads(path.read_text())
+        self.assertNotIn('verdict', original)
+        self.assertNotIn('entry', original['cases'][0])
+        self.assertEqual(qualifier.check_report(path, False, Mock()), 4)
+        for change in ('source', 'blocked', 'claim', 'exit', 'case-exit', 'verdict', 'inventory', 'function', 'case'):
+            value = copy.deepcopy(original)
+            if change == 'source': value['source_preserved'] = False
+            elif change == 'blocked': value['blocked'] = [{'status': 'blocked'}]
+            elif change == 'claim': value['claim'] = 'unbounded proof'
+            elif change == 'exit': value['exit_code'] = 1
+            elif change == 'case-exit': value['cases'][0]['exit_code'] = 1
+            elif change == 'verdict': value['cases'][0]['comparison']['verdict'] = 'inconclusive'
+            elif change == 'inventory': value['inventory'].append(copy.deepcopy(value['inventory'][0]))
+            elif change == 'function': value['cases'][0]['function'] = 'foreign'
+            elif change == 'case': value['cases'][0]['case'] = 'foreign-0'
+            qualifier.write(path, value)
+            with self.subTest(change=change), self.assertRaises(AssertionError):
+                qualifier.check_report(path, False, Mock())
 
     def test_full_route_driver_keeps_replay_detach_and_actual_shrink_report_set(self):
         calls = []
