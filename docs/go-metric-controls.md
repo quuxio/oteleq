@@ -47,6 +47,8 @@ Typed observations retain every call's before/after graph and outcome, including
 
 Each attempt retains `go-controls.json`, all checkpoint/acknowledgement links, the original native ownership records, final SDK health and raw downstream OTLP. The independent reader checks closed fields, declared call/state order, actual PID/policy/selection, receipt cursors, disabled intervals, separate setters and cumulative measurements. The detailed `go-verified-telemetry.json` adds the control-record digest and collected function counts. The comparator's six-field witness stays unchanged.
 
+Running metric export counters are independent atomic reads. A periodic export can begin after a host flush returns, so a running snapshot need not show equal attempts and successes. The audit retains both counters, requires each to remain monotonic through restoration and final shutdown, and rejects any recorded export failure. The closed final report must show every attempt succeeded, with its export count equal to independently received OTLP requests. This does not relax the separate disabled-window or retained-measurement checks.
+
 Missing checkpoints, an early acknowledgement, changed file facts, a different process, a missing positive call, lost traces, disabled-window metrics or missing restored measurements prevent qualification. A passing component test cannot supply missing runtime evidence.
 
 ## Scope

@@ -238,6 +238,43 @@ class GoLiveRetainedReceiptTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     receipt.check(folder, 'identity', 'both-on', False, witness, sdk)
 
+    def test_running_periodic_metric_export_is_retained_until_closed_final_drain(self):
+        flags = {'collection': True, 'emission': True}
+        control = {'pid': 23, 'policy_sha256': POLICY_SHA256, 'selection_sha256': 'b' * 64}
+        raw = health(2, flags, 3, 4, 1)
+        raw['metric_exports']['succeeded'] = '3'
+        current = receipt.health(raw, control, 2, flags)
+        self.assertEqual((current['metric'], current['metric_succeeded']), (4, 3))
+        # An independently loaded succeeded counter can pass the earlier
+        # attempts load. Chronological snapshots and final receipt anchor both.
+        raw['metric_exports']['succeeded'] = '5'
+        self.assertEqual(receipt.health(raw, control, 2, flags)['metric_succeeded'], 5)
+        for name, value in (('failed', '1'), ('succeeded', True), ('succeeded', '04')):
+            altered = copy.deepcopy(raw); altered['metric_exports'][name] = value
+            with self.subTest(name=name, value=value), self.assertRaises(ValueError):
+                receipt.health(altered, control, 2, flags)
+        final = health(6, flags, 17, 4, 5, final=True)
+        final['metric_exports']['succeeded'] = '3'
+        with self.assertRaisesRegex(ValueError, 'did not drain'):
+            receipt.health(final, control, 6, flags, final=True)
+
+    def test_running_metric_success_cannot_decrease_or_exceed_final_receipt(self):
+        for where in ('later', 'restored', 'final'):
+            with self.subTest(where=where), tempfile.TemporaryDirectory() as temporary:
+                folder = Path(temporary)
+                sdk, witness = record_fixture(folder, 'both-on', False)
+                path = folder / 'go-controls.json'
+                value = receipt.read(path)
+                if where == 'later':
+                    value['steps'][0]['after']['health']['metric_exports']['succeeded'] = '99'
+                elif where == 'restored':
+                    value['restored']['health']['metric_exports']['succeeded'] = '0'
+                else:
+                    value['restored']['health']['metric_exports']['succeeded'] = '99'
+                write(path, value)
+                with self.assertRaises(ValueError):
+                    receipt.check(folder, 'identity', 'both-on', False, witness, sdk)
+
     def test_cumulative_series_refuse_time_repeats_resets_and_decreases(self):
         key = ('metric', 'target', '')
         receipt.cumulative({0: {key: (1, 2, 1)}, 2: {key: (1, 3, 2)}})

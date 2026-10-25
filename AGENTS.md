@@ -1,5 +1,7 @@
 # Repository guidance
 
+- Go live audit running metric attempts/successes are separately loaded atomics, not a drain proof. Retain both counters and check their chronological monotonicity through restoration and closed final health. Final attempts must equal successes and actual downstream request counts; every failure, disabled-window metric and missing retained measurement still refuses. Preserve original failed audit records when correcting an oracle.
+
 - The maintained source-scope Go live corpus checks complete literal graphs and all named generated/retained/promoted routes, including newly discovered methods and a restored intermediate mutation. Preserve raw startup `release` acknowledgements, plain absence of SDK configuration, the default-separator health policy digest and valid exemplars joined to collected trace roots. Keep failed original audits; a corrected retained-only audit must start no applications and preserve all original bytes/file facts. See docs/go-metric-controls.md.
 
 - Explicit Go `source-scope-v1` selects private-bootstrap-v1, build6/7 and prepared-tools2. Preserve the source-v1/build4/5 boundary. Independently authenticate the complete original weaver source catalogue against the official module and go.mod checksums, the exact single-file backport, every retained source/tool file fact and three fixed native metadata queries before building. Reconstruct private helpers without SDK renderers; both build6 and build7 require complete compiler-channel evidence. Component checks do not qualify generated, live or retained execution.

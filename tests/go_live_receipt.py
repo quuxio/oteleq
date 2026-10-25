@@ -83,8 +83,13 @@ def counter(value: object) -> int:
 def health(raw: dict, control: dict, completed: int, flags: dict, *, final: bool = False) -> dict:
     """Every raw field has an expectation; dynamic export/flush counts stay explicit."""
     metric = counter(raw['metric_exports']['attempts'])
+    metric_succeeded = counter(raw['metric_exports']['succeeded'])
     trace = counter(raw['trace_exports']['attempts'])
     flush = counter(raw['metric_flush']['attempts'])
+    # The periodic reader can begin an export after the host flush returns.
+    # These atomics are read separately: running snapshots are not a drain
+    # barrier. Retain each counter, then require exact closed final accounting.
+    require(not final or metric_succeeded == metric, 'final metric exports did not drain')
     probes = {name: str(completed) if name in ('function_started', 'function_ended') else '0'
               for name in PROBES}
     exact(raw, {'schema_version': 4, 'kind': 'otelc.runtime-health', 'language': 'go',
@@ -95,13 +100,13 @@ def health(raw: dict, control: dict, completed: int, flags: dict, *, final: bool
         'metric_flush': {'attempts': str(flush), 'failed_attempts': '0'},
         'probe_accounting': {**probes, 'closed': final},
         'metric_exports': {'observed': True, 'closed': final, 'attempts': str(metric),
-                           'succeeded': str(metric), 'failed': '0'},
+                           'succeeded': str(metric_succeeded), 'failed': '0'},
         'trace_exports': {'observed': True, 'closed': final, 'attempts': str(trace),
                          'succeeded': str(trace), 'failed': '0', 'queue_pending': '0',
                          'queue_dropped': '0', 'exported_spans': str(completed)},
         'http_spans': {'observed': True, 'closed': final, 'started': '0', 'ended': '0', 'active': '0'},
         'downstream_receipt': 'unavailable', 'otlp_partial_rejection': 'unavailable'})
-    return {'metric': metric, 'trace': trace, 'flush': flush}
+    return {'metric': metric, 'metric_succeeded': metric_succeeded, 'trace': trace, 'flush': flush}
 
 
 def checkpoints(folder: Path, owner: dict) -> None:
@@ -400,13 +405,17 @@ def check(folder: Path, method: str, start: str, plain: bool, witness: dict | No
         transition(restored['history'], control['pid'], schedule[-1], flags)
         exact(restored['flush'], status(control['pid'], flags))
         restored_health = health(restored['health'], control, 6, flags)
-        require(restored_health['flush'] > flush, 'restoration did not flush')
+        require(restored_health['flush'] > flush
+                and all(restored_health[key] >= previous_health[key] for key in restored_health),
+                'restoration did not flush or health counter decreased')
         metric_window(windows, cursor, restored['cursor'], calls, required=True)
         metric_window(windows, restored['cursor'], len(bodies), calls, required=False)
         final_raw = read(folder / 'go-runtime/health.json')
         final = health(final_raw, control, 6, flags, final=True)
         require(final['flush'] > restored_health['flush'] and final['trace'] == received['trace_batches']
-                and final['metric'] == received['metric_batches'], 'final SDK counters differ from actual receipt')
+                and final['metric'] == received['metric_batches']
+                and all(final[key] >= restored_health[key] for key in final),
+                'final SDK counters differ from actual receipt or decreased')
         receipt = read(folder / 'go-verified-telemetry.json')
         fields = ('decoder', 'raw_otlp_sha256', 'functions', 'spans', 'losses', 'pending')
         exact(witness, {key: receipt[key] for key in fields})
