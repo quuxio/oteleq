@@ -225,7 +225,7 @@ def execute(command, cwd, env=None, folder=None, timeout=60, input_data=None, *,
 
 def source_outside(path, *roots):
     candidate = path.resolve()
-    if any(candidate.is_relative_to(root.resolve()) for root in roots):
+    if any(capture.path_within(candidate, root) for root in roots):
         raise ValueError("generated outputs must be outside the source and otelc repositories")
     return candidate
 
@@ -1478,7 +1478,7 @@ def export_tests(args):
     workspace, data = load_workspace(args.workspace, generated=True)
     destination = args.destination.resolve()
     java_project.protect_destination(destination, java_project.original_locations(data))
-    if destination.exists() or destination.is_relative_to(workspace) or workspace.is_relative_to(destination):
+    if destination.exists() or capture.path_within(destination, workspace) or capture.path_within(workspace, destination):
         raise ValueError("export destination must be new and independent of the workspace")
     providers = retained_provider_directories(data)
     if not args.apply:

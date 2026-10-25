@@ -49,7 +49,7 @@ directory = "/absolute/transient/sdk-compiler-cache"
 max_bytes = 1073741824
 ```
 
-The parent directory must exist without symlink aliases. The cache directory is created privately and marked by oteleq. An existing unmarked directory is refused. This option requires `source-v1` or `source-scope-v1`; it is disabled when the table is absent. `max_bytes` defaults to 1 GiB and accepts integers from 1 MiB to 9223372036854775807 bytes. The directory and limit stay in the frozen policy, including exported, reduced and promoted suites. That location must remain available for retained builds; make a new plan to select another location.
+The parent directory must exist without symlink aliases. Source and workspace protection checks physical directory identities as well as path spelling, including case aliases on macOS. The cache directory is created privately and marked by oteleq. An existing unmarked directory is refused. This option requires `source-v1` or `source-scope-v1`; it is disabled when the table is absent. `max_bytes` defaults to 1 GiB and accepts integers from 1 MiB to 9223372036854775807 bytes. The directory and limit stay in the frozen policy, including exported, reduced and promoted suites. That location must remain available for retained builds; make a new plan to select another location.
 
 Only the SDK `go-build` command uses this shared cache. Original caller discovery and compiler exports keep their separate private cache, and module/dependency caches remain unchanged. The SDK command disables an external `GOCACHEPROG` so the selected builtin Go cache format applies. Its actual cache path appears in `go-tooling/<number>/command.json`. A nonzero free-space floor checks both the attempt output and SDK cache volumes during that command.
 

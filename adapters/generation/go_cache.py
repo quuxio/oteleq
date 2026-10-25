@@ -10,6 +10,7 @@ from typing import Iterator
 
 from go_provider import require, same
 import go_files as files
+import otelc_capture as capture
 
 MARKER = "owner.json"
 PROFILE = "oteleq.go.sdk-cache-v1"
@@ -44,7 +45,7 @@ def location(options: dict, protected: list[Path]) -> Path:
     root = Path(settings(options)["directory"])
     for path in protected:
         require(path.is_absolute() and path.resolve() == path, "Go SDK cache protection needs canonical paths")
-        require(not root.is_relative_to(path) and not path.is_relative_to(root),
+        require(not capture.path_within(root, path) and not capture.path_within(path, root),
                 "Go SDK cache overlaps source, retained inputs or execution evidence")
     return root
 

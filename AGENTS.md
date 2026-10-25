@@ -1,5 +1,7 @@
 # Repository guidance
 
+- Output, temporary-directory and cache source boundaries must check physical ancestry as well as resolved path spelling. Case aliases on case-insensitive filesystems can retain different strings after Path.resolve(). Refuse overlaps before tempfile probes, exports or SDK cache writes; retain portable symlink and actual case-alias regression controls.
+
 - An explicit Go build_cache is disposable SDK compiler state, separate from retained caller exports and module inputs. Refuse original source/SDK/workspace/Go-installation overlaps before writes. Keep the owner marker, exclusive lease, closed builtin cache layout and anchored directory identities; preserve eviction receipts and never prune through links or producer-selected paths. The logical limit applies between SDK commands. Nonzero build_min_free_bytes samples both output and cache volumes through the original executor cleanup. Defaults stay disabled; qualification of changed cache and retained/live workflows remains separate.
 
 - Go telemetry must bind the expected service to the frozen prepared policy and retain complete histogram state through cumulative checks. Sums must fit actual extrema and populated buckets with an explicit binary64 summation bound. Fresh live qualification uses the configured free-space floor before commands; preserve prelaunch storage refusals as incomplete evidence. Run startup corpora serially and preserve referenced compiler exports when clearing terminal caches.
