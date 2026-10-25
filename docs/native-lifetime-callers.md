@@ -2,7 +2,7 @@
 
 <!-- markdownlint-disable MD013 -->
 
-Status: maintainer components for compiler-bound scalar callers with independent C++ object and C resource discovery. Experimental [public lifetime configuration and orchestration](native-lifetime-generation.md) now connect them to explicit fixture expectations and owned execution. Genuine generated/retained workflow qualification remains pending. These components feed the separate [build readers](native-lifetime-provider.md) and [telemetry receipt](native-lifetime-receipt.md).
+Status: maintainer components for compiler-bound scalar callers with independent C++ object and C resource discovery. Experimental [public lifetime configuration and orchestration](native-lifetime-generation.md) connect them to explicit fixture expectations and owned execution, with [100-launch qualification](qualification/native-lifetime-workflows-2026-10-25.json) for three completed-lifetime fixtures and their generated/retained/promoted routes. Broader profiles remain open. These components feed the separate [build readers](native-lifetime-provider.md) and [telemetry receipt](native-lifetime-receipt.md).
 
 ## Before SDK compilation
 

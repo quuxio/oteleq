@@ -2,7 +2,7 @@
 
 <!-- markdownlint-disable MD013 -->
 
-Status: a maintained genuine-workflow development driver and hosted job. No passing hosted execution is claimed yet. The separate [public profiles](native-lifetime-generation.md) have literal component evidence; this job must build and execute their actual SDK/application path before it can add runtime evidence.
+Status: the [exact-revision diagnostic qualification](qualification/native-lifetime-workflows-2026-10-25.json) covers 100 original application launches, 50 instrumented receipts and 26 reports, including nine current-source promotion reports, from [run 40211685995](https://github.com/quuxio/oteleq/actions/runs/40211685995). A separate retained-byte audit checks complete raw signals and original source/product hashes; 28 altered-capture controls refuse. This qualifies the three named completed-lifetime fixtures and routes below. Broader profiles remain open.
 
 ## Run in one original environment
 
@@ -32,7 +32,7 @@ The driver exercises generated execution, the generated framework, replay and de
 
 The driver also exercises current-source promotion for each fixture. It checks a dry-run plan before applying the external framework bundle, then runs the suite against the original source and a relocated changed checkout. The original function must now return `43`; a newly added `selected_extra` must return `44`. Both keep the declared state/errno effects and one completed `Item` per call. The two-unit compilation database is relocated explicitly. The oracle requires the complete declared callable inventory and four new original application launch records per case; copied earlier reports cannot satisfy this denominator. Original and changed fixture file facts must remain unchanged through their respective executions.
 
-`qualification.json` explicitly labels a successful result as genuine public workflow development. The consumer checks the SDK's complete lifetime/function receipt. A separate driver oracle checks raw signals, literal completed-instance expectations, the canonical function witness and closed final SDK units. Whole-corpus qualification of that independent oracle and the promotion route remains pending. Zero/censored/exception profiles, all startup/live states, production artefacts and the wider completion checklist remain open.
+The original `qualification.json` labels its successful execution as genuine public workflow development. The separate published record adds the completed retained-byte audit and actual altered-capture refusals for that exact execution; it does not change the original record or executor identity. The consumer checks the SDK's complete lifetime/function receipt. A separate driver oracle checks raw signals, literal completed-instance expectations, the canonical function witness and closed final SDK units. The audit covers 100 distinct launch identifiers and 104 observations, including four copied shrink observations that add no launches. All 1,048 selected original evidence files remain unchanged. Zero/censored/exception profiles, all startup/live states, production artefacts and the wider completion checklist remain open.
 
 ## Independent raw audit
 

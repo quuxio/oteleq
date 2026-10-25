@@ -2,7 +2,7 @@
 
 <!-- markdownlint-disable MD013 -->
 
-Status: experimental public configuration and orchestration, with component checks. Genuine generated, retained, replayed, reduced and promoted workflow qualification is pending. Select these profiles only with a matching SDK that provides the complete requested protocol. The existing [function-only profile](native-prepared-provider.md) keeps its separate qualification.
+Status: experimental public configuration and orchestration, with [100-launch diagnostic qualification](qualification/native-lifetime-workflows-2026-10-25.json) for the three completed-lifetime fixtures, generated/retained/replayed/reduced routes and current-source promotion. Broader lifetime profiles remain unqualified. Select these profiles only with a matching SDK that provides the complete requested protocol. The existing [function-only profile](native-prepared-provider.md) keeps its separate qualification.
 
 ## Configure independent expectations
 
@@ -53,7 +53,7 @@ This establishes equivalence over the declared application tests and observation
 
 ## Contributor checks and remaining qualification
 
-The separate [hosted workflow driver](native-lifetime-workflows.md) builds a fixed noncoverage SDK and exercises actual public generated/framework/replayed/detached/reduced routes in one Linux job, with literal return/state/errno oracles and original source/product facts. Its hosted execution is pending. A successful development run does not replace the remaining independent raw lifetime audit or broader profile qualification.
+The separate [hosted workflow driver](native-lifetime-workflows.md) builds a fixed noncoverage SDK and exercises actual public generated/framework/replayed/detached/reduced/promoted routes in one Linux job, with literal return/state/errno oracles and original source/product facts. Its exact `55d5476` execution and independent retained-byte audit cover 100 applications and 50 instrumented receipts, with 28 altered-evidence refusals. Zero/censored/exception profiles, startup/live states and broader qualification remain separate requirements.
 
 ```sh
 make native-lifetime-public-check PYTHON=/absolute/path/to/python
