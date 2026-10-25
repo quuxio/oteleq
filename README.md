@@ -41,7 +41,7 @@ The explicit [native prepared provider](docs/native-prepared-provider.md) connec
 
 Separate [native lifetime components](docs/native-lifetime-receipt.md) check caller-declared C++ object and C resource expectations against creation links, release or censored shutdown, complete metrics and owned final health. Their [caller pipeline](docs/native-lifetime-callers.md) binds private generated scalar callers to actual compiler/VFS observations and independently obtained type/site facts before SDK compilation. Experimental [public lifetime profiles](docs/native-lifetime-generation.md) now connect explicit fixture expectations, frontend discovery, build4/build5 and owned runtime receipt. Component checks pass; genuine generated/retained workflows and exact-revision qualification remain pending.
 
-The [hosted native lifetime driver](docs/native-lifetime-workflows.md) builds the reviewed fixed SDK and executes public generated/retained/reduced routes in one Linux job, with independent literal state/errno expectations. Hosted execution and broader qualification remain pending; its component checks do not establish runtime success.
+The [hosted native lifetime driver](docs/native-lifetime-workflows.md) builds the reviewed fixed SDK and executes public generated/retained/reduced routes in one Linux job, with independent literal state/errno expectations, complete raw protobuf/final-health auditing and altered-evidence checks. It logs stage progress separately from application channels. Whole-corpus hosted qualification remains pending; archived C signals and literal C++ component checks do not establish broader runtime success.
 
 The result is **equivalence over these tests and observations**. It is not a blanket proof that every function is identical.
 

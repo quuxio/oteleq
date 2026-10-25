@@ -9,6 +9,7 @@ from pathlib import Path
 BOUNDS = [1e-6, 1e-5, 1e-4, .001, .01, .1, 1.]
 SCOPE = 'io.quux.otelc.native'
 ROUTES = {'/v1/traces', '/v1/metrics'}
+MAX_BYTES = 32 * 1024**2
 
 
 def require(condition: bool, reason: str) -> None:
@@ -48,17 +49,22 @@ def groups(message, language: str, service: str, *, traces: bool):
             yield from rows
 
 
+def function_span(span, name: str) -> None:
+    """Check one independently selected ordinary function root."""
+    require(len(span.trace_id) == 16 and any(span.trace_id) and len(span.span_id) == 8 and any(span.span_id)
+            and not span.parent_span_id and span.name == name and span.kind == 1 and span.flags & 1
+            and span.status.code == 0 and not span.status.message
+            and 0 < span.start_time_unix_nano <= span.end_time_unix_nano
+            and not span.events and not span.links
+            and not span.dropped_attributes_count and not span.dropped_events_count and not span.dropped_links_count,
+            'fixture trace is not one complete successful selected root')
+    same(attributes(span.attributes), {'function': name})
+
+
 def trace(message, language: str, service: str, name: str) -> int:
     count = 0
     for span in groups(message, language, service, traces=True):
-        require(len(span.trace_id) == 16 and any(span.trace_id) and len(span.span_id) == 8 and any(span.span_id)
-                and not span.parent_span_id and span.name == name and span.kind == 1 and span.flags & 1
-                and span.status.code == 0 and not span.status.message
-                and 0 < span.start_time_unix_nano <= span.end_time_unix_nano
-                and not span.events and not span.links
-                and not span.dropped_attributes_count and not span.dropped_events_count and not span.dropped_links_count,
-                'fixture trace is not one complete successful selected root')
-        same(attributes(span.attributes), {'function': name})
+        function_span(span, name)
         count += 1
     return count
 
@@ -80,34 +86,38 @@ def histogram(point) -> tuple:
     return point.count, tuple(point.bucket_counts), point.sum
 
 
-def metric(message, language: str, service: str, name: str, series: dict) -> int:
+def function_metric(value, name: str, series: dict) -> int:
+    """Retain every point from one declared function instrument."""
     count = 0
     expected = {'otelc.function.calls': ('sum', '{call}'), 'otelc.function.errors': ('sum', '{error}'),
                 'otelc.function.duration': ('histogram', 's')}
-    for value in groups(message, language, service, traces=False):
-        require(value.name in expected, 'foreign metric instrument')
-        kind, unit = expected[value.name]
-        data = getattr(value, kind)
-        require(value.WhichOneof('data') == kind and value.unit == unit
-                and data.aggregation_temporality == 2 and bool(data.data_points), 'invalid metric type/unit/temporality')
-        if kind == 'sum':
-            require(data.is_monotonic, 'nonmonotonic function counter')
-        for point in data.data_points:
-            labels = {'function': name}
-            if value.name.endswith('.errors'):
-                labels['error.type'] = 'exception'
-            same(attributes(point.attributes), labels)
-            require(not point.flags and not point.exemplars and 0 < point.start_time_unix_nano <= point.time_unix_nano,
-                    'invalid metric flags/exemplars/time')
-            if kind == 'histogram':
-                sample = histogram(point)
-            else:
-                require(point.WhichOneof('value') == 'as_int' and point.as_int in (0, 1)
-                        and (not value.name.endswith('.errors') or point.as_int == 0), 'invalid normal-call counter')
-                sample = (point.as_int, (), 0)
-            series.setdefault(value.name, []).append((point.start_time_unix_nano, point.time_unix_nano, *sample))
-            count += 1
+    require(value.name in expected, 'foreign metric instrument')
+    kind, unit = expected[value.name]
+    data = getattr(value, kind)
+    require(value.WhichOneof('data') == kind and value.unit == unit
+            and data.aggregation_temporality == 2 and bool(data.data_points), 'invalid metric type/unit/temporality')
+    if kind == 'sum':
+        require(data.is_monotonic, 'nonmonotonic function counter')
+    for point in data.data_points:
+        labels = {'function': name}
+        if value.name.endswith('.errors'):
+            labels['error.type'] = 'exception'
+        same(attributes(point.attributes), labels)
+        require(not point.flags and not point.exemplars and 0 < point.start_time_unix_nano <= point.time_unix_nano,
+                'invalid metric flags/exemplars/time')
+        if kind == 'histogram':
+            sample = histogram(point)
+        else:
+            require(point.WhichOneof('value') == 'as_int' and point.as_int in (0, 1)
+                    and (not value.name.endswith('.errors') or point.as_int == 0), 'invalid normal-call counter')
+            sample = (point.as_int, (), 0)
+        series.setdefault(value.name, []).append((point.start_time_unix_nano, point.time_unix_nano, *sample))
+        count += 1
     return count
+
+
+def metric(message, language: str, service: str, name: str, series: dict) -> int:
+    return sum(function_metric(value, name, series) for value in groups(message, language, service, traces=False))
 
 
 def totals(series: dict) -> None:
@@ -140,21 +150,33 @@ def response(value: dict, bodies: list) -> None:
                 'invalid HTTP response clock')
 
 
-def receipt(folder: Path, read, language: str, service: str, name: str, *, plain: bool) -> tuple[dict | None, int, int, int]:
-    """Decode original protobuf and bind each retained successful server response."""
+def payloads(folder: Path, read) -> list[tuple[str, bytes]]:
+    """Only bounded fixed capture filenames may supply the complete HTTP payload set."""
     manifest = read(folder / 'http-capture.json')
     same(sorted(manifest), ['bodies', 'errors']); same(manifest['errors'], [])
     bodies = []
+    total = 0
     require(len(manifest['bodies']) <= 4096, 'HTTP request budget exceeded')
     for index, row in enumerate(manifest['bodies']):
         same(sorted(row), ['file', 'path'])
         require(row['path'] in ROUTES and row['file'] == 'otlp-' + str(index) + '.protobuf', 'foreign transport payload')
         path = folder / row['file']
-        require(path.is_file() and not path.is_symlink() and 0 < path.stat().st_size <= 32 * 1024**2, 'invalid protobuf file')
-        bodies.append((row['path'], path.read_bytes()))
+        require(path.is_file() and not path.is_symlink(), 'invalid protobuf file')
+        size = path.stat().st_size
+        require(0 < size <= MAX_BYTES - total, 'protobuf capture budget exceeded')
+        with path.open('rb') as stream:
+            raw = stream.read(MAX_BYTES - total + 1)
+        require(len(raw) == size and len(raw) <= MAX_BYTES - total, 'protobuf changed or exceeded capture budget')
+        bodies.append((row['path'], raw))
+        total += len(raw)
     same(sorted(path.name for path in folder.glob('otlp-*.protobuf')), sorted(row['file'] for row in manifest['bodies']))
-    require(sum(len(raw) for _, raw in bodies) <= 32 * 1024**2, 'protobuf capture budget exceeded')
     response(read(folder / 'http-responses.json'), bodies)
+    return bodies
+
+
+def receipt(folder: Path, read, language: str, service: str, name: str, *, plain: bool) -> tuple[dict | None, int, int, int]:
+    """Decode original protobuf and bind each retained successful server response."""
+    bodies = payloads(folder, read)
     if plain:
         require(not bodies, 'plain fixture emitted telemetry')
         return None, 0, 0, 0

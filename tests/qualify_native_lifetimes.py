@@ -1,11 +1,13 @@
 """Exercise genuine public native lifetime workflows with literal state oracles.
 
-This first corpus covers one completed Item per synchronous scalar call. The
-consumer checks direct lifetime telemetry; a separate independent raw lifetime
-audit and broader zero/censored/startup/live profiles remain required.
+This corpus covers one completed Item per synchronous scalar call. The driver
+independently audits raw lifetime/function telemetry, closed final health and
+altered copies. Whole-corpus and broader zero/censored/startup/live qualification
+remain required.
 """
 
 import argparse
+import copy
 import errno
 import hashlib
 import json
@@ -14,10 +16,13 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import time
 
 import native_prepared_receipt as retained
+import native_lifetime_audit as raw_audit
+import native_lifetime_refusals as raw_refusals
 import qualification_storage
-from qualify_project_tests import command, toml
+from qualify_project_tests import command as execute_command, toml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'examples'))
 from otelc_capture import path_within
@@ -25,6 +30,16 @@ from otelc_capture import path_within
 CASES = (('c-completed', 'c', False), ('cpp-completed', 'cpp', False), ('c-state', 'c', True))
 SDK_HEAD = 'acb13d7735526448209df37b7e6b98e5717befdb'
 PROFILES = {'c': 'native-resources-owned-v1', 'cpp': 'native-objects-owned-v1'}
+
+
+def command(argv: list, folder: Path, label: str, **options) -> str:
+    """Expose stage timing without mixing SDK/application channels into driver output."""
+    print(json.dumps({'phase': 'starting', 'case': folder.name, 'stage': label}), flush=True)
+    started = time.monotonic()
+    output = execute_command(argv, folder, label, **options)
+    print(json.dumps({'phase': 'completed', 'case': folder.name, 'stage': label,
+                      'seconds': round(time.monotonic() - started, 3)}), flush=True)
+    return output
 
 
 def digest(path: Path) -> str:
@@ -103,11 +118,15 @@ class Audit:
         self.registry = retained.Oracle(root, provider)
         self.records = {}
         self.files = {}
+        self.contexts = {}
+        self.case_languages = {self.registry.root / name: language for name, language, _ in CASES}
 
     def attempt(self, report: Path, folder: Path, entry: dict, lane: str, witness,
                 expected_arguments: tuple[int, ...]) -> None:
         original = self.registry.original(report)
         actual = original.parent / folder.relative_to(report.parent)
+        languages = [language for root, language in self.case_languages.items() if actual.is_relative_to(root)]
+        assert languages == [entry['language']]
         runtime = actual / 'native-runtime'
         request = retained.read(runtime / 'native-request.json')
         application = retained.read(runtime / 'native-application-start.json')
@@ -118,7 +137,6 @@ class Audit:
         retained.same(finished['application_pid'], application['pid'])
         retained.same(finished['application_exit_code'], 0)
         held = {'pid': application['pid'], 'folder': str(actual), 'plain': request['plain']}
-        assert self.records.setdefault(request['launch_id'], held) == held
         caller = retained.read(actual / 'native-caller/caller.json')
         retained.same(caller['entry'], entry)
         assert arguments(caller['arguments']) == expected_arguments
@@ -146,6 +164,12 @@ class Audit:
             counters = verified['health']['object_accounting' if entry['language'] == 'cpp' else 'resource_accounting']
             assert all(counters[key] == str(value) for key, value in
                        {'types': 1, 'admitted': 1, 'completed': 1, 'censored': 0}.items())
+        held['raw_lifetime_receipt'] = raw_audit.verify(actual, entry, witness, plain=lane == 'baseline')
+        assert (held['raw_lifetime_receipt'] is None) is (lane == 'baseline')
+        retained.same(self.records.setdefault(request['launch_id'], held), held)
+        if lane != 'baseline':
+            context = {'folder': str(actual), 'entry': copy.deepcopy(entry), 'witness': copy.deepcopy(witness)}
+            retained.same(self.contexts.setdefault(request['launch_id'], context), context)
         for path in (actual / 'expected-lifetimes-before-build.json', actual / 'expected-lifetimes.json'):
             retained.identity(path, private=True)
         for path in actual.rglob('*'):
@@ -153,12 +177,26 @@ class Audit:
                 value = retained.identity(path, owned=True)
                 assert self.files.setdefault(str(path), value) == value
 
+    def refusals(self, root: Path) -> dict:
+        """Both actual language captures must refuse altered copies without new apps."""
+        root.mkdir()
+        by_language = {}
+        for context in self.contexts.values():
+            language = context['entry']['language']
+            if language not in by_language:
+                by_language[language] = raw_refusals.run(Path(context['folder']), context['entry'],
+                                                       context['witness'], root / language)
+        assert set(by_language) == {'c', 'cpp'}
+        assert all(value['count'] == 14 and value['new_application_launches'] == 0 for value in by_language.values())
+        return by_language
+
     def finish(self) -> dict:
         for path, facts in self.files.items():
             assert retained.identity(Path(path), owned=True) == facts
         return {'actual_application_records': len(self.records), 'original_evidence_files_held': len(self.files),
                 'records': self.records, 'copied_reports': sorted(self.registry.archived),
-                'scope': 'Independent literal application state, launch denominator and original file preservation; consumer-checked lifetime receipt'}
+                'raw_lifetime_receipts': sum(row['raw_lifetime_receipt'] is not None for row in self.records.values()),
+                'scope': 'Independent literal application state, raw lifetime/function protobuf, closed SDK health, launch denominator and original file preservation'}
 
 
 def arguments(value: object) -> tuple[int, ...]:
@@ -253,14 +291,16 @@ def exercise(cli: Path, provider: Path, sdk: Path, root: Path) -> dict:
                 check_report(Path(trial['report']), True, audit, expected=arguments(trial['arguments']))
             framework(Path(summary['workspace']), folder, 'reduced-framework', True, audit, expected=(0,))
         results.append({'name': name, 'language': language, 'difference': difference})
+    refusal_results = audit.refusals(root / 'raw-evidence-refusals')
     summary = audit.finish()
     return {'claim': 'equivalence over these tests and observations', 'cases': results,
             'actual_application_launches': summary['actual_application_records'], 'audit': summary,
+            'raw_evidence_refusals': refusal_results,
             'consumer_cli_sha256': digest(cli), 'sdk_source': SDK_HEAD,
             'consumer_source': subprocess.check_output(['git', 'rev-parse', 'HEAD'],
                 cwd=Path(__file__).resolve().parents[1]).decode().strip(),
             'routes': ['generated', 'framework', 'replay', 'detached', 'scalar-reduction'],
-            'remaining': ['independent complete raw lifetime audit and evidence refusals', 'current-source promotion',
+            'remaining': ['qualification of the independent raw lifetime audit and evidence refusals', 'current-source promotion',
                           'zero/censored/exception/startup/live profiles', 'shipping, broader platforms and completion checklist'],
             'qualification_tier': 'genuine public workflow development; no broader profile admission'}
 

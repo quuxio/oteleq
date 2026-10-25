@@ -5,6 +5,10 @@ on:
     paths:
       - '.github/workflows/native-lifetimes.yml'
       - 'tests/qualify_native_lifetimes.py'
+      - 'tests/native_lifetime_audit.py'
+      - 'tests/native_lifetime_otlp.py'
+      - 'tests/native_lifetime_refusals.py'
+      - 'tests/native_prepared_otlp.py'
   workflow_dispatch:
 
 permissions:

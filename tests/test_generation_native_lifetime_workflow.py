@@ -1,7 +1,9 @@
 """Literal workflow controls, not compiler/SDK/application qualification."""
 
 import copy
+from contextlib import redirect_stdout
 import errno
+import io
 import json
 from pathlib import Path
 import tempfile
@@ -17,6 +19,22 @@ class NativeLifetimeWorkflowTests(TestCase):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name).resolve()
+
+    def test_driver_progress_keeps_command_output_and_failure_identity(self):
+        output = io.StringIO()
+        with patch.object(qualifier, 'execute_command', return_value='original command output') as execute, \
+                patch.object(qualifier.time, 'monotonic', side_effect=[1, 2]), redirect_stdout(output):
+            self.assertEqual(qualifier.command(['never-executed'], self.root, 'run', expected=1), 'original command output')
+        execute.assert_called_once_with(['never-executed'], self.root, 'run', expected=1)
+        events = [json.loads(line) for line in output.getvalue().splitlines()]
+        self.assertEqual([row['phase'] for row in events], ['starting', 'completed'])
+        self.assertEqual(events[-1]['seconds'], 1)
+        failure = RuntimeError('original stage failed'); output = io.StringIO()
+        with patch.object(qualifier, 'execute_command', side_effect=failure), redirect_stdout(output), \
+                self.assertRaises(RuntimeError) as caught:
+            qualifier.command(['never-executed'], self.root, 'failed')
+        self.assertIs(caught.exception, failure)
+        self.assertEqual(len(output.getvalue().splitlines()), 1)
 
     def report(self, difference=False, *, amount=5, language='c'):
         function = 'selected(int)' if language == 'cpp' else 'selected'
@@ -88,8 +106,9 @@ class NativeLifetimeWorkflowTests(TestCase):
     def test_equal_but_wrong_observations_and_missing_repeats_refuse(self):
         path, original = self.report()
         bundle_path = path.parent / 'sample-0/typed-bundle.json'
-        for change in ('return', 'state', 'errno', 'type', 'before', 'gaps', 'capture', 'capture-type', 'exit-type', 'repeats'):
+        for change in ('return', 'state', 'errno', 'type', 'before', 'gaps', 'capture', 'capture-type', 'exit-type', 'repeats', 'roots'):
             value = copy.deepcopy(original)
+            if change == 'roots': value['contract']['required_roots'].append(value['contract']['required_roots'][0])
             for lane in ('baseline', 'instrumented_on'):
                 for attempt in value[lane]:
                     observed = attempt['observation']
@@ -196,6 +215,7 @@ class NativeLifetimeWorkflowTests(TestCase):
                     'trials': [{'arguments': [2], 'report': str(folder / 'trial/report.json')}]})
             return ''
         fake = Mock(); fake.finish.return_value = {'actual_application_records': 52}
+        fake.refusals.return_value = {'c': {'count': 14}, 'cpp': {'count': 14}}
         with patch.object(qualifier, 'command', side_effect=command), \
                 patch.object(qualifier, 'Audit', return_value=fake), \
                 patch.object(qualifier, 'check_report', return_value=4) as check, \
@@ -210,7 +230,8 @@ class NativeLifetimeWorkflowTests(TestCase):
         self.assertEqual(check.call_args_list[-1].kwargs, {'expected': (2,)})
         self.assertEqual(framework.call_args.kwargs, {'expected': (0,)})
         self.assertEqual([row[0] for row in calls].count('shrink'), 1)
-        self.assertIn('independent complete raw lifetime audit and evidence refusals', result['remaining'])
+        self.assertIn('qualification of the independent raw lifetime audit and evidence refusals', result['remaining'])
+        self.assertEqual(result['raw_evidence_refusals'], fake.refusals.return_value)
 
     def test_original_source_facts_detect_restored_bytes_with_new_write_facts(self):
         path = self.root / 'source.py'; path.write_text('original')
@@ -220,6 +241,10 @@ class NativeLifetimeWorkflowTests(TestCase):
             self.assertNotEqual(qualifier.source_facts(self.root), before)
 
     def audit_fixture(self, lane='baseline', *, suffix=''):
+        # These controls isolate literal joins/file preservation. The separate
+        # raw-audit suite checks the unchanged complete capture and mutations.
+        validation = patch.object(qualifier.raw_audit, 'verify', return_value=None if lane == 'baseline' else {'mocked': True})
+        validation.start(); self.addCleanup(validation.stop)
         folder = self.root / (lane + suffix); runtime = folder / 'native-runtime'; runtime.mkdir(parents=True)
         request = {'plain': lane == 'baseline', 'runtime': str(runtime), 'launch_id': 'a' * 32}
         values = {'native-request.json': request,
@@ -245,13 +270,21 @@ class NativeLifetimeWorkflowTests(TestCase):
             qualifier.write(folder / 'native-verified-lifetimes.json', verified)
         audit = object.__new__(qualifier.Audit)
         audit.registry = Mock(); audit.registry.original.return_value = self.root / 'report.json'
-        audit.registry.archived = set(); audit.records = {}; audit.files = {}
+        audit.registry.archived = set(); audit.records = {}; audit.files = {}; audit.contexts = {}
+        audit.case_languages = {self.root: 'c'}
         return audit, folder, entry, witness
+
+    def test_report_cannot_choose_another_case_language_for_the_oracle(self):
+        audit, folder, entry, witness = self.audit_fixture()
+        entry['language'] = 'cpp'
+        with self.assertRaises(AssertionError):
+            audit.attempt(self.root / 'report.json', folder, entry, 'baseline', witness, (5,))
 
     def test_launch_records_complete_receipt_and_original_file_facts_remain_bound(self):
         for lane in ('baseline', 'instrumented_on'):
             audit, folder, entry, witness = self.audit_fixture(lane)
             audit.attempt(self.root / 'report.json', folder, entry, lane, witness, (5,))
+            qualifier.raw_audit.verify.assert_called_once_with(folder, entry, witness, plain=lane == 'baseline')
             result = audit.finish()
             self.assertEqual(result['actual_application_records'], 1)
             self.assertGreater(result['original_evidence_files_held'], 4)
@@ -282,6 +315,17 @@ class NativeLifetimeWorkflowTests(TestCase):
             qualifier.write(path, value)
             with self.subTest(change=change), self.assertRaises(ValueError):
                 audit.attempt(self.root / 'report.json', folder, entry, 'instrumented_on', witness, (5,))
+
+    def test_actual_refusal_dispatch_requires_both_languages_and_fixed_counts(self):
+        audit = object.__new__(qualifier.Audit)
+        audit.contexts = {str(i): {'folder': str(self.root / language), 'entry': {'language': language}, 'witness': {}}
+                          for i, language in enumerate(('c', 'c', 'cpp'))}
+        with patch.object(qualifier.raw_refusals, 'run', return_value={'count': 14, 'new_application_launches': 0}) as run:
+            self.assertEqual(set(audit.refusals(self.root / 'refusals')), {'c', 'cpp'})
+            self.assertEqual(run.call_count, 2)
+        audit.contexts.pop('2')
+        with patch.object(qualifier.raw_refusals, 'run', return_value={'count': 14, 'new_application_launches': 0}), \
+                self.assertRaises(AssertionError): audit.refusals(self.root / 'missing')
 
     def test_main_pins_sdk_source_and_preserves_noncoverage_products(self):
         provider = self.root / 'provider'; provider.mkdir()

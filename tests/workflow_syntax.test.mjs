@@ -18,6 +18,9 @@ test('all GitHub workflow files have valid YAML syntax', () => {
 test('native lifetime qualification uses the reviewed SDK and one owned hosted job', () => {
   const workflow = yaml.load(readFileSync(new URL('../.github/workflows/native-lifetimes.yml', import.meta.url), 'utf8'));
   assert.equal(workflow.permissions.contents, 'read');
+  for (const module of ['native_lifetime_audit', 'native_lifetime_otlp', 'native_lifetime_refusals', 'native_prepared_otlp']) {
+    assert.ok(workflow.on.pull_request.paths.includes(`tests/${module}.py`));
+  }
   const job = workflow.jobs['native-lifetimes'];
   assert.equal(job['runs-on'], 'ubuntu-24.04');
   const checkouts = job.steps.filter(step => step.uses?.startsWith('actions/checkout@'));
