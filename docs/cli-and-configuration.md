@@ -139,7 +139,7 @@ The explicit source-v1 Node provider accepts [live metric schedules](node-metric
 
 A prepared Java receiver call can include `metrics = { collection = false, emission = true }`. Every call in that schedule must declare both booleans, with a both-on positive control somewhere in the schedule. The host controls one unchanged JVM through private checkpoints, waits for an effective export-off barrier, and restores both settings before shutdown. [The control guide](java-metric-controls.md) defines the qualified initial states, direct trace/metric/health checks, budgets and limitations. The ordinary plain/on workflow is unchanged when controls are absent.
 
-Explicit source-v1 [Go receiver schedules](go-metric-controls.md) implement the same declared states through owned native checkpoints and independent metric-subset checks. Actual-provider and retained-workflow qualification is in progress. Prepared origin/cache [Python schedules](python-metric-controls.md) have their separate qualified profiles.
+Explicit source-scope-v1 [Go receiver schedules](go-metric-controls.md) have [320-launch qualification](qualification/go-scope-metric-controls-2026-10-25.json) for untagged build6, all four startup states and generated/retained workflows. Owned native checkpoints and independent graph/trace/metric checks retain the observed limits; other Go profiles need separate qualification. Prepared origin/cache [Python schedules](python-metric-controls.md) have their separate qualified profiles.
 
 ### Ordered receiver sequences
 

@@ -36,7 +36,7 @@ The reader additionally binds build-5 `command_evidence` to every retained compi
 
 ### Candidate private-bootstrap builds
 
-Set `adapters.go.backend = "source-scope-v1"` to select the separate candidate `private-bootstrap-v1` helper profile. It requires prepared-tools 2, untagged build 6/inspection 1 or tagged build 7/inspection 2, with configuration 2 and health 4. Component checks are implemented; generated, live and retained workflow qualification remains pending. Existing build-4/5 records keep their original helper and tooling requirements.
+Set `adapters.go.backend = "source-scope-v1"` to select the separate `private-bootstrap-v1` helper profile. It requires prepared-tools 2, untagged build 6/inspection 1 or tagged build 7/inspection 2, with configuration 2 and health 4. The [320-launch qualification](qualification/go-scope-metric-controls-2026-10-25.json) covers the recorded untagged build6 generated/live/retained profile and all four startup states. Tagged build7 remains unqualified by that record. Existing build-4/5 records keep their original helper and tooling requirements.
 
 Prepare the compatible SDK's private weaver in its fixed `build/go-upstream-scope` directory. The public protocol query is `go-protocols --scope-safe --prepared-tools`, with `--build-tags` added only for a nonempty tag selection. Each public build adds `--scope-safe --tooling-directory /absolute/sdk/build/go-upstream-scope`. The consumer chooses these arguments and paths; metadata cannot choose a command or trigger a fallback.
 

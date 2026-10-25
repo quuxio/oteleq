@@ -1,8 +1,8 @@
 # Go live metric schedules
 
-Status: implemented for explicit `source-v1` call-only receiver workers; actual-provider and retained-workflow qualification is in progress. Component tests do not establish complete Go support. The [prepared-provider guide](go-prepared-provider.md) names the accepted SDK protocols and remaining build limits.
+Status: bounded diagnostic qualification for explicit `source-scope-v1` call-only receiver workers. The [320-launch qualification](qualification/go-scope-metric-controls-2026-10-25.json) covers all four startup states and generated/retained routes against its frozen runtime/provider. The separate `source-v1` implementation and earlier records retain their own scope. This does not establish complete Go support. The [prepared-provider guide](go-prepared-provider.md) names the accepted SDK protocols and remaining build limits.
 
-The separate candidate `source-scope-v1` backend uses the same schedule contract with private-bootstrap-v1 and build6/7/prepared-tools2. Its generated, live and retained execution requires separate qualification; older source-v1 records do not cover it.
+The qualified `source-scope-v1` record uses private-bootstrap-v1, untagged build6/inspection1 and prepared-tools2. Tagged build7 and other helper/build profiles need separate execution and qualification; neither older source-v1 records nor this untagged corpus cover them.
 
 ## Declare a schedule
 
@@ -13,7 +13,7 @@ schema_version = 1
 languages = ["go"]
 
 [adapters.go]
-backend = "source-v1"
+backend = "source-scope-v1"
 module_roots = ["."]
 
 [limits]
@@ -53,7 +53,7 @@ Missing checkpoints, an early acknowledgement, changed file facts, a different p
 
 ## Scope
 
-This profile supports declared synchronous receiver calls and its fixed compiler/build recipe. It does not establish general invocation attribution, goroutine scheduling, resource actions, arbitrary Go objects, cgo/workspaces, shipping artefacts or other SDK helper recipes. Tagged builds and retained/replayed/reduced/promoted workflows need evidence against their exact implementation revisions. The [completion checklist](completion.md) remains open.
+This profile supports declared synchronous receiver calls and its fixed compiler/build recipe. It does not establish general invocation attribution, goroutine scheduling, resource actions, arbitrary Go objects, cgo/workspaces, shipping artefacts or other SDK helper recipes. The recorded untagged retained/replayed/reduced/promoted workflows have the separate exact-revision evidence above. Tagged builds and changed profiles need their own qualification. The [completion checklist](completion.md) remains open.
 
 The result is **equivalence over these tests and observations**.
 
@@ -81,4 +81,6 @@ The command exercises direct generation, replay, external unittest, detached exp
 
 The shrink archive is a byte copy with new filesystem identities. Its four launch IDs must identify one unique original report in the complete retained registry. Every archived file, directory, mode and byte digest must match that original before the audit uses the original publication/link facts. Missing or ambiguous originals, modified archives and extra entries refuse qualification. The archive is not recertified as a new execution, and its observations remain separate from actual launches.
 
-These are maintained qualification tools. Successful focused tests or one startup state do not qualify the complete matrix; published evidence must identify the actual source, SDK, tools and routes executed.
+The [25 October record](qualification/go-scope-metric-controls-2026-10-25.json) binds runtime `cb08b82`, its CLI and SDK `eda9fcc` to 320 actual applications and 160 SDK processes. The four serial corpora produce 76 reports and 336 observations, including 16 copied originals, with 84 recomputed comparisons and 20 altered-evidence refusals. The final retained-only audit starts no applications, confirms 320 globally unique launch IDs and preserves all 401,894 original evidence files plus 587 consumer, 500 SDK, 485 pinned-weaver and six tooling inputs. The measured SDK cache bound is 512 MiB; every fresh command samples an 8 GiB storage floor. Earlier storage/interruption/oracle failures remain separate failed or incomplete records. Later native integration or documentation changes do not broaden the frozen Go runtime qualification.
+
+These are maintained qualification tools. Successful focused tests or one startup state do not qualify the complete matrix; each new profile needs actual source, SDK, tooling and route evidence.
