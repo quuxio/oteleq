@@ -54,3 +54,23 @@ Missing checkpoints, an early acknowledgement, changed file facts, a different p
 This profile supports declared synchronous receiver calls and its fixed compiler/build recipe. It does not establish general invocation attribution, goroutine scheduling, resource actions, arbitrary Go objects, cgo/workspaces, shipping artefacts or other SDK helper recipes. Tagged builds and retained/replayed/reduced/promoted workflows need evidence against their exact implementation revisions. The [completion checklist](completion.md) remains open.
 
 The result is **equivalence over these tests and observations**.
+
+## Qualify generated and retained suites
+
+The maintained `source-scope-v1` corpus uses a private receiver, seven application declarations that shadow builtins, five ordered calls and a primitive panic. One method deliberately changes intermediate instance state only in the instrumented lane, then restores it. Complete literal graph expectations check every root, scalar, storage location, self cycle and call outcome in both repeats of both lanes. Matching return values and final state cannot hide that intermediate difference.
+
+Run each initial state in a new external directory against the matching prepared SDK:
+
+```sh
+make generation-go-controls-otelc \
+  OTELC_ROOT=/absolute/path/to/prepared-otelc \
+  REPORT_DIR=/absolute/path/to/new-go-controls \
+  AUDIT_DIR=/absolute/path/to/new-go-controls-audit \
+  GO_CONTROL_STARTUP=both-on
+```
+
+Repeat with `collection-off`, `emission-off` and `both-off`. Every schedule includes all four flag pairs, an emitting positive control and a final collected panic while emission is disabled. Restoration must deliver the retained call, duration and error measurements. Raw decoded traces must retain the factory and all five selected calls throughout the schedule.
+
+The command exercises direct generation, replay, external unittest, detached export, scalar shrinking and current-source promotion. Promotion changes existing return values and discovers a newly added method. The retained audit recomputes comparisons, checks every named operation and separates copied shrink observations from actual application launches. `GENERATION_ARGS=--retained-only` audits an existing complete run into a new `AUDIT_DIR`, without starting applications. Interrupted or failed operations retain their original output and must be inspected before recovery.
+
+These are maintained qualification tools. Successful focused tests or one startup state do not qualify the complete matrix; published evidence must identify the actual source, SDK, tools and routes executed.

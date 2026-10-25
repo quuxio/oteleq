@@ -12,11 +12,13 @@ JAVA_STARTUP_PROFILE ?= safe-methods-v1
 PYTHON_CONTROL_STARTUP ?= both-on
 PYTHON_CONTROL_PROFILE ?= python-native-origins-v2
 GO_SOURCE_BACKEND ?= source-v1
+GO_CONTROL_STARTUP ?= both-on
 AUDIT_DIR ?= $(REPORT_DIR)-audit
 MARKDOWNLINT ?= ./ci/markdownlint/node_modules/.bin/markdownlint
 DEPENDENCY_AUDIT_OUTPUT ?= $(CURDIR)/build/dependency-audit
 
 .PHONY: dependency-audit dependency-audit-check
+.PHONY: generation-go-controls-otelc
 
 .PHONY: generation-project-tests-otelc generation-preconditions-otelc generation-domains-otelc generation-input-walks-otelc generation-retained-source-otelc generation-native-project-otelc generation-return-otelc generation-java-sequence-otelc generation-java-controls-otelc generation-java-project-otelc generation-java-archive-otelc generation-node-project-otelc
 .PHONY: node-source-context-check
@@ -33,6 +35,7 @@ DEPENDENCY_AUDIT_OUTPUT ?= $(CURDIR)/build/dependency-audit
 .PHONY: help setup lint examples docs-check observer-check generation-check effect-qualification-check node-observer-check node-sequence-check java-observer-check go-observer-check cpp-observer-check generation-cpp-receiver-otelc generation-go-receiver-otelc generation-go-source-otelc generation-java-receiver-otelc generation-otelc generation-policy-otelc generation-rust-otelc rust-semantic-otelc generation-native-otelc generation-shrink-otelc generation-python-project-otelc generation-receiver-otelc generation-node-receiver-otelc generation-go-build-otelc generation-go-project-otelc generation-sequence-otelc generation-typescript-sequence-otelc generation-filesystem-otelc generation-http-otelc resource-otelc capture-otelc report core-check coverage check
 
 help:
+	@printf '%s\n' 'generation-go-controls-otelc Qualify source-scope Go live states, retained suites and promotion (GO_CONTROL_STARTUP, AUDIT_DIR)'
 	@printf '%s\n' 'generation-go-source-otelc Qualify rebuilt Go receiver, retained and shrink workflows (GO_SOURCE_BACKEND)'
 	@printf '%s\n' 'generation-python-controls-otelc Qualify Python startup/live metric states and retained/promoted suites (PYTHON_CONTROL_PROFILE, PYTHON_CONTROL_STARTUP, AUDIT_DIR)'
 	@printf '%s\n' 'dependency-audit Check all locked repository dependencies against current OSV advisories' 'dependency-audit-check Test the audit runner offline and enforce 80% coverage'
@@ -437,6 +440,11 @@ generation-go-source-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
 	$(PYTHON) tests/qualify_go_receivers.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" --backend "$(GO_SOURCE_BACKEND)" $(GENERATION_ARGS)
+
+generation-go-controls-otelc:
+	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
+	cargo build --locked
+	$(PYTHON) tests/qualify_go_controls.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --audit-dir "$(AUDIT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" --startup-state "$(GO_CONTROL_STARTUP)" $(GENERATION_ARGS)
 
 generation-go-project-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
