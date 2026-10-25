@@ -37,7 +37,7 @@ Fixed diagnostic corpora also qualify [Python and Java executor context](docs/ei
 
 The [original-source Rust compiler corpus](docs/rust-build-bundles.md) qualifies four generated scalar cases through generated/exported suites and fixed completion/cancellation/unwind and aliased-module diagnostics: 108 candidate-provider launches, 24 legacy compatibility launches and 14 altered build-record refusals. General Cargo, generated async and receiver support remain open.
 
-The [native prepared-provider components](docs/native-prepared-provider.md) independently check C/C++ build and launch records, actual pre-exec OS ownership and final SDK health. Their fixed-startup telemetry reader joins actual selected calls and metrics to decoded downstream receipt. Generator selection and generated/retained workflow qualification remain open.
+The [native prepared-provider components](docs/native-prepared-provider.md) independently check C/C++ build and launch records, actual pre-exec OS ownership and final SDK health. Their fixed-startup telemetry reader joins actual selected calls and metrics to decoded downstream receipt, binds the service to the prepared policy and checks complete cumulative histograms. Generator selection and generated/retained workflow qualification remain open.
 
 The result is **equivalence over these tests and observations**. It is not a blanket proof that every function is identical.
 

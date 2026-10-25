@@ -6,6 +6,7 @@ import json
 import math
 from pathlib import Path
 
+import histogram_observation
 import native_execution
 from native_protocol import require
 import otelc_capture as capture
@@ -114,12 +115,15 @@ def point(metric, value, names: set[str], bounds: list) -> tuple:
             require(value.HasField('min') and value.HasField('max')
                     and math.isfinite(value.min) and math.isfinite(value.max)
                     and 0 <= value.min <= value.max, 'missing native histogram extrema')
+        histogram_observation.histogram_range(value, bounds)
         number = value.count
+        buckets, total, limits = tuple(value.bucket_counts), value.sum, (value.min, value.max)
     else:
         require(metric.sum.is_monotonic and value.WhichOneof('value') == 'as_int'
                 and value.as_int >= 0 and not value.exemplars, 'invalid native cumulative counter')
         number = value.as_int
-    return (metric.name, function), (value.start_time_unix_nano, value.time_unix_nano, number)
+        buckets, total, limits = (), 0, ()
+    return (metric.name, function), (value.start_time_unix_nano, value.time_unix_nano, number, buckets, total, limits)
 
 
 def metrics(bodies: list, language: str, service: str, names: dict, errors: Counter,
@@ -157,6 +161,9 @@ def metrics(bodies: list, language: str, service: str, names: dict, errors: Coun
         require(len({row[0] for row in samples}) == 1 and len({row[1] for row in samples}) == len(samples)
                 and all(first[2] <= second[2] for first, second in zip(samples, samples[1:])),
                 'reset, duplicate or decreasing native cumulative samples')
+        if key[0] == DURATION:
+            for previous, sample in zip(samples, samples[1:]):
+                histogram_observation.cumulative_histogram(previous, sample, bounds)
         totals[key] = samples[-1][2]
     if enabled:
         wanted = {(metric, name): number for name, number in names.items() for metric in (CALLS, DURATION)}
@@ -175,10 +182,13 @@ def witness(completed: native_execution.Execution, bodies: list, service: str,
             and all(type(name) is str and 0 < len(name) <= 4096 for name in roots), 'invalid native receipt intent')
     completed.verify()
     launch = completed.started.launch
+    policy = launch.intent.policy()
+    require(type(service) is str and bool(service)
+            and service == policy.get('resource', {}).get('service_name'),
+            'native receipt service differs from prepared policy')
     if launch.intent.plain:
         require(not bodies and completed.health is None, 'plain native worker emitted SDK evidence')
         return None
-    policy = launch.intent.policy()
     require(policy['traces']['enabled'] is True and type(policy['traces']['sample_ratio']) in (int, float)
             and policy['traces']['sample_ratio'] == 1.0,
             'native qualification requires complete selected traces')

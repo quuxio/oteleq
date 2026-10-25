@@ -11,6 +11,7 @@ import native_sdk
 import native_toolchain
 
 POLICY = {'schema_version': 3, 'languages': ['c', 'cpp'], 'sources': {'include': ['**'], 'exclude': []},
+          'resource': {'service_name': 'native-telemetry-unit'},
           'functions': {'include': ['workload*'], 'exclude': []}, 'lifetimes': {'enabled': False},
           'context': {'http': False, 'tasks': False}}
 BOOTSTRAP = '''#include <cstdlib>

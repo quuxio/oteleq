@@ -1,12 +1,11 @@
 """Independent process/code-ID OTLP accounting; source origin remains separate."""
 
-from bisect import bisect_left
 from collections import Counter
-from fractions import Fraction
 import math
 
 from google.protobuf.message import DecodeError
 
+import histogram_observation
 import otelc_capture as capture
 import python_execution
 from python_provider import require
@@ -100,68 +99,13 @@ def metric_point(metric, point, functions: dict) -> tuple:
 
 
 def histogram_range(point) -> None:
-    """Bound the sum using actual extrema and inclusive-upper bucket semantics.
-
-    Fractions avoid overflow and rounding while constructing feasible bounds.
-    The final comparison allows binary64 summation error and subnormal rounding.
-    Counts above this error model cannot fit the bounded local trace receipt.
-    """
-    count, minimum, maximum = point.count, point.min, point.max
-    require(0 < count < 2 ** 52, "Python histogram count exceeds the summation bound")
-    extrema = (minimum, maximum) if minimum != maximum else (minimum,)
-    lower, upper = feasible_range(point.bucket_counts, minimum, maximum, extrema)
-    total = Fraction(point.sum)
-    require(lower - rounding_bound(count, lower) <= total <= upper + rounding_bound(count, upper),
-            "Python histogram sum contradicts its range or populated buckets")
-
-
-def feasible_range(buckets: tuple, minimum: float, maximum: float, extrema: tuple) -> tuple[Fraction, Fraction]:
-    """Bound nonnegative observations and reserve each required actual extreme."""
-    lower = upper = Fraction(0)
-    remaining = list(buckets)
-    # The reported extrema must each be an actual observation, not merely
-    # arbitrary limits intersecting one of the populated buckets.
-    for value in extrema:
-        index = bisect_left(BOUNDS, value)
-        remaining[index] -= 1
-        require(remaining[index] >= 0, "Python histogram extrema have no observations")
-        lower += Fraction(value)
-        upper += Fraction(value)
-    for index, amount in enumerate(remaining):
-        if not amount:
-            continue
-        low = minimum if index == 0 else max(minimum, math.nextafter(BOUNDS[index - 1], math.inf))
-        high = maximum if index == len(BOUNDS) else min(maximum, BOUNDS[index])
-        require(low <= high, "Python histogram populated bucket contradicts its extrema")
-        lower += Fraction(low) * amount
-        upper += Fraction(high) * amount
-    return lower, upper
-
-
-def rounding_bound(count: int, bound: Fraction) -> Fraction:
-    """Bound nonnegative binary64 addition error, including subnormal rounding."""
-    # For nonnegative binary64 additions, gamma_n bounds relative rounding;
-    # n half-minimum-subnormal units additionally bound absolute underflow.
-    additions = count - 1  # Adding the first binary64 value to zero is exact.
-    gamma = Fraction(additions, 2 ** 53 - additions)
-    underflow = Fraction(additions, 2 ** 1075) * (1 + gamma)
-    return bound * gamma + underflow if bound else Fraction(0)
+    """Retain Python's fixed boundaries with the common binary64 range check."""
+    histogram_observation.histogram_range(point, BOUNDS)
 
 
 def cumulative_histogram(previous: tuple, sample: tuple) -> None:
     """New cumulative sums must fit only the newly added bucket observations."""
-    old_minimum, old_maximum = previous[5]
-    minimum, maximum = sample[5]
-    required = tuple(value for changed, value in ((minimum < old_minimum, minimum), (maximum > old_maximum, maximum)) if changed)
-    buckets = tuple(current - old for current, old in zip(sample[3], previous[3], strict=True))
-    lower, upper = feasible_range(buckets, minimum, maximum, required)
-    _, old_upper = feasible_range(previous[3], old_minimum, old_maximum,
-                                 (old_minimum, old_maximum) if old_minimum != old_maximum else (old_minimum,))
-    _, current_upper = feasible_range(sample[3], minimum, maximum,
-                                     (minimum, maximum) if minimum != maximum else (minimum,))
-    error = rounding_bound(previous[2], old_upper) + rounding_bound(sample[2], current_upper)
-    added = Fraction(sample[4]) - Fraction(previous[4])
-    require(lower - error <= added <= upper + error, "Python cumulative histogram sum contradicts added bucket observations")
+    histogram_observation.cumulative_histogram(previous, sample, BOUNDS)
 
 
 def metric_group(group, execution: python_execution.Execution, service: str, functions: dict,

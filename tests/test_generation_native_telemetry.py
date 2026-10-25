@@ -1,6 +1,7 @@
 """Literal native protobuf observations and independent owned completion controls."""
 
 import json
+import math
 from pathlib import Path
 import sys
 import tempfile
@@ -62,6 +63,25 @@ def bodies(traces=None, metrics=None):
             ('/v1/metrics', (metrics or metric).SerializeToString())]
 
 
+def metric_prefix(values, timestamp, bounds=BOUNDS):
+    """Aggregate concrete observations independently of the production reader."""
+    _, message = messages()
+    scope = message.resource_metrics[0].scope_metrics[0]
+    scope.metrics[0].sum.data_points[0].as_int = len(values)
+    for instrument in scope.metrics:
+        data = instrument.histogram if instrument.name == receipt.DURATION else instrument.sum
+        data.data_points[0].time_unix_nano = timestamp
+    point = scope.metrics[1].histogram.data_points[0]
+    point.count, point.sum, point.min, point.max = len(values), sum(values), min(values), max(values)
+    point.explicit_bounds[:] = bounds
+    buckets = [0] * (len(bounds) + 1)
+    for value in values:
+        index = next((index for index, boundary in enumerate(bounds) if value <= boundary), len(bounds))
+        buckets[index] += 1
+    point.bucket_counts[:] = buckets
+    return message
+
+
 def execution(root, *, plain=False, collection=True, emission=True):
     values = {'traces': {'enabled': True, 'sample_ratio': 1.0},
               'metrics': {'collection': collection, 'emission': emission, 'histogram_boundaries_seconds': BOUNDS}}
@@ -80,6 +100,66 @@ def execution(root, *, plain=False, collection=True, emission=True):
 
 
 class NativeTelemetryTests(unittest.TestCase):
+    def test_service_argument_and_both_resources_cannot_replace_prepared_service(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            completed = execution(Path(temporary).resolve())
+            trace, metric = messages()
+            for group in (trace.resource_spans[0], metric.resource_metrics[0]):
+                group.resource.attributes[0].value.string_value = 'foreign-service'
+            with self.assertRaises(ValueError):
+                receipt.witness(completed, bodies(trace, metric), 'foreign-service', (NAME, NAME))
+
+    def test_impossible_histogram_sum_and_decreasing_cumulative_sum_refuse(self):
+        trace, metric = messages()
+        histogram = metric.resource_metrics[0].scope_metrics[0].metrics[1].histogram.data_points[0]
+        histogram.sum = 1000
+        with self.subTest(kind='impossible-single-sum'), self.assertRaises(ValueError):
+            receipt.metrics(bodies(trace, metric), 'cpp', SERVICE, {NAME: 3}, {NAME: 1}, BOUNDS, True)
+        trace, previous = messages(); _, current = messages()
+        scope = current.resource_metrics[0].scope_metrics[0]
+        for instrument in scope.metrics:
+            data = instrument.histogram if instrument.name == receipt.DURATION else instrument.sum
+            data.data_points[0].time_unix_nano = 200
+        scope.metrics[0].sum.data_points[0].as_int = 6
+        histogram = scope.metrics[1].histogram.data_points[0]
+        histogram.count, histogram.sum, histogram.min = 6, .02, .0015
+        histogram.bucket_counts[4] = 6
+        payload = [('/v1/metrics', value.SerializeToString()) for value in (current, previous)]
+        with self.subTest(kind='decreasing-cumulative-sum'), self.assertRaises(ValueError):
+            receipt.metrics(payload, 'cpp', SERVICE, {NAME: 6}, {NAME: 1}, BOUNDS, True)
+
+    def test_real_histogram_prefixes_rounding_and_selected_boundaries_are_accepted(self):
+        values = [0., math.ulp(0.), 1e-6, math.nextafter(.01, math.inf), .1, .1, .1, 1e300]
+        payload = [('/v1/metrics', metric_prefix(values[:count], count + 100).SerializeToString())
+                   for count in range(1, len(values) + 1)]
+        self.assertEqual(receipt.metrics(list(reversed(payload)), 'cpp', SERVICE,
+            {NAME: len(values)}, {NAME: 1}, BOUNDS, True), 3 * len(values))
+        repeated = [('/v1/metrics', metric_prefix([.1] * 3, timestamp).SerializeToString())
+                    for timestamp in (100, 200)]
+        self.assertEqual(receipt.metrics(repeated, 'cpp', SERVICE, {NAME: 3}, {NAME: 1}, BOUNDS, True), 6)
+        custom = [.02, .3]
+        payload = [('/v1/metrics', metric_prefix([.01, .1, .2], 100, custom).SerializeToString())]
+        self.assertEqual(receipt.metrics(payload, 'cpp', SERVICE, {NAME: 3}, {NAME: 1}, custom, True), 3)
+
+    def test_histogram_bucket_extrema_and_added_sum_regressions_refuse(self):
+        for kind in ('bucket-regression', 'lost-extreme', 'no-new-observations', 'added-sum-high', 'added-sum-low'):
+            previous = metric_prefix([.01] * 3, 100)
+            current = metric_prefix([.01, .01, .03, .03, .03, .03], 200)
+            if kind == 'lost-extreme':
+                previous = metric_prefix([.004, .01, .01], 100)
+                current = metric_prefix([.005] * 5 + [.01], 200)
+            elif kind == 'no-new-observations':
+                current = metric_prefix([.01] * 3, 200)
+                current.resource_metrics[0].scope_metrics[0].metrics[1].histogram.data_points[0].sum = math.nextafter(.03, math.inf)
+            elif kind.startswith('added-sum'):
+                previous = metric_prefix([.002, .004, .01], 100)
+                current = metric_prefix([.002] * 5 + [.01], 200)
+                current.resource_metrics[0].scope_metrics[0].metrics[1].histogram.data_points[0].sum = .05 if kind.endswith('high') else .02
+            count = current.resource_metrics[0].scope_metrics[0].metrics[0].sum.data_points[0].as_int
+            payload = [('/v1/metrics', message.SerializeToString()) for message in (previous, current)]
+            with self.subTest(kind=kind), self.assertRaises(ValueError):
+                receipt.metrics(payload, 'cpp', SERVICE, {NAME: count}, {NAME: 1}, BOUNDS, True)
+
     def test_complete_recursive_call_trees_and_metrics_join_owned_completion(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary).resolve(); completed = execution(root)
