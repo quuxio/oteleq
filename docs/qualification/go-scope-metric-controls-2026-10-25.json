@@ -1,0 +1,229 @@
+{
+  "qualification_schema_version": 1,
+  "date": "2026-10-25",
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "platform": {
+    "os": "macOS",
+    "architecture": "ARM64",
+    "go": "1.27.3",
+    "python": "3.12.15"
+  },
+  "runtime": {
+    "commit": "cb08b8267d70be6e578f9f76089f7a60f3a8b3cb",
+    "tree": "396f51e11f17ab36f155701afd8ebdd493d6aebb",
+    "source_archive_sha256": "417c0546a77dc6d0f1ef6c2671784f978a3296eab50e681948681fffb42c08ad",
+    "cli_sha256": "002e2faf3435f38633bba4cbfbb24fd12c1b7a55bad2e0ac260b14af4720ed62",
+    "provider_commit": "eda9fccdfac281dc8763b485a540e10219f45ea7",
+    "provider_source_archive_sha256": "8700550add162ba276c56368c00715fa26b5c0b30f6ad568e9ad907803f01013"
+  },
+  "profile": {
+    "backend": "source-scope-v1",
+    "helper": "private-bootstrap-v1",
+    "build": 6,
+    "inspection": 1,
+    "prepared_tools": 2,
+    "config": 2,
+    "health": 4,
+    "request": 1,
+    "plan": 1,
+    "prepared": 1,
+    "command": 1,
+    "execution": 1,
+    "build_tags": [],
+    "module_roots": "explicit",
+    "context": {
+      "tasks": false,
+      "http": false
+    },
+    "lifetimes": false,
+    "source_complete": false,
+    "traces": true,
+    "startup_states": [
+      "both-on",
+      "collection-off",
+      "emission-off",
+      "both-off"
+    ],
+    "live_states": [
+      [
+        true,
+        true
+      ],
+      [
+        false,
+        true
+      ],
+      [
+        true,
+        false
+      ],
+      [
+        false,
+        false
+      ]
+    ],
+    "one_unchanged_application_and_build_per_schedule": true
+  },
+  "results": {
+    "applications": 320,
+    "sdk_processes": 160,
+    "globally_unique_application_launch_ids": 320,
+    "reports": 76,
+    "observations": 336,
+    "copied_original_observations": 16,
+    "recomputed_comparisons": 84,
+    "altered_evidence_refusals": 20,
+    "original_evidence_files_held": 401894,
+    "startup": {
+      "both-on": {
+        "applications": 80,
+        "sdk_processes": 40,
+        "reports": 19,
+        "observations": 84,
+        "copied_original_observations": 4,
+        "recomputed_comparisons": 21,
+        "altered_evidence_refusals": 5,
+        "original_evidence_files_held": 100535,
+        "actual_corpus_seconds": 2234.521,
+        "retained_only_audit_seconds": 63.656,
+        "original_status_sha256": "0ba3486d1bc442271a6ce7264ccef7fc9ada9bf1f857574bdbf025118eae7196",
+        "original_audit_sha256": "21467109208597f05e9da4edb9af36515cb7498dcc30ff676456207cf06c0adf",
+        "retained_audit_sha256": "21467109208597f05e9da4edb9af36515cb7498dcc30ff676456207cf06c0adf"
+      },
+      "collection-off": {
+        "applications": 80,
+        "sdk_processes": 40,
+        "reports": 19,
+        "observations": 84,
+        "copied_original_observations": 4,
+        "recomputed_comparisons": 21,
+        "altered_evidence_refusals": 5,
+        "original_evidence_files_held": 100415,
+        "actual_corpus_seconds": 2798.858,
+        "retained_only_audit_seconds": 63.113,
+        "original_status_sha256": "4495eaa2d92352698870692b6c3f4776a65da2ce822a1fd4f7eaa4eb0302bc01",
+        "original_audit_sha256": "ac4bd3119f5ecb737072614eaccb642f635fdec4901ab24abebe95364fdfefa1",
+        "retained_audit_sha256": "ac4bd3119f5ecb737072614eaccb642f635fdec4901ab24abebe95364fdfefa1"
+      },
+      "emission-off": {
+        "applications": 80,
+        "sdk_processes": 40,
+        "reports": 19,
+        "observations": 84,
+        "copied_original_observations": 4,
+        "recomputed_comparisons": 21,
+        "altered_evidence_refusals": 5,
+        "original_evidence_files_held": 100469,
+        "actual_corpus_seconds": 2597.388,
+        "retained_only_audit_seconds": 64.462,
+        "original_status_sha256": "5d355141f2ef4794642a36d087033fc77cf460c7cd879855cc041e6743d126c5",
+        "original_audit_sha256": "2fc2dcc0deb48f98b9a1dc36572b13db2cbfd2ea88e90e66e94ac507439e418d",
+        "retained_audit_sha256": "2fc2dcc0deb48f98b9a1dc36572b13db2cbfd2ea88e90e66e94ac507439e418d"
+      },
+      "both-off": {
+        "applications": 80,
+        "sdk_processes": 40,
+        "reports": 19,
+        "observations": 84,
+        "copied_original_observations": 4,
+        "recomputed_comparisons": 21,
+        "altered_evidence_refusals": 5,
+        "original_evidence_files_held": 100475,
+        "actual_corpus_seconds": 2521.447,
+        "retained_only_audit_seconds": 153.852,
+        "original_status_sha256": "c7c5fce702f6dfcd83ac575ce61acb658baac867c50c53dfd7d82175fb5cbda3",
+        "original_audit_sha256": "ac00b5c28f89059e6b1ce716f414c8f9f6a01a51697b86116705b68d62a34675",
+        "retained_audit_sha256": "ac00b5c28f89059e6b1ce716f414c8f9f6a01a51697b86116705b68d62a34675"
+      }
+    }
+  },
+  "observations": [
+    "Declared synchronous private scalar receiver/factory with seven application declarations shadowing builtins",
+    "Five ordered calls, primitive panic continuation, complete literal intermediate graphs and serial trace trees",
+    "Same-return instance-state mutation restored before the final boundary remains a visible difference",
+    "Independent collection/emission changes in one unchanged application process and executable; initial state precedes construction",
+    "Emitting positive control, collection suppression, quiet emission-off windows and restored retained call/error/duration measurements",
+    "Actual supervisor/application ownership, original startup release acknowledgements, final drained SDK health and direct raw downstream receipt",
+    "Generated execution, frozen replay, unittest, detached export, scalar receiver reduction and reduced replay",
+    "Current-source promotion after changed existing bodies and discovery of an added selected method",
+    "Copied shrink evidence joined to exactly one original four-launch report; copies are not new execution"
+  ],
+  "preservation": {
+    "consumer_source_files": 587,
+    "provider_source_files": 500,
+    "pinned_weaver_source_files": 485,
+    "selected_tooling_files": 6,
+    "original_evidence_files": 401894,
+    "all_input_groups_held": {
+      "consumer": true,
+      "sdk": true,
+      "weaver_source": true,
+      "tooling": true
+    },
+    "dimensions": [
+      "bytes",
+      "device/inode",
+      "mode",
+      "size",
+      "mtime/ctime"
+    ],
+    "scope": "Recorded before/after each corpus and the combined retained-only audit. Runtime remains frozen CB; later native integration or documentation does not broaden this record."
+  },
+  "budgets": {
+    "sdk_compiler_cache_max_bytes": 536870912,
+    "start_free_margin_bytes": 12884901888,
+    "sampled_command_min_free_bytes": 8589934592,
+    "cache_scope": "Disposable SDK compiler state, distinct from retained caller exports and module inputs. The logical cache bound is enforced between SDK commands; free-space samples are not a quota."
+  },
+  "validation": {
+    "full_local_gate": {
+      "exit_code": 0,
+      "seconds": 511.068,
+      "source_files_held": 587
+    },
+    "independent_component_review": {
+      "tests": 67,
+      "seconds": 15.786,
+      "skips": 0,
+      "sha256": "a1a83ca74e38c30d16aef96e839deedc98be0c8d8f3631cfdd542f19401f528d"
+    },
+    "combined_retained_only_audit": {
+      "status": "passed",
+      "seconds": 365.631,
+      "new_application_launches": 0,
+      "globally_unique_application_launch_ids": 320,
+      "sha256": "726d8793383feeea5bcd760df64adb3512c69e1fbac950aada58e62f7e8252ed"
+    }
+  },
+  "retained_evidence": {
+    "root": "2026-10-25/go-path-boundaries",
+    "execution_directories": [
+      "both-on-cb08b82-01",
+      "collection-off-cb08b82-01",
+      "emission-off-cb08b82-01",
+      "both-off-cb08b82-01"
+    ],
+    "combined_audit": "retained-final-matrix-01",
+    "original_failures": "Earlier 206/655/a400 storage, interruption and oracle failures remain failed or incomplete. This fresh CB matrix and its retained audit do not recertify those runs."
+  },
+  "reproduction": {
+    "command": "make generation-go-controls-otelc PYTHON=/absolute/path/to/python OTELC_ROOT=/absolute/path/to/matching/otelc REPORT_DIR=/absolute/path/to/new-evidence AUDIT_DIR=/absolute/path/to/new-audit GO_CONTROL_STARTUP=both-on GO_CONTROL_CACHE_MAX_BYTES=536870912",
+    "qualifier_commit": "cb08b8267d70be6e578f9f76089f7a60f3a8b3cb",
+    "other_startup_states": [
+      "collection-off",
+      "emission-off",
+      "both-off"
+    ],
+    "scope": "Run all four serially in new external directories with the recorded matching provider/tooling. Retained-only audits use GENERATION_ARGS=--retained-only and a new AUDIT_DIR; they start no applications."
+  },
+  "remaining": [
+    "Tagged build7 and other helper/build profiles",
+    "Moduleless, cgo/workspace and general dependency/build integration",
+    "General mutable object arguments, asynchronous/goroutine/resource actions and richer codecs",
+    "General per-action attribution, task/HTTP context and lifetime observations",
+    "Other hosts/platforms/toolchains",
+    "Actual production/shipping artefacts and performance/resource budgets",
+    "Full eight-language completion checklist"
+  ]
+}
