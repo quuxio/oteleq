@@ -2,7 +2,7 @@
 
 <!-- markdownlint-disable MD013 -->
 
-Status: independent negotiation, SDK source binding, build/inventory readers, owned preparation/final health and a separate [raw lifetime receipt](native-lifetime-receipt.md) component. Experimental [public lifetime profiles](native-lifetime-generation.md) now connect these components to generated scalar callers and explicit fixture expectations; actual workflow qualification remains pending. The [qualified prepared project profile](native-prepared-provider.md) remains the function-only build3 route. Its 100-application result does not qualify object/resource lifetimes.
+Status: independent negotiation, SDK source binding, build/inventory readers, owned preparation/final health and a separate [raw lifetime receipt](native-lifetime-receipt.md) component. Experimental [public lifetime profiles](native-lifetime-generation.md) connect these components to generated scalar callers and explicit fixture expectations. Their separate [100-launch lifetime qualification](qualification/native-lifetime-workflows-2026-10-25.json) covers three completed-lifetime fixtures and generated/retained/promoted routes; broader profiles remain open. The [qualified prepared project profile](native-prepared-provider.md) remains the function-only build3 route and retains its separate evidence.
 
 ## Explicit contracts
 
@@ -44,7 +44,7 @@ A separate uncommitted development snapshot exercises genuine SDK `b425d1f` thro
 
 ## Remaining integration and acceptance
 
-The [maintainer caller pipeline](native-lifetime-callers.md) now materialises compiler-bound scalar callers, obtains complete lifetime semantic facts before SDK compilation and repeats compiler input/search and semantic checks. Its genuine two-profile metadata probe starts no SDK builds or applications. The experimental public route connects explicit planning/runtime configuration and independent prebuild expectations; genuine generated and retained-suite qualification remains open.
+The [maintainer caller pipeline](native-lifetime-callers.md) materialises compiler-bound scalar callers, obtains complete lifetime semantic facts before SDK compilation and repeats compiler input/search and semantic checks. Its earlier two-profile metadata probe starts no SDK builds or applications. The experimental public route connects explicit planning/runtime configuration and independent prebuild expectations; the separate qualified completed-lifetime corpus adds actual generated, retained and promoted execution. Metadata probes alone do not qualify execution.
 
 1. Qualify caller-selected per-unit contexts and independently observed semantic type/construction/allocation sites through the connected public route, including private VFS/neutral-driver assets and producer-selected path refusals.
 2. Exercise the connected build4/build5 readers through genuine generated callers and public planning/runtime, retaining complete commands, products, semantic expectations and compiler channels.

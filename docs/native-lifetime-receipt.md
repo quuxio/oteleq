@@ -2,7 +2,7 @@
 
 <!-- markdownlint-disable MD013 -->
 
-Status: maintainer components for independently checking recorded C++ object and C resource telemetry. Public generated lifetime selection and the complete retained/replayed/promoted workflow still require integration. The [provider components](native-lifetime-provider.md) supply the separately checked builds, owned processes and final health.
+Status: maintainer components for independently checking recorded C++ object and C resource telemetry. The public generated route has separate [100-launch completed-lifetime qualification](qualification/native-lifetime-workflows-2026-10-25.json), including retained/replayed/promoted workflows and a complete raw-byte audit. Broader lifetime profiles remain open. The [provider components](native-lifetime-provider.md) supply the separately checked builds, owned processes and final health.
 
 ## Caller expectations before execution
 
