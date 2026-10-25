@@ -214,7 +214,7 @@ class NativeLifetimeWorkflowTests(TestCase):
                     'status': 'candidate_rule_minimal', 'source_preserved': True, 'workspace': str(folder / 'reduced'),
                     'trials': [{'arguments': [2], 'report': str(folder / 'trial/report.json')}]})
             return ''
-        fake = Mock(); fake.finish.return_value = {'actual_application_records': 240, 'raw_lifetime_receipts': 120}
+        fake = Mock(); fake.finish.return_value = {'actual_application_records': 268, 'raw_lifetime_receipts': 134}
         fake.refusals.return_value = {'c': {'count': 14}, 'cpp': {'count': 14}}
         with patch.object(qualifier, 'command', side_effect=command), \
                 patch.object(qualifier, 'Audit', return_value=fake), \
@@ -223,15 +223,15 @@ class NativeLifetimeWorkflowTests(TestCase):
                 patch.object(qualifier, 'promotion', return_value={'application_observations': 12}) as promotion, \
                 patch.object(qualifier, 'digest', return_value='a' * 64):
             result = qualifier.exercise(self.root / 'cli', self.root / 'provider', self.root / 'sdk', self.root)
-        self.assertEqual(result['actual_application_launches'], 240)
-        self.assertEqual(len(result['cases']), 8)
-        self.assertEqual(framework.call_count, 17)
-        self.assertEqual(check.call_count, 19)
+        self.assertEqual(result['actual_application_launches'], 268)
+        self.assertEqual(len(result['cases']), 9)
+        self.assertEqual(framework.call_count, 19)
+        self.assertEqual(check.call_count, 21)
         self.assertIn({'expected': (0,)}, [call.kwargs for call in check.call_args_list])
         self.assertIn({'expected': (2,)}, [call.kwargs for call in check.call_args_list])
         self.assertIn({'expected': (0,), 'mode': 'zero'}, [call.kwargs for call in framework.call_args_list])
         self.assertEqual([row[0] for row in calls].count('shrink'), 1)
-        self.assertEqual(promotion.call_count, 8)
+        self.assertEqual(promotion.call_count, 9)
         self.assertIn('current-source-promotion', result['routes'])
         self.assertIn('genuine qualification of all declared boundary, raw-audit, refusal and promotion routes', result['remaining'])
         self.assertEqual(result['raw_evidence_refusals'], fake.refusals.return_value)
@@ -283,7 +283,8 @@ class NativeLifetimeWorkflowTests(TestCase):
         return audit, folder, entry, witness
 
     def test_zero_censor_and_unwind_metadata_stay_bound_to_the_caller_case(self):
-        profiles = [('c', 'zero'), ('cpp', 'zero'), ('c', 'censored'), ('cpp', 'censored'), ('cpp', 'unwind')]
+        profiles = [('c', 'zero'), ('cpp', 'zero'), ('c', 'censored'), ('cpp', 'censored'),
+                    ('cpp', 'unwind'), ('cpp', 'throwing-destructor')]
         for language, mode in profiles:
             audit, folder, entry, witness = self.audit_fixture('instrumented_on', suffix=language+mode,
                                                                language=language, mode=mode)
@@ -341,15 +342,15 @@ class NativeLifetimeWorkflowTests(TestCase):
     def test_actual_refusal_dispatch_requires_both_languages_and_fixed_counts(self):
         audit = object.__new__(qualifier.Audit)
         profiles = [('c', 'completed'), ('cpp', 'completed'), ('c', 'zero'), ('cpp', 'zero'),
-                    ('c', 'censored'), ('cpp', 'censored'), ('cpp', 'unwind')]
+                    ('c', 'censored'), ('cpp', 'censored'), ('cpp', 'unwind'), ('cpp', 'throwing-destructor')]
         audit.contexts = {str(i): {'folder': str(self.root / language), 'entry': {'language': language},
                                  'witness': {}, 'function': 'selected', 'mode': mode}
                           for i, (language, mode) in enumerate(profiles)}
         with patch.object(qualifier.raw_refusals, 'run', return_value={'count': 14, 'new_application_launches': 0}) as run:
             self.assertEqual(set(audit.refusals(self.root / 'refusals')),
                              {language + '-' + mode for language, mode in profiles})
-            self.assertEqual(run.call_count, 7)
-        audit.contexts.pop('6')
+            self.assertEqual(run.call_count, 8)
+        audit.contexts.pop('7')
         with patch.object(qualifier.raw_refusals, 'run', return_value={'count': 14, 'new_application_launches': 0}), \
                 self.assertRaises(AssertionError): audit.refusals(self.root / 'missing')
 

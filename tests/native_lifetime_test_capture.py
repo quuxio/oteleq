@@ -22,8 +22,8 @@ def write(folder: Path, name: str, value: object) -> None:
 
 def capture(folder: Path, language: str, mode: str) -> tuple[dict, dict]:
     """Copy an actual completed capture, then declare any adapted boundary input."""
-    assert language in ('c', 'cpp') and mode in ('completed', 'zero', 'censored', 'unwind')
-    assert mode != 'unwind' or language == 'cpp'
+    assert language in ('c', 'cpp') and mode in ('completed', 'zero', 'censored', 'unwind', 'throwing-destructor')
+    assert mode not in ('unwind', 'throwing-destructor') or language == 'cpp'
     original = FIXTURES / ('native-lifetime-' + language + '-capture')
     shutil.copytree(original, folder)
     manifest = json.loads((original / 'capture.json').read_text())
@@ -39,7 +39,7 @@ def capture(folder: Path, language: str, mode: str) -> tuple[dict, dict]:
     end = 'shutdown_censored' if mode == 'censored' else release
     observation = {'type_usr': 'c:@S@Item', 'name': 'Item', 'creation_path': [0],
                    'release_path': [0] if complete else None, 'complete': complete,
-                   'exception_exit': mode == 'unwind' if language == 'cpp' and complete else None}
+                   'exception_exit': mode == 'throwing-destructor' if language == 'cpp' and complete else None}
     trace = ExportTraceServiceRequest.FromString((folder / 'otlp-1.protobuf').read_bytes())
     scope = trace.resource_spans[0].scope_spans[0]
     lifetime, = [span for span in scope.spans if span.name == 'Item lifetime']
@@ -48,7 +48,7 @@ def capture(folder: Path, language: str, mode: str) -> tuple[dict, dict]:
     duration = lifetime.end_time_unix_nano - lifetime.start_time_unix_nano
     labels = [('type', 'Item'), ('boundary', end), ('otelc.lifetime.complete', complete),
               ('otelc.lifetime.instance', '1')]
-    if language == 'cpp' and complete: labels.append(('otelc.destructor.exception_exit', mode == 'unwind'))
+    if language == 'cpp' and complete: labels.append(('otelc.destructor.exception_exit', mode == 'throwing-destructor'))
     del lifetime.attributes[:]
     for name, value in labels:
         attribute = lifetime.attributes.add(key=name)

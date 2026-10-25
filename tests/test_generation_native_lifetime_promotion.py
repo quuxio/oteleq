@@ -149,7 +149,8 @@ class NativeLifetimePromotionTests(unittest.TestCase):
             with self.subTest(language=language): self.run_promotion(language)
 
     def test_promoted_zero_censor_and_unwind_cases_keep_their_declared_inputs(self):
-        for language, mode in (('c', 'zero'), ('cpp', 'zero'), ('c', 'censored'), ('cpp', 'censored'), ('cpp', 'unwind')):
+        for language, mode in (('c', 'zero'), ('cpp', 'zero'), ('c', 'censored'), ('cpp', 'censored'),
+                               ('cpp', 'unwind'), ('cpp', 'throwing-destructor')):
             with self.subTest(language=language, mode=mode): self.run_promotion(language, mode=mode)
 
     def test_incomplete_foreign_or_mutated_promotion_cannot_pass(self):

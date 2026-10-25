@@ -1,6 +1,6 @@
 """Independent raw oracle for the declared one-call native lifetime corpus.
 
-Only the explicit zero/completed/censored/caught-unwind fixtures are admitted.
+Only the explicit zero/completed/censored/C++ exception fixtures are admitted.
 Other object counts, escaping errors, startup and live schedules stay separate.
 No SDK or consumer receipt renderer supplies expected telemetry values.
 """
@@ -78,7 +78,7 @@ def observation(values: list, language: str, function: str, *, mode: str = 'comp
 def metric(value, boundary: str, duration_ns: int, series: dict, *, mode: str = 'completed') -> int:
     """Retain every cumulative/gauge point and the exact raw span duration."""
     require(value.name in INSTRUMENTS, 'undeclared lifetime metric')
-    require(mode != 'zero' and mode in ('completed', 'censored', 'unwind')
+    require(mode != 'zero' and mode in ('completed', 'censored', 'unwind', 'throwing-destructor')
             and (not value.name.endswith('.completed') or mode != 'censored')
             and (not value.name.endswith('.incomplete') or mode == 'censored'),
             'lifetime metric differs from declared completion/censoring')

@@ -23,7 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'adapters/generatio
 import policy
 
 PROFILES = (('c', 'completed'), ('cpp', 'completed'), ('c', 'zero'), ('cpp', 'zero'),
-            ('c', 'censored'), ('cpp', 'censored'), ('cpp', 'unwind'))
+            ('c', 'censored'), ('cpp', 'censored'), ('cpp', 'unwind'), ('cpp', 'throwing-destructor'))
 
 
 class NativeLifetimeBoundaryTests(unittest.TestCase):
@@ -36,6 +36,28 @@ class NativeLifetimeBoundaryTests(unittest.TestCase):
         folder = self.root / (language + '-' + mode)
         entry, witness = inputs.capture(folder, language, mode)
         return folder, entry, witness
+
+    def test_outer_unwind_contract_matches_the_normal_destructor_source(self):
+        folder = self.root / 'outer-unwind'; folder.mkdir()
+        source, config = driver.fixture(folder, 'cpp', False, self.root / 'sdk', mode='unwind')
+        self.assertIn('~Item(){value=0;}', (source / 'include/item.h').read_text())
+        self.assertIn('throw amount;', (source / 'src/app.cpp').read_text())
+        self.assertIn('catch(int)', (source / 'src/app.cpp').read_text())
+        self.assertIs(cases.expected('cpp', 'unwind')['observations'][0]['exception_exit'], False)
+        self.assertIs(tomllib.loads(config.read_text())['fixtures'][0]['lifetimes'][0]['exception_exit'], False)
+        self.assertEqual(cases.expected('cpp', 'unwind'), cases.expected('cpp', 'completed'))
+
+    def test_throwing_destructor_contract_matches_an_exception_leaving_that_destructor(self):
+        folder = self.root / 'throwing-destructor'; folder.mkdir()
+        source, config = driver.fixture(folder, 'cpp', False, self.root / 'sdk', mode='throwing-destructor')
+        header = (source / 'include/item.h').read_text()
+        self.assertIn('~Item() noexcept(false)', header)
+        self.assertIn('throw 17;', header)
+        body = (source / 'src/app.cpp').read_text()
+        self.assertIn('try{', body); self.assertIn('catch(int)', body)
+        self.assertNotIn('throw amount;', body)
+        self.assertIs(cases.expected('cpp', 'throwing-destructor')['observations'][0]['exception_exit'], True)
+        self.assertIs(tomllib.loads(config.read_text())['fixtures'][0]['lifetimes'][0]['exception_exit'], True)
 
     def test_actual_cpp_capture_and_complete_original_graphs_are_unchanged(self):
         folder, entry, witness = self.prepare('cpp', 'completed')
@@ -64,12 +86,14 @@ class NativeLifetimeBoundaryTests(unittest.TestCase):
                     self.assertEqual(row['release_path'], None if mode == 'censored' else [0])
                     self.assertEqual(row['boundary'], 'shutdown_censored' if mode == 'censored'
                                      else 'destructor_entry' if language == 'cpp' else 'free_entry')
-                    self.assertIs(row['exception_exit'], mode == 'unwind'
+                    self.assertIs(row['exception_exit'], mode == 'throwing-destructor'
                                   if language == 'cpp' and mode != 'censored' else None)
-                if mode != 'completed':
+                # A normal destructor during outer unwinding has the same
+                # lifetime wire contract as normal scope exit.
+                if mode not in ('completed', 'unwind'):
                     with self.assertRaises(ValueError): audit.verify(folder, entry, witness, plain=False)
 
-    def test_all_seven_real_or_adapted_wire_profiles_refuse_fourteen_corrupt_copies(self):
+    def test_all_declared_real_or_adapted_wire_profiles_refuse_fourteen_corrupt_copies(self):
         total = 0
         for language, mode in PROFILES:
             folder, entry, witness = self.prepare(language, mode)
@@ -79,10 +103,11 @@ class NativeLifetimeBoundaryTests(unittest.TestCase):
             self.assertEqual(result['mode'], mode)
             total += result['count']
             for path, expected in before.items(): self.assertEqual(records.identity(path), expected)
-        self.assertEqual(total, 98)
+        self.assertEqual(total, 112)
 
     def test_censoring_and_unwinding_have_direct_span_boundary_controls(self):
-        for language, mode in (('c', 'completed'), ('c', 'censored'), ('cpp', 'unwind'), ('cpp', 'zero')):
+        for language, mode in (('c', 'completed'), ('c', 'censored'), ('cpp', 'unwind'),
+                               ('cpp', 'throwing-destructor'), ('cpp', 'zero')):
             folder, entry, _ = self.prepare(language, mode)
             message = ExportTraceServiceRequest.FromString((folder / 'otlp-1.protobuf').read_bytes())
             spans = list(message.resource_spans[0].scope_spans[0].spans)
@@ -95,7 +120,7 @@ class NativeLifetimeBoundaryTests(unittest.TestCase):
                 if mode == 'censored': lifetime.end_time_unix_nano = function.end_time_unix_nano - 1
                 elif mode == 'completed': lifetime.end_time_unix_nano = function.end_time_unix_nano + 1
                 else:
-                    next(a for a in lifetime.attributes if a.key == 'otelc.destructor.exception_exit').value.bool_value = False
+                    next(a for a in lifetime.attributes if a.key == 'otelc.destructor.exception_exit').value.bool_value = mode != 'throwing-destructor'
             with self.subTest(mode=mode), self.assertRaises(ValueError):
                 raw.observation(spans, language, entry['otelc_runtime_function'], mode=mode)
 
@@ -131,7 +156,7 @@ class NativeLifetimeBoundaryTests(unittest.TestCase):
             audit.health(final, selected, language, final['pid'], observed, mode=mode)
             wrong = copy.deepcopy(final)
             key = 'object_accounting' if language == 'cpp' else 'resource_accounting'
-            wrong[key]['completed'] = '0' if mode in ('completed', 'unwind') else '1'
+            wrong[key]['completed'] = '0' if mode in ('completed', 'unwind', 'throwing-destructor') else '1'
             with self.subTest(language=language, mode=mode), self.assertRaises(ValueError):
                 audit.health(wrong, selected, language, final['pid'], observed, mode=mode)
 
@@ -150,8 +175,12 @@ class NativeLifetimeBoundaryTests(unittest.TestCase):
                 self.assertIs(fixture['lifetimes'][0]['complete'], False)
             elif mode == 'unwind':
                 self.assertIn('throw amount;', body); self.assertIn('catch(int)', body)
+                self.assertIs(fixture['lifetimes'][0]['exception_exit'], False)
+            elif mode == 'throwing-destructor':
+                self.assertNotIn('throw amount;', body); self.assertIn('catch(int)', body)
+                self.assertIn('throw 17;', (source / 'include/item.h').read_text())
                 self.assertIs(fixture['lifetimes'][0]['exception_exit'], True)
-        for language, mode in (('c', 'unwind'), ('cpp', 'foreign'), ('rust', 'completed')):
+        for language, mode in (('c', 'unwind'), ('c', 'throwing-destructor'), ('cpp', 'foreign'), ('rust', 'completed')):
             with self.assertRaises(ValueError): cases.expected(language, mode)
             with self.assertRaises(ValueError): driver.fixture(self.root / 'invalid', language, False,
                                                                 self.root / 'sdk', mode=mode)

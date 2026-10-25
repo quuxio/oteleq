@@ -1,7 +1,8 @@
 """Exercise genuine public native lifetime workflows with literal state oracles.
 
-This corpus declares zero, one completed, one censored or one caught-unwind Item
-per synchronous scalar call. The driver independently audits raw telemetry,
+This corpus declares zero, one completed or one censored Item per synchronous
+scalar call, including normal destructor exit during outer unwinding and an
+exception leaving the destructor. The driver independently audits raw telemetry,
 closed final health, promotion and altered copies. Genuine whole-corpus,
 escaping-error, startup/live and broader qualification remain required.
 """
@@ -30,10 +31,12 @@ from otelc_capture import path_within
 
 CASES = (('c-completed', 'c', False), ('cpp-completed', 'cpp', False), ('c-state', 'c', True),
          ('c-zero', 'c', False), ('cpp-zero', 'cpp', False), ('c-censored', 'c', False),
-         ('cpp-censored', 'cpp', False), ('cpp-unwind', 'cpp', False))
+         ('cpp-censored', 'cpp', False), ('cpp-unwind', 'cpp', False),
+         ('cpp-throwing-destructor', 'cpp', False))
 CASE_MODES = {'c-completed': 'completed', 'cpp-completed': 'completed', 'c-state': 'completed',
               'c-zero': 'zero', 'cpp-zero': 'zero', 'c-censored': 'censored',
-              'cpp-censored': 'censored', 'cpp-unwind': 'unwind'}
+              'cpp-censored': 'censored', 'cpp-unwind': 'unwind',
+              'cpp-throwing-destructor': 'throwing-destructor'}
 SDK_HEAD = 'acb13d7735526448209df37b7e6b98e5717befdb'
 PROFILES = {'c': 'native-resources-owned-v1', 'cpp': 'native-objects-owned-v1'}
 BASE_CALLS = (('selected', 42),)
@@ -82,7 +85,9 @@ def fixture(folder: Path, language: str, difference: bool, sdk: Path, *, mode: s
         (source / name).mkdir(parents=True)
     extension = '.cpp' if language == 'cpp' else '.c'
     relative, helper = 'src/app' + extension, 'src/keep' + extension
-    declaration = ('struct Item { int value; explicit Item(int n):value(n){} ~Item(){value=0;} };\n'
+    destructor = ('~Item() noexcept(false){value=0;throw 17;}' if mode == 'throwing-destructor'
+                  else '~Item(){value=0;}')
+    declaration = ('struct Item { int value; explicit Item(int n):value(n){} ' + destructor + ' };\n'
                    if language == 'cpp' else 'struct Item { int value; };\n')
     (source / 'include/item.h').write_text('#ifndef NATIVE_ITEM_H\n#define NATIVE_ITEM_H\n' + declaration +
         'void keep_item(struct Item *item);\n#endif\n')
@@ -99,6 +104,8 @@ def fixture(folder: Path, language: str, difference: bool, sdk: Path, *, mode: s
                    else acquire.replace('free(item);', ''))
     elif mode == 'unwind':
         acquire = 'try{Item item(amount);keep_item(&item);state+=item.value;throw amount;}catch(int){}'
+    elif mode == 'throwing-destructor':
+        acquire = 'try' + acquire + 'catch(int){}'
     mutation = 'if(getenv("OTELC_NATIVE_PLAN_FD"))state++;' if difference else ''
     (source / relative).write_text('#include <stdlib.h>\n#include <errno.h>\n#include "item.h"\n' +
         'int state=7;int observed_errno=0;\nint selected(int amount){errno=ECHILD;' + acquire +
@@ -397,7 +404,7 @@ def exercise(cli: Path, provider: Path, sdk: Path, root: Path) -> dict:
         results.append({'name': name, 'language': language, 'difference': difference, 'mode': mode, 'promotion': promoted})
     refusal_results = audit.refusals(root / 'raw-evidence-refusals')
     summary = audit.finish()
-    assert summary['actual_application_records'] == 240 and summary['raw_lifetime_receipts'] == 120
+    assert summary['actual_application_records'] == 268 and summary['raw_lifetime_receipts'] == 134
     return {'claim': 'equivalence over these tests and observations', 'cases': results,
             'actual_application_launches': summary['actual_application_records'], 'audit': summary,
             'raw_evidence_refusals': refusal_results,

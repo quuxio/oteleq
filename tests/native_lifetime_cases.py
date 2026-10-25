@@ -4,18 +4,19 @@ from native_prepared_otlp import require
 
 
 def expected(language: str, mode: str) -> dict:
-    """Declare zero, completed, censored or caught C++ unwinding before launch."""
+    """Declare boundaries and exceptions leaving the destructor before launch."""
     require(type(language) is str and language in ('c', 'cpp') and type(mode) is str
-            and mode in ('completed', 'zero', 'censored', 'unwind')
-            and (mode != 'unwind' or language == 'cpp'), 'foreign native lifetime corpus mode')
+            and mode in ('completed', 'zero', 'censored', 'unwind', 'throwing-destructor')
+            and (mode not in ('unwind', 'throwing-destructor') or language == 'cpp'),
+            'foreign native lifetime corpus mode')
     admitted = int(mode != 'zero')
-    complete = mode in ('completed', 'unwind')
+    complete = mode in ('completed', 'unwind', 'throwing-destructor')
     release = 'destructor_entry' if language == 'cpp' else 'free_entry'
     boundary = 'shutdown_censored' if mode == 'censored' else release
     observations = [] if not admitted else [{
         'type_usr': 'c:@S@Item', 'name': 'Item', 'creation_path': [0],
         'release_path': [0] if complete else None, 'complete': complete,
-        'exception_exit': mode == 'unwind' if language == 'cpp' and complete else None}]
+        'exception_exit': mode == 'throwing-destructor' if language == 'cpp' and complete else None}]
     terminal = 'completed' if complete else 'incomplete'
     instruments = () if not admitted else tuple('otelc.lifetime.' + name
                                                for name in ('admitted', terminal, 'duration', 'live'))
