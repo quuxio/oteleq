@@ -87,7 +87,7 @@
   "observations": [
     "Complete literal before/after scalar globals/statics, results and unchanged raw application output",
     "Generated standard-library unittest, direct execution, frozen replay and detached exported suites",
-    "Current-source promotion after a checkout copy/body change and discovery of an added selected function",
+    "Current-source promotion after a checkout copy and addition of a selected function",
     "Same-return instrumented-only global mutation, scalar reduction from 5 to 0 and fresh confirmation",
     "Compiler-bound targets, original caller/tool facts and repeated dependency/existence-probe checks",
     "Actual pre-exec application/supervisor parent, group and session; final SDK health and original start/release/completion records",
