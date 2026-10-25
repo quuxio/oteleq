@@ -3,6 +3,7 @@
 import copy
 from dataclasses import replace
 import json
+import math
 from pathlib import Path
 import sys
 import tempfile
@@ -60,6 +61,32 @@ class NativeLifetimeReceiptTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             final, intent, bodies, *_ = fixture.fixture(Path(temporary).resolve(), observations=())
             self.assertEqual(receipt.witness(final, intent, bodies)['lifetimes'], [])
+
+    def test_long_durations_match_cpp_chrono_conversion_and_refuse_wrong_values(self):
+        for nanoseconds in ((1 << 53) - 1, 1 << 53, (1 << 53) + 3):
+            with self.subTest(nanoseconds=nanoseconds), tempfile.TemporaryDirectory() as temporary:
+                final, intent, _, trace, metric = fixture.fixture(Path(temporary).resolve())
+                spans = trace.resource_spans[0].scope_spans[0].spans
+                lifespan, function = spans[1], spans[0]
+                lifespan.end_time_unix_nano = lifespan.start_time_unix_nano + nanoseconds
+                function.end_time_unix_nano = lifespan.end_time_unix_nano + 10
+                for entry in metric.resource_metrics[0].scope_metrics[0].metrics:
+                    point = getattr(entry, entry.WhichOneof('data')).data_points[0]
+                    point.time_unix_nano = function.end_time_unix_nano + 100
+                    if entry.name.endswith('.duration'):
+                        duration = nanoseconds if entry.name.startswith('otelc.lifetime.') else (
+                            function.end_time_unix_nano - function.start_time_unix_nano)
+                        seconds = float(duration) / 1_000_000_000
+                        point.sum = point.min = point.max = seconds
+                        del point.bucket_counts[:]
+                        point.bucket_counts.extend([0] * len(fixture.BOUNDS) + [1])
+                bodies = [('/v1/traces', trace.SerializeToString()), ('/v1/metrics', metric.SerializeToString())]
+                self.assertEqual(receipt.witness(final, intent, bodies)['lifetimes'][0]['duration_ns'], nanoseconds)
+                duration = next(entry for entry in metric.resource_metrics[0].scope_metrics[0].metrics
+                                if entry.name == 'otelc.lifetime.duration').histogram.data_points[0]
+                duration.sum = duration.min = duration.max = math.nextafter(duration.sum, math.inf)
+                with self.assertRaisesRegex(ValueError, 'differs from observed span durations'):
+                    receipt.witness(final, intent, [bodies[0], ('/v1/metrics', metric.SerializeToString())])
 
     def test_prelaunch_expectations_refuse_wrong_types_paths_bounds_and_late_freeze(self):
         with tempfile.TemporaryDirectory() as temporary:

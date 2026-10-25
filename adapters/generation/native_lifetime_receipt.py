@@ -123,7 +123,9 @@ def metrics(intent: caller.Intent, bodies: tuple, language: str, service: str, n
     boundary = 'destructor_entry' if intent.launch.intent.lifetime_kind() == 'object' else 'free_entry'
     duration_values = defaultdict(list)
     for row in observations:
-        duration_values[row['name'], row['boundary']].append(row['duration_ns'] / 1_000_000_000)
+        # C++ chrono duration<double> converts the integer ticks before scaling.
+        # Python's integer true division can round differently above 2**53 ns.
+        duration_values[row['name'], row['boundary']].append(float(row['duration_ns']) / 1_000_000_000)
     count += measurements.validate(iter(lifetimes), intent.observations, boundary, bounds, enabled, duration_values)
     require(count <= telemetry.MAX_POINTS, 'combined native metric point budget exceeded')
     return count
