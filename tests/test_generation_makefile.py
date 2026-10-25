@@ -16,7 +16,8 @@ class QualificationRecipeTests(unittest.TestCase):
             'PYTHON=/selected/python'], cwd=ROOT, capture_output=True, text=True, check=True)
         self.assertIn('/selected/python -m coverage run', result.stdout)
         for name in ('test_generation_native_prepared_inputs', 'test_generation_native_prepared_build',
-                     'test_generation_native_prepared', 'test_generation_native_execution', 'test_generation_native_session'):
+                     'test_generation_native_prepared', 'test_generation_native_execution', 'test_generation_native_session',
+                     'test_generation_native_telemetry'):
             self.assertIn(name, result.stdout)
         self.assertIn('--data-file=.native-provider.coverage', result.stdout)
         self.assertIn('--fail-under=80', result.stdout)

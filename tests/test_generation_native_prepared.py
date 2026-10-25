@@ -21,8 +21,9 @@ def setup(root: Path, *, plain: bool = False, arguments: tuple = ()):
         (producer / name).write_text('unit producer source; never executed: ' + name)
     config = root / 'policy.toml'
     lines = ['schema_version=3', 'languages=["c","cpp"]']
-    for name in ('sources', 'functions', 'lifetimes', 'context'):
-        lines += ['[' + name + ']', *[key + '=' + json.dumps(value) for key, value in fixture.POLICY[name].items()]]
+    for name, values in fixture.POLICY.items():
+        if type(values) is dict:
+            lines += ['[' + name + ']', *[key + '=' + json.dumps(value) for key, value in values.items()]]
     config.write_text('\n'.join(lines) + '\n')
     intent = prepared.freeze(built, root / 'runtime', Path(sys.executable).absolute(), config, fixture.POLICY,
                              plain=plain, arguments=arguments, wait_ms=12345)

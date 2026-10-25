@@ -213,6 +213,10 @@ const RESOURCES: &[(&str, &str)] = &[
         include_str!("../adapters/generation/native_session.py"),
     ),
     (
+        "native_telemetry.py",
+        include_str!("../adapters/generation/native_telemetry.py"),
+    ),
+    (
         "native_project.py",
         include_str!("../adapters/generation/native_project.py"),
     ),
