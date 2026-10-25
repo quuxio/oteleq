@@ -47,17 +47,34 @@ def fixture(folder: Path, language: str, difference: bool, sdk: Path) -> tuple[P
     """Ordinary uninstrumented sources acquire one Item and expose scalar state."""
     if language not in PROFILES:
         raise ValueError('native lifetime corpus requires c or cpp')
-    source = folder / 'source'; (source / 'src').mkdir(parents=True)
-    relative = 'src/app.' + ('cpp' if language == 'cpp' else 'c')
+    source = folder / 'source'
+    for name in ('src', 'include', 'build'):
+        (source / name).mkdir(parents=True)
+    extension = '.cpp' if language == 'cpp' else '.c'
+    relative, helper = 'src/app' + extension, 'src/keep' + extension
     declaration = ('struct Item { int value; explicit Item(int n):value(n){} ~Item(){value=0;} };\n'
                    if language == 'cpp' else 'struct Item { int value; };\n')
-    acquire = ('{Item item(amount);state+=item.value;}' if language == 'cpp' else
+    (source / 'include/item.h').write_text('#ifndef NATIVE_ITEM_H\n#define NATIVE_ITEM_H\n' + declaration +
+        'void keep_item(struct Item *item);\n#endif\n')
+    # The external call prevents -O2 from eliding the intended allocation. Both
+    # lanes use the same ordinary two-unit recipe, without link-time optimisation.
+    (source / helper).write_text('#include "item.h"\nvoid keep_item(struct Item *item){(void)item;}\n')
+    acquire = ('{Item item(amount);keep_item(&item);state+=item.value;}' if language == 'cpp' else
                'struct Item *item=malloc(sizeof *item);if(!item)return -1;'
-               'item->value=amount;state+=item->value;free(item);')
+               'item->value=amount;keep_item(item);state+=item->value;free(item);')
     mutation = 'if(getenv("OTELC_NATIVE_PLAN_FD"))state++;' if difference else ''
-    (source / relative).write_text('#include <stdlib.h>\n#include <errno.h>\n' + declaration +
+    (source / relative).write_text('#include <stdlib.h>\n#include <errno.h>\n#include "item.h"\n' +
         'int state=7;int observed_errno=0;\nint selected(int amount){errno=ECHILD;' + acquire +
         'observed_errno=errno;' + mutation + 'return 42;}\n')
+    compiler = os.environ.get('OTELC_CLANGXX' if language == 'cpp' else 'OTELC_CLANG')
+    if compiler is None:
+        prefix = '/opt/homebrew/opt/llvm@22/bin/' if sys.platform == 'darwin' else '/usr/lib/llvm-22/bin/'
+        compiler = prefix + ('clang++' if language == 'cpp' else 'clang')
+    units = [relative, helper]
+    write(source / 'build/compile_commands.json', [{'directory': str(source / 'build'), 'file': '../' + name,
+        'arguments': [compiler, '-I', '../include', '-std=c++17' if language == 'cpp' else '-std=c11',
+                      '-O2', '-fexceptions', '-pthread', '-c', '../' + name, '-o', str(index) + '.o']}
+        for index, name in enumerate(units)])
     expected = {'type': 'Item', 'creation_path': [0], 'release_path': [0], 'complete': True}
     if language == 'cpp':
         expected['exception_exit'] = False
@@ -66,7 +83,10 @@ def fixture(folder: Path, language: str, difference: bool, sdk: Path) -> tuple[P
         'fixtures': [{'language': language, 'source': relative, 'function': 'selected*', 'cases': [[5]],
                       'domains': [{'kind': 'integer', 'minimum': 0, 'maximum': 5}], 'lifetimes': [expected]}],
         'adapters': {language: {'backend': 'prepared', 'profile': PROFILES[language],
-                               'sdk_build': str(sdk), 'lifetimes': {'include': ['Item']}}}}
+                               'sdk_build': str(sdk), 'lifetimes': {'include': ['Item']},
+                               'compilation_database': 'build/compile_commands.json',
+                               'targets': [{'name': 'application', 'units': [{'source': name} for name in units],
+                                            'link_flags': ['-pthread']}]}}}
     config = folder / 'generation.toml'
     config.write_text('\n'.join(key + '=' + toml(value) for key, value in configuration.items()) + '\n')
     return source, config
@@ -84,7 +104,8 @@ class Audit:
         self.records = {}
         self.files = {}
 
-    def attempt(self, report: Path, folder: Path, entry: dict, lane: str, witness) -> None:
+    def attempt(self, report: Path, folder: Path, entry: dict, lane: str, witness,
+                arguments: tuple[int, ...]) -> None:
         original = self.registry.original(report)
         actual = original.parent / folder.relative_to(report.parent)
         runtime = actual / 'native-runtime'
@@ -96,6 +117,8 @@ class Audit:
         assert finished['application_pid'] == application['pid'] and finished['application_exit_code'] == 0
         held = {'pid': application['pid'], 'folder': str(actual), 'plain': request['plain']}
         assert self.records.setdefault(request['launch_id'], held) == held
+        caller = retained.read(actual / 'native-caller/caller.json')
+        assert caller['entry'] == entry and caller['arguments'] == list(arguments)
         if lane == 'baseline':
             assert witness is None and not (runtime / 'app/health.json').exists()
             assert retained.read(actual / 'http-capture.json') == {'errors': [], 'bodies': []}
@@ -130,7 +153,13 @@ class Audit:
                 'scope': 'Independent literal application state, launch denominator and original file preservation; consumer-checked lifetime receipt'}
 
 
-def check_report(path: Path, difference: bool, audit: Audit) -> int:
+def arguments(value: object) -> tuple[int, ...]:
+    """The declared scalar domain is independent of report and trial outcomes."""
+    assert type(value) is list and len(value) == 1 and type(value[0]) is int and 0 <= value[0] <= 5
+    return tuple(value)
+
+
+def check_report(path: Path, difference: bool, audit: Audit, *, expected: tuple[int, ...] = (5,)) -> int:
     """Equal-but-wrong returns, state, errno, missing repeats or receipt counts refuse."""
     report = retained.read(path)
     assert report['verdict'] == ('different_observed' if difference else 'equivalent_observed')
@@ -139,7 +168,8 @@ def check_report(path: Path, difference: bool, audit: Audit) -> int:
     assert entry['native_options']['profile'] == PROFILES[language]
     assert {row['name'] for row in entry['globals']} == {'state', 'observed_errno'}
     bundle = retained.read(path.parent / result['case'] / 'typed-bundle.json')['cases'][0]
-    amount, = result['arguments']
+    assert arguments(result['arguments']) == expected
+    amount, = expected
     initial = {'global:state': scalar(language, 7), 'global:observed_errno': scalar(language, 0)}
     assert set(bundle['contract']['required_roots']) == set(initial)
     for lane in ('baseline', 'instrumented_on'):
@@ -155,16 +185,18 @@ def check_report(path: Path, difference: bool, audit: Audit) -> int:
             execution = attempt['execution']
             assert execution['capture_complete'] and execution['channels'] == {'stdout': [], 'stderr': []}
             assert execution['termination'] == {'kind': 'exit', 'code': 0}
-            audit.attempt(path, path.parent / result['case'] / (lane + '-' + str(index)), entry, lane, execution['witness'])
+            audit.attempt(path, path.parent / result['case'] / (lane + '-' + str(index)),
+                          entry, lane, execution['witness'], expected)
     return 4
 
 
-def framework(workspace: Path, folder: Path, label: str, difference: bool, audit: Audit) -> int:
+def framework(workspace: Path, folder: Path, label: str, difference: bool, audit: Audit,
+              *, expected: tuple[int, ...] = (5,)) -> int:
     output = command([sys.executable, '-I', '-B', workspace / 'tests/test_equivalence.py'],
                      folder, label, expected=int(difference))
     rows = [json.loads(line) for line in output.splitlines()]
     assert len(rows) == 1
-    return check_report(Path(rows[0]['report']), difference, audit)
+    return check_report(Path(rows[0]['report']), difference, audit, expected=expected)
 
 
 def exercise(cli: Path, provider: Path, sdk: Path, root: Path) -> dict:
@@ -196,10 +228,11 @@ def exercise(cli: Path, provider: Path, sdk: Path, root: Path) -> dict:
             summary = retained.read(reduced / 'shrink.json')
             assert summary['original_arguments'] == [5] and summary['reduced_arguments'] == [0]
             assert summary['status'] == 'candidate_rule_minimal' and summary['source_preserved']
-            for path in (reduced / 'original/report.json', reduced / 'confirmation/report.json',
-                         *(Path(row['report']) for row in summary['trials'])):
-                check_report(path, True, audit)
-            framework(Path(summary['workspace']), folder, 'reduced-framework', True, audit)
+            check_report(reduced / 'original/report.json', True, audit, expected=(5,))
+            check_report(reduced / 'confirmation/report.json', True, audit, expected=(0,))
+            for trial in summary['trials']:
+                check_report(Path(trial['report']), True, audit, expected=arguments(trial['arguments']))
+            framework(Path(summary['workspace']), folder, 'reduced-framework', True, audit, expected=(0,))
         results.append({'name': name, 'language': language, 'difference': difference})
     summary = audit.finish()
     return {'claim': 'equivalence over these tests and observations', 'cases': results,
@@ -227,6 +260,8 @@ def main() -> None:
     assert not any(path_within(root, path) or path_within(sdk, path)
                    for path in (provider, Path(__file__).resolve().parents[1]))
     assert subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=provider).decode().strip() == SDK_HEAD
+    for source in (provider, Path(__file__).resolve().parents[1]):
+        assert not subprocess.check_output(['git', 'status', '--porcelain'], cwd=source).strip(), 'source checkout is dirty'
     root.mkdir(mode=0o700, parents=True)
     held = {str(path): source_facts(path) for path in (provider, Path(__file__).resolve().parents[1])}
     write(root / 'original-source-facts.json', held)

@@ -18,15 +18,15 @@ class NativeLifetimeWorkflowTests(TestCase):
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name).resolve()
 
-    def report(self, difference=False):
+    def report(self, difference=False, *, amount=5):
         entry = {'language': 'c', 'native_options': {'profile': qualifier.PROFILES['c']},
                  'globals': [{'name': 'state'}, {'name': 'observed_errno'}]}
-        result = {'entry': entry, 'case': 'sample', 'arguments': [5]}
+        result = {'entry': entry, 'case': 'sample', 'arguments': [amount]}
         value = {'verdict': 'different_observed' if difference else 'equivalent_observed', 'cases': [result]}
         before = {'global:state': qualifier.scalar('c', 7), 'global:observed_errno': qualifier.scalar('c', 0)}
         bundle = {'contract': {'required_roots': list(before)}, 'baseline': [], 'instrumented_on': []}
         for lane in ('baseline', 'instrumented_on'):
-            after = {'global:state': qualifier.scalar('c', 12 + int(difference and lane == 'instrumented_on')),
+            after = {'global:state': qualifier.scalar('c', 7 + amount + int(difference and lane == 'instrumented_on')),
                      'global:observed_errno': qualifier.scalar('c', errno.ECHILD)}
             observation = {'gaps': [], 'before': {'roots': before, 'nodes': []},
                 'after': {'roots': after, 'nodes': []}, 'outcome': {'kind': 'return', 'graph': {
@@ -34,7 +34,8 @@ class NativeLifetimeWorkflowTests(TestCase):
             attempt = {'observation': observation, 'execution': {'capture_complete': True,
                 'channels': {'stdout': [], 'stderr': []}, 'termination': {'kind': 'exit', 'code': 0}, 'witness': None}}
             bundle[lane] = [copy.deepcopy(attempt), copy.deepcopy(attempt)]
-        folder = self.root / ('different' if difference else 'matching'); (folder / 'sample').mkdir(parents=True)
+        folder = self.root / (('different' if difference else 'matching') + '-' + str(amount))
+        (folder / 'sample').mkdir(parents=True)
         qualifier.write(folder / 'report.json', value)
         qualifier.write(folder / 'sample/typed-bundle.json', {'cases': [bundle]})
         return folder / 'report.json', bundle
@@ -48,9 +49,26 @@ class NativeLifetimeWorkflowTests(TestCase):
                 self.assertEqual(parsed['adapters'][language]['profile'], qualifier.PROFILES[language])
                 self.assertEqual(parsed['fixtures'][0]['lifetimes'][0]['complete'], True)
                 self.assertEqual(parsed['fixtures'][0]['lifetimes'][0].get('exception_exit'), False if language == 'cpp' else None)
-                body = next((source / 'src').iterdir()).read_text()
+                extension = '.cpp' if language == 'cpp' else '.c'
+                body = (source / ('src/app' + extension)).read_text()
                 self.assertIn('observed_errno=errno', body)
                 self.assertEqual('getenv(' in body, difference)
+                self.assertIn('keep_item(&item)' if language == 'cpp' else 'keep_item(item)', body)
+                self.assertNotIn('struct Item {', body)
+                self.assertIn('struct Item {', (source / 'include/item.h').read_text())
+                self.assertEqual((source / ('src/keep' + extension)).read_text(),
+                                 '#include "item.h"\nvoid keep_item(struct Item *item){(void)item;}\n')
+                target, = parsed['adapters'][language]['targets']
+                units = ['src/app' + extension, 'src/keep' + extension]
+                self.assertEqual(target['units'], [{'source': name} for name in units])
+                self.assertEqual(target['link_flags'], ['-pthread'])
+                database = json.loads((source / parsed['adapters'][language]['compilation_database']).read_text())
+                self.assertEqual([row['file'] for row in database], ['../' + name for name in units])
+                for row in database:
+                    self.assertEqual(row['directory'], str(source / 'build'))
+                    self.assertIn('-O2', row['arguments'])
+                    self.assertNotIn('-flto', row['arguments'])
+                    self.assertIn('../include', row['arguments'])
         with self.assertRaises(ValueError):
             qualifier.fixture(self.root, 'python', False, self.root / 'sdk')
 
@@ -89,7 +107,7 @@ class NativeLifetimeWorkflowTests(TestCase):
             self.assertEqual(qualifier.framework(self.root / 'workspace', self.root, 'framework', True, audit), 4)
             self.assertEqual(command.call_args.args[0][1:3], ['-I', '-B'])
             self.assertEqual(command.call_args.kwargs['expected'], 1)
-            check.assert_called_once_with(report, True, audit)
+            check.assert_called_once_with(report, True, audit, expected=(5,))
         with patch.object(qualifier, 'command', return_value='{}\n{}'), self.assertRaises(AssertionError):
             qualifier.framework(self.root, self.root, 'bad', False, Mock())
 
@@ -107,7 +125,7 @@ class NativeLifetimeWorkflowTests(TestCase):
                 output = folder / 'shrinking'; output.mkdir()
                 qualifier.write(output / 'shrink.json', {'original_arguments': [5], 'reduced_arguments': [0],
                     'status': 'candidate_rule_minimal', 'source_preserved': True, 'workspace': str(folder / 'reduced'),
-                    'trials': [{'report': str(folder / 'trial/report.json')}]})
+                    'trials': [{'arguments': [2], 'report': str(folder / 'trial/report.json')}]})
             return ''
         fake = Mock(); fake.finish.return_value = {'actual_application_records': 52}
         with patch.object(qualifier, 'command', side_effect=command), \
@@ -120,6 +138,9 @@ class NativeLifetimeWorkflowTests(TestCase):
         self.assertEqual(len(result['cases']), 3)
         self.assertEqual(framework.call_count, 7)
         self.assertEqual(check.call_count, 9)
+        self.assertEqual(check.call_args_list[-2].kwargs, {'expected': (0,)})
+        self.assertEqual(check.call_args_list[-1].kwargs, {'expected': (2,)})
+        self.assertEqual(framework.call_args.kwargs, {'expected': (0,)})
         self.assertEqual([row[0] for row in calls].count('shrink'), 1)
         self.assertIn('independent complete raw lifetime audit and evidence refusals', result['remaining'])
 
@@ -141,6 +162,8 @@ class NativeLifetimeWorkflowTests(TestCase):
         for name in ('expected-lifetimes-before-build.json', 'expected-lifetimes.json'):
             qualifier.write(folder / name, {}); (folder / name).chmod(0o600)
         entry = {'language': 'c', 'otelc_runtime_function': 'src/app.c::selected'}
+        (folder / 'native-caller').mkdir()
+        qualifier.write(folder / 'native-caller/caller.json', {'entry': entry, 'arguments': [5]})
         witness = None
         if lane == 'instrumented_on':
             (runtime / 'app').mkdir()
@@ -160,7 +183,7 @@ class NativeLifetimeWorkflowTests(TestCase):
     def test_launch_records_complete_receipt_and_original_file_facts_remain_bound(self):
         for lane in ('baseline', 'instrumented_on'):
             audit, folder, entry, witness = self.audit_fixture(lane)
-            audit.attempt(self.root / 'report.json', folder, entry, lane, witness)
+            audit.attempt(self.root / 'report.json', folder, entry, lane, witness, (5,))
             result = audit.finish()
             self.assertEqual(result['actual_application_records'], 1)
             self.assertGreater(result['original_evidence_files_held'], 4)
@@ -173,7 +196,7 @@ class NativeLifetimeWorkflowTests(TestCase):
         for changes in ({'spans': 1}, {'sdk_pid': 99}, {'lifetimes': []}):
             qualifier.write(path, {**original, **changes})
             with self.subTest(changes=changes), self.assertRaises(AssertionError):
-                audit.attempt(self.root / 'report.json', folder, entry, 'instrumented_on', witness)
+                audit.attempt(self.root / 'report.json', folder, entry, 'instrumented_on', witness, (5,))
 
     def test_main_pins_sdk_source_and_preserves_noncoverage_products(self):
         provider = self.root / 'provider'; provider.mkdir()
@@ -187,7 +210,8 @@ class NativeLifetimeWorkflowTests(TestCase):
             (sdk / 'libotelc_native_runtime.so').write_bytes(b'literal library; never loaded')
             return ''
         with patch('sys.argv', argv), patch.dict(qualifier.os.environ, {}, clear=False), \
-                patch.object(qualifier.subprocess, 'check_output', return_value=qualifier.SDK_HEAD.encode()), \
+                patch.object(qualifier.subprocess, 'check_output', side_effect=lambda argv, **kwargs:
+                             b'' if argv[1] == 'status' else qualifier.SDK_HEAD.encode()), \
                 patch.object(qualifier, 'source_facts', return_value={'literal.py': {'original': True}}), \
                 patch.object(qualifier, 'command', side_effect=build), \
                 patch.object(qualifier, 'exercise', return_value={'status': 'literal component only'}):
@@ -212,6 +236,44 @@ class NativeLifetimeWorkflowTests(TestCase):
                     qualifier.main()
                 command.assert_not_called()
                 self.assertFalse((provider / 'inside').exists())
+
+    def test_self_consistent_wrong_fixed_or_reduced_input_refuses(self):
+        for amount in (0, 4):
+            path, _ = self.report(amount=amount)
+            with self.subTest(amount=amount), self.assertRaises(AssertionError):
+                qualifier.check_report(path, False, Mock())
+        path = self.root / 'matching-0/report.json'
+        self.assertEqual(qualifier.check_report(path, False, Mock(), expected=(0,)), 4)
+        with self.assertRaises(AssertionError):
+            qualifier.check_report(self.root / 'matching-4/report.json', False, Mock(), expected=(0,))
+        for value in ([], [False], [True], [0.0], [-1], [6], [1, 2], None):
+            with self.subTest(value=value), self.assertRaises(AssertionError): qualifier.arguments(value)
+
+    def test_trial_candidate_and_actual_report_arguments_must_match(self):
+        path, _ = self.report(amount=3)
+        self.assertEqual(qualifier.check_report(path, False, Mock(), expected=qualifier.arguments([3])), 4)
+        with self.assertRaises(AssertionError):
+            qualifier.check_report(path, False, Mock(), expected=qualifier.arguments([2]))
+
+    def test_caller_arguments_cannot_disagree_with_the_checked_input(self):
+        audit, folder, entry, witness = self.audit_fixture()
+        qualifier.write(folder / 'native-caller/caller.json', {'entry': entry, 'arguments': [4]})
+        with self.assertRaises(AssertionError):
+            audit.attempt(self.root / 'report.json', folder, entry, 'baseline', witness, (5,))
+
+    def test_dirty_pinned_sdk_refuses_before_initial_snapshot_or_build(self):
+        provider = self.root / 'provider'; provider.mkdir()
+        cli = self.root / 'cli'; cli.write_bytes(b'never executed')
+        report = self.root / 'evidence'
+        def git(argv, **kwargs):
+            return b' M source.cpp\n' if argv[1] == 'status' else qualifier.SDK_HEAD.encode()
+        with patch('sys.argv', ['qualifier', '--otelc-root', str(provider), '--cli', str(cli),
+                                '--sdk-build', str(self.root / 'sdk'), '--report-dir', str(report)]), \
+                patch.object(qualifier.subprocess, 'check_output', side_effect=git), \
+                patch.object(qualifier, 'command') as command, self.assertRaisesRegex(AssertionError, 'dirty'):
+            qualifier.main()
+        command.assert_not_called()
+        self.assertFalse(report.exists())
 
 
 if __name__ == '__main__':
