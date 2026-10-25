@@ -11,6 +11,16 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class QualificationRecipeTests(unittest.TestCase):
+    def test_native_project_recipe_selects_only_an_explicit_prepared_sdk_and_storage_floor(self):
+        for backend in ('legacy', 'prepared'):
+            result = subprocess.run(['make', '--no-print-directory', '-n', 'generation-native-project-otelc',
+                'OTELC_ROOT=/tmp/provider', 'REPORT_DIR=/tmp/native-evidence', 'NATIVE_BACKEND=' + backend,
+                'NATIVE_SDK_BUILD=/tmp/held-sdk', 'NATIVE_MIN_FREE_BYTES=123456'],
+                cwd=ROOT, capture_output=True, text=True, check=True)
+            self.assertIn('--backend "' + backend + '"', result.stdout)
+            self.assertIn('--min-free-bytes "123456"', result.stdout)
+            self.assertEqual('--sdk-build "/tmp/held-sdk"' in result.stdout, backend == 'prepared')
+
     def test_native_caller_recipe_has_its_own_compiler_checks_and_coverage_floor(self):
         result = subprocess.run(['make', '--no-print-directory', '-n', 'native-caller-check',
             'PYTHON=/selected/python'], cwd=ROOT, capture_output=True, text=True, check=True)

@@ -7,14 +7,19 @@ from pathlib import Path
 import shutil
 import sys
 
-from qualify_generation import command
+from qualify_project_tests import command
+import qualification_storage
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'examples'))
+from otelc_capture import path_within
 
 CASES = (('c-o0', 'c', '-O0', False), ('cpp-o2', 'cpp', '-O2', False), ('c-state', 'c', '-O2', True))
 
 
 def digest(path: Path) -> str:
     """Retain actual original fixture bytes independently of the generated plan."""
-    return hashlib.file_digest(path.open('rb'), 'sha256').hexdigest()
+    with path.open('rb') as stream:
+        return hashlib.file_digest(stream, 'sha256').hexdigest()
 
 
 def write(path: Path, value: object) -> None:
@@ -23,8 +28,11 @@ def write(path: Path, value: object) -> None:
 
 
 def prepare(cli: Path, provider: Path, folder: Path, language: str, optimisation: str,
-            difference: bool = False, *, opaque: bool = False) -> tuple[Path, Path, dict]:
+            difference: bool = False, *, opaque: bool = False,
+            backend: str = 'legacy', sdk_build: Path | None = None) -> tuple[Path, Path, dict]:
     """Both lanes compile the same declared two-unit fixture and generated header."""
+    if backend not in ('legacy', 'prepared') or (backend == 'prepared') != (sdk_build is not None):
+        raise ValueError('choose legacy or prepared with its explicit SDK build directory')
     source = folder / 'source'
     for name in ('src', 'include', 'build/generated'):
         (source / name).mkdir(parents=True)
@@ -39,7 +47,8 @@ def prepare(cli: Path, provider: Path, folder: Path, language: str, optimisation
     (source / units[0]).write_text('#include "state.h"\n#include "settings.h"\n#include <stdlib.h>\n'
         '#if __has_include("optional.h")\n#define EXTRA 1\n#else\n#define EXTRA 0\n#endif\n'
         'static int local=3;int selected(int amount){local+=amount;int result=sibling(amount)+local+OFFSET+EXTRA;'
-        + ('if(getenv("OTELC_CONFIG"))total++;' if difference else '') + 'return result;}int main(void){}\n')
+        + ('if(getenv("' + ('OTELC_NATIVE_PLAN_FD' if backend == 'prepared' else 'OTELC_CONFIG') + '"))total++;'
+           if difference else '') + 'return result;}int main(void){}\n')
     (source / units[1]).write_text('#include "state.h"\nint total=7;static int local=4;\n'
         'int sibling(int amount){local+=amount;total+=amount;return total;}\n' +
         ('volatile int hidden=1;\n' if opaque else ''))
@@ -50,11 +59,13 @@ def prepare(cli: Path, provider: Path, folder: Path, language: str, optimisation
     (source / 'build/compile_commands.json').write_text(json.dumps(database))
     original = {path.relative_to(source).as_posix(): digest(path) for path in source.rglob('*') if path.is_file()}
     function = 'selected(int)' if language == 'cpp' else 'selected'
+    selection = 'selected*' if backend == 'prepared' else function
+    adapter = ('backend="prepared"\nsdk_build=' + json.dumps(str(sdk_build)) + '\n') if backend == 'prepared' else ''
     config = folder / 'equivalence.toml'
-    config.write_text('languages=[' + json.dumps(language) + ']\n[functions]\ninclude=[' + json.dumps(function) + ']\n'
-        '[[fixtures]]\nfunction=' + json.dumps(function) + '\ncases=[[5]]\n'
+    config.write_text('languages=[' + json.dumps(language) + ']\n[functions]\ninclude=[' + json.dumps(selection) + ']\n'
+        '[[fixtures]]\nfunction=' + json.dumps(selection) + '\ncases=[[5]]\n'
         'domains=[{kind="integer",minimum=0,maximum=5}]\n'
-        '[adapters.' + language + ']\ncompilation_database="build/compile_commands.json"\n'
+        '[adapters.' + language + ']\n' + adapter + 'compilation_database="build/compile_commands.json"\n'
         '[[adapters.' + language + '.targets]]\nname="application"\nunits=[' +
         ','.join('{source=' + json.dumps(name) + '}' for name in units) + ']\n')
     workspace = Path(command([cli, 'plan', '--source', source, '--otelc-root', provider,
@@ -68,17 +79,29 @@ def scalar(language: str, value: int) -> dict:
     return {'kind': 'integer', 'type': language + '.int', 'value': str(value), 'bits': 32, 'signed': True}
 
 
-def check_report(path: Path, *, difference: bool = False) -> tuple[int, dict]:
+def check_report(path: Path, *, difference: bool = False, backend: str = 'legacy',
+                 function: str = 'selected', native_audit=None) -> tuple[int, dict]:
     """Every actual repeat has independently expected complete state and witnesses."""
     report = json.loads(path.read_text())
     assert report['source_preserved'] and not report['blocked'] and len(report['cases']) == 1
     result = report['cases'][0]
     assert result['exit_code'] == int(difference)
-    entry = next(item for item in report['inventory'] if item['status'] == 'ready')
-    assert result['function'] == ('selected(int)' if entry['language'] == 'cpp' else 'selected')
+    candidates = [item for item in report['inventory'] if item['status'] == 'ready'
+                  and (backend == 'legacy' or item['otelc_function'] == result['function'])]
+    assert len(candidates) == 1
+    entry, = candidates
+    assert result['function'] == (function + '(int)' if entry['language'] == 'cpp' else function)
+    if backend == 'prepared':
+        assert entry['native_backend'] == 'prepared' and native_audit is not None
+        assert entry['path'] == 'src/one.' + ('cpp' if entry['language'] == 'cpp' else 'c')
+    assert len(result['arguments']) == 1
     amount = result['arguments'][0]
+    assert type(amount) is int and 0 <= amount <= 5
     bundle = json.loads((path.parent / result['case'] / 'typed-bundle.json').read_text())['cases'][0]
     assert len(entry['globals']) == 3 and len({item['unit'] for item in entry['globals']}) == 2
+    units = {item['unit'] for item in entry['globals']}
+    assert entry['unit'] in units
+    assert {item['name'] for item in entry['globals']} == {'total', *('unit:' + unit + ':local' for unit in units)}
     initial = {'global:' + item['name']: scalar(entry['language'],
         7 if item['name'] == 'total' else 3 if item['unit'] == entry['unit'] else 4) for item in entry['globals']}
     assert set(bundle['contract']['required_roots']) == set(initial)
@@ -101,9 +124,12 @@ def check_report(path: Path, *, difference: bool = False) -> tuple[int, dict]:
                 assert execution['witness'] is None
             else:
                 witness = execution['witness']
-                assert witness['functions'] == {result['function']: 1} and witness['spans'] == 1
+                runtime_name = entry['path'] + '::' + result['function'] if backend == 'prepared' else result['function']
+                assert witness['functions'] == {runtime_name: 1} and witness['spans'] == 1
                 assert witness['pending'] == 0 and not any(witness['losses'].values())
             folder = path.parent / result['case'] / (lane + '-' + str(index))
+            if backend == 'prepared':
+                native_audit(path, folder, entry, lane, execution['witness'], [amount])
             lines = (folder / 'observation').read_bytes().splitlines()
             abi = json.loads(lines[0][4:])
             assert abi['char_bits'] == 8 and abi['bits']['int'] == 32 and abi['byte_order'] == 'little'
@@ -119,19 +145,20 @@ def check_report(path: Path, *, difference: bool = False) -> tuple[int, dict]:
     return launches, report
 
 
-def framework(workspace: Path, folder: Path, name: str, *, difference: bool) -> int:
+def framework(workspace: Path, folder: Path, name: str, *, difference: bool,
+              backend: str = 'legacy', native_audit=None) -> int:
     """The generated standard-library unittest must return the declared verdict."""
     output = command([sys.executable, workspace / 'tests/test_equivalence.py'], folder, name,
                      expected=int(difference))
     summaries = [json.loads(line) for line in output.splitlines()]
     assert len(summaries) == 1
-    return check_report(Path(summaries[0]['report']), difference=difference)[0]
+    return check_report(Path(summaries[0]['report']), difference=difference, backend=backend, native_audit=native_audit)[0]
 
 
-def refusals(cli: Path, provider: Path, folder: Path) -> int:
+def refusals(cli: Path, provider: Path, folder: Path, *, backend: str = 'legacy', sdk_build: Path | None = None) -> int:
     """Changed inputs, probes and retained context refuse before application launch."""
     folder.mkdir()
-    workspace, source, original = prepare(cli, provider, folder, 'c', '-O0')
+    workspace, source, original = prepare(cli, provider, folder, 'c', '-O0', backend=backend, sdk_build=sdk_build)
     header = source / 'build/generated/settings.h'
     saved = header.read_bytes()
     header.write_text('#define OFFSET 9\n')
@@ -151,39 +178,109 @@ def refusals(cli: Path, provider: Path, folder: Path) -> int:
     return 4
 
 
+def promotion(cli: Path, workspace: Path, source: Path, folder: Path, language: str,
+              difference: bool, audit) -> int:
+    """Discover the current original and a newly added compiler-bound callable."""
+    bundle = folder / 'project-tests'
+    arguments = [cli, 'promote', '--workspace', workspace, '--source', source, '--destination', bundle]
+    planned = json.loads(command(arguments, folder, 'promote-plan'))
+    assert planned['mode'] == 'dry-run' and planned['files'] and not bundle.exists()
+    command([*arguments, '--apply'], folder, 'promote-apply')
+    parent = folder / 'current-workspaces'; parent.mkdir()
+
+    def current(application: Path, name: str, methods: tuple[str, ...]) -> int:
+        output = command([sys.executable, '-I', '-B', bundle / 'test_equivalence.py'], folder, name,
+                         expected=int(difference), environment={'OTELEQ_SOURCE': str(application),
+                                                               'OTELEQ_WORKSPACE_PARENT': str(parent)})
+        rows = [json.loads(line) for line in output.splitlines()]
+        assert len(rows) == len(methods) + 1 and rows[0]['project_source'] == str(application)
+        observed, seen = 0, []
+        for row in rows[1:]:
+            path = Path(row['report'])
+            report = json.loads(path.read_text())
+            function = report['cases'][0]['function']
+            method = function.split('(', 1)[0]
+            assert method in methods and path.is_relative_to(folder)
+            count, _ = check_report(path, difference=difference, backend='prepared', function=method, native_audit=audit)
+            observed += count; seen.append(method)
+        assert sorted(seen) == sorted(methods)
+        return observed
+
+    launches = current(source, 'current-original', ('selected',))
+    changed = folder / 'current-source'
+    shutil.copytree(source, changed)
+    unit = changed / ('src/one.cpp' if language == 'cpp' else 'src/one.c')
+    unit.write_text(unit.read_text() + '\nint selected_added(int amount){return selected(amount);}\n')
+    database = changed / 'build/compile_commands.json'
+    records = json.loads(database.read_text())
+    for record in records:
+        record['directory'] = str(changed / 'build')
+    write(database, records)
+    original = {path.relative_to(changed).as_posix(): digest(path) for path in changed.rglob('*') if path.is_file()}
+    launches += current(changed, 'current-changed', ('selected', 'selected_added'))
+    assert {path.relative_to(changed).as_posix(): digest(path) for path in changed.rglob('*') if path.is_file()} == original
+    return launches
+
+
 def main() -> None:
     """Run external diagnostic qualification; preserve every real launch and source."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--otelc-root', type=Path, required=True)
     parser.add_argument('--report-dir', type=Path, required=True)
     parser.add_argument('--cli', type=Path, required=True)
+    parser.add_argument('--backend', choices=('legacy', 'prepared'), default='legacy')
+    parser.add_argument('--sdk-build', type=Path)
+    parser.add_argument('--min-free-bytes', type=int, default=0)
     args = parser.parse_args()
+    if sys.flags.optimize:
+        parser.error('qualification requires assertions; disable -O/PYTHONOPTIMIZE')
+    if (args.backend == 'prepared') != (args.sdk_build is not None):
+        parser.error('prepared qualification requires --sdk-build; legacy qualification must omit it')
+    if args.min_free_bytes < 0:
+        parser.error('--min-free-bytes must be nonnegative')
+    sdk_build = args.sdk_build.resolve(strict=True) if args.sdk_build is not None else None
+    if sdk_build is not None and not sdk_build.is_dir():
+        parser.error('--sdk-build must identify an existing SDK directory')
     provider, supplied_cli = args.otelc_root.resolve(strict=True), args.cli.resolve(strict=True)
     folder = args.report_dir.resolve()
-    if any(folder.is_relative_to(root) for root in (provider, Path(__file__).resolve().parents[1])):
+    protected = [provider, Path(__file__).resolve().parents[1]]
+    if sdk_build is not None:
+        protected.append(sdk_build)
+    if any(path_within(folder, root) for root in protected):
         parser.error('qualification directory must be new and external')
     folder.mkdir(mode=0o700, exist_ok=False)
     cli = folder / 'quux-oteleq'
     shutil.copy2(supplied_cli, cli)
     cli.chmod(0o555)
     os.environ['OTELEQ_PYTHON'], os.environ['OTELEQ_CLI'] = sys.executable, str(cli)
+    with qualification_storage.budget(args.min_free_bytes):
+        exercise(cli, provider, folder, backend=args.backend, sdk_build=sdk_build)
+
+
+def exercise(cli: Path, provider: Path, folder: Path, *, backend: str = 'legacy', sdk_build: Path | None = None) -> None:
+    """Keep each generated/retained route and its actual process denominator."""
+    from native_prepared_receipt import Oracle
+    audit = Oracle(folder, provider) if backend == 'prepared' else None
     launches, reduced, results = 0, False, []
     for name, language, optimisation, difference in CASES:
         case = folder / name
         case.mkdir()
-        workspace, source, original = prepare(cli, provider, case, language, optimisation, difference)
+        workspace, source, original = prepare(cli, provider, case, language, optimisation, difference,
+                                               backend=backend, sdk_build=sdk_build)
         captures = case / 'comparison'
         command([cli, 'run', '--workspace', workspace, '--report-dir', captures], case, 'run', expected=int(difference))
-        count, report = check_report(captures / 'report.json', difference=difference)
-        count += framework(workspace, case, 'generated-framework', difference=difference)
+        count, report = check_report(captures / 'report.json', difference=difference, backend=backend, native_audit=audit)
+        count += framework(workspace, case, 'generated-framework', difference=difference, backend=backend, native_audit=audit)
         target = report['cases'][0]['case']
         replay = json.loads(command([cli, 'replay', '--workspace', workspace, '--case', target], case, 'replay', expected=int(difference)))
-        count += check_report(Path(replay['report']), difference=difference)[0]
+        count += check_report(Path(replay['report']), difference=difference, backend=backend, native_audit=audit)[0]
         exported = case / 'exported'
         command([cli, 'export-tests', '--workspace', workspace, '--destination', exported, '--apply'], case, 'export')
+        if backend == 'prepared':
+            count += promotion(cli, workspace, source, case, language, difference, audit)
         assert {path.relative_to(source).as_posix(): digest(path) for path in source.rglob('*') if path.is_file()} == original
         shutil.rmtree(source)
-        count += framework(exported, case, 'detached-framework', difference=difference)
+        count += framework(exported, case, 'detached-framework', difference=difference, backend=backend, native_audit=audit)
         if difference:
             shrink = case / 'shrinking'
             command([cli, 'shrink', '--workspace', exported, '--case', target, '--report-dir', shrink, '--trials', '8'], case, 'shrink', expected=1)
@@ -192,23 +289,30 @@ def main() -> None:
             assert result['status'] == 'candidate_rule_minimal' and result['source_preserved']
             reports = [shrink / 'original/report.json', shrink / 'confirmation/report.json',
                        *(Path(trial['report']) for trial in result['trials'])]
-            count += sum(check_report(path, difference=True)[0] for path in reports)
-            count += framework(Path(result['workspace']), case, 'reduced-framework', difference=True)
+            count += sum(check_report(path, difference=True, backend=backend, native_audit=audit)[0] for path in reports)
+            count += framework(Path(result['workspace']), case, 'reduced-framework', difference=True,
+                               backend=backend, native_audit=audit)
             reduced = True
         launches += count
         results.append({'name': name, 'language': language, 'optimisation': optimisation,
                         'verdict': 'different_observed' if difference else 'equivalent_observed',
                         'actual_application_launches': count})
-    controls = refusals(cli, provider, folder / 'refusals')
+    controls = refusals(cli, provider, folder / 'refusals', backend=backend, sdk_build=sdk_build)
     actual = [path for path in folder.rglob('command.json') if path.parent.name.startswith(('baseline-', 'instrumented_on-'))
               and 'original' not in path.relative_to(folder).parts]
     # The original shrink replay is copied evidence, rather than new launches.
     assert len(actual) == launches, (len(actual), launches)
+    receipt_summary = audit.finish() if audit is not None else None
+    if receipt_summary is not None:
+        assert receipt_summary['actual_application_records'] == launches
     write(folder / 'qualification.json', {'claim': 'equivalence over these tests and observations',
         'artefact_class': 'diagnostic', 'runtime_cli_sha256': digest(cli),
         'qualifier_sha256': digest(Path(__file__)), 'cases': results, 'actual_application_launches': launches,
         'refusal_controls': controls, 'generated_detached_replay_and_scalar_reduction': reduced,
-        'source_preserved': True, 'scope': 'declared signed integer free functions in explicit same-language native targets; macOS ARM64 provider execution'})
+        'source_preserved': True, 'backend': backend,
+        'current_source_promotion': backend == 'prepared',
+        'independent_native_receipt': receipt_summary,
+        'scope': 'declared signed integer free functions in explicit same-language native targets; macOS ARM64 provider execution'})
     print(json.dumps({'actual_application_launches': launches, 'refusal_controls': controls}))
 
 

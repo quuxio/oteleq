@@ -105,6 +105,25 @@ This runs native reader/controller tests, including changed or rehashed records,
 
 The separate caller target uses matched Clang tools for real AST/VFS/input checks and ordinary generated worker execution. Its SDK recipe fixtures are literal data; that target does not build or run the official SDK. It checks unknown/missing helper declarations, changed signatures/references, absent profiling exclusions, changed and restored helper bytes, header alias substitution and positive/negative existence probes. Actual SDK execution and retained-route qualification remain separate checks.
 
+### Qualify generated and retained suites
+
+The maintained native project corpus can explicitly select the prepared provider:
+
+```sh
+make generation-native-project-otelc \
+  PYTHON=/absolute/path/to/python \
+  OTELC_ROOT=/absolute/otelc \
+  NATIVE_BACKEND=prepared \
+  NATIVE_SDK_BUILD=/absolute/otelc/build/context-sdk \
+  REPORT_DIR=/absolute/new-native-qualification
+```
+
+The default `NATIVE_BACKEND=legacy` retains the older provider route and omits the prepared SDK argument. `NATIVE_MIN_FREE_BYTES` defaults to 8 GiB. The corpus checks available storage before each command, keeps started/exit/output records and refuses to overwrite an incomplete operation. Use a new external report directory for a fresh run; inspect any failure before deciding how to recover it.
+
+The prepared corpus covers two-unit C `-O0`, C++ `-O2` and same-return C global mutation fixtures. It checks complete expected scalar globals/statics and results through direct execution, generated unittest, replay, detached export and scalar reduction. Current-source promotion also checks a copied checkout and a newly added selected function. Four changed-input/context controls must refuse before application execution.
+
+A separate fixture oracle reads actual ownership/start/release/completion records, original file identities, final health, raw protobuf and HTTP response receipts. It compares copied shrink evidence to exactly one original four-launch report, checks the complete copy denominator and counts copies separately. Thirteen altered-evidence controls use separate values or capture copies; they start no applications and leave the original evidence unchanged. Every observed original evidence file is rechecked before the final summary. The receipt modules each require 80% coverage in `make effect-qualification-check`. This normal-call corpus does not establish recursive/exception, receiver, live-control or shipping qualification. Exact-revision execution remains pending until its qualification record is published.
+
 ## Remaining integration
 
 The candidate now connects provider selection, compiler-bound callers, owned sessions and the native OTLP reader. Generated, replayed, framework, detached, reduced and promoted suites need exact-revision execution, source preservation and negative controls before admission. Live collection/emission schedules, invocation attribution, automatic object lifetimes, task/HTTP context, broader build recipes and platform/shipping qualification remain open. The [project completion checklist](completion.md) remains the acceptance boundary.
