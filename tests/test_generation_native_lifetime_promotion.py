@@ -23,6 +23,8 @@ class NativeLifetimePromotionTests(unittest.TestCase):
         folder.mkdir(parents=True)
         named = lambda name: name + ('(int)' if language == 'cpp' else '')
         entries = [{'id': name, 'status': 'ready', 'language': language, 'otelc_function': named(name),
+                    'expected_baseline': ({'kind': 'error', 'category': 'exception', 'type': 'cpp.std::runtime_error'}
+                                          if mode == 'target-error' else {'kind': 'return'}),
                     'native_options': {'profile': qualifier.PROFILES[language]},
                     'globals': [{'name': 'state'}, {'name': 'observed_errno'}]} for name, _ in contracts]
         case = function + '-0'
@@ -31,7 +33,9 @@ class NativeLifetimePromotionTests(unittest.TestCase):
                     'cases': [{'case': case, 'function': named(function), 'arguments': [amount], 'exit_code': int(difference),
                                'comparison': {'verdict': 'different_observed' if difference else 'equivalent_observed'}}]}
         before = {'global:state': qualifier.scalar(language, 7), 'global:observed_errno': qualifier.scalar(language, 0)}
-        bundle = {'contract': {'required_roots': list(before)}}
+        bundle = {'contract': {'required_roots': list(before),
+                               'expected_baseline': ({'kind': 'error', 'category': 'exception', 'type': 'cpp.std::runtime_error'}
+                                          if mode == 'target-error' else {'kind': 'return'})}}
         for lane in ('baseline', 'instrumented_on'):
             after = {'global:state': qualifier.scalar(language, 7 + amount + int(difference and lane == 'instrumented_on')),
                      'global:observed_errno': qualifier.scalar(language, errno.ECHILD)}
