@@ -1,0 +1,25 @@
+{
+  "run": 40205833448,
+  "consumer_source": "123e0b2c154cc85a8e8726b372fb6f9d4ada5be3",
+  "provider_source": "acb13d7735526448209df37b7e6b98e5717befdb",
+  "artifact_id": 12605677364,
+  "artifact_sha256": "d4293a5d2601ef3230289eb6706b1e2dc0de2683bc377888ea3bbf04aacc6b81",
+  "original_attempt": "cpp-completed/comparison/7dd3c919df391b5b421e-0/instrumented_on-0",
+  "files": {
+    "http-responses.json": "ba8f2f930ac43454b03814043c53935e25c33ad928c907bb897d91bbddef6a57",
+    "report.json": "b0ce29ae988b120734a9c5500c30cf9647a1787f84d421f910486a4eba695b88",
+    "http-capture.json": "13270c489befcf3f6fd933beeb180898d2ac0e023b895e01681d6b71b919c7bd",
+    "expected-lifetimes.json": "5671be22bc91ec4aa67e7374d6b2d22441c2b55166e6d7dae5e0f426897fa929",
+    "typed-bundle.json": "5b10ee74cd077023bc92001de06d253215c784d606ab07afa03fb3592be30b21",
+    "otlp-0.protobuf": "9c3b611031ae68f209fa5ebb9d9c9228f94d62dc495d884cc67d6fe6e3df1c93",
+    "otlp-1.protobuf": "23c447bff370560899d58f5c8022678e70f89324df9cc2c7e6c690a35359e0ba",
+    "policy.toml": "3807ee37931b5a6f1c9d9c6ac63351182a16026002bf7322f6bfa07ce27ad1ea",
+    "otlp-2.protobuf": "eb133e1324bb509169ea42d4d7faa797361330bdbe72a7654e31cbac6451fac9",
+    "native-verified-lifetimes.json": "f311c8f62fe8dac50875364306e93245b561b329e3170468fd6c72769b0c7a71",
+    "expected-lifetimes-before-build.json": "83f7cfb61337b9d7b2f989cdc3962fe1df471990484e0a384268b3f6cb7bced8",
+    "native-runtime/native-application-start.json": "38edf6158b9d49753b74fe3528414bd83ef3ff9fe9a4769badc55ebb7a9912cd",
+    "native-runtime/native-request.json": "389f4f892bf8bd3575b652bceb81c3fbd7c348b104b9ff5af51a9f47cce6c53b",
+    "native-runtime/app/health.json": "f674b98ac60892c4dd3f4dc0fa6594d41547770dae0bab7c0169b850606a0a30"
+  },
+  "scope": "Complete unchanged captured C++ raw/policy/health/expectations plus complete original report/typed bundle. Runner paths remain historical data, not new filesystem identities."
+}

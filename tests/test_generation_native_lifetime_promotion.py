@@ -18,7 +18,7 @@ class NativeLifetimePromotionTests(unittest.TestCase):
         self.root = Path(temporary.name).resolve()
 
     def report(self, folder: Path, language: str, function: str, contracts: tuple,
-               *, difference: bool = False) -> Path:
+               *, difference: bool = False, amount: int = 5) -> Path:
         """Create explicit literal observations for one declared promoted call."""
         folder.mkdir(parents=True)
         named = lambda name: name + ('(int)' if language == 'cpp' else '')
@@ -28,12 +28,12 @@ class NativeLifetimePromotionTests(unittest.TestCase):
         case = function + '-0'
         document = {'source_preserved': True, 'blocked': [], 'claim': 'equivalence over these tests and observations',
                     'exit_code': int(difference), 'inventory': entries,
-                    'cases': [{'case': case, 'function': named(function), 'arguments': [5], 'exit_code': int(difference),
+                    'cases': [{'case': case, 'function': named(function), 'arguments': [amount], 'exit_code': int(difference),
                                'comparison': {'verdict': 'different_observed' if difference else 'equivalent_observed'}}]}
         before = {'global:state': qualifier.scalar(language, 7), 'global:observed_errno': qualifier.scalar(language, 0)}
         bundle = {'contract': {'required_roots': list(before)}}
         for lane in ('baseline', 'instrumented_on'):
-            after = {'global:state': qualifier.scalar(language, 12 + int(difference and lane == 'instrumented_on')),
+            after = {'global:state': qualifier.scalar(language, 7 + amount + int(difference and lane == 'instrumented_on')),
                      'global:observed_errno': qualifier.scalar(language, errno.ECHILD)}
             observation = {'gaps': [], 'before': {'roots': before, 'nodes': []}, 'after': {'roots': after, 'nodes': []},
                            'outcome': {'kind': 'return', 'graph': {'roots': {
@@ -54,7 +54,8 @@ class NativeLifetimePromotionTests(unittest.TestCase):
                 self.assertEqual(qualifier.check_report(path, False, audit, function=function,
                                                        contracts=qualifier.PROMOTED_CALLS), 4)
                 self.assertEqual(audit.attempt.call_count, 4)
-                self.assertTrue(all(call.kwargs == {'function': function} for call in audit.attempt.call_args_list))
+                self.assertTrue(all(call.kwargs == {'function': function, 'mode': 'completed'}
+                                    for call in audit.attempt.call_args_list))
                 with self.assertRaises(AssertionError): qualifier.check_report(path, False, Mock())
 
     def test_missing_extra_duplicate_id_and_foreign_inventory_function_refuse(self):
@@ -83,9 +84,9 @@ class NativeLifetimePromotionTests(unittest.TestCase):
             with self.subTest(function=function), self.assertRaises(ValueError):
                 qualifier.check_report(path, False, Mock(), function=function, contracts=qualifier.PROMOTED_CALLS)
 
-    def run_promotion(self, language: str, *, fault: str = ''):
-        case = self.root / (language + '-' + (fault or 'valid')); case.mkdir()
-        source, _ = qualifier.fixture(case, language, True, self.root / 'sdk')
+    def run_promotion(self, language: str, *, fault: str = '', mode: str = 'completed'):
+        case = self.root / (language + '-' + mode + '-' + (fault or 'valid')); case.mkdir()
+        source, _ = qualifier.fixture(case, language, True, self.root / 'sdk', mode=mode)
         original = qualifier.fixture_facts(source)
         folder = case / 'promotion'
         stages = []
@@ -115,7 +116,8 @@ class NativeLifetimePromotionTests(unittest.TestCase):
                 self.assertTrue(all(row['directory'] == str(application / 'build') for row in database))
             rows = [{'project_source': str(application)}]
             for function, _ in contracts:
-                path = self.report(parent / label / function, language, function, contracts, difference=True)
+                path = self.report(parent / label / function, language, function, contracts, difference=True,
+                                   amount=0 if mode == 'zero' else 5)
                 rows.append({'report': str(path)})
             if fault == 'mutated-source':
                 path = application / 'include/item.h'; path.write_bytes(path.read_bytes())
@@ -132,10 +134,11 @@ class NativeLifetimePromotionTests(unittest.TestCase):
         if fault != 'reused-launches':
             audit.attempt.side_effect = lambda report, folder, *args, **kwargs: audit.records.setdefault(str(folder), {})
         with patch.object(qualifier, 'command', side_effect=command):
-            result = qualifier.promotion(self.root / 'cli', case / 'workspace', source, folder, language, True, audit)
+            result = qualifier.promotion(self.root / 'cli', case / 'workspace', source, folder, language, True, audit, mode=mode)
         self.assertEqual(qualifier.fixture_facts(source), original)
         self.assertEqual(stages, ['promote-plan', 'promote-apply', 'current-original', 'current-changed'])
         self.assertEqual(audit.attempt.call_count, 12)
+        self.assertTrue(all(call.kwargs['mode'] == mode for call in audit.attempt.call_args_list))
         self.assertEqual(result['application_observations'], 12)
         self.assertEqual(result['changed_calls'], {'selected': 43, 'selected_extra': 44})
         self.assertEqual(len(result['reports']), 3)
@@ -144,6 +147,10 @@ class NativeLifetimePromotionTests(unittest.TestCase):
     def test_current_and_changed_relocated_sources_cover_both_languages(self):
         for language in ('c', 'cpp'):
             with self.subTest(language=language): self.run_promotion(language)
+
+    def test_promoted_zero_censor_and_unwind_cases_keep_their_declared_inputs(self):
+        for language, mode in (('c', 'zero'), ('cpp', 'zero'), ('c', 'censored'), ('cpp', 'censored'), ('cpp', 'unwind')):
+            with self.subTest(language=language, mode=mode): self.run_promotion(language, mode=mode)
 
     def test_incomplete_foreign_or_mutated_promotion_cannot_pass(self):
         for fault in ('dry-run-write', 'wrong-source', 'foreign-report', 'missing-report',

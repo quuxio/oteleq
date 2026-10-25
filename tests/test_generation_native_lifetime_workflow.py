@@ -134,7 +134,7 @@ class NativeLifetimeWorkflowTests(TestCase):
             self.assertEqual(qualifier.framework(self.root / 'workspace', self.root, 'framework', True, audit), 4)
             self.assertEqual(command.call_args.args[0][1:3], ['-I', '-B'])
             self.assertEqual(command.call_args.kwargs['expected'], 1)
-            check.assert_called_once_with(report, True, audit, expected=(5,))
+            check.assert_called_once_with(report, True, audit, expected=(5,), mode='completed')
         with patch.object(qualifier, 'command', return_value='{}\n{}'), self.assertRaises(AssertionError):
             qualifier.framework(self.root, self.root, 'bad', False, Mock())
 
@@ -214,7 +214,7 @@ class NativeLifetimeWorkflowTests(TestCase):
                     'status': 'candidate_rule_minimal', 'source_preserved': True, 'workspace': str(folder / 'reduced'),
                     'trials': [{'arguments': [2], 'report': str(folder / 'trial/report.json')}]})
             return ''
-        fake = Mock(); fake.finish.return_value = {'actual_application_records': 52}
+        fake = Mock(); fake.finish.return_value = {'actual_application_records': 240, 'raw_lifetime_receipts': 120}
         fake.refusals.return_value = {'c': {'count': 14}, 'cpp': {'count': 14}}
         with patch.object(qualifier, 'command', side_effect=command), \
                 patch.object(qualifier, 'Audit', return_value=fake), \
@@ -223,17 +223,17 @@ class NativeLifetimeWorkflowTests(TestCase):
                 patch.object(qualifier, 'promotion', return_value={'application_observations': 12}) as promotion, \
                 patch.object(qualifier, 'digest', return_value='a' * 64):
             result = qualifier.exercise(self.root / 'cli', self.root / 'provider', self.root / 'sdk', self.root)
-        self.assertEqual(result['actual_application_launches'], 52)
-        self.assertEqual(len(result['cases']), 3)
-        self.assertEqual(framework.call_count, 7)
-        self.assertEqual(check.call_count, 9)
-        self.assertEqual(check.call_args_list[-2].kwargs, {'expected': (0,)})
-        self.assertEqual(check.call_args_list[-1].kwargs, {'expected': (2,)})
-        self.assertEqual(framework.call_args.kwargs, {'expected': (0,)})
+        self.assertEqual(result['actual_application_launches'], 240)
+        self.assertEqual(len(result['cases']), 8)
+        self.assertEqual(framework.call_count, 17)
+        self.assertEqual(check.call_count, 19)
+        self.assertIn({'expected': (0,)}, [call.kwargs for call in check.call_args_list])
+        self.assertIn({'expected': (2,)}, [call.kwargs for call in check.call_args_list])
+        self.assertIn({'expected': (0,), 'mode': 'zero'}, [call.kwargs for call in framework.call_args_list])
         self.assertEqual([row[0] for row in calls].count('shrink'), 1)
-        self.assertEqual(promotion.call_count, 3)
+        self.assertEqual(promotion.call_count, 8)
         self.assertIn('current-source-promotion', result['routes'])
-        self.assertIn('qualification of the independent raw lifetime audit, evidence refusals and promotion', result['remaining'])
+        self.assertIn('genuine qualification of all declared boundary, raw-audit, refusal and promotion routes', result['remaining'])
         self.assertEqual(result['raw_evidence_refusals'], fake.refusals.return_value)
 
     def test_original_source_facts_detect_restored_bytes_with_new_write_facts(self):
@@ -243,7 +243,7 @@ class NativeLifetimeWorkflowTests(TestCase):
             path.write_text('original')
             self.assertNotEqual(qualifier.source_facts(self.root), before)
 
-    def audit_fixture(self, lane='baseline', *, suffix=''):
+    def audit_fixture(self, lane='baseline', *, suffix='', language='c', mode='completed'):
         # These controls isolate literal joins/file preservation. The separate
         # raw-audit suite checks the unchanged complete capture and mutations.
         validation = patch.object(qualifier.raw_audit, 'verify', return_value=None if lane == 'baseline' else {'mocked': True})
@@ -257,25 +257,43 @@ class NativeLifetimeWorkflowTests(TestCase):
         qualifier.write(folder / 'http-capture.json', {'errors': [], 'bodies': []})
         for name in ('expected-lifetimes-before-build.json', 'expected-lifetimes.json'):
             qualifier.write(folder / name, {}); (folder / name).chmod(0o600)
-        entry = {'language': 'c', 'otelc_runtime_function': 'src/app.c::selected'}
+        declared = qualifier.lifetime_cases.expected(language, mode)
+        entry = {'language': language, 'otelc_runtime_function':
+                 'src/app.cpp::selected(int)' if language == 'cpp' else 'src/app.c::selected'}
         (folder / 'native-caller').mkdir()
-        qualifier.write(folder / 'native-caller/caller.json', {'entry': entry, 'arguments': [5]})
+        qualifier.write(folder / 'native-caller/caller.json', {'entry': entry, 'arguments': list(declared['arguments'])})
         witness = None
         if lane == 'instrumented_on':
             (runtime / 'app').mkdir()
-            health = {'resource_accounting': {'types': '1', 'admitted': '1', 'completed': '1', 'censored': '0'}}
+            health = {'object_accounting' if language == 'cpp' else 'resource_accounting':
+                      {'types': str(declared['admitted']), 'admitted': str(declared['admitted']),
+                       'completed': str(declared['completed']), 'censored': str(declared['censored'])}}
             qualifier.write(runtime / 'app/health.json', health)
             witness = {'functions': {entry['otelc_runtime_function']: 1}, 'spans': 1, 'pending': 0,
                        'losses': {'lifetime_lost': 0}, 'raw_otlp_sha256': 'a' * 64}
-            verified = {**witness, 'spans': 2, 'sdk_pid': 23, 'health': health,
-                'lifetimes': [{'type_usr': 'c:@S@Item', 'name': 'Item', 'creation_path': [0], 'release_path': [0],
-                    'complete': True, 'exception_exit': None, 'instance': '1', 'boundary': 'free_entry', 'duration_ns': 1}]}
+            verified = {**witness, 'spans': declared['spans'], 'sdk_pid': 23, 'health': health,
+                'lifetimes': [{**row, 'instance': '1', 'boundary': declared['boundary'], 'duration_ns': 1}
+                              for row in declared['observations']]}
             qualifier.write(folder / 'native-verified-lifetimes.json', verified)
         audit = object.__new__(qualifier.Audit)
         audit.registry = Mock(); audit.registry.original.return_value = self.root / 'report.json'
         audit.registry.archived = set(); audit.records = {}; audit.files = {}; audit.contexts = {}
-        audit.case_languages = {self.root: 'c'}
+        audit.case_languages = {self.root: language}
+        audit.case_modes = {self.root: mode}
         return audit, folder, entry, witness
+
+    def test_zero_censor_and_unwind_metadata_stay_bound_to_the_caller_case(self):
+        profiles = [('c', 'zero'), ('cpp', 'zero'), ('c', 'censored'), ('cpp', 'censored'), ('cpp', 'unwind')]
+        for language, mode in profiles:
+            audit, folder, entry, witness = self.audit_fixture('instrumented_on', suffix=language+mode,
+                                                               language=language, mode=mode)
+            expected = (0,) if mode == 'zero' else (5,)
+            audit.attempt(self.root / 'report.json', folder, entry, 'instrumented_on', witness, expected, mode=mode)
+            self.assertEqual(audit.finish()['records']['a' * 32]['mode'], mode)
+            qualifier.raw_audit.verify.assert_called_once_with(folder, entry, witness, plain=False,
+                                                               function='selected', mode=mode)
+            with self.assertRaises(AssertionError):
+                audit.attempt(self.root / 'report.json', folder, entry, 'instrumented_on', witness, expected)
 
     def test_report_cannot_choose_another_case_language_for_the_oracle(self):
         audit, folder, entry, witness = self.audit_fixture()
@@ -287,7 +305,8 @@ class NativeLifetimeWorkflowTests(TestCase):
         for lane in ('baseline', 'instrumented_on'):
             audit, folder, entry, witness = self.audit_fixture(lane)
             audit.attempt(self.root / 'report.json', folder, entry, lane, witness, (5,))
-            qualifier.raw_audit.verify.assert_called_once_with(folder, entry, witness, plain=lane == 'baseline', function='selected')
+            qualifier.raw_audit.verify.assert_called_once_with(folder, entry, witness, plain=lane == 'baseline',
+                                                               function='selected', mode='completed')
             result = audit.finish()
             self.assertEqual(result['actual_application_records'], 1)
             self.assertGreater(result['original_evidence_files_held'], 4)
@@ -321,13 +340,16 @@ class NativeLifetimeWorkflowTests(TestCase):
 
     def test_actual_refusal_dispatch_requires_both_languages_and_fixed_counts(self):
         audit = object.__new__(qualifier.Audit)
+        profiles = [('c', 'completed'), ('cpp', 'completed'), ('c', 'zero'), ('cpp', 'zero'),
+                    ('c', 'censored'), ('cpp', 'censored'), ('cpp', 'unwind')]
         audit.contexts = {str(i): {'folder': str(self.root / language), 'entry': {'language': language},
-                                 'witness': {}, 'function': 'selected'}
-                          for i, language in enumerate(('c', 'c', 'cpp'))}
+                                 'witness': {}, 'function': 'selected', 'mode': mode}
+                          for i, (language, mode) in enumerate(profiles)}
         with patch.object(qualifier.raw_refusals, 'run', return_value={'count': 14, 'new_application_launches': 0}) as run:
-            self.assertEqual(set(audit.refusals(self.root / 'refusals')), {'c', 'cpp'})
-            self.assertEqual(run.call_count, 2)
-        audit.contexts.pop('2')
+            self.assertEqual(set(audit.refusals(self.root / 'refusals')),
+                             {language + '-' + mode for language, mode in profiles})
+            self.assertEqual(run.call_count, 7)
+        audit.contexts.pop('6')
         with patch.object(qualifier.raw_refusals, 'run', return_value={'count': 14, 'new_application_launches': 0}), \
                 self.assertRaises(AssertionError): audit.refusals(self.root / 'missing')
 

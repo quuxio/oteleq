@@ -9,6 +9,7 @@ import re
 import tomllib
 
 import native_lifetime_otlp as otlp
+import native_lifetime_cases as cases
 import native_prepared_receipt as records
 from native_prepared_otlp import BOUNDS, require, same
 
@@ -41,11 +42,13 @@ def policy(folder: Path, entry: dict, *, function: str = 'selected') -> dict:
     return value
 
 
-def health(value: dict, expected_policy: dict, language: str, pid: int, raw: dict) -> None:
+def health(value: dict, expected_policy: dict, language: str, pid: int, raw: dict, *, mode: str = 'completed') -> None:
     """All closed final counters and API units must explain the raw transport."""
     require(type(pid) is int and 1 < pid < 2**31, 'invalid native lifetime SDK PID')
-    accounting = {'types': '1', 'admitted': '1', 'completed': '1', 'live': '0', 'ending': '0',
-                  'censored': '0', 'lost': '0', 'duplicates': '0', 'invalid': '0', 'closing': True, 'closed': True,
+    expected = cases.expected(language, mode)
+    accounting = {'types': str(expected['admitted']), 'admitted': str(expected['admitted']),
+                  'completed': str(expected['completed']), 'live': '0', 'ending': '0',
+                  'censored': str(expected['censored']), 'lost': '0', 'duplicates': '0', 'invalid': '0', 'closing': True, 'closed': True,
                   'destroying' if language == 'cpp' else 'releasing': '0'}
     selection = {key: expected_policy[key] for key in ('sources', 'functions')}
     selection['lifetimes'] = {key: expected_policy['lifetimes'][key] for key in ('enabled', 'include', 'exclude')}
@@ -58,13 +61,13 @@ def health(value: dict, expected_policy: dict, language: str, pid: int, raw: dic
         'function_accounting': {'registered': '1', 'started': '1', 'ended': '1', 'active': '0',
                                 'closed': True, 'lost': '0', 'invalid': '0', 'metadata_errors': '0'},
         'object_accounting' if language == 'cpp' else 'resource_accounting': accounting,
-        'span_accounting': {'sampled_started': '2', 'sampled_ended': '2', 'sampled_active': '0',
+        'span_accounting': {'sampled_started': str(expected['spans']), 'sampled_ended': str(expected['spans']), 'sampled_active': '0',
             'queue_dropped': '0', 'queue_pending': '0', 'queue_evidence': 'derived_after_shutdown',
             'processors_observed': 1, 'batch_processors_observed': 1},
         'trace_exports': value['trace_exports'], 'metric_exports': value['metric_exports'],
         'metric_flush': value['metric_flush'], 'diagnostics': {'dropped': '0'},
         'downstream_receipt': 'unavailable', 'otlp_partial_rejection': 'unavailable'})
-    records.exports(value['trace_exports'], 'spans', 2, raw['trace_requests'])
+    records.exports(value['trace_exports'], 'spans', expected['spans'], raw['trace_requests'])
     records.exports(value['metric_exports'], 'metric_points', raw['metric_points'], raw['metric_requests'])
     same(sorted(value['metric_flush']), ['attempts', 'failed_attempts'])
     require(type(value['metric_flush']['attempts']) is str and
@@ -72,13 +75,13 @@ def health(value: dict, expected_policy: dict, language: str, pid: int, raw: dic
     same(value['metric_flush']['failed_attempts'], '0')
 
 
-def verify(folder: Path, entry: dict, witness, *, plain: bool, function: str = 'selected') -> dict | None:
+def verify(folder: Path, entry: dict, witness, *, plain: bool, function: str = 'selected',
+           mode: str = 'completed') -> dict | None:
     """Decode all original bytes before joining any producer-verified receipt."""
     selected = policy(folder, entry, function=function)
     request = records.read(folder / 'native-runtime/native-request.json')
     same(request['plain'], plain); same(request['policy'], selected)
-    observations = [{'type_usr': 'c:@S@Item', 'name': 'Item', 'creation_path': [0], 'release_path': [0],
-                     'complete': True, 'exception_exit': False if entry['language'] == 'cpp' else None}]
+    observations = cases.expected(entry['language'], mode)['observations']
     before = {'schema_version': 1, 'kind': 'oteleq.native.lifetime-before-build',
               'roots': [entry['otelc_runtime_function']], 'observations': observations}
     same(records.read(folder / 'expected-lifetimes-before-build.json'), before)
@@ -86,14 +89,14 @@ def verify(folder: Path, entry: dict, witness, *, plain: bool, function: str = '
     same(intent['roots'], before['roots']); same(intent['observations'], observations)
     same(intent['native_profile'], 'object' if entry['language'] == 'cpp' else 'resource')
     raw = otlp.receipt(folder, records.read, entry['language'], selected['resource']['service_name'],
-                       entry['otelc_runtime_function'], plain=plain)
+                       entry['otelc_runtime_function'], plain=plain, mode=mode)
     checkpoint = folder / 'native-runtime/app/health.json'
     if plain:
         require(witness is None and not checkpoint.exists(), 'plain lifetime fixture has SDK evidence')
         return None
     pid = records.read(folder / 'native-runtime/native-application-start.json')['pid']
     final = records.read(checkpoint)
-    health(final, selected, entry['language'], pid, raw)
+    health(final, selected, entry['language'], pid, raw, mode=mode)
     verified = records.read(folder / 'native-verified-lifetimes.json')
     same({key: verified[key] for key in ('functions', 'spans', 'lifetimes', 'metric_points', 'raw_otlp_sha256')},
          {key: raw[key] for key in ('functions', 'spans', 'lifetimes', 'metric_points', 'raw_otlp_sha256')})

@@ -1,0 +1,17 @@
+{
+  "errors": [],
+  "bodies": [
+    {
+      "path": "/v1/metrics",
+      "file": "otlp-0.protobuf"
+    },
+    {
+      "path": "/v1/traces",
+      "file": "otlp-1.protobuf"
+    },
+    {
+      "path": "/v1/metrics",
+      "file": "otlp-2.protobuf"
+    }
+  ]
+}

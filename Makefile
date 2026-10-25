@@ -217,9 +217,11 @@ native-lifetime-public-check:
 	$(PYTHON) -m coverage report --data-file=.native-lifetime-public.coverage --include='*/native_source_run.py' --fail-under=80
 
 native-lifetime-workflow-check:
-	PYTHONPATH="$(CURDIR)/tests$${PYTHONPATH:+:$${PYTHONPATH}}" $(PYTHON) -m coverage run --data-file=.native-lifetime-workflow.coverage --include='*/qualify_native_lifetimes.py,*/native_lifetime_audit.py,*/native_lifetime_otlp.py,*/native_lifetime_refusals.py,*/native_prepared_otlp.py' -m unittest test_generation_native_lifetime_workflow test_generation_native_lifetime_promotion test_generation_native_lifetime_audit test_generation_native_receipt_qualification -v
+	PYTHONPATH="$(CURDIR)/tests$${PYTHONPATH:+:$${PYTHONPATH}}" $(PYTHON) -m coverage run --data-file=.native-lifetime-workflow.coverage --include='*/qualify_native_lifetimes.py,*/native_lifetime_cases.py,*/native_lifetime_audit.py,*/native_lifetime_otlp.py,*/native_lifetime_refusals.py,*/native_prepared_otlp.py,*/native_lifetime_test_capture.py' -m unittest test_generation_native_lifetime_workflow test_generation_native_lifetime_promotion test_generation_native_lifetime_boundaries test_generation_native_lifetime_audit test_generation_native_receipt_qualification -v
 	$(PYTHON) -m coverage report --data-file=.native-lifetime-workflow.coverage --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.native-lifetime-workflow.coverage --include='*/qualify_native_lifetimes.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.native-lifetime-workflow.coverage --include='*/native_lifetime_cases.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.native-lifetime-workflow.coverage --include='*/native_lifetime_test_capture.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.native-lifetime-workflow.coverage --include='*/native_lifetime_audit.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.native-lifetime-workflow.coverage --include='*/native_lifetime_otlp.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.native-lifetime-workflow.coverage --include='*/native_lifetime_refusals.py' --fail-under=80
