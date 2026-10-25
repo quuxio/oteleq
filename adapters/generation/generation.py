@@ -1186,6 +1186,8 @@ def attempt_receiver_options(entry, runtime):
         requests = max(capture.MAX_REQUESTS, 2 * sequences.call_count(entry))
         if requests > capture.MAX_REQUESTS:
             options["max_requests"] = requests
+    if native_source.enabled(entry) and sequences.controls(entry):
+        options['max_requests'] = native_source_run.native_live.MAX_TELEMETRY_REQUESTS
     if node_source.enabled(entry) or go_source.enabled(entry):
         options["allow_chunked"] = True
     return options

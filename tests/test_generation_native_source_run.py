@@ -167,6 +167,21 @@ class NativeSourceRunTests(unittest.TestCase):
         self.assertEqual(observed['witness'], {'spans': 2})
         self.assertEqual(witness.call_args.args[4], ('selected.c::selected',) * 2)
 
+    def test_native_capture_reserves_every_live_flush_trace_and_periodic_request(self):
+        self.controlled_entry()
+        for language in ('c', 'cpp'):
+            for count in (1, 2, 16, 32):
+                entry = {**self.entry, 'language': language,
+                         'sequence_configuration': [self.entry['sequence_configuration'][0]] * count}
+                options = generation.attempt_receiver_options(entry, None)
+                with self.subTest(language=language, calls=count):
+                    self.assertEqual(options['max_requests'], run.native_live.MAX_TELEMETRY_REQUESTS)
+                    self.assertGreater(options['max_requests'], 4 * count)
+                    self.assertNotIn('max_bytes', options)
+                    self.assertNotIn('allow_chunked', options)
+            single = {key: value for key, value in entry.items() if key != 'sequence_configuration'}
+            self.assertEqual(generation.attempt_receiver_options(single, None), {})
+
 
 if __name__ == '__main__':
     unittest.main()

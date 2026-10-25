@@ -15,6 +15,7 @@ from otelc_capture import strict_json
 INTERVAL_MS = 1000
 MAX_STATUSES = 4096
 MAX_RECORD_BYTES = 8 * 1024 * 1024
+MAX_TELEMETRY_REQUESTS = 4096
 
 
 class Session:

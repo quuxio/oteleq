@@ -73,7 +73,7 @@ def witness(completed, session: native_live.Session, bodies: list, service: str,
     session.checkpoints.finish()
     policy = completed.started.launch.intent.policy()
     require(service == policy['resource']['service_name'] and type(bodies) is list
-            and len(bodies) <= 4096
+            and len(bodies) <= native_live.MAX_TELEMETRY_REQUESTS
             and all(type(row) is tuple and len(row) == 2 and row[0] in ('/v1/traces', '/v1/metrics')
                     and type(row[1]) is bytes and bool(row[1]) for row in bodies)
             and sum(len(raw) for _, raw in bodies) <= telemetry.MAX_BYTES,

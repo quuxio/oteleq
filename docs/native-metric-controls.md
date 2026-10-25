@@ -49,6 +49,8 @@ The host-created `observation` container packages the exact original frame bytes
 
 Immutable `native-live-N.json` snapshots and final `native-controls.json` retain bounded control replies without the SDK endpoint authentication token. Running health keeps unavailable queue observations as null. It checks the same PID, policy and selection, complete paused function work, and failures separately from final shutdown health.
 
+The live receiver and receipt reader share a 4,096-request limit. This reserves repeated metric flushes, trace batches, periodic exports and final drain; it does not increase the existing raw byte limit. The ordinary single-call receiver limit is unchanged.
+
 The direct raw-OTLP reader checks serial roots and recursive child trees. Each root's error status must match its corresponding scalar outcome. Traces count every selected call. Function measurements count only calls made while collection is enabled. Emission-disabled collected measurements must appear after restoration. Complete cumulative counters and histogram samples are retained; disabled receiver windows, exporter counter resets, missing roots and wrong final SDK units refuse.
 
 Results remain **equivalence over these tests and observations**. These diagnostic workers do not establish behaviour of a different shipping artefact.
