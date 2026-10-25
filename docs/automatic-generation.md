@@ -4,6 +4,8 @@ oteleq now inventories source files and generates an external `unittest` suite f
 
 ## Build and run
 
+Experimental [native lifetime profiles](native-lifetime-generation.md) accept independently declared C++ object or C resource observations and connect the compiler-bound caller to build4/build5, owned execution and direct receipt. They require explicit profile/type/fixture selection. Component checks exist; actual generated/retained workflow qualification remains pending.
+
 Python can explicitly select the rebuilt [origin-v2 prepared route](python-prepared-provider.md) with `adapters.python.backend = "prepared"` and `profile = "python-native-origins-v2"`. The [424-launch diagnostic record](qualification/python-generated-origins-2026-10-24.json) covers the recorded receiver, domain/effect and retained/promoted workflows on Python 3.12/3.14. The default legacy route is unchanged; the original input-only prepared profile remains blocked. Use a complete pinned SDK Python environment and matching prebuilt native products for the explicit route.
 
 Prepare a qualified otelc provider and its matching compiler/runtime adapters first. The default pre-rebuild contract uses revisions such as frozen `d6d03b7` in the [integrated-provider record](qualification/integrated-provider-2026-10-20.json). Java's [prepared SDK provider](java-prepared-provider.md) and Node's [source SDK profile](node-source-context.md#rebuilt-sdk-source-profile) are explicit alternatives with separate qualification records. Use the selected provider's recorded Python/decoder environment: the legacy record uses CPython 3.12 and the Node source record uses CPython 3.14. Build oteleq with Rust 1.98.1 or newer:

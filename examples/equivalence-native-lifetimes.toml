@@ -1,0 +1,19 @@
+# Experimental public route. Real generated/retained workflow qualification is pending.
+schema_version = 1
+languages = ["cpp"]
+
+[functions]
+include = ["workload(int)"]
+
+[adapters.cpp]
+backend = "prepared"
+profile = "native-objects-owned-v1"
+sdk_build = "/absolute/otelc/build/context-sdk"
+lifetimes = { include = ["Item"], exclude = [], max_live = 4096 }
+
+[[fixtures]]
+language = "cpp"
+source = "src/workload.cpp"
+function = "workload(int)"
+cases = [[5]]
+lifetimes = [{ type = "Item", creation_path = [0], release_path = [0], complete = true, exception_exit = false }]

@@ -233,6 +233,14 @@ const RESOURCES: &[(&str, &str)] = &[
         include_str!("../adapters/generation/native_lifetime_caller.py"),
     ),
     (
+        "native_lifetime_frontend.py",
+        include_str!("../adapters/generation/native_lifetime_frontend.py"),
+    ),
+    (
+        "native_lifetime_policy.py",
+        include_str!("../adapters/generation/native_lifetime_policy.py"),
+    ),
+    (
         "native_source.py",
         include_str!("../adapters/generation/native_source.py"),
     ),

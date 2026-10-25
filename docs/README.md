@@ -1,6 +1,6 @@
 # oteleq documentation
 
-Updated 23 October 2026, `quux-oteleq compare-workload` runs the Rust comparator, with diagnostic capture integrations for all eight otelc languages. [Automatic scalar test generation](automatic-generation.md) inventories and executes supported functions in private workspaces, emitting shared typed boundary graphs. [Scalar shrinking](counterexample-shrinking.md) reduces qualified differences within explicit independent domains. Semantic/build-aware adapters and richer object/factory codecs remain incomplete.
+Updated 25 October 2026, `quux-oteleq compare-workload` runs the Rust comparator, with diagnostic capture integrations for all eight otelc languages. [Automatic scalar test generation](automatic-generation.md) inventories and executes supported functions in private workspaces, emitting shared typed boundary graphs. [Scalar shrinking](counterexample-shrinking.md) reduces qualified differences within explicit independent domains. Semantic/build-aware adapters and richer object/factory codecs remain incomplete.
 
 | Document | Use it to |
 | --- | --- |
@@ -12,6 +12,7 @@ Updated 23 October 2026, `quux-oteleq compare-workload` runs the Rust comparator
 | [Native lifetime provider components](native-lifetime-provider.md) | Inspect explicit object/resource build, process and health contracts |
 | [Native lifetime telemetry receipt](native-lifetime-receipt.md) | Bind prelaunch caller expectations to complete raw lifetime/function telemetry |
 | [Native lifetime caller pipeline](native-lifetime-callers.md) | Bind generated caller/compiler contexts to independently obtained lifetime semantics |
+| [Generated native lifetime tests](native-lifetime-generation.md) | Configure experimental object/resource expectations and inspect public-route limits |
 | [Go build bundles](go-build-bundles.md) | Retain matched executables, compiler evidence and detached replay |
 | [Go live metric schedules](go-metric-controls.md) | Declare same-process metric states and inspect the pending qualification boundary |
 | [Java compiler bindings](java-build-bundles.md) | Inspect actual source origins, JDK/compiler identities and retained class products |

@@ -2,7 +2,7 @@
 
 <!-- markdownlint-disable MD013 -->
 
-Status: independent negotiation, SDK source binding, build/inventory readers, owned preparation/final health and a separate [raw lifetime receipt](native-lifetime-receipt.md) component. Generated lifetime execution is not available through this work yet. The [qualified prepared project profile](native-prepared-provider.md) remains the function-only build3 route. Its 100-application result does not qualify object/resource lifetimes.
+Status: independent negotiation, SDK source binding, build/inventory readers, owned preparation/final health and a separate [raw lifetime receipt](native-lifetime-receipt.md) component. Experimental [public lifetime profiles](native-lifetime-generation.md) now connect these components to generated scalar callers and explicit fixture expectations; actual workflow qualification remains pending. The [qualified prepared project profile](native-prepared-provider.md) remains the function-only build3 route. Its 100-application result does not qualify object/resource lifetimes.
 
 ## Explicit contracts
 
@@ -18,7 +18,7 @@ SDK source catalogues are a separate caller choice, not inferred from the produc
 
 The component `native_sdk.capture(..., source_profile=...)` binds the complete selected catalogue, matching built library, original build record, fixed CMake/Ninja recipe and LLVM tool queries. A newer SDK with all three headers needs the explicit `resource-v1` catalogue even when a future caller selects C++ object instrumentation. Catalogue names describe held SDK inputs, not application language support. Metadata cannot introduce another header path, select a different profile or repair an already accepted source identity. Missing/aliased headers, record substitutions and identical-byte replacements refuse.
 
-These interfaces are for maintainers implementing the next provider. Accepted build4/build5 components can enter the owned preparation/session path, but they do not enable a new user-facing generated configuration or qualify its observation/telemetry contract.
+These interfaces support the experimental [public lifetime profiles](native-lifetime-generation.md). Accepted build4/build5 components enter the owned preparation/session path with independently declared test expectations. Component acceptance does not qualify the generated observation/telemetry workflow.
 
 ## Caller-bound builds and inventories
 
@@ -44,12 +44,12 @@ A separate uncommitted development snapshot exercises genuine SDK `b425d1f` thro
 
 ## Remaining integration and acceptance
 
-The [maintainer caller pipeline](native-lifetime-callers.md) now materialises compiler-bound scalar callers, obtains complete lifetime semantic facts before SDK compilation and repeats compiler input/search and semantic checks. Its genuine two-profile metadata probe starts no SDK builds or applications. This advances the caller integration below; public planning/runtime and retained-suite qualification remain open.
+The [maintainer caller pipeline](native-lifetime-callers.md) now materialises compiler-bound scalar callers, obtains complete lifetime semantic facts before SDK compilation and repeats compiler input/search and semantic checks. Its genuine two-profile metadata probe starts no SDK builds or applications. The experimental public route connects explicit planning/runtime configuration and independent prebuild expectations; genuine generated and retained-suite qualification remains open.
 
-1. Freeze caller-selected per-unit contexts and independently observed semantic type/construction/allocation sites before SDK compilation. Bind private VFS/neutral-driver assets without importing SDK renderers or trusting producer-selected paths.
-2. Connect the implemented build4/build5 readers to generated callers and the public planning/runtime path, retaining their complete commands, products, semantic expectations and compiler channels.
-3. Supply independently obtained frontend/tool facts from the application pipeline, preserving unsupported cases and compiler input/search probes before and after builds/execution. Type names and aggregate counts alone do not establish construction or resource pairing.
-4. Integrate the implemented caller expectation and lifetime-specific direct OTLP components with public generated observations. Keep complete-constructor return, destructor entry, C free entry and garbage collection as distinct observations. Censored shutdown and lost/capacity-refused observations must remain visible.
+1. Qualify caller-selected per-unit contexts and independently observed semantic type/construction/allocation sites through the connected public route, including private VFS/neutral-driver assets and producer-selected path refusals.
+2. Exercise the connected build4/build5 readers through genuine generated callers and public planning/runtime, retaining complete commands, products, semantic expectations and compiler channels.
+3. Qualify independent frontend/tool discovery and unsupported cases through compiler input/search probes before and after actual builds/execution. Type names and aggregate counts alone do not establish construction or resource pairing.
+4. Verify the integrated caller expectation and direct OTLP components against actual public generated observations. Keep complete-constructor return, destructor entry, C free entry and garbage collection distinct. Censored shutdown and lost/capacity-refused observations must remain visible.
 5. Connect real nontrivial/allocated fixtures to generated and retained/replayed/reduced/promoted suites. Qualify all metric startup states and same-process live controls separately, including same-output state differences and altered-evidence refusals.
 6. Complete source preservation, independent review, measured coverage, final-head CI and published exact-revision execution before admitting either profile. Shipping artefacts, performance/resource budgets and broader platforms retain separate acceptance evidence.
 

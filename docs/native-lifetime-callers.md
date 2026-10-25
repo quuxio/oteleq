@@ -2,7 +2,7 @@
 
 <!-- markdownlint-disable MD013 -->
 
-Status: maintainer components for compiler-bound scalar callers with independent C++ object and C resource discovery. Public lifetime configuration, generated execution and complete retained workflows remain in progress. These components feed the separate [build readers](native-lifetime-provider.md) and [telemetry receipt](native-lifetime-receipt.md).
+Status: maintainer components for compiler-bound scalar callers with independent C++ object and C resource discovery. Experimental [public lifetime configuration and orchestration](native-lifetime-generation.md) now connect them to explicit fixture expectations and owned execution. Genuine generated/retained workflow qualification remains pending. These components feed the separate [build readers](native-lifetime-provider.md) and [telemetry receipt](native-lifetime-receipt.md).
 
 ## Before SDK compilation
 
@@ -32,4 +32,4 @@ make native-lifetime-caller-check PYTHON=/absolute/path/to/python
 
 The target checks the new pipeline and existing compiler-bound function callers, with separate 80% statement floors. Tests use actual Clang frontend/VFS discovery and explicit nonexecuted literal SDK tools, plus bounded Mach-O/UUID, command failure, original-channel, source-boundary and substitution controls. The SDK build3 reader continues to refuse enabled lifetime policies. The new module is embedded in the Rust distribution and included in generator identity.
 
-The [completion checklist](completion.md) still requires public planning/execution integration, independent test expectations, generated/replayed/reduced/promoted qualification, actual startup/live schedules, source preservation and final release evidence.
+The [completion checklist](completion.md) still requires exact-revision generated/replayed/reduced/promoted qualification of the experimental public integration, actual startup/live schedules, source preservation and final release evidence.
