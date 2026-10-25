@@ -246,6 +246,20 @@ func unused()*Unused{return nil}
         (self.module / go_project.COMMAND_DIRECTORY).rmdir()
         (self.module / go_project.OBSERVER_DIRECTORY).mkdir()
         self.assertIn("observer directory", self.discover(source)["functions"][0]["reason"])
+        (self.module / go_project.OBSERVER_DIRECTORY).rmdir()
+        (self.module / go_project.CONTROL_DIRECTORY).mkdir()
+        self.assertIn("control directory", self.discover(source)["functions"][0]["reason"])
+        (self.module / go_project.CONTROL_DIRECTORY).rmdir()
+        (self.module / go_project.CONTROL_DIRECTORY).symlink_to(self.base / "absent")
+        self.assertIn("control directory", self.discover(source)["functions"][0]["reason"])
+
+    def test_module_import_keeps_nested_module_and_package_bindings(self):
+        context = {"module_root": "services/api", "directory": "services/api/internal/counter",
+                   "import_path": "example.test/service/internal/counter"}
+        self.assertEqual(go_project.module_import(context), "example.test/service")
+        for name in ("example.test/foreign", "/internal/counter", ""):
+            with self.subTest(name=name), self.assertRaises(ValueError):
+                go_project.module_import({**context, "import_path": name})
 
     def test_invalid_project_context_keeps_each_syntactic_callable_visible(self):
         source = self.source("counter/api.go", "package counter\nfunc one(){}\nfunc two(){}\n")
@@ -283,6 +297,13 @@ func unused()*Unused{return nil}
             with self.subTest(value=value), self.assertRaises(ValueError):
                 go_project.settings(value)
         self.assertEqual(go_project.settings({"build_timeout_ms": 600000})["build_timeout_ms"], 600000)
+        selected = {"backend": "source-scope-v1", "build_min_free_bytes": 8 * 1024 ** 3}
+        self.assertEqual(go_project.settings(selected)["build_min_free_bytes"], 8 * 1024 ** 3)
+        for minimum in (False, -1, 1.5, "1", 2 ** 63):
+            with self.subTest(minimum=minimum), self.assertRaisesRegex(ValueError, "build_min_free_bytes"):
+                go_project.settings({**selected, "build_min_free_bytes": minimum})
+        with self.assertRaisesRegex(ValueError, "requires a source-v1"):
+            go_project.settings({"build_min_free_bytes": 1})
         for timeout in (None, False, 0, -1, 900001, 1.5, "600000"):
             with self.subTest(timeout=timeout), self.assertRaisesRegex(ValueError, "build_timeout_ms"):
                 go_project.settings({"build_timeout_ms": timeout})

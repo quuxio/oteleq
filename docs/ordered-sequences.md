@@ -2,6 +2,8 @@
 
 Declared Python, C++, Java, JavaScript and TypeScript receiver fixtures can execute an ordered sequence of calls to the selected method. Node receivers additionally support release and optional collection. Each case reconstructs its receiver independently in each process. The typed contract records every requested action and its required roots; missing, reordered or unobserved actions cannot become passing skips.
 
+The candidate [Go source-provider route](#candidate-go-call-sequences) adds the same call-only boundary with separate pending provider qualification.
+
 ```toml
 schema_version = 1
 languages = ["javascript"]
@@ -49,6 +51,16 @@ Both `legacy` and explicit `prepared` providers require one independent selected
 Prepared Java calls can declare [live metric collection/emission states](java-metric-controls.md), using private host checkpoints and direct receipt. This does not add release or object collection. Java release, collection, asynchronous schedules, other method targets and resource actions remain named blockers. Identity is local to each graph; the profile does not establish allocation identity across calls. Filesystem/HTTP observations cover the whole worker rather than each intermediate call. All steps share the existing case time/output budgets.
 
 Run `make generation-java-sequence-otelc JAVA_BACKEND=prepared OTELC_ROOT=/absolute/frozen/sdk REPORT_DIR=/new/external/evidence` for the maintained actual-provider corpus. Select `JAVA_BACKEND=legacy` with the matching earlier provider for compatibility qualification. The corpus checks complete independently expected intermediate graphs, private factories, expected intermediate errors, recursive trees and a state difference restored before the final boundary. It exercises generated/detached-exported suites, per-case replay, scalar shrinking and altered-evidence refusals. Implementation tests alone do not qualify another provider or platform.
+
+## Candidate Go call sequences
+
+Select `backend = "source-v1"` under `adapters.go`, configure the module root and declare the existing [Go receiver factory](go-receivers.md). The fixture accepts the same call-only `sequence` syntax as Java above, with 1 through 32 concrete calls. One construction and one Go application execute all steps per repeat. The version-three private receiver envelope retains the complete intermediate source-bound graphs, primitive panic outcomes and local aliases. A later call continues after an explicitly expected panic.
+
+The separate candidate `backend = "source-scope-v1"` accepts this call contract with the [private-bootstrap build6/7 boundary](go-prepared-provider.md#candidate-private-bootstrap-builds). It requires its own generated and retained execution qualification; source-v1 records cannot qualify it.
+
+The independent reader rejects missing/reordered steps, other action kinds and contradictory outer boundaries. All records share the existing capture/time budgets; reaching a budget cannot yield a partial passing sequence. Source-provider telemetry requires the exact independent root-call count, complete recursive descendants, factory-before-call ordering, serial root trees and matching final cumulative metrics/health.
+
+Component and actual plain-worker regressions cover the new boundary. Explicit [Go live metric schedules](go-metric-controls.md) additionally connect private checkpoints, independent setters and collection-dependent metric/retained-receipt checks. Actual-provider and generated/exported/replayed/reduced qualification of the current recipes remains in progress. Legacy Go sequences and controls, release/collection, other targets, goroutine and resource actions remain blocked.
 
 ## Python call sequences
 

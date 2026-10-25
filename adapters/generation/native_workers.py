@@ -61,10 +61,17 @@ def copied_value(expression: str, type_: str, language: str) -> str:
             'return sizeof(__oteleq_value);\n')
 
 
-def invocation(entry: dict, args: list) -> str:
+def declaration_prefix(language: str, unprofiled: bool) -> str:
+    """Only generated accessors receive the SDK's compiler profiling exclusion."""
+    require(type(unprofiled) is bool, 'invalid generated accessor profiling option')
+    return (C_LINKAGE if language == 'cpp' else '') + (
+        '__attribute__((no_profile_instrument_function)) ' if unprofiled else '')
+
+
+def invocation(entry: dict, args: list, *, unprofiled: bool = False) -> str:
     """Freeze one exact scalar signature and its concrete invocation inputs."""
     language = entry['language']
-    linkage = C_LINKAGE if language == 'cpp' else ''
+    linkage = declaration_prefix(language, unprofiled)
     parameters = ','.join(harness.native_literal(value, harness.scalar_type(type_), language)
                           for value, type_ in zip(args, entry['parameters']))
     name = ('::' if language == 'cpp' else '') + entry['name']
@@ -82,10 +89,10 @@ def invocation(entry: dict, args: list) -> str:
             binding + returned + '}\n')
 
 
-def application_helpers(entry: dict, args: list, key: str) -> str:
+def application_helpers(entry: dict, args: list, key: str, *, unprofiled: bool = False) -> str:
     """Append header-free accessors after the original application bytes."""
     language = entry['language']
-    linkage = C_LINKAGE if language == 'cpp' else ''
+    linkage = declaration_prefix(language, unprofiled)
     functions = []
     for index, item in enumerate(entry['globals']):
         if item['unit'] != key:
@@ -96,7 +103,7 @@ def application_helpers(entry: dict, args: list, key: str) -> str:
                          type_check(expression, item['type'], language) + '\n' +
                          copied_value(expression, item['type'], language) + '}\n')
     if key == entry['unit']:
-        functions.append(invocation(entry, args))
+        functions.append(invocation(entry, args, unprofiled=unprofiled))
     code = ''.join(functions)
     names = [entry['name'], *(item['expression'] for item in entry['globals']),
              *entry['parameters'], entry['output'], *(item['type'] for item in entry['globals'])]
@@ -161,7 +168,7 @@ def instrumented_command(step: dict, prefix: list[str], language: str) -> list[s
     return [*prefix, 'clang++' if language == 'cpp' else 'clang', *step['command'][1:]]
 
 
-def materialise(project: Path, prepared: dict, entry: dict, args: list, directory: Path) -> dict:
+def materialise(project: Path, prepared: dict, entry: dict, args: list, directory: Path, *, unprofiled: bool = False) -> dict:
     """Create explicit VFS, compile, object-symbol rewrite and target-link recipes."""
     target = validate(prepared, entry, args)
     project, directory = project.resolve(), directory.resolve()
@@ -175,7 +182,7 @@ def materialise(project: Path, prepared: dict, entry: dict, args: list, director
         unit = prepared['units'][key]
         source = project / unit['source']
         augmented = directory / (key + source.suffix)
-        augmented.write_bytes(source.read_bytes() + application_helpers(entry, args, key).encode())
+        augmented.write_bytes(source.read_bytes() + application_helpers(entry, args, key, unprofiled=unprofiled).encode())
         overlay = directory / (key + '.vfs.json')
         overlay.write_text(json.dumps({'version': 0, 'use-external-names': False, 'roots': [
             {'type': 'file', 'name': str(source), 'external-contents': str(augmented)}]}) + '\n')

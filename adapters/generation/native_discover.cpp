@@ -16,7 +16,9 @@
 #include <llvm/Support/FileSystem.h>
 #include <llvm/Support/FormatVariadic.h>
 #include <llvm/Support/JSON.h>
+#include <llvm/Support/MemoryBuffer.h>
 #include <llvm/Support/Signals.h>
+#include <llvm/Support/VirtualFileSystem.h>
 #include <llvm/Support/raw_ostream.h>
 #include <map>
 #include <memory>
@@ -318,6 +320,31 @@ public:
     return true;
   }
 };
+
+llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
+compilerFilesystem(const std::vector<std::string> &command) {
+  using FileSystem = llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>;
+  auto filesystem = llvm::vfs::getRealFileSystem();
+  // ToolInvocation's supplied FileManager needs the compiler's actual overlays.
+  // Keeping -ivfsoverlay only in argv otherwise inspects the original bytes.
+  for (std::size_t index = 1; index < command.size(); ++index) {
+    llvm::StringRef option(command[index]);
+    if (!option.starts_with("-ivfsoverlay"))
+      continue;
+    if (option != "-ivfsoverlay" || ++index == command.size())
+      return FileSystem();
+    auto buffer = llvm::MemoryBuffer::getFile(command[index]);
+    if (!buffer)
+      return FileSystem();
+    auto overlay = llvm::vfs::getVFSFromYAML(
+        std::move(*buffer), nullptr, command[index], nullptr, filesystem);
+    if (!overlay)
+      return FileSystem();
+    filesystem =
+        llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>(overlay.release());
+  }
+  return filesystem;
+}
 } // namespace
 
 int main(int argc, char **argv) {
@@ -338,9 +365,12 @@ int main(int argc, char **argv) {
     action = std::make_unique<InventoryAction>(state);
   else
     action = std::make_unique<InputsAction>(state);
-  llvm::IntrusiveRefCntPtr<clang::FileManager> files(
-      new clang::FileManager(clang::FileSystemOptions{}));
   std::vector<std::string> command(argv + 3, argv + argc);
+  auto filesystem = compilerFilesystem(command);
+  if (!filesystem)
+    return 2;
+  llvm::IntrusiveRefCntPtr<clang::FileManager> files(
+      new clang::FileManager(clang::FileSystemOptions{}, filesystem));
   clang::tooling::ToolInvocation invocation(command, std::move(action),
                                             files.get());
   bool success = invocation.run();

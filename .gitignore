@@ -9,3 +9,5 @@ __pycache__/
 .observer.coverage
 .generation.coverage
 .effect-qualification.coverage
+.native-provider.coverage
+.native-caller.coverage

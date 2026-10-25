@@ -5,7 +5,9 @@ from pathlib import Path, PurePosixPath
 import struct
 
 from go_project import OBSERVER_DIRECTORY
+import go_project
 import go_rendezvous
+import sequences
 
 OBSERVER = Path(__file__).with_name("go_observe.go").read_text()
 
@@ -148,25 +150,33 @@ def scalar_input(value: object) -> dict:
     return {"kind": "string", "value": value.encode("utf-8", errors="strict").hex()}
 
 
-def configuration(entry: dict, arguments: list) -> dict:
+def configuration(entry: dict, arguments: list, sequence: list[dict] | None = None) -> dict:
     """Freeze independent construction and method inputs with their real types."""
-    return {"models": entry["go_models"], "roots": entry["go_root_types"],
+    result = {"models": entry["go_models"], "roots": entry["go_root_types"],
             "receiver": entry["go_receiver_type"], "method_receiver": entry["go_receiver"],
             "parameters": entry["go_parameters"], "output": entry["go_result"],
             "factory_parameters": entry["receiver_fixture"]["parameter_storage"],
             "factory_arguments": [scalar_input(value) for value in entry["receiver_fixture"]["arguments"]],
             "arguments": [scalar_input(value) for value in arguments]}
+    if sequence is not None:
+        require(1 <= len(sequence) <= 32, "sequence requires 1 to 32 calls")
+        result["sequence"] = []
+        for index, step in enumerate(sequence):
+            require(step.get("id") == "step-" + str(index) and step.get("action") == "call"
+                    and set(step) <= {"id", "action", "arguments", "expected_baseline", "metrics"},
+                    "sequence requires concrete call-only inputs")
+            result["sequence"].append({"id": step["id"], "action": "call",
+                                       "arguments": [scalar_input(value) for value in step["arguments"]]})
+    return result
 
 
-def driver(entry: dict, arguments: list, source: str) -> str:
+def driver(entry: dict, arguments: list, source: str, sequence: list[dict] | None = None) -> str:
     """Call statically bound private source functions through an external helper."""
+    require(("sequence_configuration" in entry) == (sequence is not None), "missing concrete sequence calls")
     context, fixture = entry["go_context"], entry["receiver_fixture"]
-    module_prefix = context["import_path"]
-    relative = PurePosixPath(context["directory"]).relative_to(context["module_root"])
-    if relative.as_posix() != ".":
-        module_prefix = module_prefix.removesuffix("/" + relative.as_posix())
-    helper = module_prefix + "/" + OBSERVER_DIRECTORY
-    imports = '\nimport (__oteleq_reflect "reflect"; __oteleq_observe ' + json.dumps(helper) + ')\n'
+    helper = go_project.module_import(context) + "/" + OBSERVER_DIRECTORY
+    imports = ('\nimport (__oteleq_reflect "reflect"; __oteleq_observe ' + json.dumps(helper) + ')\n'
+               + go_rendezvous.imports(entry))
     raw = source.encode()
     source = (raw[:entry["package_end"]] + imports.encode() + raw[entry["package_end"]:]).decode()
     owner = entry["receiver_class"]
@@ -175,8 +185,11 @@ def driver(entry: dict, arguments: list, source: str) -> str:
     worker = "OteleqGeneratedRun" if context["package"] != "main" else "main"
     roots = ["__oteleq_observe.Bind(" + json.dumps("global:" + item["name"])
              + ",__oteleq_reflect.ValueOf(&" + item["name"] + "))" for item in entry["globals"]]
-    encoded = json.dumps(json.dumps(configuration(entry, arguments), separators=(",", ":")))
+    encoded = json.dumps(json.dumps(configuration(entry, arguments, sequence), separators=(",", ":")))
+    controlled = sequences.controls(entry)
+    require(not controlled or go_rendezvous.enabled(entry), "live receiver calls require the source-v1 host gate")
+    runner = "RunControlledSequence" if controlled else "RunSequence" if sequence is not None else "Run"
     return (source + '\nfunc ' + worker + '(){' + go_rendezvous.statement(entry)
-            + '__oteleq_observe.Run(' + encoded + ',__oteleq_reflect.ValueOf('
+            + '__oteleq_observe.' + runner + '(' + encoded + (',__oteleq_gate.Checkpoint' if controlled else '') + ',__oteleq_reflect.ValueOf('
             + fixture["factory"] + '),__oteleq_reflect.ValueOf(' + target + ')'
             + (',' + ','.join(roots) if roots else '') + ')}\n')

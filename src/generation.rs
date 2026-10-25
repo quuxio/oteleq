@@ -45,6 +45,10 @@ const RESOURCES: &[(&str, &str)] = &[
         include_str!("../adapters/generation/python_health.py"),
     ),
     (
+        "histogram_observation.py",
+        include_str!("../adapters/generation/histogram_observation.py"),
+    ),
+    (
         "python_telemetry.py",
         include_str!("../adapters/generation/python_telemetry.py"),
     ),
@@ -177,6 +181,62 @@ const RESOURCES: &[(&str, &str)] = &[
         include_str!("../adapters/generation/native_profile.py"),
     ),
     (
+        "native_protocol.py",
+        include_str!("../adapters/generation/native_protocol.py"),
+    ),
+    (
+        "native_inputs.py",
+        include_str!("../adapters/generation/native_inputs.py"),
+    ),
+    (
+        "native_toolchain.py",
+        include_str!("../adapters/generation/native_toolchain.py"),
+    ),
+    (
+        "native_sdk.py",
+        include_str!("../adapters/generation/native_sdk.py"),
+    ),
+    (
+        "native_build.py",
+        include_str!("../adapters/generation/native_build.py"),
+    ),
+    (
+        "native_unit_build.py",
+        include_str!("../adapters/generation/native_unit_build.py"),
+    ),
+    (
+        "native_unit_caller.py",
+        include_str!("../adapters/generation/native_unit_caller.py"),
+    ),
+    (
+        "native_source.py",
+        include_str!("../adapters/generation/native_source.py"),
+    ),
+    (
+        "native_source_run.py",
+        include_str!("../adapters/generation/native_source_run.py"),
+    ),
+    (
+        "native_prepared.py",
+        include_str!("../adapters/generation/native_prepared.py"),
+    ),
+    (
+        "native_health.py",
+        include_str!("../adapters/generation/native_health.py"),
+    ),
+    (
+        "native_execution.py",
+        include_str!("../adapters/generation/native_execution.py"),
+    ),
+    (
+        "native_session.py",
+        include_str!("../adapters/generation/native_session.py"),
+    ),
+    (
+        "native_telemetry.py",
+        include_str!("../adapters/generation/native_telemetry.py"),
+    ),
+    (
         "native_project.py",
         include_str!("../adapters/generation/native_project.py"),
     ),
@@ -257,8 +317,28 @@ const RESOURCES: &[(&str, &str)] = &[
         include_str!("../adapters/generation/go_project.py"),
     ),
     (
+        "go_storage.py",
+        include_str!("../adapters/generation/go_storage.py"),
+    ),
+    (
+        "go_cache.py",
+        include_str!("../adapters/generation/go_cache.py"),
+    ),
+    (
         "go_caller.py",
         include_str!("../adapters/generation/go_caller.py"),
+    ),
+    (
+        "go_source.py",
+        include_str!("../adapters/generation/go_source.py"),
+    ),
+    (
+        "go_source_run.py",
+        include_str!("../adapters/generation/go_source_run.py"),
+    ),
+    (
+        "go_telemetry.py",
+        include_str!("../adapters/generation/go_telemetry.py"),
     ),
     (
         "go_provider.py",
@@ -307,6 +387,26 @@ const RESOURCES: &[(&str, &str)] = &[
     (
         "go_rendezvous.py",
         include_str!("../adapters/generation/go_rendezvous.py"),
+    ),
+    (
+        "go_rendezvous.go",
+        include_str!("../adapters/generation/go_rendezvous.go"),
+    ),
+    (
+        "go_control.py",
+        include_str!("../adapters/generation/go_control.py"),
+    ),
+    (
+        "go_tooling.py",
+        include_str!("../adapters/generation/go_tooling.py"),
+    ),
+    (
+        "go_live.py",
+        include_str!("../adapters/generation/go_live.py"),
+    ),
+    (
+        "go_control_receipt.py",
+        include_str!("../adapters/generation/go_control_receipt.py"),
     ),
     (
         "go_receivers.py",
@@ -665,4 +765,16 @@ pub fn inventory(path: &Path) -> Result<Value, String> {
     };
     inventory.visit_file(&syntax);
     Ok(json!({"functions":inventory.entries,"globals":inventory.globals,"parser":"syn 3.0.6"}))
+}
+
+#[cfg(test)]
+mod resource_tests {
+    use super::RESOURCES;
+    use std::collections::BTreeSet;
+
+    #[test]
+    fn embedded_resource_names_are_unique() {
+        let names: BTreeSet<_> = RESOURCES.iter().map(|(name, _)| name).collect();
+        assert_eq!(names.len(), RESOURCES.len());
+    }
 }

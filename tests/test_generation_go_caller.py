@@ -16,6 +16,7 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(REPO / "adapters/generation"), str(REPO / "examples")]
 import generation
 import go_caller
+import go_cache
 import go_files
 import go_project
 import go_receivers
@@ -37,6 +38,7 @@ class GoCallerTests(unittest.TestCase):
         self.options = go_project.settings({"module_roots": ["."]})
         self.environment = {**os.environ, **go_project.environment(self.options),
                             "GOTOOLCHAIN": "local", "GOCACHE": str(REPO / "build/go-caller-cache")}
+        self.frontends = 0
 
     def execute(self, argv, cwd, env=None, *, input_data=None, max_output_bytes=None):
         result = subprocess.run(argv, cwd=cwd, env=env or self.environment, input=input_data,
@@ -60,8 +62,60 @@ class GoCallerTests(unittest.TestCase):
         return entry
 
     def discover(self, entry, execute=None):
+        self.frontends += 1
         return go_caller.discover(go_files.freeze(self.project), entry, self.go,
-                                  self.environment, execute or self.execute)
+                                  self.environment, execute or self.execute,
+                                  frontend_directory=self.root / ("frontend-" + str(self.frontends)))
+
+    def test_compiler_frontend_survives_the_original_cli_temporary_directory(self):
+        entry = self.materialise("package main\nfunc Add(value int)int{return value+1}\nfunc main(){}\n")
+        temporary = self.root / "temporary-cli-source.go"
+        source = go_caller.DISCOVERY.read_bytes()
+        temporary.write_bytes(source)
+        with patch.object(go_caller, "DISCOVERY", temporary):
+            caller = self.discover(entry)
+        temporary.unlink()
+        retained = self.root / "frontend-1/discover.go"
+        self.assertEqual(retained.read_bytes(), source)
+        self.assertIn(str(retained), caller.reads)
+        self.assertNotIn(str(temporary), caller.reads)
+        self.assertEqual(retained.stat().st_mode & 0o777, 0o600)
+        caller.verify()
+        retained.write_bytes(source + b"\n")
+        with self.assertRaisesRegex(ValueError, "compiler input changed"):
+            caller.verify()
+
+    def test_actual_sdk_style_cache_eviction_preserves_retained_compiler_exports(self):
+        entry = self.materialise("package main\nfunc Add(value int)int{return value+1}\nfunc main(){}\n")
+        caller = self.discover(entry)
+        evidence = self.root / "cache-evidence"; evidence.mkdir()
+        pool = self.root / "sdk-cache"
+        options = {"directory": str(pool), "max_bytes": 1024 ** 2}
+        protected = [self.project, Path(self.environment["GOCACHE"])]
+        with go_cache.lease(options, protected, evidence) as cached:
+            result = self.execute([self.go, "build", "-mod=readonly", "-o", self.root / "plain", caller.target],
+                                  self.project, {**self.environment, **cached})
+            self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((self.root / "plain").is_file())
+        receipt = json.loads((evidence / "sdk-cache-after.json").read_text())
+        self.assertTrue(receipt["complete"])
+        self.assertGreater(receipt["before_bytes"], options["max_bytes"])
+        self.assertLessEqual(receipt["after_bytes"], options["max_bytes"])
+        self.assertTrue(receipt["removed"])
+        caller.verify()
+
+    def test_frontend_directory_cannot_replace_source_or_existing_evidence(self):
+        entry = self.materialise("package main\nfunc Add(value int)int{return value+1}\nfunc main(){}\n")
+        snapshot = go_files.freeze(self.project)
+        for directory in (Path("relative"), self.project / "frontend", self.root):
+            with self.subTest(directory=directory), self.assertRaises((ValueError, FileExistsError)):
+                go_caller.discover(snapshot, entry, self.go, self.environment, self.execute,
+                                   frontend_directory=directory)
+        caller = self.discover(entry)
+        with self.assertRaises(FileExistsError):
+            go_caller.discover(snapshot, entry, self.go, self.environment, self.execute,
+                               frontend_directory=self.root / "frontend-1")
+        caller.verify()
 
     def test_generated_main_rebinds_line_without_running_initialisers(self):
         sentinel = self.root / "initialiser-ran"
@@ -74,7 +128,7 @@ class GoCallerTests(unittest.TestCase):
         self.assertNotEqual(caller.targets[0].line, entry["line"])
         self.assertEqual(caller.targets[0].parameters, 1)
         self.assertEqual(caller.targets[0].receiver_id, "")
-        self.assertIn("zz_oteleq_rendezvous.go", caller.compiler_inputs)
+        self.assertIn("oteleq_generated_control/rendezvous.go", caller.compiler_inputs)
         self.assertFalse(sentinel.exists())
         caller.verify()
         toolchain = {"go": str(self.go), "go_sha256": caller.reads[str(self.go)][0]["sha256"]}
@@ -99,22 +153,27 @@ class GoCallerTests(unittest.TestCase):
         self.assertEqual([target.name for target in caller.targets],
                          ["example.test/caller/counter.Counter.Add", "example.test/caller/counter.New"])
         self.assertEqual([target.receiver_id for target in caller.targets], ["*Counter", ""])
-        self.assertEqual(len(caller.packages), 3)
+        self.assertEqual(len(caller.packages), 4)
         self.assertIn("oteleq_generated_cmd/main.go", caller.compiler_inputs)
         caller.verify()
 
     def test_active_tag_and_embed_inputs_are_compiler_owned(self):
-        self.options = go_project.settings({"module_roots": ["."], "build_tags": ["special"]})
+        self.options = go_project.settings({"backend": "source-v1", "module_roots": ["."],
+                                            "build_tags": ["tools", "\u03c0", "special"]})
         self.environment.update(go_project.environment(self.options))
         (self.project / "data.txt").write_bytes(b"payload")
         (self.project / "ordinary.go").write_text("//go:build !special\n\npackage main\nvar Other=2\n")
-        (self.project / "special.go").write_text('//go:build special\n\npackage main\nimport _ "embed"\n'
+        (self.project / "special.go").write_text('//go:build special && tools && \u03c0\n\npackage main\nimport _ "embed"\n'
                                                 '//go:embed data.txt\nvar Data string\n')
         entry = self.materialise("package main\nfunc Add(value int)int{return value+len(Data)}\nfunc main(){}\n")
         caller = self.discover(entry)
         self.assertIn("special.go", caller.compiler_inputs)
         self.assertIn("data.txt", caller.compiler_inputs)
         self.assertNotIn("ordinary.go", caller.compiler_inputs)
+        self.assertEqual(caller.build_tags, ("special", "tools", "\u03c0"))
+        toolchain = {"go": str(self.go), "go_sha256": caller.reads[str(self.go)][0]["sha256"]}
+        intent = caller.build_intent(self.root / "unused-output", caller.original, toolchain, {}, [], caller.original)
+        self.assertEqual(intent.build_tags, caller.build_tags)
 
     def test_value_receiver_keeps_its_non_pointer_compiler_identity(self):
         entry = self.materialise('package counter\ntype Counter struct{value int}\n'
@@ -164,7 +223,8 @@ class GoCallerTests(unittest.TestCase):
                     go_caller.active_inputs(records, snapshot)
         with patch.object(go_caller.files, "MAX_TREE_BYTES", self.go.stat().st_size):
             with self.assertRaises(ValueError):
-                go_caller.discover(snapshot, entry, self.go, self.environment, self.execute)
+                go_caller.discover(snapshot, entry, self.go, self.environment, self.execute,
+                                   frontend_directory=self.root / "budget-frontend")
 
     def test_build_reader_refuses_rehashed_incomplete_active_input_denominators(self):
         original = self.root / "reader"

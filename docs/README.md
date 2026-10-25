@@ -10,6 +10,7 @@ Updated 23 October 2026, `quux-oteleq compare-workload` runs the Rust comparator
 | [Numeric preconditions](numeric-preconditions.md) | Keep declared relationships between generated scalar arguments |
 | [Complete input inspection](input-inspection.md) | Resolve unreadable source/dependency refusals and inspect qualification evidence |
 | [Go build bundles](go-build-bundles.md) | Retain matched executables, compiler evidence and detached replay |
+| [Go live metric schedules](go-metric-controls.md) | Declare same-process metric states and inspect the pending qualification boundary |
 | [Java compiler bindings](java-build-bundles.md) | Inspect actual source origins, JDK/compiler identities and retained class products |
 | [Java runtime archives](java-runtime-archives.md) | Configure the explicit prepared profile and review selected-JDK member evidence |
 | [Prepared Java SDK provider](java-prepared-provider.md) | Select the replacement Java SDK and verify launch, PID, origins and health/OTLP receipt |

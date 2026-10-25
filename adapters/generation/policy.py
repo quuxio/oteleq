@@ -16,7 +16,7 @@ import java_profiles
 import java_actions
 import java_project
 import go_project
-import native_project
+import native_source
 import node_source
 import python_provider
 import preconditions
@@ -181,7 +181,7 @@ def adapters(value: Any) -> dict[str, Any]:
     java = value.get("java", {})
     keys(java, {"backend", "profile", "source_roots", "classpath", "witness_profile"}, "adapters.java")
     java_provider.backend(java.get("backend", "legacy"))
-    return {**{language: native_project.settings(value[language]) for language in ('c', 'cpp') if language in value},
+    return {**{language: native_source.settings(value[language]) for language in ('c', 'cpp') if language in value},
             **({"node": node} if node is not None else {}),
             "rust": {"backend": backend},
             "typescript": {"backend": typescript_provider.backend(typed.get("backend", "source"))},

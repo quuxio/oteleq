@@ -7,6 +7,7 @@ import harness
 import native_context
 import native_frontend
 import native_project
+import native_source
 import native_workers
 import native_workspace
 import owned_workspace
@@ -24,7 +25,7 @@ def prepare_inputs(workflow, source: Path, root: Path, workspace: Path,
                    configuration: dict, contents: dict, *, excluded_files=(), excluded_roots=()) -> tuple[dict, dict]:
     """Retain native discovery failures and bind added inputs before snapshotting."""
     try:
-        profiles = prepare(workflow, source, root, workspace, configuration)
+        profiles = prepare(workflow, source, root, workspace, configuration, contents=contents)
         if not profiles:
             return contents, profiles
         required = source_manifest(workflow, source, profiles, excluded_files=excluded_files,
@@ -84,20 +85,32 @@ def capability(workflow, root: Path, retained: Path, execute) -> dict:
     return {'operation': 'rename-main', 'help_sha256': workflow.capture.file_digest(retained / 'object-transform.stdout')}
 
 
-def prepare(workflow, source: Path, root: Path, workspace: Path, configuration: dict) -> dict:
+def prepare(workflow, source: Path, root: Path, workspace: Path, configuration: dict, *, contents=None) -> dict:
     """Resolve requested native builds before excluded build inputs are snapshotted."""
     profiles = {}
     for language in ('c', 'cpp'):
         options = configuration['adapters'].get(language, {})
-        if language not in configuration['languages'] or not options.get('compilation_database'):
+        prepared = native_source.selected(options)
+        if language not in configuration['languages'] or not (options.get('compilation_database') or prepared):
             continue
-        tools = workflow.capture.selected_tools(root, language)
-        artefacts = workflow.capture.artefacts(root, language, tools)
+        tools = (native_source.selected_tools(root, language) if prepared
+                 else workflow.capture.selected_tools(root, language))
+        artefacts = (native_source.artefacts(root, language, tools, options) if prepared
+                     else workflow.capture.artefacts(root, language, tools))
         selected = tools['clang++' if language == 'cpp' else 'clang']
         retained = workspace / DIRECTORY / language
         execute = executor(workflow, retained, root, tools)
-        transform = capability(workflow, root, retained, execute)
-        profile = native_project.prepare(source, options, language, selected, retained, execute)
+        if prepared:
+            native_source.negotiate(workflow, root, workspace, language, tools, options, execute)
+            transform = {'operation': 'sdk-unit-recipe1-main-rename'}
+        else:
+            transform = capability(workflow, root, retained, execute)
+        if options.get('compilation_database'):
+            project_options = {name: options[name] for name in ('compilation_database', 'targets')}
+            profile = native_project.prepare(source, project_options, language, selected, retained, execute)
+        else:
+            targets = native_source.standalone_targets(language, selected, contents or {})
+            profile = native_project.prepare_targets(source, targets, language, selected, retained, execute)
         profile.update(tools={name: str(path) for name, path in tools.items()}, artefacts=artefacts,
                        object_transform=transform)
         profile['directories'] = required_directories(profile)
@@ -163,6 +176,8 @@ def inventory(workflow, profiles: dict, root: Path, snapshot: Path, workspace: P
             if entry['status'] == 'ready':
                 try:
                     native_workers.validate(profile, entry, harness.corpus(entry, args.cases)[0])
+                    if native_source.enabled(entry):
+                        native_source.configuration(entry, 'http://127.0.0.1:4318', 'oteleq-native-planning')
                 except ValueError as error:
                     entry.update(status='blocked', reason=str(error))
             workflow.filesystem_effects.bind(entry, args.configuration)
@@ -189,7 +204,8 @@ def preview(workflow, workspace: Path, entry: dict, case: dict, destination: Pat
     """Review helpers reference the one immutable snapshot instead of copying it per case."""
     profile = data['native_projects'][entry['language']]
     project = workspace / 'snapshot'
-    recipe = native_workers.materialise(project, profile, entry, case['arguments'], destination / 'helpers')
+    recipe = native_workers.materialise(project, profile, entry, case['arguments'], destination / 'helpers',
+                                         **({'unprofiled': True} if native_source.enabled(entry) else {}))
     workflow.write(destination / 'recipe.json', recipe)
 
 

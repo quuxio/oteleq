@@ -173,6 +173,24 @@ class SequenceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "declared receiver"):
             policy.validate({"fixtures": [{"function": "x", "cases": [[1]], "sequence": STEPS}]})
 
+    def test_go_calls_require_source_provider_and_complete_live_states(self):
+        calls = sequences.validate([{"action": "call", "arguments": "case"},
+                                    {"action": "call", "arguments": [4]}], policy.expected_baseline)
+        entry = {"language": "go", "go_backend": "source-v1", "receiver_fixture": {}, "parameters": ["int"],
+                 "expected_baseline": {"kind": "return"}}
+        sequences.configure(entry, calls, harness.concrete_arguments)
+        self.assertEqual([step["arguments"] for step in sequences.concrete(entry, [3], harness.concrete_arguments)], [[3], [4]])
+        with self.assertRaisesRegex(ValueError, "explicit source-v1"):
+            sequences.configure({**entry, "go_backend": "legacy"}, calls, harness.concrete_arguments)
+        controlled = [{**calls[0], "metrics": {"collection": True, "emission": True}},
+                      {**calls[1], "metrics": {"collection": False, "emission": True}}]
+        sequences.configure(entry, controlled, harness.concrete_arguments)
+        self.assertTrue(sequences.controls(entry))
+        for steps in ([*calls, {"action": "release"}], [controlled[0], calls[1]],
+                      [{**calls[0], "metrics": {"collection": False, "emission": True}}]):
+            with self.assertRaises(ValueError):
+                sequences.configure(entry, steps, harness.concrete_arguments)
+
 
 if __name__ == "__main__":
     unittest.main()

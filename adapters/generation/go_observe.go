@@ -33,6 +33,11 @@ type input struct {
 	Kind  string `json:"kind"`
 	Value string `json:"value"`
 }
+type callInput struct {
+	ID        string  `json:"id"`
+	Action    string  `json:"action"`
+	Arguments []input `json:"arguments"`
+}
 type configuration struct {
 	Models            map[string]model  `json:"models"`
 	Roots             map[string]string `json:"roots"`
@@ -43,6 +48,7 @@ type configuration struct {
 	Output            string            `json:"output"`
 	Arguments         []input           `json:"arguments"`
 	FactoryArguments  []input           `json:"factory_arguments"`
+	Sequence          []callInput       `json:"sequence,omitempty"`
 }
 
 // Root retains the actual address of a package variable, including rebindings.
@@ -373,6 +379,7 @@ func Run(encoded string, factory, target reflect.Value, globals ...Root) {
 	}()
 	var config configuration
 	require(len(encoded) <= 1048576 && json.Unmarshal([]byte(encoded), &config) == nil)
+	require(config.Sequence == nil)
 	factoryTypes := signature(factory, config.FactoryParameters, []string{config.Receiver}, config.Models)
 	outputs := []string{}
 	if config.Output != "void" {
@@ -405,4 +412,135 @@ func Run(encoded string, factory, target reflect.Value, globals ...Root) {
 		"before": before, "outcome": map[string]any{"kind": kind, "value": outcome}, "after": after})
 	require(err == nil && len(encodedCapture) <= 3*262144+1024)
 	require(os.WriteFile(os.Getenv("OTELEQ_OBSERVATION"), encodedCapture, 0600) == nil)
+}
+
+const maxCapture = 3*262144 + 1024
+
+type callOutcome struct {
+	Kind  string   `json:"kind"`
+	Value snapshot `json:"value"`
+}
+
+type callCapture struct {
+	ID      string      `json:"id"`
+	Action  string      `json:"action"`
+	Before  snapshot    `json:"before"`
+	Outcome callOutcome `json:"outcome"`
+	After   snapshot    `json:"after"`
+}
+
+type captureStream struct {
+	file  *os.File
+	bytes int
+}
+
+func (output *captureStream) write(data []byte) {
+	require(len(data) <= maxCapture-output.bytes)
+	n, err := output.file.Write(data)
+	require(err == nil && n == len(data))
+	output.bytes += n
+}
+
+func (output *captureStream) value(value any) {
+	data, err := json.Marshal(value)
+	require(err == nil)
+	output.write(data)
+}
+
+func receiverCall(config configuration, receiver, target reflect.Value, values []reflect.Value, roots map[string]reflect.Value) callCapture {
+	for index, argument := range values {
+		roots["argument:"+strconv.Itoa(index)] = argument
+	}
+	before := capture(config.Models, roots, reflect.Value{}, "", false, false)
+	actualReceiver := receiver
+	if config.MethodReceiver != config.Receiver {
+		require(!receiver.IsNil())
+		actualReceiver = receiver.Elem()
+	}
+	result, failed := invoke(target, append([]reflect.Value{actualReceiver}, values...))
+	kind := "return"
+	if failed {
+		kind = "error"
+	}
+	return callCapture{Before: before, Outcome: callOutcome{kind, capture(config.Models, roots, result, config.Output, true, failed)},
+		After: capture(config.Models, roots, reflect.Value{}, "", false, false)}
+}
+
+func runSequence(encoded string, factory, target reflect.Value, globals []Root, checkpoint func(string)) {
+	var config configuration
+	require(len(encoded) <= 1048576 && json.Unmarshal([]byte(encoded), &config) == nil)
+	require(len(config.Sequence) >= 1 && len(config.Sequence) <= 32)
+	factoryTypes := signature(factory, config.FactoryParameters, []string{config.Receiver}, config.Models)
+	outputs := []string{}
+	if config.Output != "void" {
+		outputs = append(outputs, config.Output)
+	}
+	targetTypes := signature(target, append([]string{config.MethodReceiver}, config.Parameters...), outputs, config.Models)
+	require(config.MethodReceiver == config.Receiver || config.Receiver == "*"+config.MethodReceiver)
+	roots := declaredRoots(config, globals)
+	// Validate every concrete call before constructing application state.
+	values := make([][]reflect.Value, len(config.Sequence))
+	for index, step := range config.Sequence {
+		require(step.ID == "step-"+strconv.Itoa(index) && step.Action == "call")
+		values[index] = arguments(targetTypes[1:], step.Arguments)
+	}
+	if checkpoint != nil {
+		checkpoint("before-0")
+	}
+	receiver := factory.Call(arguments(factoryTypes, config.FactoryArguments))[0]
+	roots["receiver"] = receiver
+	file, err := os.OpenFile(os.Getenv("OTELEQ_OBSERVATION"), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	require(err == nil)
+	defer file.Close()
+	output := captureStream{file: file}
+	for index, step := range config.Sequence {
+		if checkpoint != nil && index != 0 {
+			checkpoint("before-" + strconv.Itoa(index))
+		}
+		observed := receiverCall(config, receiver, target, values[index], roots)
+		observed.ID, observed.Action = step.ID, step.Action
+		if index == 0 {
+			output.write([]byte(`{"go_receiver_schema_version":3,"before":`))
+			output.value(observed.Before)
+			output.write([]byte(`,"steps":[`))
+		} else {
+			output.write([]byte(","))
+		}
+		output.value(observed)
+		if index == len(config.Sequence)-1 {
+			output.write([]byte(`],"outcome":`))
+			output.value(observed.Outcome)
+			output.write([]byte(`,"after":`))
+			output.value(observed.After)
+		}
+		if checkpoint != nil {
+			checkpoint("after-" + strconv.Itoa(index))
+		}
+	}
+	output.write([]byte("}\n"))
+	require(file.Close() == nil)
+	if checkpoint != nil {
+		checkpoint("finish")
+	}
+}
+
+func sequenceFailure() {
+	if recover() != nil {
+		_, _ = os.Stderr.WriteString("Go receiver fixture or observation is unavailable\n")
+		os.Exit(91)
+	}
+}
+
+// RunSequence retains one constructed receiver and streams each bounded call.
+func RunSequence(encoded string, factory, target reflect.Value, globals ...Root) {
+	defer sequenceFailure()
+	runSequence(encoded, factory, target, globals, nil)
+}
+
+// RunControlledSequence pauses the same worker before construction and each call,
+// after every call and after the complete capture, before SDK shutdown.
+func RunControlledSequence(encoded string, checkpoint func(string), factory, target reflect.Value, globals ...Root) {
+	defer sequenceFailure()
+	require(checkpoint != nil)
+	runSequence(encoded, factory, target, globals, checkpoint)
 }

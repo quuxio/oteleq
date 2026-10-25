@@ -11,11 +11,21 @@ JAVA_CONTROL_STARTUP ?= both-on
 JAVA_STARTUP_PROFILE ?= safe-methods-v1
 PYTHON_CONTROL_STARTUP ?= both-on
 PYTHON_CONTROL_PROFILE ?= python-native-origins-v2
+GO_SOURCE_BACKEND ?= source-v1
+GO_CONTROL_STARTUP ?= both-on
+GO_CONTROL_MIN_FREE_BYTES ?= 8589934592
+GO_CONTROL_CACHE_MAX_BYTES ?= 1073741824
+NATIVE_BACKEND ?= legacy
+NATIVE_SDK_BUILD ?= $(OTELC_ROOT)/build/prepared-sdk
+NATIVE_MIN_FREE_BYTES ?= 8589934592
 AUDIT_DIR ?= $(REPORT_DIR)-audit
 MARKDOWNLINT ?= ./ci/markdownlint/node_modules/.bin/markdownlint
 DEPENDENCY_AUDIT_OUTPUT ?= $(CURDIR)/build/dependency-audit
 
 .PHONY: dependency-audit dependency-audit-check
+.PHONY: native-provider-check
+.PHONY: native-caller-check
+.PHONY: generation-go-controls-otelc
 
 .PHONY: generation-project-tests-otelc generation-preconditions-otelc generation-domains-otelc generation-input-walks-otelc generation-retained-source-otelc generation-native-project-otelc generation-return-otelc generation-java-sequence-otelc generation-java-controls-otelc generation-java-project-otelc generation-java-archive-otelc generation-node-project-otelc
 .PHONY: node-source-context-check
@@ -29,9 +39,13 @@ DEPENDENCY_AUDIT_OUTPUT ?= $(CURDIR)/build/dependency-audit
 .PHONY: generation-node-source-collection-otelc generation-node-source-effects-otelc generation-node-source-channels-otelc
 .PHONY: generation-node-controls-otelc generation-java-startup-otelc generation-cpp-sequence-otelc generation-python-sequence-otelc generation-java-bindings-otelc generation-java-handles-otelc
 
-.PHONY: help setup lint examples docs-check observer-check generation-check effect-qualification-check node-observer-check node-sequence-check java-observer-check go-observer-check cpp-observer-check generation-cpp-receiver-otelc generation-go-receiver-otelc generation-java-receiver-otelc generation-otelc generation-policy-otelc generation-rust-otelc rust-semantic-otelc generation-native-otelc generation-shrink-otelc generation-python-project-otelc generation-receiver-otelc generation-node-receiver-otelc generation-go-build-otelc generation-go-project-otelc generation-sequence-otelc generation-typescript-sequence-otelc generation-filesystem-otelc generation-http-otelc resource-otelc capture-otelc report core-check coverage check
+.PHONY: help setup lint examples docs-check observer-check generation-check effect-qualification-check node-observer-check node-sequence-check java-observer-check go-observer-check cpp-observer-check generation-cpp-receiver-otelc generation-go-receiver-otelc generation-go-source-otelc generation-java-receiver-otelc generation-otelc generation-policy-otelc generation-rust-otelc rust-semantic-otelc generation-native-otelc generation-shrink-otelc generation-python-project-otelc generation-receiver-otelc generation-node-receiver-otelc generation-go-build-otelc generation-go-project-otelc generation-sequence-otelc generation-typescript-sequence-otelc generation-filesystem-otelc generation-http-otelc resource-otelc capture-otelc report core-check coverage check
 
 help:
+	@printf '%s\n' 'native-caller-check Check compiler-bound native observation callers with matched Clang tools'
+	@printf '%s\n' 'native-provider-check Check native prepared readers and ownership'
+	@printf '%s\n' 'generation-go-controls-otelc Qualify source-scope Go live states, retained suites and promotion (GO_CONTROL_STARTUP, AUDIT_DIR)'
+	@printf '%s\n' 'generation-go-source-otelc Qualify rebuilt Go receiver, retained and shrink workflows (GO_SOURCE_BACKEND)'
 	@printf '%s\n' 'generation-python-controls-otelc Qualify Python startup/live metric states and retained/promoted suites (PYTHON_CONTROL_PROFILE, PYTHON_CONTROL_STARTUP, AUDIT_DIR)'
 	@printf '%s\n' 'dependency-audit Check all locked repository dependencies against current OSV advisories' 'dependency-audit-check Test the audit runner offline and enforce 80% coverage'
 	@printf '%s\n' 'generation-python-cache-workflows-otelc Qualify complete cached Python matrix, receivers, effects and retained/promoted workflows'
@@ -110,7 +124,7 @@ generation-java-archive-otelc:
 generation-native-project-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_native_project.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
+	$(PYTHON) tests/qualify_native_project.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" --backend "$(NATIVE_BACKEND)" $(if $(filter prepared,$(NATIVE_BACKEND)),--sdk-build "$(NATIVE_SDK_BUILD)") --min-free-bytes "$(NATIVE_MIN_FREE_BYTES)"
 
 lint:
 	$(MARKDOWNLINT) '**/*.md' --ignore 'ci/markdownlint/node_modules/**'
@@ -139,8 +153,11 @@ node-sequence-check:
 	$(NODE) --test --experimental-test-coverage --test-coverage-include='adapters/generation/node_checkpoint.mjs' --test-coverage-lines=80 --test-coverage-functions=80 --test-coverage-branches=80 tests/node_checkpoint.test.mjs
 
 effect-qualification-check:
-	$(PYTHON) -m coverage run --data-file=.effect-qualification.coverage --include='*/effect_qualification.py' -m unittest discover -s tests -p 'test_generation_*qualification.py'
+	$(PYTHON) -m coverage run --data-file=.effect-qualification.coverage --include='*/effect_qualification.py,*/qualification_storage.py,*/native_prepared_otlp.py,*/native_prepared_receipt.py' -m unittest discover -s tests -p 'test_generation_*qualification.py'
 	$(PYTHON) -m coverage report --data-file=.effect-qualification.coverage --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.effect-qualification.coverage --include='*/qualification_storage.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.effect-qualification.coverage --include='*/native_prepared_otlp.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.effect-qualification.coverage --include='*/native_prepared_receipt.py' --fail-under=80
 
 java-observer-check:
 	$(PYTHON) ci/java_coverage.py check
@@ -150,6 +167,19 @@ go-observer-check:
 
 cpp-observer-check:
 	$(PYTHON) ci/cpp_coverage.py
+
+native-provider-check:
+	PYTHONPATH="$(CURDIR)/tests$${PYTHONPATH:+:$${PYTHONPATH}}" $(PYTHON) -m coverage run --data-file=.native-provider.coverage --include='*/native_protocol.py,*/native_inputs.py,*/native_toolchain.py,*/native_sdk.py,*/native_build.py,*/native_unit_build.py,*/native_prepared.py,*/native_health.py,*/native_execution.py,*/native_session.py,*/native_telemetry.py,*/histogram_observation.py' -m unittest test_generation_native_prepared_inputs test_generation_native_prepared_build test_generation_native_units test_generation_native_prepared test_generation_native_execution test_generation_native_session test_generation_native_telemetry -v
+	$(PYTHON) -m coverage report --data-file=.native-provider.coverage --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.native-provider.coverage --include='*/native_unit_build.py' --fail-under=80
+	PYTHONPATH="$(CURDIR)/tests$${PYTHONPATH:+:$${PYTHONPATH}}" $(PYTHON) -m coverage run --append --data-file=.native-provider.coverage --include='*/native_source.py,*/native_source_run.py' -m unittest test_generation_native_source test_generation_native_source_run -v
+	$(PYTHON) -m coverage report --data-file=.native-provider.coverage --include='*/native_source.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.native-provider.coverage --include='*/native_source_run.py' --fail-under=80
+
+native-caller-check:
+	PYTHONPATH="$(CURDIR)/tests$${PYTHONPATH:+:$${PYTHONPATH}}" $(PYTHON) -m coverage run --data-file=.native-caller.coverage --include='*/native_unit_caller.py,*/native_workers.py,*/native_frontend.py' -m unittest test_generation_native_callers test_generation_native_workers test_generation_native_frontend -v
+	$(PYTHON) -m coverage report --data-file=.native-caller.coverage --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.native-caller.coverage --include='*/native_unit_caller.py' --fail-under=80
 
 node-source-context-check:
 	$(NODE) --test --experimental-test-coverage --test-coverage-include='adapters/generation/node_source_context.mjs' --test-coverage-lines=80 --test-coverage-functions=80 --test-coverage-branches=80 tests/node_source_context.test.mjs
@@ -191,12 +221,22 @@ generation-check: node-observer-check node-sequence-check node-source-context-ch
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/go_context_sources.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/go_build.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/go_caller.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/go_source.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/go_source_run.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/go_storage.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/go_cache.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/go_telemetry.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/go_hooks.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/go_prepared.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/go_execution.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/go_launch.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/go_rendezvous.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/go_control.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/go_tooling.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/go_live.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/go_control_receipt.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/python_telemetry.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/histogram_observation.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/python_launch.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/live_control.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/python_control.py' --fail-under=80
@@ -245,6 +285,20 @@ generation-check: node-observer-check node-sequence-check node-source-context-ch
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/native_workers.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/native_workspace.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/native_profile.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/native_protocol.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/native_inputs.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/native_toolchain.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/native_sdk.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/native_build.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/native_unit_build.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/native_unit_caller.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/native_source.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/native_source_run.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/native_prepared.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/native_health.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/native_execution.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/native_session.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/native_telemetry.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/cpp_receivers.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/cpp_worker.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/cpp_graph.py' --fail-under=80
@@ -423,6 +477,16 @@ generation-go-receiver-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
 	$(PYTHON) tests/qualify_go_receivers.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
+
+generation-go-source-otelc:
+	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
+	cargo build --locked
+	$(PYTHON) tests/qualify_go_receivers.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" --backend "$(GO_SOURCE_BACKEND)" $(GENERATION_ARGS)
+
+generation-go-controls-otelc:
+	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
+	cargo build --locked
+	$(PYTHON) tests/qualify_go_controls.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --audit-dir "$(AUDIT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" --min-free-bytes "$(GO_CONTROL_MIN_FREE_BYTES)" --cache-max-bytes "$(GO_CONTROL_CACHE_MAX_BYTES)" --startup-state "$(GO_CONTROL_STARTUP)" $(GENERATION_ARGS)
 
 generation-go-project-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"

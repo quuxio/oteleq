@@ -31,7 +31,7 @@ class NativeWorkersTests(unittest.TestCase):
         for name in ('src', 'include', 'build'):
             (self.root / name).mkdir(parents=True)
 
-    def prepare(self, language, *, throws=False):
+    def prepare(self, language, *, throws=False, presence_probe=False, probe_exists=False):
         cpp = language == 'cpp'
         compiler = Path(os.environ.get('OTELC_CLANGXX' if cpp else 'OTELC_CLANG')
                         or shutil.which('clang++' if cpp else 'clang'))
@@ -45,7 +45,11 @@ class NativeWorkersTests(unittest.TestCase):
                         'int selected(int amount){return -999;}}\n')
         else:
             function = 'static int local=3;' + function
-        (self.root / sources[0]).write_text('#include "state.h"\n' +
+        probe = ('#if __has_include("optional.h")\nint optional_present=1;\n#else\nint optional_present=0;\n#endif\n'
+                 if presence_probe else '')
+        if probe_exists:
+            (self.root / 'include/optional.h').write_text('/* existence-only compiler input */\n')
+        (self.root / sources[0]).write_text('#include "state.h"\n' + probe +
             ('#include <stdexcept>\n' if throws else '') +
             function + 'int main(void){}\n' +
             '#define int broken_type\n#define __builtin_memcpy_inline(a,b,c) broken_copy\n')

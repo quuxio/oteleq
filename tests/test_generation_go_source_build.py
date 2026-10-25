@@ -103,6 +103,91 @@ class GoSourceBuildTests(unittest.TestCase):
         self.receipt["inventory"] = files.identity(self.intent.directory / "inspection/inventory.json")
         self.publish()
 
+    def tagged(self):
+        """Extend the literal fixture independently with the explicit build-5 fields."""
+        self.intent = replace(self.intent, build_tags=("feature", "tools", "\u03c0"))
+        self.inventory.update(schema_version=2, build_tags=["feature", "tools", "\u03c0"])
+        pin = self.intent.directory / "private/otel.instrumentation.go"
+        pin.write_text(pin.read_text().replace("//go:build tools\n", "//go:build !feature\n", 1))
+        self.receipt.update(schema_version=5, build_tags=["feature", "tools", "\u03c0"],
+                            private_inputs=files.freeze(self.intent.directory / "private").identities)
+        commands = copy.deepcopy(self.receipt["commands"])
+        for row in commands[-2:]:
+            position = row["argv"].index("-mod=readonly") + 1
+            row["argv"].insert(position, "-tags=feature,tools,\u03c0")
+        self.receipt["commands"] = commands
+        write(self.intent.directory / "commands.json", commands)
+        self.receipt["command_evidence"] = {name: files.identity(self.intent.directory / name) for name in
+            ["commands.json", *[f"command-{index}.{suffix}" for index in range(len(commands))
+                               for suffix in ("stdout", "stderr")]]}
+        self.inventory_change()
+
+    def test_tagged_profile_binds_unicode_tags_inventory_fixed_flags_and_private_pin(self):
+        self.tagged()
+        with patch("subprocess.run", side_effect=AssertionError("reader executed a compiler")), \
+                patch("subprocess.Popen", side_effect=AssertionError("reader launched a target")):
+            actual = build.read(self.intent)
+            actual.verify()
+        self.assertEqual(actual.receipt["schema_version"], 5)
+        self.assertEqual(actual.inventory["schema_version"], 2)
+        for row in build.commands(self.intent)[-2:]:
+            self.assertEqual([arg for arg in row["argv"] if arg.startswith("-tags=")],
+                             ["-tags=feature,tools,\u03c0"])
+        with self.assertRaises(ValueError):
+            build.read(replace(self.intent, build_tags=()))
+        for tags in (["feature"], ("tools", "feature"), ("x", "x"), ("-race",)):
+            with self.subTest(tags=tags), self.assertRaises(ValueError):
+                build.validate_intent(replace(self.intent, build_tags=tags))
+
+    def test_tagged_receipt_and_active_inventory_cannot_substitute_the_request(self):
+        self.tagged()
+        original = copy.deepcopy(self.receipt)
+        for key, value in (("schema_version", 4), ("schema_version", True), ("build_tags", []),
+                           ("build_tags", ["tools", "feature", "\u03c0"]),
+                           ("build_tags", ["feature"]), ("command_evidence", {})):
+            self.receipt = {**original, key: value}
+            self.publish()
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                build.read(self.intent)
+        self.receipt = original
+        for key, value in (("schema_version", 1), ("build_tags", ["tools"]), ("build_tags", None)):
+            saved = copy.deepcopy(self.inventory)
+            self.inventory[key] = value
+            self.inventory_change()
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                build.read(self.intent)
+            self.inventory = saved
+        self.inventory_change()
+        build.read(self.intent).verify()
+
+    def test_tagged_log_seals_and_rehashed_wrong_recipe_or_pin_refuse(self):
+        self.tagged()
+        checked = build.read(self.intent)
+        log = self.intent.directory / "command-0.stderr"
+        log.write_bytes(b"changed compiler diagnostic")
+        with self.assertRaisesRegex(ValueError, "compiler evidence differs"):
+            build.read(self.intent)
+        with self.assertRaisesRegex(ValueError, "compiler evidence changed"):
+            checked.verify()
+        log.write_bytes(b"")
+        commands = copy.deepcopy(self.receipt["commands"])
+        commands[-1]["argv"].remove("-tags=feature,tools,\u03c0")
+        self.receipt["commands"] = commands
+        write(self.intent.directory / "commands.json", commands)
+        self.receipt["command_evidence"]["commands.json"] = files.identity(self.intent.directory / "commands.json")
+        self.publish()
+        with self.assertRaisesRegex(ValueError, "command recipe differs"):
+            build.read(self.intent)
+        self.receipt["commands"] = build.commands(self.intent)
+        write(self.intent.directory / "commands.json", self.receipt["commands"])
+        self.receipt["command_evidence"]["commands.json"] = files.identity(self.intent.directory / "commands.json")
+        pin = self.intent.directory / "private/otel.instrumentation.go"
+        pin.write_text(pin.read_text().replace("//go:build !feature\n", "//go:build tools\n", 1))
+        self.receipt["private_inputs"] = files.freeze(self.intent.directory / "private").identities
+        self.publish()
+        with self.assertRaisesRegex(ValueError, "helper differs"):
+            build.read(self.intent)
+
     def test_complete_build_is_bound_without_compiler_or_target_execution(self):
         with patch("subprocess.run", side_effect=AssertionError("reader executed a command")), \
                 patch("subprocess.Popen", side_effect=AssertionError("reader started a target")):

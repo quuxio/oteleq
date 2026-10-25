@@ -11,6 +11,39 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class QualificationRecipeTests(unittest.TestCase):
+    def test_native_project_recipe_selects_only_an_explicit_prepared_sdk_and_storage_floor(self):
+        for backend in ('legacy', 'prepared'):
+            result = subprocess.run(['make', '--no-print-directory', '-n', 'generation-native-project-otelc',
+                'OTELC_ROOT=/tmp/provider', 'REPORT_DIR=/tmp/native-evidence', 'NATIVE_BACKEND=' + backend,
+                'NATIVE_SDK_BUILD=/tmp/held-sdk', 'NATIVE_MIN_FREE_BYTES=123456'],
+                cwd=ROOT, capture_output=True, text=True, check=True)
+            self.assertIn('--backend "' + backend + '"', result.stdout)
+            self.assertIn('--min-free-bytes "123456"', result.stdout)
+            self.assertEqual('--sdk-build "/tmp/held-sdk"' in result.stdout, backend == 'prepared')
+
+    def test_native_caller_recipe_has_its_own_compiler_checks_and_coverage_floor(self):
+        result = subprocess.run(['make', '--no-print-directory', '-n', 'native-caller-check',
+            'PYTHON=/selected/python'], cwd=ROOT, capture_output=True, text=True, check=True)
+        self.assertIn('test_generation_native_callers', result.stdout)
+        self.assertIn('test_generation_native_workers', result.stdout)
+        self.assertIn('test_generation_native_frontend', result.stdout)
+        self.assertIn("--include='*/native_unit_caller.py' --fail-under=80", result.stdout)
+        self.assertNotIn('cargo build', result.stdout)
+
+    def test_native_provider_components_have_a_focused_compiler_free_recipe(self):
+        result = subprocess.run(['make', '--no-print-directory', '-n', 'native-provider-check',
+            'PYTHON=/selected/python'], cwd=ROOT, capture_output=True, text=True, check=True)
+        self.assertIn('/selected/python -m coverage run', result.stdout)
+        for name in ('test_generation_native_prepared_inputs', 'test_generation_native_prepared_build',
+                     'test_generation_native_prepared', 'test_generation_native_execution', 'test_generation_native_session',
+                     'test_generation_native_telemetry', 'test_generation_native_units'):
+            self.assertIn(name, result.stdout)
+        self.assertIn('--data-file=.native-provider.coverage', result.stdout)
+        self.assertIn('--fail-under=80', result.stdout)
+        self.assertIn("--include='*/native_unit_build.py' --fail-under=80", result.stdout)
+        self.assertNotIn('cargo build', result.stdout)
+        self.assertNotIn('--otelc-root', result.stdout)
+
     def test_all_qualification_recipes_honour_default_relative_and_spaced_target_directories(self):
         targets = {}
         target = None
@@ -20,7 +53,8 @@ class QualificationRecipeTests(unittest.TestCase):
             for flag in ("--cli", "--comparator"):
                 if line.startswith("\t") and flag + " " in line:
                     targets[target] = flag
-        self.assertEqual(len(targets), 45)
+        self.assertEqual(len(targets), 47)
+        self.assertIn("generation-go-controls-otelc", targets)
         self.assertIn("generation-python-controls-otelc", targets)
         self.assertIn("generation-python-cache-workflows-otelc", targets)
         self.assertIn("generation-python-caches-otelc", targets)
@@ -48,6 +82,7 @@ class QualificationRecipeTests(unittest.TestCase):
         self.assertIn("generation-java-project-otelc", targets)
         self.assertIn("generation-java-archive-otelc", targets)
         self.assertIn("generation-go-receiver-otelc", targets)
+        self.assertIn("generation-go-source-otelc", targets)
         self.assertIn("rust-semantic-otelc", targets)
         with tempfile.TemporaryDirectory() as temporary:
             base = Path(temporary)
@@ -76,7 +111,8 @@ class QualificationRecipeTests(unittest.TestCase):
                         self.assertEqual(result.returncode, 0, result.stderr)
                         arguments = json.loads(record.read_text())
                         self.assertEqual(arguments[arguments.index(flag) + 1], expected)
-                        if name in ('generation-node-controls-otelc', 'generation-java-startup-otelc', 'generation-python-controls-otelc'):
+                        if name in ('generation-node-controls-otelc', 'generation-java-startup-otelc',
+                                    'generation-python-controls-otelc', 'generation-go-controls-otelc'):
                             self.assertEqual(arguments[arguments.index('--startup-state') + 1], 'both-on')
                         if name == 'generation-java-startup-otelc':
                             self.assertEqual(arguments[arguments.index('--java-profile') + 1], 'safe-methods-v1')
@@ -91,6 +127,16 @@ class QualificationRecipeTests(unittest.TestCase):
         self.assertIn('tests/qualify_python_controls.py', result.stdout)
         self.assertIn('--profile "python-native-cache-origins-v3" --startup-state "both-off"', result.stdout)
         self.assertIn('--audit-dir "/tmp/audit-two" --retained-only', result.stdout)
+
+    def test_go_control_recipe_retains_startup_and_separate_retained_audit(self):
+        result = subprocess.run(['make', '--no-print-directory', '-n', 'generation-go-controls-otelc',
+            'OTELC_ROOT=/tmp/provider', 'REPORT_DIR=/tmp/evidence', 'AUDIT_DIR=/tmp/go-audit',
+            'GO_CONTROL_STARTUP=both-off', 'GO_CONTROL_MIN_FREE_BYTES=123456', 'GENERATION_ARGS=--retained-only'],
+            cwd=ROOT, capture_output=True, text=True, check=True)
+        self.assertIn('tests/qualify_go_controls.py', result.stdout)
+        self.assertIn('--startup-state "both-off" --retained-only', result.stdout)
+        self.assertIn('--audit-dir "/tmp/go-audit"', result.stdout)
+        self.assertIn('--min-free-bytes "123456"', result.stdout)
 
     def test_java_action_recipe_retains_explicit_profile_and_retained_only_mode(self):
         result = subprocess.run(['make', '--no-print-directory', '-n', 'generation-java-actions-otelc',
@@ -125,6 +171,7 @@ class QualificationRecipeTests(unittest.TestCase):
     def test_help_names_the_http_qualification_target(self):
         result = subprocess.run(["make", "help"], cwd=ROOT, capture_output=True, text=True, check=True)
         self.assertIn("generation-http-otelc Qualify scripted HTTP", result.stdout)
+        self.assertIn('native-provider-check Check native prepared readers and ownership', result.stdout)
         self.assertIn("generation-java-handles-otelc Qualify generated private-handle", result.stdout)
         self.assertIn("generation-project-tests-otelc Qualify current-source suites", result.stdout)
         self.assertIn("generation-preconditions-otelc Qualify numeric relations", result.stdout)
@@ -136,6 +183,7 @@ class QualificationRecipeTests(unittest.TestCase):
         self.assertIn("generation-node-source-channels-otelc Qualify nonempty binary", result.stdout)
         self.assertIn("generation-java-startup-otelc Qualify Java startup flags", result.stdout)
         self.assertIn("generation-python-sequence-otelc Qualify ordered Python package receivers", result.stdout)
+        self.assertIn("generation-go-controls-otelc Qualify source-scope Go live states", result.stdout)
 
     def test_handle_binding_recipe_uses_the_prebuilt_sdk_without_building_a_cli(self):
         result = subprocess.run(['make', '--no-print-directory', '-n', 'generation-java-handles-otelc',

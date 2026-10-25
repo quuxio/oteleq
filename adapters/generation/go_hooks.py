@@ -7,7 +7,7 @@ import unicodedata
 from typing import cast
 
 import go_files as files
-from go_provider import require, same
+from go_provider import SCOPE_HELPER_PROFILE, require, same
 
 KEYWORDS = set("break default func interface select case defer go map struct chan else goto package switch "
                "const fallthrough if range type continue for import return var".split())
@@ -22,7 +22,7 @@ def identifier(value: object) -> bool:
                for index, char in enumerate(value))
 
 
-def failure(results: object) -> str:
+def failure(results: object, *, prefix: str | None = None) -> str:
     """Only the compiler profile's literal error predicates can enter a rule."""
     require(type(results) is list and len(results) <= 4096, "invalid Go hook result denominator")
     results = cast(list, results)
@@ -35,10 +35,40 @@ def failure(results: object) -> str:
         names.add(row["expression"])
         if row["error"]:
             require(row["failure"] in ("true", row["expression"] + " != nil"), "invalid Go hook error predicate")
-            predicates.append(row["failure"])
+            predicate = row["failure"]
+            if prefix is not None:
+                predicate = prefix + ("True" if predicate == "true" else "NotNil(" + row["expression"] + ")")
+            predicates.append(predicate)
         else:
             require(row["failure"] == "", "non-error Go result has an error predicate")
-    return " || ".join(predicates) or "false"
+    return " || ".join(predicates) or ("false" if prefix is None else prefix + "False")
+
+
+def scope_bootstrap(digest: str) -> bytes:
+    """Keep initialisation and static-type nil tests in one private package."""
+    return ('package otelcbootstrap\nimport (\n "reflect"\n'
+            ' official "go.opentelemetry.io/otelc/pkg/runtime"\n owned "io.quux.otelc/go/runtime"\n)\n'
+            'type Any = interface{}\ntype Bool = bool\ntype Int = int\ntype RuntimeType = owned.Runtime\n'
+            'const False = false\nconst True = true\n'
+            'func NotNil[T any](value T)bool{return !reflect.ValueOf(&value).Elem().IsNil()}\n'
+            'var Runtime = func()*owned.Runtime {\n'
+            ' value,err:=owned.FromEnvironment(official.ContextWithImplicitTelemetry,official.DetachSpanFromGLS)\n'
+            ' if err!=nil{panic(err)}\n'
+            ' if value.Config.SelectionSHA256!=' + json.dumps(digest) + '{panic("Go runtime differs from compiled selection")}\n'
+            ' return value\n}()\n').encode()
+
+
+def scope_helper(package: str, prefix: str, bootstrap: str) -> bytes:
+    """Application scope contains only qualified types, constants and accessor calls."""
+    return (f'package {package}\nimport (\n {prefix}probe "io.quux.otelc/go/probe"\n'
+            f' {prefix}bootstrap {json.dumps(bootstrap)}\n)\n'
+            f'const {prefix}False = {prefix}bootstrap.False\nconst {prefix}True = {prefix}bootstrap.True\n'
+            f'func {prefix}Runtime()*{prefix}bootstrap.RuntimeType{{return {prefix}bootstrap.Runtime}}\n'
+            f'func {prefix}NotNil[T {prefix}bootstrap.Any](value T){prefix}bootstrap.Bool{{return {prefix}bootstrap.NotNil(value)}}\n'
+            f'func {prefix}Track[T {prefix}bootstrap.Any](value *T,id {prefix}bootstrap.Int)*T{{\n'
+            f' {prefix}probe.Track({prefix}bootstrap.Runtime.Probes,value,id);return value\n}}\n'
+            f'func {prefix}Release[T {prefix}bootstrap.Any](value *T,success {prefix}bootstrap.Bool)'
+            f'{{{prefix}probe.Release({prefix}bootstrap.Runtime.Probes,value,success)}}\n').encode()
 
 
 def helper(package: str, prefix: str, digest: str) -> bytes:
@@ -87,17 +117,18 @@ def callable_binding(row: dict, packages: dict) -> tuple[dict, str]:
     return fact, receiver
 
 
-def injection(row: dict, selected: dict, prefix: str, finish: bool, package: dict) -> list[str]:
+def injection(row: dict, selected: dict, prefix: str, finish: bool, package: dict, *, scope: bool = False) -> list[str]:
     """Keep shutdown ordering and selected invocation indices explicit."""
     code = []
+    runtime = prefix + ("Runtime()" if scope else "Runtime")
     if finish:
         require(package["name"] == "main" and type(row["parameters"]) is int
                 and row["parameters"] == 0 and same(row["results"], []),
                 "invalid Go main shutdown binding")
-        code.append("defer " + prefix + "Runtime.Close()")
+        code.append("defer " + runtime + ".Close()")
     if row["name"] in selected:
-        predicate = failure(row["results"])
-        code += [f"{prefix}Invocation := {prefix}Runtime.Probes.Start({selected[row['name']]})",
+        predicate = failure(row["results"], prefix=prefix if scope else None)
+        code += [f"{prefix}Invocation := {runtime}.Probes.Start({selected[row['name']]})",
                  "defer func(){" + prefix + "Invocation.End(" + predicate + ")}()"]
     return code
 
@@ -111,11 +142,14 @@ def rule(row: dict, main: str, receiver: str, index: int, code: list[str]) -> st
     return result + "  do:\n    - inject_code:\n        raw: |\n" + "".join("          " + line + "\n" for line in code)
 
 
-def generated(selection: dict, inventory: dict, module: str) -> dict[str, bytes]:
+def generated(selection: dict, inventory: dict, module: str, *, build_tags: tuple[str, ...] = (),
+              helper_profile: str | None = None) -> dict[str, bytes]:
     """Derive all additions for the explicit synchronous, no-context hook profile."""
     require(same(selection["context"], {"tasks": False, "http": False})
             and all(same(selection[name], []) for name in ("types", "allocations", "releases")),
             "unsupported Go generated hook profile")
+    require(helper_profile in (None, SCOPE_HELPER_PROFILE), "unsupported Go helper profile")
+    scope = helper_profile is not None
     digest = selection["sha256"]
     require(type(digest) is str and len(digest) == 64 and all(char in "0123456789abcdef" for char in digest),
             "invalid Go hook selection digest")
@@ -128,7 +162,7 @@ def generated(selection: dict, inventory: dict, module: str) -> dict[str, bytes]
         if row["name"] not in selected and not finish:
             continue
         fact, receiver = callable_binding(row, packages)
-        code = injection(row, selected, prefix, finish, fact)
+        code = injection(row, selected, prefix, finish, fact, scope=scope)
         rules.append(rule(row, inventory["main"], receiver, len(rules), code))
         mains += int(finish)
         used.add(row["package"])
@@ -136,22 +170,29 @@ def generated(selection: dict, inventory: dict, module: str) -> dict[str, bytes]
     for package in sorted(used):
         fact = packages[package]
         path = Path(fact["directory"]) / ("zz_otelc_" + digest[:12] + ".go")
-        additions[path.as_posix()] = helper(fact["name"], prefix, digest)
+        additions[path.as_posix()] = (scope_helper(fact["name"], prefix, module + "/otelc_bootstrap_" + digest[:12])
+                                     if scope else helper(fact["name"], prefix, digest))
+    if scope:
+        additions["otelc_bootstrap_" + digest[:12] + "/bootstrap.go"] = scope_bootstrap(digest)
     additions["otelc_rules/doc.go"] = b"package rules\n"
     additions["otelc_rules/otelc.yaml"] = "\n".join(rules).encode()
     imports = [module + "/otelc_rules", "go.opentelemetry.io/otelc/instrumentation/runtime",
                "go.opentelemetry.io/otelc/instrumentation/go.opentelemetry.io/otel/sdk/trace"]
-    additions["otel.instrumentation.go"] = ("//go:build tools\n\npackage tools\nimport (\n"
+    constraint = "!" + build_tags[0] if build_tags else "tools"
+    additions["otel.instrumentation.go"] = ("//go:build " + constraint + "\n\npackage tools\nimport (\n"
                                            + "".join(" _ " + json.dumps(name) + "\n" for name in imports) + ")\n").encode()
     return additions
 
 
 def verify(original: files.Snapshot, private: files.Snapshot, selection: dict,
-           inventory: dict, module: str) -> None:
+           inventory: dict, module: str, *, build_tags: tuple[str, ...] = (), helper_profile: str | None = None) -> None:
     """A rehashed manifest cannot admit changed helpers or additional private code."""
-    expected = generated(selection, inventory, module)
+    expected = generated(selection, inventory, module, build_tags=build_tags, helper_profile=helper_profile)
+    reserved = ("otelc_rules", "otel.instrumentation.go", "otelc.tool.go")
+    if helper_profile is not None:
+        reserved += ("otelc_bootstrap_" + selection["sha256"][:12],)
     require(not any((original.root / name).exists() or (original.root / name).is_symlink()
-                    for name in ("otelc_rules", "otel.instrumentation.go", "otelc.tool.go"))
+                    for name in reserved)
             and not set(expected) & set(original.identities), "Go generated helpers collide with original inputs")
     prefix = ("__otelc_" + selection["sha256"][:12] + "_").encode()
     for name in inventory["files"]:

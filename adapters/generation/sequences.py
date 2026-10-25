@@ -5,6 +5,7 @@ import math
 from typing import Any
 
 import preconditions
+import go_project
 
 MAX_STEPS = 32
 
@@ -73,10 +74,12 @@ def configure(entry: dict, value: list[dict], coerce: Callable) -> None:
     """Requested unavailable adapters remain named inventory blockers."""
     language = entry["language"]
     receiver = "cpp_receiver" if language == "cpp" else "receiver_fixture"
-    if language not in ("python", "javascript", "typescript", "java", "cpp") or receiver not in entry:
-        raise ValueError("sequences require a declared Python/C++/Java/JavaScript/TypeScript receiver fixture")
-    if language in ("python", "java", "cpp") and any(step["action"] != "call" for step in value):
-        label = {"python": "Python", "cpp": "C++", "java": "Java"}[language]
+    if language not in ("python", "javascript", "typescript", "java", "cpp", "go") or receiver not in entry:
+        raise ValueError("sequences require a declared Python/C++/Go/Java/JavaScript/TypeScript receiver fixture")
+    if language == "go" and entry.get("go_backend") not in go_project.SOURCE_BACKENDS:
+        raise ValueError("Go receiver sequences require an explicit source-v1 or source-scope-v1 backend")
+    if language in ("python", "java", "cpp", "go") and any(step["action"] != "call" for step in value):
+        label = {"python": "Python", "cpp": "C++", "java": "Java", "go": "Go"}[language]
         raise ValueError(label + " receiver sequences currently support call actions only")
     if any("metrics" in step for step in value):
         configure_controls(entry, value)
@@ -95,12 +98,13 @@ def configure_controls(entry: dict, value: list[dict]) -> None:
     prepared_python = origin(entry)
     prepared_java = entry["language"] == "java" and entry.get("java_backend") == "prepared"
     source_node = entry["language"] in ("javascript", "typescript") and entry.get("node_backend") == "source-v1"
-    if (not (prepared_java or source_node or prepared_python)
+    source_go = entry["language"] == "go" and entry.get("go_backend") in go_project.SOURCE_BACKENDS
+    if (not (prepared_java or source_node or prepared_python or source_go)
             or any(step["action"] != "call" or "metrics" not in step for step in value)):
-        raise ValueError("live metrics require prepared origin Python/Java or source-v1 Node calls with an explicit state for every call")
+        raise ValueError("live metrics require prepared origin Python/Java or source-v1 Go/Node calls with an explicit state for every call")
     positive = {"collection": True, "emission": True}
     if not any(step["metrics"] == positive for step in value):
-        language = "Python" if prepared_python else "Java" if prepared_java else "Node"
+        language = "Python" if prepared_python else "Java" if prepared_java else "Go" if source_go else "Node"
         raise ValueError("live " + language + " metrics require a collection-on/emission-on positive control")
 
 
