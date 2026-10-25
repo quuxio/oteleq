@@ -43,6 +43,33 @@ test('pip binary-only arguments require quoting in a YAML command scalar', () =>
   assert.equal(yaml.load(`run: '${command}'\n`).run, command);
 });
 
+test('native metric workflows cover both languages and every startup state with retained evidence', () => {
+  const workflow = yaml.load(readFileSync(new URL('../.github/workflows/native-metrics.yml', import.meta.url), 'utf8'));
+  assert.equal(workflow.permissions.contents, 'read');
+  const job = workflow.jobs['native-metrics'];
+  assert.equal(job['runs-on'], 'ubuntu-24.04');
+  assert.equal(job.strategy['fail-fast'], false);
+  assert.equal(job.strategy['max-parallel'], 2);
+  assert.deepEqual(job.strategy.matrix.language, ['c', 'cpp']);
+  assert.deepEqual(job.strategy.matrix.start, ['11', '01', '10', '00']);
+  const checkouts = job.steps.filter(step => step.uses?.startsWith('actions/checkout@'));
+  assert.equal(checkouts.length, 2);
+  assert.ok(checkouts.every(step => step.with['persist-credentials'] === false));
+  assert.equal(checkouts[1].with.repository, 'quuxio/otelc');
+  assert.equal(checkouts[1].with.ref, 'acb13d7735526448209df37b7e6b98e5717befdb');
+  const execute = job.steps.find(step => step.name === 'Build original SDK and exercise public metric workflows');
+  assert.match(execute.run, /tests\/qualify_native_metrics\.py/);
+  assert.match(execute.run, /--language/);
+  assert.match(execute.run, /--start/);
+  assert.doesNotMatch(execute.run, /--coverage/);
+  const retain = job.steps.find(step => step.name === 'Retain original qualification and SDK build failures');
+  assert.equal(retain.if, 'always()');
+  assert.equal(retain.with['retention-days'], 7);
+  assert.match(retain.with.path, /native-metric-evidence/);
+  assert.match(retain.with.path, /native-sdk-build.json/);
+  assert.ok(!Object.hasOwn(job, 'secrets'));
+});
+
 test('Python validation installs enforce wheel and dependency hashes', () => {
   const workflow = yaml.load(readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8'));
   const install = workflow.jobs.design.steps.find(step => step.name === 'Install pinned Python validation tools');

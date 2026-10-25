@@ -67,4 +67,6 @@ The target enforces 80% statement coverage separately for the five new Python mo
 
 Before runtime qualification can be published, both languages and all four startup states must complete actual generated, framework, replay, detached, reduced and promoted workflows with independently prescribed state/result/error observations and altered-evidence refusals. Default single-call compatibility also needs current-revision regression evidence. No historical runtime record is transferred to this implementation.
 
+The [workflow qualifier](native-metric-workflows.md) implements those routes with independent complete frame/health/OTLP readers and an eight-shard hosted matrix. Its component checks use authored records; complete original application evidence is still required.
+
 Prepared receivers, native object/resource live schedules, variable per-call arguments, general asynchronous actions, shipping artefacts and invocation-scoped attribution require further integration and qualification. Requested unsupported profiles remain visible refusals.

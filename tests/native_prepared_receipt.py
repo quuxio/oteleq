@@ -75,7 +75,10 @@ def archive(original: Path, copied: Path) -> None:
     same(manifest(original), manifest(copied))
 
 
-def policy(value: dict, entry: dict) -> None:
+def policy(value: dict, entry: dict, *, metric_flags: dict | None = None) -> None:
+    flags = {'collection': True, 'emission': True} if metric_flags is None else metric_flags
+    require(type(flags) is dict and set(flags) == {'collection', 'emission'}
+            and all(type(flag) is bool for flag in flags.values()), 'invalid expected metric flags')
     service = value['resource']['service_name']; endpoint = value['export']['endpoint']
     require(re.fullmatch(r'oteleq-gen-[0-9a-f]{32}', service) is not None, 'unbound generated service')
     match = re.fullmatch(r'http://127\.0\.0\.1:([1-9][0-9]{0,4})', endpoint)
@@ -84,7 +87,7 @@ def policy(value: dict, entry: dict) -> None:
         'export': {'endpoint': endpoint, 'interval_ms': 1000, 'timeout_ms': 1000, 'shutdown_timeout_ms': 10000},
         'sources': {'include': [entry['path']], 'exclude': []},
         'functions': {'include': [entry['otelc_function']], 'exclude': []},
-        'metrics': {'collection': True, 'emission': True, 'histogram_boundaries_seconds': BOUNDS},
+        'metrics': {**flags, 'histogram_boundaries_seconds': BOUNDS},
         'traces': {'enabled': True, 'sample_ratio': 1.0},
         'lifetimes': {'enabled': False, 'include': [], 'exclude': [], 'max_live': 4096, 'release_methods': ['close']},
         'context': {'tasks': False, 'http': False}, 'benchmark': {'iterations': 10000, 'samples': 15, 'warmup': 5}})
@@ -104,17 +107,19 @@ def exports(value: dict, unit: str, units: int, requests: int) -> None:
     same(value['units_started'], str(units)); same(value['units_succeeded'], str(units))
 
 
-def health(value: dict, expected_policy: dict, language: str, pid: int, points: int, traces: int, metrics: int) -> None:
+def health(value: dict, expected_policy: dict, language: str, pid: int, points: int, traces: int, metrics: int,
+           *, functions: int = 1) -> None:
     """Keep unavailable dimensions visible and bind final SDK units to raw receipt."""
+    require(type(functions) is int and functions > 0, 'invalid expected function denominator')
     expected = {'schema_version': 1, 'kind': 'otelc.runtime-health', 'language': language, 'pid': pid,
         'phase': 'final', 'scope': 'sdk_pipeline', 'sdk_attached': True, 'source_complete': False,
         'policy_sha256': digest(expected_policy),
         'selection_sha256': digest({key: expected_policy[key] for key in ('sources', 'functions')}),
         'controls': {'schema_version': 1, 'pid': pid, 'collection': True, 'emission': True, 'effective_emission_off': False},
         'lifecycle': {'flush': 'succeeded', 'shutdown': 'succeeded'},
-        'function_accounting': {'registered': '1', 'started': '1', 'ended': '1', 'active': '0', 'closed': True,
+        'function_accounting': {'registered': '1', 'started': str(functions), 'ended': str(functions), 'active': '0', 'closed': True,
                                 'lost': '0', 'invalid': '0', 'metadata_errors': '0'},
-        'span_accounting': {'sampled_started': '1', 'sampled_ended': '1', 'sampled_active': '0',
+        'span_accounting': {'sampled_started': str(functions), 'sampled_ended': str(functions), 'sampled_active': '0',
             'queue_dropped': '0', 'queue_pending': '0', 'queue_evidence': 'derived_after_shutdown',
             'processors_observed': 1, 'batch_processors_observed': 1},
         'trace_exports': value['trace_exports'], 'metric_exports': value['metric_exports'],
@@ -125,11 +130,12 @@ def health(value: dict, expected_policy: dict, language: str, pid: int, points: 
     require(type(value['metric_flush']['attempts']) is str
             and re.fullmatch(r'[1-9][0-9]{0,19}', value['metric_flush']['attempts']) is not None, 'no final SDK flush')
     same(value['metric_flush']['failed_attempts'], '0')
-    exports(value['trace_exports'], 'spans', 1, traces)
+    exports(value['trace_exports'], 'spans', functions, traces)
     exports(value['metric_exports'], 'metric_points', points, metrics)
 
 
-def attempt(folder: Path, entry: dict, lane: str, witness, provider: Path, arguments: list) -> None:
+def attempt(folder: Path, entry: dict, lane: str, witness, provider: Path, arguments: list, *,
+            policy_check=policy, receipt_check=receipt, health_check=health) -> None:
     """Independently join fixed commands, original images, host ownership and signals."""
     runtime = folder / 'native-runtime'; plain = lane == 'baseline'
     request, plan = read(runtime / 'native-request.json'), read(runtime / 'native-plan.json')
@@ -139,7 +145,7 @@ def attempt(folder: Path, entry: dict, lane: str, witness, provider: Path, argum
     application = read(runtime / 'native-application-start.json')
     started, finished = read(runtime / 'oteleq-native-start.json'), read(runtime / 'oteleq-native-finish.json')
     process = read(folder / 'process.json')
-    expected_policy = tomllib.loads((folder / 'policy.toml').read_text()); policy(expected_policy, entry)
+    expected_policy = tomllib.loads((folder / 'policy.toml').read_text()); policy_check(expected_policy, entry)
     require(re.fullmatch(r'[0-9a-f]{32}', request['launch_id']) is not None, 'invalid launch identity')
     same(request, {'schema_version': 1, 'kind': 'otelc.native.request', 'profile': PROFILE,
         'build': identity(folder / 'native-build/native-source-build.json', owned=True),
@@ -181,7 +187,7 @@ def attempt(folder: Path, entry: dict, lane: str, witness, provider: Path, argum
         'application_pid': pid, 'application_exit_code': 0, 'sdk_pid': None if plain else pid,
         'scope': 'owned completion; direct downstream telemetry qualification remains separate'})
     service = expected_policy['resource']['service_name']
-    expected, points, traces, metrics = receipt(folder, read, entry['language'], service,
+    expected, points, traces, metrics = receipt_check(folder, read, entry['language'], service,
         entry['path'] + '::' + entry['otelc_function'], plain=plain)
     same(witness, expected)
     checkpoint = None if plain else read(runtime / 'app/health.json')
@@ -189,7 +195,7 @@ def attempt(folder: Path, entry: dict, lane: str, witness, provider: Path, argum
         require(not (runtime / 'app/health.json').exists(), 'plain application has SDK health')
     else:
         identity(runtime / 'app/health.json', private=True)
-        health(checkpoint, expected_policy, entry['language'], pid, points, traces, metrics)
+        health_check(checkpoint, expected_policy, entry['language'], pid, points, traces, metrics)
     same(final, {'schema_version': 1, 'kind': 'otelc.native.execution', 'profile': PROFILE,
         'request_sha256': digest(request), 'plan_sha256': digest(plan), 'supervisor': supervisor, 'application': application,
         'released': True, 'process_exit_code': 0, 'supervisor_exit_code': 0, 'inputs_rechecked': True,
