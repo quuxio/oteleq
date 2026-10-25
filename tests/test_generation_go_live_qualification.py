@@ -319,7 +319,9 @@ class GoLiveWorkflowTests(unittest.TestCase):
                     patch.object(qualifier.shared, 'exercise_routes') as routes, \
                     patch.object(qualifier, 'current_suite') as current, \
                     patch.object(qualifier, 'command', return_value='{"mode":"dry-run","files":["test.py"]}') as commands:
-                qualifier.run(Path('cli'), Path('sdk'), root, 'both-off', {'frozen': 'inputs'})
+                qualifier.run(Path('cli'), Path('sdk'), root, 'both-off', {'frozen': 'inputs'}, min_free_bytes=123)
+            configured = tomllib.loads((root / 'cases/equivalence.toml').read_text())
+            self.assertEqual(configured['adapters']['go']['build_min_free_bytes'], 123)
             self.assertEqual(plan.call_args.args[-1], set(fixture.FUNCTIONS))
             self.assertEqual(routes.call_count, 1)
             self.assertEqual([call.kwargs['changed'] for call in current.call_args_list], [False, True])

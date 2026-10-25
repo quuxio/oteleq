@@ -76,7 +76,7 @@ def framework(workspace: Path, folder: Path, name: str, count: int = len(fixture
     return shared.framework(workspace, folder, name, count, check_report)
 
 
-def run(cli: Path, provider: Path, folder: Path, start: str, catalogue: dict) -> None:
+def run(cli: Path, provider: Path, folder: Path, start: str, catalogue: dict, *, min_free_bytes: int = 0) -> None:
     """Exercise every maintained route without changing the original application."""
     folder.mkdir(mode=0o700)
     write(folder / 'provider-inputs.json', catalogue)
@@ -85,7 +85,7 @@ def run(cli: Path, provider: Path, folder: Path, start: str, catalogue: dict) ->
     inputs = oracle.make_source(cases / 'application')
     write(folder / 'independent-inputs.json', inputs)
     config = cases / 'equivalence.toml'
-    config.write_text(fixture.policy(start))
+    config.write_text(fixture.policy(start, min_free_bytes=min_free_bytes))
     workspace = shared.plan_generate(cli, provider, cases, cases / 'application', config, set(fixture.FUNCTIONS))
     check_report = partial(oracle.check_report, start=start, provider=provider)
     run_framework = partial(framework, check_report=check_report)
@@ -288,7 +288,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument('--startup-state', choices=fixture.STARTS, default='both-on')
     parser.add_argument('--retained-only', action='store_true')
     parser.add_argument('--min-free-bytes', type=int, default=qualification_storage.MIN_FREE_BYTES,
-                        help='free-space floor checked before each new command (default: 8 GiB)')
+                        help='free-space floor checked between commands and during Go builds (default: 8 GiB)')
     args = parser.parse_args(argv)
     if args.min_free_bytes < 0:
         parser.error('--min-free-bytes must be nonnegative')
@@ -307,7 +307,7 @@ def main(argv: list[str] | None = None) -> None:
     catalogue = go_source.artefacts(provider, tools, backend='source-scope-v1')
     if not args.retained_only:
         with qualification_storage.budget(args.min_free_bytes):
-            run(cli, provider, folder, args.startup_state, catalogue)
+            run(cli, provider, folder, args.startup_state, catalogue, min_free_bytes=args.min_free_bytes)
     result = audit(cli, provider, folder, destination, args.startup_state, catalogue)
     fixture.exact(go_source.artefacts(provider, tools, backend='source-scope-v1'), catalogue)
     write(destination / 'QUALIFICATION.json', result)

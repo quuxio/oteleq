@@ -94,9 +94,13 @@ class GoSourceRunTests(unittest.TestCase):
         self.events.append("discovery")
         return self.caller
 
-    def execute(self, argv, cwd, environment, folder, *, timeout, input_data, max_output_bytes):
+    def execute(self, argv, cwd, environment, folder, *, timeout, input_data, max_output_bytes, interaction=None):
         words = list(map(str, argv))
         self.commands.append((words, cwd))
+        if interaction is not None:
+            self.assertIsInstance(interaction, source_run.go_storage.Guard)
+            self.assertEqual(interaction.minimum, self.entry["go_options"]["build_min_free_bytes"])
+            self.assertEqual(interaction.directory, folder)
         self.assertEqual(timeout, 1.234)
         self.assertIs(environment, self.environment)
         is_tooling_query = (go_source.scope_safe(self.entry)
@@ -324,6 +328,28 @@ class GoSourceRunTests(unittest.TestCase):
             self.run_prepare()
         self.assertTrue((self.folder / "go-tooling/0/stdout").is_file())
         self.assertTrue((self.folder / "go-tooling/0/stderr").is_file())
+        self.reader.assert_not_called()
+        self.launcher.assert_not_called()
+
+    def test_build_floor_guards_every_command_and_is_retained(self):
+        self.entry["go_options"]["build_min_free_bytes"] = 1
+        with patch.object(source_run.go_storage.shutil, "disk_usage", return_value=SimpleNamespace(free=1)) as usage:
+            self.run_prepare()
+        channels = list((self.folder / "go-tooling").iterdir())
+        self.assertEqual(usage.call_count, len(self.commands))
+        self.assertEqual(len(channels), len(self.commands))
+        for directory in channels:
+            self.assertEqual(generation.read(directory / "command.json")["minimum_free_bytes"], 1)
+
+    def test_low_build_space_refuses_before_any_compiler_and_retains_its_command(self):
+        self.entry["go_options"]["build_min_free_bytes"] = 2
+        with patch.object(source_run.go_storage.shutil, "disk_usage", return_value=SimpleNamespace(free=1)), \
+                self.assertRaisesRegex(ValueError, "storage headroom exhausted"):
+            self.run_prepare()
+        self.assertEqual(self.commands, [])
+        retained = self.folder / "go-tooling/0"
+        self.assertEqual(generation.read(retained / "command.json")["minimum_free_bytes"], 2)
+        self.assertFalse(generation.read(retained / "storage-refusal.json")["process_started"])
         self.reader.assert_not_called()
         self.launcher.assert_not_called()
 

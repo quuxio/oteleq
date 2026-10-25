@@ -16,6 +16,7 @@ import go_project
 import go_tooling
 from go_provider import SCOPE_HELPER_PROFILE, data_seal, require, same
 import go_source
+import go_storage
 import otelc_capture as capture
 import python_prepared
 
@@ -56,6 +57,7 @@ def prepare(workflow, root: Path, project: Path, entry: dict, tools: dict,
     backend = entry["go_backend"]
     tooling = go_source.toolchain(root, tools, backend=backend)
     timeout = go_project.build_timeout(entry["go_build_timeout_ms"]) / 1000
+    minimum = go_storage.minimum(entry["go_options"].get("build_min_free_bytes", 0))
     count = 0
 
     def execute(argv, cwd, env=None, *, input_data=None, max_output_bytes=files.MAX_METADATA_BYTES):
@@ -64,11 +66,13 @@ def prepare(workflow, root: Path, project: Path, entry: dict, tools: dict,
         count += 1
         destination.mkdir(mode=0o700, parents=True)
         workflow.write(destination / "command.json", {"argv": list(map(str, argv)), "cwd": str(cwd),
-                                                       "timeout_ms": round(timeout * 1000)})
+                                                       "timeout_ms": round(timeout * 1000),
+                                                       **({"minimum_free_bytes": minimum} if minimum else {})})
         if input_data is not None:
             (destination / "stdin").write_bytes(input_data)
+        options = {"interaction": go_storage.Guard(destination, minimum)} if minimum else {}
         result = workflow.execute(argv, cwd, env or environment, destination, timeout=timeout,
-                                  input_data=input_data, max_output_bytes=max_output_bytes)
+                                  input_data=input_data, max_output_bytes=max_output_bytes, **options)
         require(result.returncode == 0, "Go public build/preparation failed; inspect retained compiler channels")
         return result
 

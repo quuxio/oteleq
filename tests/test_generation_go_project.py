@@ -297,6 +297,13 @@ func unused()*Unused{return nil}
             with self.subTest(value=value), self.assertRaises(ValueError):
                 go_project.settings(value)
         self.assertEqual(go_project.settings({"build_timeout_ms": 600000})["build_timeout_ms"], 600000)
+        selected = {"backend": "source-scope-v1", "build_min_free_bytes": 8 * 1024 ** 3}
+        self.assertEqual(go_project.settings(selected)["build_min_free_bytes"], 8 * 1024 ** 3)
+        for minimum in (False, -1, 1.5, "1", 2 ** 63):
+            with self.subTest(minimum=minimum), self.assertRaisesRegex(ValueError, "build_min_free_bytes"):
+                go_project.settings({**selected, "build_min_free_bytes": minimum})
+        with self.assertRaisesRegex(ValueError, "requires a source-v1"):
+            go_project.settings({"build_min_free_bytes": 1})
         for timeout in (None, False, 0, -1, 900001, 1.5, "600000"):
             with self.subTest(timeout=timeout), self.assertRaisesRegex(ValueError, "build_timeout_ms"):
                 go_project.settings({"build_timeout_ms": timeout})
