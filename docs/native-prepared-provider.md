@@ -1,12 +1,56 @@
-# Native prepared provider components
+# Native prepared provider
 
 <!-- markdownlint-disable MD013 -->
 
-Status: internal integration work. These readers and the execution controller implement the public otelc `native-owned-v1` build-2/preparation-1 contract for C and C++. A separate candidate build3 reader adds explicitly negotiated per-unit recipes. Generated test commands do not select this provider yet. The existing native generator continues to use its documented provider. This work does not qualify C, C++, Rust, production artefacts or the whole project as complete.
+Status: candidate public integration. Explicit C/C++ `backend = "prepared"` selects `native-owned-v1` build3/unit-recipe1 and preparation1 through the ordinary planning, generation and execution commands. The separate older fixed-source build2 readers remain available to component maintainers. Generated/retained workflow qualification is in progress. The default native provider is unchanged; this work does not qualify whole-language, production artefact or project completion.
+
+## Select the candidate
+
+Use the matching built SDK and LLVM 22 installation. Select each native language present in the source tree explicitly:
+
+```toml
+schema_version = 1
+languages = ["cpp"]
+
+[adapters.cpp]
+backend = "prepared"
+sdk_build = "/absolute/otelc/build/context-sdk"
+build_timeout_ms = 180000
+```
+
+`sdk_build` is optional and defaults to `build/prepared-sdk` under the selected otelc root. It must identify the existing matching SDK library and build record. The provider negotiates the complete build3 descriptor and independently checks the selected toolchain and SDK recipe. An unavailable or incompatible provider refuses; there is no legacy fallback. Build timeouts accept 1000 to 900000 milliseconds and remain separate from the application's case timeout.
+
+Without a compilation database, each C11 or C++17 source unit is a separate standalone target with fixed `-O2`, exception and pthread settings. Linked application targets use the existing explicit compilation-database policy. Add these fields to the selected adapter table and declare its ordered targets:
+
+```toml
+[adapters.cpp]
+backend = "prepared"
+sdk_build = "/absolute/otelc/build/context-sdk"
+compilation_database = "build/compile_commands.json"
+
+[[adapters.cpp.targets]]
+name = "application"
+units = [{source = "src/main.cpp"}, {source = "src/state.cpp"}]
+link_flags = ["-pthread"]
+```
+
+Per-unit working directories, qualified semantic flags, actual dependencies and existence/search probes are frozen before SDK builds. The compilation database does not supply an inferred link recipe. See [native project context](native-project-context.md) for supported flags and target selection.
+
+```sh
+quux-oteleq plan --source /absolute/application --otelc-root /absolute/otelc \
+  --config generation.toml --workspace-parent /absolute/transient
+quux-oteleq generate --workspace /absolute/transient/oteleq-run-EXAMPLE
+quux-oteleq run --workspace /absolute/transient/oteleq-run-EXAMPLE \
+  --report-dir /absolute/transient/native-report
+```
+
+The candidate currently follows the scalar project-worker contract, including supported target-wide globals/statics and declared standard C++ exception observations. Unknown exception types, receivers, action sequences and live metric switches need separate integration. The generator retains these limits as blockers or incomplete execution; it does not silently discard them. Tests, copied source, access helpers, compiler products and runtime records remain in the external workspace. No application or dependency annotation is required.
+
+The native exception graph uses names such as `cpp.std::runtime_error`. Declare an expected native error with `expected_baseline = { kind = "error", category = "exception", type = "cpp.std::runtime_error" }` in its fixture. This differs from the byte-based exception label used by the separate legacy C++ receiver codec. A wrong expectation blocks comparison even when both captured results match.
 
 ## Inputs and private builds
 
-The consumer freezes operator-selected LLVM 22 tools, six fixed metadata queries, the native SDK library/build record, original SDK sources, application units and independently supplied per-unit dependency sets. It reconstructs the plugin, pre-exec gate, bootstrap and both compiler/linker recipes without importing SDK renderers. The fixed standalone recipe is C11 or C++17; general compilation databases and build-system flags need separate integration.
+The consumer freezes operator-selected LLVM 22 tools, six fixed metadata queries, the native SDK library/build record, original SDK sources, application units and independently supplied per-unit dependency sets. It reconstructs the plugin, pre-exec gate, bootstrap and both compiler/linker recipes without importing SDK renderers. The fixed standalone recipe is C11 or C++17; explicit compilation-database targets use build3 per-unit recipes. Broader build-system flags still need separate integration.
 
 Every accepted build retains its complete product and command-channel denominator, including both per-unit dependency manifests. Checks bind original bytes, inode, write times, permissions and link counts. A rewritten record or an identical-byte replacement cannot repair an earlier accepted identity. Caller-selected paths precede producer metadata; metadata never chooses an executable or a foreign dependency to inspect.
 
@@ -28,7 +72,7 @@ The frontend gives its supplied file manager the same VFS overlays as the compil
 
 Compiler MD channels and preprocessor existence/search probes are retained separately. Caller-owned header aliases bind logical names to already frozen canonical inputs before SDK compilation. This covers macOS SDK directory aliases without allowing a producer dependency file to choose a new filesystem read. Missing alias declarations, foreign paths, substitutions and changed original file facts refuse.
 
-Maintainers must call `Caller.recheck` after the SDK build and after each application execution. It repeats compiler input/probe checks into a fresh external evidence directory. A newly present `__has_include` target can change compilation while all previously read source files remain unchanged; a byte-only recheck is insufficient. Original caller metadata, helper/tool inputs and compiler channels retain their own immutable file identities.
+The generated execution path calls `Caller.recheck` after the SDK build and after each application execution. It repeats compiler input/probe checks into a fresh external evidence directory. A newly present `__has_include` target can change compilation while all previously read source files remain unchanged; a byte-only recheck is insufficient. Original caller metadata, helper/tool inputs and compiler channels retain their own immutable file identities.
 
 The development caller probe against held SDK `5476ce0` completes four actual C/C++ plain/woven applications with independently decoded telemetry. Generated callers preserve the selected overload, complete supported target-wide globals/statics, argument values, ordinary return and original C++ exception path. A first attempt refused an undeclared macOS SDK header alias before any application launch and remains failed. The corrected probe is scoped to its recorded development snapshot; public CLI selection and generated/retained workflow qualification remain open. This bridge currently follows the existing scalar project-worker contract; receiver, action, resource and broader build fixtures require their own integration.
 
@@ -63,4 +107,4 @@ The separate caller target uses matched Clang tools for real AST/VFS/input check
 
 ## Remaining integration
 
-The public generator still needs explicit provider selection and application of the caller/dependency bridge, inventory-to-compiler binding and native OTLP reader. Generated, replayed, framework, detached, reduced and promoted suites need exact-revision execution, source preservation and negative controls. Live collection/emission schedules, invocation attribution, automatic object lifetimes, task/HTTP context, broader build recipes and platform/shipping qualification remain open. The [project completion checklist](completion.md) remains the acceptance boundary.
+The candidate now connects provider selection, compiler-bound callers, owned sessions and the native OTLP reader. Generated, replayed, framework, detached, reduced and promoted suites need exact-revision execution, source preservation and negative controls before admission. Live collection/emission schedules, invocation attribution, automatic object lifetimes, task/HTTP context, broader build recipes and platform/shipping qualification remain open. The [project completion checklist](completion.md) remains the acceptance boundary.

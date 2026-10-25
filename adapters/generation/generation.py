@@ -49,6 +49,11 @@ import node_live
 import node_control_receipt
 import owned_workspace
 import native_profile
+import native_source
+import native_source_run
+import native_prepared
+import native_session as native_owned
+import native_telemetry
 import otelc_capture as capture
 import otelc_collection
 import policy as project_policy
@@ -451,6 +456,8 @@ def configure_entry_context(entry, discovered, configuration, snapshot, excluded
     """Apply explicit per-language provider settings and source-context bindings."""
     language = entry["language"]
     adapters = configuration["adapters"]
+    if language in native_source.LANGUAGES:
+        native_source.configure(entry, adapters.get(language, {}))
     if language in ("javascript", "typescript"):
         node_project.bind_entry(entry, discovered)
         if adapters.get("node", {}).get("backend") == node_source.SOURCE:
@@ -656,6 +663,8 @@ def plan(args):
         data["python_provider_manifest"] = manifest(workspace / python_provider.DIRECTORY)
     if (workspace / go_source.DIRECTORY).exists():
         data["go_provider_manifest"] = manifest(workspace / go_source.DIRECTORY)
+    if (workspace / native_source.DIRECTORY).exists():
+        data['native_provider_manifest'] = manifest(workspace / native_source.DIRECTORY)
     if python_context is not None:
         data['python_cache_context_manifest'] = python_context
         data['source_sha256'] = identity({'source': data['source_sha256'], 'python_cache_context': python_context})
@@ -722,7 +731,7 @@ def generator_identity():
         'node_live.py', 'node_control.py', 'node_control_receipt.py', 'node_checkpoint.mjs',
         'native_protocol.py', 'native_inputs.py', 'native_toolchain.py', 'native_sdk.py',
         'native_build.py', 'native_unit_build.py', 'native_unit_caller.py', 'native_prepared.py', 'native_health.py', 'native_execution.py',
-        'native_session.py', 'native_telemetry.py',
+        'native_session.py', 'native_telemetry.py', 'native_source.py', 'native_source_run.py',
         'native_profile.py', 'native_project.py', 'native_dependencies.py', 'native_frontend.py',
         'native_discover.cpp', 'native_context.py', 'native_workers.py', 'native_workspace.py',
         'owned_workspace.py', 'preconditions.py', 'project_tests.py', 'project_runner.py',
@@ -765,6 +774,7 @@ def load_workspace(path, generated=False):
     node_source.verify_probes(sys.modules[__name__], workspace, data)
     python_provider.verify_probes(sys.modules[__name__], workspace, data)
     go_source.verify_probes(sys.modules[__name__], workspace, data)
+    native_source.verify_probes(sys.modules[__name__], workspace, data)
     python_cache.verify(sys.modules[__name__], workspace, data)
     if generated and manifest(workspace / "tests") != read(workspace / GENERATED_MANIFEST):
         raise ValueError("generated suite or corpus changed; create a new plan")
@@ -846,6 +856,8 @@ if __name__=="__main__":unittest.main()
 
 
 def policy(entry, endpoint, *, service="oteleq-generation"):
+    if native_source.enabled(entry):
+        return native_source.policy(entry, endpoint, service)
     if go_source.enabled(entry):
         return go_source.policy(entry, endpoint, service)
     if python_provider.enabled(entry):
@@ -1056,7 +1068,7 @@ def baseline_receipt(entry, folder, bodies):
 
 def qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, decoder, *, extra_channels=None,
                     capture_complete=True, prepared_runtime=None, python_runtime=None, action_session=None, case=None,
-                    go_runtime=None):
+                    go_runtime=None, native_runtime=None):
     if errors or result.returncode:
         raise ValueError("application exit or OTLP capture failed; inspect retained stdout/stderr")
     if python_provider.enabled(entry):
@@ -1069,7 +1081,13 @@ def qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, 
     if len(result.stdout) + len(result.stderr) + observation.stat().st_size + sum(map(len, extra_channels.values())) > data["configuration"]["limits"]["max_capture_bytes"]:
         raise ValueError("case observation exceeds comparator channel budget")
     witness = None
-    if go_source.enabled(entry):
+    if native_source.enabled(entry):
+        native_source.require(isinstance(native_runtime, native_source_run.Run), 'missing owned native execution')
+        witness = native_telemetry.witness(native_runtime.session.execution, bodies, service,
+                                           (entry['otelc_runtime_function'],), folder=folder)
+        if lane == 'baseline':
+            baseline_receipt(entry, folder, bodies)
+    elif go_source.enabled(entry):
         go_source.require(isinstance(go_runtime, go_source_run.Run), "missing owned Go source execution")
         witness = go_telemetry.witness(go_runtime, bodies, service, decoder, folder=folder, calls=sequences.call_count(entry),
                                        **({"sequence": entry["sequence_configuration"]} if sequences.controls(entry) else {}))
@@ -1106,7 +1124,9 @@ def qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, 
 
 def provider_stable(root, language, tools, expected, entry):
     """Re-enumerate the selected provider without changing its frozen API."""
-    if python_provider.enabled(entry):
+    if native_source.enabled(entry):
+        native_source.stable(root, language, tools, entry['native_options'], expected)
+    elif python_provider.enabled(entry):
         python_provider.require(python_inputs.artefacts(root, tools) == expected, "SDK or selected Python inputs changed")
     elif java_provider.prepared(entry):
         options = {'action': True} if java_actions.enabled(entry) else {}
@@ -1133,7 +1153,7 @@ def attempt(workspace, data, entry, case, lane, folder, decoder, *, http_fixture
 
 def attempt_policy(entry, endpoint, service, runtime):
     """Prepared providers consume the same original per-attempt service identity."""
-    if runtime is not None or node_source.enabled(entry) or python_provider.enabled(entry) or go_source.enabled(entry):
+    if runtime is not None or native_source.enabled(entry) or node_source.enabled(entry) or python_provider.enabled(entry) or go_source.enabled(entry):
         return policy(entry, endpoint, service=service)
     return policy(entry, endpoint)
 
@@ -1184,6 +1204,16 @@ def attempt_environment(workspace, root, project, entry, tools, service, folder)
     return env, scratch
 
 
+@contextmanager
+def native_cleanup(run):
+    """Retain the native child's separate process-group cleanup on every exit."""
+    if run is None:
+        yield
+    else:
+        with native_owned.retained(run.session):
+            yield
+
+
 def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, http_fixtures, runtime):
     """Capture each lane with the same private source, effects and process budgets."""
     root, language = Path(data["otelc_root"]), entry["language"]
@@ -1201,7 +1231,7 @@ def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, ht
         env["NODE_OPTIONS"] = "--expose-gc"
         write(folder / "collection-controls.json", {"NODE_OPTIONS": "--expose-gc", "sequence": case["sequence"]})
     immutable = manifest(project)
-    python_run = python_session = go_run = None
+    python_run = python_session = go_run = native_run = None
     java_context = java_project.materialise(workspace, data, folder, project) if language == "java" else None
     receiver_options = attempt_receiver_options(entry, runtime)
     with retained_receiver(folder, receiver_options) as (endpoint, bodies, errors):
@@ -1214,7 +1244,11 @@ def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, ht
             env["OTELC_TYPESCRIPT_BACKEND"] = capture.typescript_backend(root, language, entry, config.read_bytes())
             write(folder / "typescript-controls.json", {"OTELC_TYPESCRIPT_BACKEND": env["OTELC_TYPESCRIPT_BACKEND"],
                                                         "provider": entry.get("typescript_provider")})
-        if 'native_context' in entry:
+        if native_source.enabled(entry):
+            native_run = native_source_run.prepare(sys.modules[__name__], workspace, data, entry, case,
+                                                    project, tools, env, folder, config, lane)
+            command = native_prepared.command(native_run.prepared.intent)
+        elif 'native_context' in entry:
             prefix = [root / 'target/debug/quux-otelc', '--config', config, '--language', language]
             command = native_profile.build(sys.modules[__name__], workspace, data, entry, case,
                                            project, prefix, env, folder, lane)
@@ -1248,8 +1282,9 @@ def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, ht
         with http_effects.observe(http_fixtures, folder, data["configuration"]["limits"]["max_capture_bytes"]) as requests:
             options = execution_options(entry, case, lane, folder, runtime, bodies, env, service=service,
                                         **({"python_session": python_session} if python_session is not None else {}),
-                                        **({"go_session": go_run.session} if go_run is not None else {}))
-            with java_action_run.retained(options):
+                                        **({"go_session": go_run.session} if go_run is not None else {}),
+                                        **({'native_session': native_run.session} if native_run is not None else {}))
+            with java_action_run.retained(options), native_cleanup(native_run):
                 result = execute(command, working_directory, env, folder, timeout=data["configuration"]["limits"]["case_timeout_ms"] / 1000,
                                  **options)
     effect_channels, complete = filesystem_effects.finish(effects, folder)
@@ -1263,13 +1298,19 @@ def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, ht
     if python_run is not None:
         python_checked = (python_run, python_launch.verify(sys.modules[__name__], python_run, entry, folder, result,
                                                           data["artefacts"][language]))
+    if native_run is not None:
+        native_run.verify(folder)
     return qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, decoder,
                            extra_channels=effect_channels, capture_complete=complete, prepared_runtime=runtime,
-                           python_runtime=python_checked, go_runtime=go_run, **action_options)
+                           python_runtime=python_checked, go_runtime=go_run, native_runtime=native_run, **action_options)
 
 
-def execution_options(entry, case, lane, folder, runtime, bodies, env, *, service=None, python_session=None, go_session=None):
+def execution_options(entry, case, lane, folder, runtime, bodies, env, *, service=None, python_session=None, go_session=None, native_session=None):
     """Add only explicitly requested process recording and live host checkpoints."""
+    if native_source.enabled(entry):
+        native_source.require(isinstance(native_session, native_owned.Session),
+                                               'missing native owned session')
+        return {'record_process': True, 'interaction': native_session}
     if go_source.enabled(entry):
         expected = go_source_run.go_live.Session if sequences.controls(entry) else go_source_run.go_launch.Session
         go_source.require(isinstance(go_session, expected), "missing native Go ready/release or live session")
@@ -1318,7 +1359,7 @@ def verify_attempt_inputs(data, entry, project, folder, scratch, tools, immutabl
         java_project.verify_attempt(folder, java_context)
         if runtime is None:
             java_launch.origins(folder, folder, entry, context=java_context)
-    if 'native_context' in entry:
+    if 'native_context' in entry and not native_source.enabled(entry):
         native_profile.verify_build(sys.modules[__name__], folder)
     provider_stable(root, language, tools, data["artefacts"][language], entry)
 
@@ -1463,6 +1504,7 @@ def run(args):
 def retained_provider_directories(data):
     """Dry-run and applied exports retain exactly the same provider evidence."""
     providers = ((data.get('native_projects'), native_profile.DIRECTORY),
+                 ('native_provider_manifest' in data, native_source.DIRECTORY),
                  (data.get('java_context'), java_project.DIRECTORY),
                  ('java_provider_manifest' in data, java_provider.DIRECTORY),
                  ('node_provider_manifest' in data, node_source.DIRECTORY),

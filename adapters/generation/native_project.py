@@ -260,11 +260,17 @@ def digest(path: Path) -> str:
 def prepare(root: Path, options: dict, language: str, compiler: Path, evidence: Path, execute) -> dict:
     """Freeze actual commands, project ASTs, read inputs and existence-only probes."""
     root = root.resolve()
-    require(not evidence.resolve().is_relative_to(root), 'build evidence must be outside application source')
     targets = load(root, options, language, compiler)
+    return prepare_targets(root, targets, language, compiler, evidence, execute, database=options['compilation_database'])
+
+
+def prepare_targets(root: Path, targets: list[dict], language: str, compiler: Path,
+                    evidence: Path, execute, *, database: str | None = None) -> dict:
+    """Share compiler discovery between explicit projects and fixed standalone targets."""
+    root = root.resolve()
+    require(not evidence.resolve().is_relative_to(root), 'build evidence must be outside application source')
     frontend = native_frontend.build(compiler, evidence / 'frontend', root, execute)
-    database = options['compilation_database']
-    local = {database: digest(root / database)}
+    local = {database: digest(root / database)} if database is not None else {}
     units, resolved_targets, external = {}, [], {}
     for target in targets:
         selected = []
