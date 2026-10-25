@@ -42,7 +42,8 @@ class NativeUnitBuildTests(unittest.TestCase):
                 intent.recipe()['units'].clear(); intent.policy()['sources'].clear(); built.manifest().clear()
                 built.verify()
                 with self.assertRaises(ValueError): built.file('foreign')
-                with self.assertRaises(ValueError): replace(built, files=()).verify()
+                incomplete = replace(built, files=())
+                with self.assertRaises(ValueError): incomplete.verify()
                 with self.assertRaises(ValueError): native_build.read(intent)
 
     def test_rehashed_changed_contexts_and_denominators_refuse(self):
