@@ -205,6 +205,10 @@ const RESOURCES: &[(&str, &str)] = &[
         include_str!("../adapters/generation/native_unit_build.py"),
     ),
     (
+        "native_unit_caller.py",
+        include_str!("../adapters/generation/native_unit_caller.py"),
+    ),
+    (
         "native_prepared.py",
         include_str!("../adapters/generation/native_prepared.py"),
     ),

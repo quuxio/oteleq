@@ -20,6 +20,18 @@ An optional neutral driver is a separately held private asset outside applicatio
 
 Build3 requires full `-MD` dependency channels, including application headers supplied through `-isystem`. The original SDK candidate's `-MMD` recipe omitted those headers and accepted a changed application header in an independent real-compiler control. That failed control remains recorded; this consumer refuses the incomplete recipe. A development probe against corrected SDK `5476ce0` completes four actual C/C++ plain/woven launches, including a mixed-language target, private observation overlays, different per-unit flags/directories, main rename, exact results, a C++ exception and independent direct telemetry. Both the caller-held consumer and SDK verifier refuse changed system-classified application headers. This is component evidence from a dirty development snapshot; immutable exact-head and generated/retained workflow qualification remain separate acceptance steps. The older fixed-source build2 contract is unchanged.
 
+### Compiler-bound generated callers
+
+`native_unit_caller.freeze/prepare` connects the independently inventoried scalar project-worker profile to build3. It freezes the project/target, concrete arguments, common SDK policy and compiler context before callbacks. It generates private source accessors and a neutral driver, then has the actual frontend check the original physical definition, unchanged signature and the generated invocation's reference to the intended declaration. This binds C++ overload selection as well as C calls. Every generated application accessor must have Clang's `NoProfileFunctionAttr`; developers add no annotations or code.
+
+The frontend gives its supplied file manager the same VFS overlays as the compiler. Passing an overlay flag without applying it to that file manager previously inspected the original source instead. The regression checks both actual declarations and overlay-only header inputs, while preserving original source bytes.
+
+Compiler MD channels and preprocessor existence/search probes are retained separately. Caller-owned header aliases bind logical names to already frozen canonical inputs before SDK compilation. This covers macOS SDK directory aliases without allowing a producer dependency file to choose a new filesystem read. Missing alias declarations, foreign paths, substitutions and changed original file facts refuse.
+
+Maintainers must call `Caller.recheck` after the SDK build and after each application execution. It repeats compiler input/probe checks into a fresh external evidence directory. A newly present `__has_include` target can change compilation while all previously read source files remain unchanged; a byte-only recheck is insufficient. Original caller metadata, helper/tool inputs and compiler channels retain their own immutable file identities.
+
+The development caller probe against held SDK `5476ce0` completes four actual C/C++ plain/woven applications with independently decoded telemetry. Generated callers preserve the selected overload, complete supported target-wide globals/statics, argument values, ordinary return and original C++ exception path. A first attempt refused an undeclared macOS SDK header alias before any application launch and remains failed. The corrected probe is scoped to its recorded development snapshot; public CLI selection and generated/retained workflow qualification remain open. This bridge currently follows the existing scalar project-worker contract; receiver, action, resource and broader build fixtures require their own integration.
+
 ## Preparation and owned execution
 
 `native_prepared.freeze/read` binds the runtime policy, literal application arguments, fixed lane image, selected isolated Python interpreter and complete SDK producer source set before execution. Its three preparation files must be stable private records in a new external directory. The command is reconstructed as the fixed SDK supervisor; recorded argv is never executed.
@@ -42,10 +54,13 @@ The expected service name must match the frozen prepared policy before receipt i
 
 ```sh
 make native-provider-check PYTHON=/absolute/path/to/python
+make native-caller-check PYTHON=/absolute/path/to/python
 ```
 
 This runs native reader/controller tests, including changed or rehashed records, per-unit flags/directories, private overlays, neutral-driver selection, main rename, dependency substitution, wrong PID/group/session, unsafe publication, nonzero exits, final health failures and child cleanup. The full `make check` also requires at least 80% statement coverage in each new component. These tests use literal independent records and narrow OS fakes. They do not start a real SDK application or replace actual provider qualification.
 
+The separate caller target uses matched Clang tools for real AST/VFS/input checks and ordinary generated worker execution. Its SDK recipe fixtures are literal data; that target does not build or run the official SDK. It checks unknown/missing helper declarations, changed signatures/references, absent profiling exclusions, changed and restored helper bytes, header alias substitution and positive/negative existence probes. Actual SDK execution and retained-route qualification remain separate checks.
+
 ## Remaining integration
 
-The generator still needs explicit provider selection, independent caller/dependency discovery, inventory-to-compiler target binding and integration of the native OTLP reader. Generated, replayed, framework, detached, reduced and promoted suites need exact-revision execution, source preservation and negative controls. Live collection/emission schedules, invocation attribution, automatic object lifetimes, task/HTTP context, broader build recipes and platform/shipping qualification remain open. The [project completion checklist](completion.md) remains the acceptance boundary.
+The public generator still needs explicit provider selection and application of the caller/dependency bridge, inventory-to-compiler binding and native OTLP reader. Generated, replayed, framework, detached, reduced and promoted suites need exact-revision execution, source preservation and negative controls. Live collection/emission schedules, invocation attribution, automatic object lifetimes, task/HTTP context, broader build recipes and platform/shipping qualification remain open. The [project completion checklist](completion.md) remains the acceptance boundary.

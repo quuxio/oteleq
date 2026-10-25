@@ -1,5 +1,7 @@
 # Repository guidance
 
+- Native generated callers require actual frontend VFS handling, the original physical target/signature/reference, and compiler NoProfileFunctionAttr on generated accessors. Preserve complete MD inputs and semantic existence/search probes separately; recheck both after SDK builds and execution. Only independently frozen aliases may join raw compiler paths to canonical inputs; producer metadata cannot select a new filesystem read. Keep caller/tool evidence, generator identity, Rust embedding and per-module coverage aligned. Component probes do not admit public generated/retained workflows.
+
 - Keep native build3/unit-recipe1 separate from the older fixed-source build2 contract. Freeze the caller's complete ordered units, semantic flags/cwds, private VFS/neutral-driver assets and independently discovered per-unit compiler input sets before SDK compilation. Reconstruct fixed compile/main-rename/link argv and every output channel independently. Require full MD dependency channels so isystem application headers cannot disappear. Candidate component checks do not admit generated native execution.
 
 - Native direct receipt must bind the expected service to the frozen prepared policy. Preserve complete histogram counts, buckets, sums and extrema through cumulative checks. Use the common rational range and binary64 rounding model; counts alone cannot establish a valid histogram. Keep the helper embedded, identity-bound and covered for native and Python readers.

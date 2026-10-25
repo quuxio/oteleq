@@ -40,6 +40,32 @@ class NativeFrontendTests(unittest.TestCase):
         self.project = self.root / 'project'
         self.project.mkdir()
 
+    def test_private_overlay_changes_actual_ast_and_inputs_without_editing_source(self):
+        source = self.project / 'app.c'
+        header = self.project / 'overlay-only.h'; header.write_text('#define VALUE 7\n')
+        augmented = self.root / 'private.c'
+        augmented.write_text('#include "overlay-only.h"\nint virtual_only(void){return VALUE;}\n')
+        overlay = self.root / 'overlay.json'
+        overlay.write_text(json.dumps({'version': 0, 'use-external-names': False, 'roots': [
+            {'type': 'file', 'name': str(source), 'external-contents': str(augmented)}]}) + '\n')
+        original = 'int original_only(void){return 3;}\n'
+        for mode in ('ast', 'inputs'):
+            with self.subTest(mode=mode):
+                value = self.inspect(original, mode=mode, flags=['-ivfsoverlay', str(overlay)])
+                self.assertIn(str(header), value['files'])
+                self.assertIn(str(source), value['files'])
+                if mode == 'ast':
+                    names = {node.get('name') for node in value['ast']['inner']}
+                    self.assertIn('virtual_only', names)
+                    self.assertNotIn('original_only', names)
+                self.assertEqual(source.read_text(), original)
+
+    def test_missing_malformed_or_unhandled_overlay_option_refuses(self):
+        invalid = self.root / 'invalid-overlay.json'; invalid.write_text('{}\n')
+        for flags in (['-ivfsoverlay'], ['-ivfsoverlay', str(invalid)], ['-ivfsoverlay=/foreign']):
+            with self.subTest(flags=flags), self.assertRaises(ValueError):
+                self.inspect('int work(void){return 1;}\n', flags=flags)
+
     def inspect(self, source: str, *, cpp: bool = False, mode: str = 'ast',
                 flags: list[str] | None = None, helper: Path | None = None) -> dict:
         name = 'app.cpp' if cpp else 'app.c'

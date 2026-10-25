@@ -19,6 +19,7 @@ DEPENDENCY_AUDIT_OUTPUT ?= $(CURDIR)/build/dependency-audit
 
 .PHONY: dependency-audit dependency-audit-check
 .PHONY: native-provider-check
+.PHONY: native-caller-check
 .PHONY: generation-go-controls-otelc
 
 .PHONY: generation-project-tests-otelc generation-preconditions-otelc generation-domains-otelc generation-input-walks-otelc generation-retained-source-otelc generation-native-project-otelc generation-return-otelc generation-java-sequence-otelc generation-java-controls-otelc generation-java-project-otelc generation-java-archive-otelc generation-node-project-otelc
@@ -36,6 +37,7 @@ DEPENDENCY_AUDIT_OUTPUT ?= $(CURDIR)/build/dependency-audit
 .PHONY: help setup lint examples docs-check observer-check generation-check effect-qualification-check node-observer-check node-sequence-check java-observer-check go-observer-check cpp-observer-check generation-cpp-receiver-otelc generation-go-receiver-otelc generation-go-source-otelc generation-java-receiver-otelc generation-otelc generation-policy-otelc generation-rust-otelc rust-semantic-otelc generation-native-otelc generation-shrink-otelc generation-python-project-otelc generation-receiver-otelc generation-node-receiver-otelc generation-go-build-otelc generation-go-project-otelc generation-sequence-otelc generation-typescript-sequence-otelc generation-filesystem-otelc generation-http-otelc resource-otelc capture-otelc report core-check coverage check
 
 help:
+	@printf '%s\n' 'native-caller-check Check compiler-bound native observation callers with matched Clang tools'
 	@printf '%s\n' 'native-provider-check Check native prepared readers and ownership'
 	@printf '%s\n' 'generation-go-controls-otelc Qualify source-scope Go live states, retained suites and promotion (GO_CONTROL_STARTUP, AUDIT_DIR)'
 	@printf '%s\n' 'generation-go-source-otelc Qualify rebuilt Go receiver, retained and shrink workflows (GO_SOURCE_BACKEND)'
@@ -163,6 +165,11 @@ native-provider-check:
 	$(PYTHON) -m coverage report --data-file=.native-provider.coverage --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.native-provider.coverage --include='*/native_unit_build.py' --fail-under=80
 
+native-caller-check:
+	PYTHONPATH="$(CURDIR)/tests$${PYTHONPATH:+:$${PYTHONPATH}}" $(PYTHON) -m coverage run --data-file=.native-caller.coverage --include='*/native_unit_caller.py,*/native_workers.py,*/native_frontend.py' -m unittest test_generation_native_callers test_generation_native_workers test_generation_native_frontend -v
+	$(PYTHON) -m coverage report --data-file=.native-caller.coverage --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.native-caller.coverage --include='*/native_unit_caller.py' --fail-under=80
+
 node-source-context-check:
 	$(NODE) --test --experimental-test-coverage --test-coverage-include='adapters/generation/node_source_context.mjs' --test-coverage-lines=80 --test-coverage-functions=80 --test-coverage-branches=80 tests/node_source_context.test.mjs
 
@@ -271,6 +278,7 @@ generation-check: node-observer-check node-sequence-check node-source-context-ch
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/native_sdk.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/native_build.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/native_unit_build.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/native_unit_caller.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/native_prepared.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/native_health.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/native_execution.py' --fail-under=80

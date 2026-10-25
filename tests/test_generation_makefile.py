@@ -11,6 +11,15 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class QualificationRecipeTests(unittest.TestCase):
+    def test_native_caller_recipe_has_its_own_compiler_checks_and_coverage_floor(self):
+        result = subprocess.run(['make', '--no-print-directory', '-n', 'native-caller-check',
+            'PYTHON=/selected/python'], cwd=ROOT, capture_output=True, text=True, check=True)
+        self.assertIn('test_generation_native_callers', result.stdout)
+        self.assertIn('test_generation_native_workers', result.stdout)
+        self.assertIn('test_generation_native_frontend', result.stdout)
+        self.assertIn("--include='*/native_unit_caller.py' --fail-under=80", result.stdout)
+        self.assertNotIn('cargo build', result.stdout)
+
     def test_native_provider_components_have_a_focused_compiler_free_recipe(self):
         result = subprocess.run(['make', '--no-print-directory', '-n', 'native-provider-check',
             'PYTHON=/selected/python'], cwd=ROOT, capture_output=True, text=True, check=True)
