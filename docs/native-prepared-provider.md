@@ -2,7 +2,7 @@
 
 <!-- markdownlint-disable MD013 -->
 
-Status: internal integration work. These readers and the execution controller implement the public otelc `native-owned-v1` build-2/preparation-1 contract for C and C++. Generated test commands do not select this provider yet. The existing native generator continues to use its documented provider. This work does not qualify C, C++, Rust, production artefacts or the whole project as complete.
+Status: internal integration work. These readers and the execution controller implement the public otelc `native-owned-v1` build-2/preparation-1 contract for C and C++. A separate candidate build3 reader adds explicitly negotiated per-unit recipes. Generated test commands do not select this provider yet. The existing native generator continues to use its documented provider. This work does not qualify C, C++, Rust, production artefacts or the whole project as complete.
 
 ## Inputs and private builds
 
@@ -11,6 +11,14 @@ The consumer freezes operator-selected LLVM 22 tools, six fixed metadata queries
 Every accepted build retains its complete product and command-channel denominator, including both per-unit dependency manifests. Checks bind original bytes, inode, write times, permissions and link counts. A rewritten record or an identical-byte replacement cannot repair an earlier accepted identity. Caller-selected paths precede producer metadata; metadata never chooses an executable or a foreign dependency to inspect.
 
 Function selectors in this SDK profile match demangled compiler names such as `workload(int)`. Source selection is separate. Emitted function identities add the relative source path, such as `main.cpp::workload(int)`. Generated inventory integration must translate and bind that relationship, then require positive downstream evidence for each requested target. An attached SDK with zero selected functions does not prove instrumentation.
+
+### Candidate per-unit recipe
+
+`native_unit_build.freeze/read` independently binds the explicit build3/unit-recipe1 contract. Build2 negotiation and its fixed-source reader remain separate. The caller supplies the complete ordered application units, each unit's language, semantic flags, working directory and independently discovered compiler inputs before the SDK creates products. Mixed C/C++ units can retain different standards and defines. This reader does not infer a compilation database or discover dependencies from a producer's response.
+
+An optional neutral driver is a separately held private asset outside application source. It is compiled without probes in both lanes. A private VFS file maps original source paths to separately held observation copies; original files stay unchanged. Optional main rename uses only the fixed matched `llvm-objcopy` operation. Compiler, rename and link operations have complete product/stdout/stderr denominators, with an independently reconstructed compilation database. The common preparation controller accepts the checked build3 products under the unchanged request/preparation1 contract.
+
+Build3 requires full `-MD` dependency channels, including application headers supplied through `-isystem`. The original SDK candidate's `-MMD` recipe omitted those headers and accepted a changed application header in an independent real-compiler control. That failed control remains recorded; this consumer refuses the incomplete recipe. A development probe against corrected SDK `5476ce0` completes four actual C/C++ plain/woven launches, including a mixed-language target, private observation overlays, different per-unit flags/directories, main rename, exact results, a C++ exception and independent direct telemetry. Both the caller-held consumer and SDK verifier refuse changed system-classified application headers. This is component evidence from a dirty development snapshot; immutable exact-head and generated/retained workflow qualification remain separate acceptance steps. The older fixed-source build2 contract is unchanged.
 
 ## Preparation and owned execution
 
@@ -36,7 +44,7 @@ The expected service name must match the frozen prepared policy before receipt i
 make native-provider-check PYTHON=/absolute/path/to/python
 ```
 
-This runs native reader/controller tests, including changed or rehashed records, per-unit dependency substitution, wrong PID/group/session, unsafe publication, nonzero exits, final health failures and child cleanup. The full `make check` also requires at least 80% statement coverage in each new component. These tests use literal independent records and narrow OS fakes. They do not start a real SDK application or replace actual provider qualification.
+This runs native reader/controller tests, including changed or rehashed records, per-unit flags/directories, private overlays, neutral-driver selection, main rename, dependency substitution, wrong PID/group/session, unsafe publication, nonzero exits, final health failures and child cleanup. The full `make check` also requires at least 80% statement coverage in each new component. These tests use literal independent records and narrow OS fakes. They do not start a real SDK application or replace actual provider qualification.
 
 ## Remaining integration
 

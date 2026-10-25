@@ -201,6 +201,10 @@ const RESOURCES: &[(&str, &str)] = &[
         include_str!("../adapters/generation/native_build.py"),
     ),
     (
+        "native_unit_build.py",
+        include_str!("../adapters/generation/native_unit_build.py"),
+    ),
+    (
         "native_prepared.py",
         include_str!("../adapters/generation/native_prepared.py"),
     ),
@@ -602,18 +606,6 @@ const RESOURCES: &[(&str, &str)] = &[
     ),
 ];
 
-#[cfg(test)]
-mod resource_tests {
-    use super::RESOURCES;
-    use std::collections::BTreeSet;
-
-    #[test]
-    fn embedded_resource_names_are_unique() {
-        let names: BTreeSet<_> = RESOURCES.iter().map(|(name, _)| name).collect();
-        assert_eq!(names.len(), RESOURCES.len());
-    }
-}
-
 pub fn launch(args: &[String]) -> Result<i32, String> {
     let parent = Path::new("/tmp")
         .canonicalize()
@@ -753,4 +745,16 @@ pub fn inventory(path: &Path) -> Result<Value, String> {
     };
     inventory.visit_file(&syntax);
     Ok(json!({"functions":inventory.entries,"globals":inventory.globals,"parser":"syn 3.0.6"}))
+}
+
+#[cfg(test)]
+mod resource_tests {
+    use super::RESOURCES;
+    use std::collections::BTreeSet;
+
+    #[test]
+    fn embedded_resource_names_are_unique() {
+        let names: BTreeSet<_> = RESOURCES.iter().map(|(name, _)| name).collect();
+        assert_eq!(names.len(), RESOURCES.len());
+    }
 }

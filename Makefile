@@ -159,8 +159,9 @@ cpp-observer-check:
 	$(PYTHON) ci/cpp_coverage.py
 
 native-provider-check:
-	PYTHONPATH="$(CURDIR)/tests$${PYTHONPATH:+:$${PYTHONPATH}}" $(PYTHON) -m coverage run --data-file=.native-provider.coverage --include='*/native_protocol.py,*/native_inputs.py,*/native_toolchain.py,*/native_sdk.py,*/native_build.py,*/native_prepared.py,*/native_health.py,*/native_execution.py,*/native_session.py,*/native_telemetry.py,*/histogram_observation.py' -m unittest test_generation_native_prepared_inputs test_generation_native_prepared_build test_generation_native_prepared test_generation_native_execution test_generation_native_session test_generation_native_telemetry -v
+	PYTHONPATH="$(CURDIR)/tests$${PYTHONPATH:+:$${PYTHONPATH}}" $(PYTHON) -m coverage run --data-file=.native-provider.coverage --include='*/native_protocol.py,*/native_inputs.py,*/native_toolchain.py,*/native_sdk.py,*/native_build.py,*/native_unit_build.py,*/native_prepared.py,*/native_health.py,*/native_execution.py,*/native_session.py,*/native_telemetry.py,*/histogram_observation.py' -m unittest test_generation_native_prepared_inputs test_generation_native_prepared_build test_generation_native_units test_generation_native_prepared test_generation_native_execution test_generation_native_session test_generation_native_telemetry -v
 	$(PYTHON) -m coverage report --data-file=.native-provider.coverage --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.native-provider.coverage --include='*/native_unit_build.py' --fail-under=80
 
 node-source-context-check:
 	$(NODE) --test --experimental-test-coverage --test-coverage-include='adapters/generation/node_source_context.mjs' --test-coverage-lines=80 --test-coverage-functions=80 --test-coverage-branches=80 tests/node_source_context.test.mjs
@@ -269,6 +270,7 @@ generation-check: node-observer-check node-sequence-check node-source-context-ch
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/native_toolchain.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/native_sdk.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/native_build.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/native_unit_build.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/native_prepared.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/native_health.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/native_execution.py' --fail-under=80

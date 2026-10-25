@@ -1,5 +1,7 @@
 # Repository guidance
 
+- Keep native build3/unit-recipe1 separate from the older fixed-source build2 contract. Freeze the caller's complete ordered units, semantic flags/cwds, private VFS/neutral-driver assets and independently discovered per-unit compiler input sets before SDK compilation. Reconstruct fixed compile/main-rename/link argv and every output channel independently. Require full MD dependency channels so isystem application headers cannot disappear. Candidate component checks do not admit generated native execution.
+
 - Native direct receipt must bind the expected service to the frozen prepared policy. Preserve complete histogram counts, buckets, sums and extrema through cumulative checks. Use the common rational range and binary64 rounding model; counts alone cannot establish a valid histogram. Keep the helper embedded, identity-bound and covered for native and Python readers.
 
 - Native fixed-startup OTLP qualification joins actual serial root/recursive trees, source-qualified names, exception counts and cumulative metrics to owned final SDK unit counters. Preserve the C++ SDK resource language for C applications and the candidate SDK version binding. Empty metric API batches need not create HTTP requests. Disabled metric startup states retain complete selected traces; plain lanes require absent SDK evidence. This reader does not establish live toggles or per-action attribution. Keep all native modules in the generator identity as well as the Rust distribution.

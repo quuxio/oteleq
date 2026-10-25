@@ -32,9 +32,13 @@ def digest(value: Any) -> str:
     return hashlib.sha256(encoded(value).encode()).hexdigest()
 
 
-def verify_protocols(value: object) -> dict:
+def verify_protocols(value: object, *, build_version: int = 2) -> dict:
     """Negotiate the complete current descriptor before any application launch."""
-    require(type(value) is dict and same(value, PROTOCOLS), 'unsupported public native protocols')
+    require(type(build_version) is int and build_version in (2, 3), 'unsupported native build version')
+    expected = {**PROTOCOLS, 'build': build_version}
+    if build_version == 3:
+        expected['unit_recipe'] = 1
+    require(type(value) is dict and same(value, expected), 'unsupported public native protocols')
     return value
 
 

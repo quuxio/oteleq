@@ -7,6 +7,7 @@ import re
 import tomllib
 
 import native_build
+import native_unit_build
 import native_inputs as inputs
 from native_protocol import PROFILE, digest, encoded, require, same
 from otelc_capture import strict_json
@@ -30,7 +31,7 @@ def producer_paths(root: Path) -> tuple[Path, ...]:
 class Intent:
     """Runtime policy, literal arguments and all SDK source paths precede preparation."""
 
-    build: native_build.Build
+    build: native_build.Build | native_unit_build.Build
     runtime: Path
     python: inputs.File
     interpreter: inputs.File
@@ -58,10 +59,10 @@ class Intent:
             item.verify()
 
 
-def freeze(build: native_build.Build, runtime: Path, python: Path, policy_file: Path,
+def freeze(build: native_build.Build | native_unit_build.Build, runtime: Path, python: Path, policy_file: Path,
            policy: dict, *, plain: bool, arguments: tuple[str, ...] = (), wait_ms: int = 30000) -> Intent:
     """Capture bounded literal intent before the SDK creates launch records."""
-    require(type(build) is native_build.Build and type(plain) is bool and type(wait_ms) is int
+    require(type(build) in (native_build.Build, native_unit_build.Build) and type(plain) is bool and type(wait_ms) is int
             and 1 <= wait_ms <= 300000, 'invalid native lane, build or release budget')
     build.verify()
     require(type(arguments) is tuple and len(arguments) <= 4096

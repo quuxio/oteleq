@@ -17,10 +17,11 @@ class QualificationRecipeTests(unittest.TestCase):
         self.assertIn('/selected/python -m coverage run', result.stdout)
         for name in ('test_generation_native_prepared_inputs', 'test_generation_native_prepared_build',
                      'test_generation_native_prepared', 'test_generation_native_execution', 'test_generation_native_session',
-                     'test_generation_native_telemetry'):
+                     'test_generation_native_telemetry', 'test_generation_native_units'):
             self.assertIn(name, result.stdout)
         self.assertIn('--data-file=.native-provider.coverage', result.stdout)
         self.assertIn('--fail-under=80', result.stdout)
+        self.assertIn("--include='*/native_unit_build.py' --fail-under=80", result.stdout)
         self.assertNotIn('cargo build', result.stdout)
         self.assertNotIn('--otelc-root', result.stdout)
 

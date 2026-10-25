@@ -246,6 +246,7 @@ class Build:
 
 def read(intent: Intent) -> Build:
     """Bind the compiler response; never run commands or select paths from it."""
+    require(type(intent) is Intent, 'native build2 requires its fixed-source caller intent')
     intent.verify()
     require(file_set(intent.output) == names(intent), 'native build file denominator differs from the fixed recipe')
     held = {name: inputs.capture(intent.output / name, keep=name.endswith(('.json', '.d')) or name == 'bootstrap.cpp')

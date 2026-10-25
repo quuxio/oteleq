@@ -721,7 +721,7 @@ def generator_identity():
         'node_project.py', 'node_context.mjs', 'node_source_context.mjs', 'node_source_context.py', 'node_source.py', 'node_source_worker.py', 'node_launch.py', 'node_inputs.py', 'node_execution.py', 'node_telemetry.py',
         'node_live.py', 'node_control.py', 'node_control_receipt.py', 'node_checkpoint.mjs',
         'native_protocol.py', 'native_inputs.py', 'native_toolchain.py', 'native_sdk.py',
-        'native_build.py', 'native_prepared.py', 'native_health.py', 'native_execution.py',
+        'native_build.py', 'native_unit_build.py', 'native_prepared.py', 'native_health.py', 'native_execution.py',
         'native_session.py', 'native_telemetry.py',
         'native_profile.py', 'native_project.py', 'native_dependencies.py', 'native_frontend.py',
         'native_discover.cpp', 'native_context.py', 'native_workers.py', 'native_workspace.py',
