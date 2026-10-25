@@ -11,3 +11,4 @@ __pycache__/
 .effect-qualification.coverage
 .native-provider.coverage
 .native-caller.coverage
+.native-lifetime.coverage
