@@ -30,6 +30,8 @@ from otelc_capture import path_within
 CASES = (('c-completed', 'c', False), ('cpp-completed', 'cpp', False), ('c-state', 'c', True))
 SDK_HEAD = 'acb13d7735526448209df37b7e6b98e5717befdb'
 PROFILES = {'c': 'native-resources-owned-v1', 'cpp': 'native-objects-owned-v1'}
+BASE_CALLS = (('selected', 42),)
+PROMOTED_CALLS = (('selected', 43), ('selected_extra', 44))
 
 
 def command(argv: list, folder: Path, label: str, **options) -> str:
@@ -56,6 +58,12 @@ def source_facts(root: Path) -> dict:
     """Freeze tracked source; build caches and producer-selected paths are excluded."""
     names = subprocess.check_output(['git', 'ls-files', '-z'], cwd=root).decode().rstrip('\0').split('\0')
     return {name: retained.identity(root / name) for name in names}
+
+
+def fixture_facts(root: Path) -> dict:
+    """Preserve the complete caller-owned fixture before and after each route."""
+    return {path.relative_to(root).as_posix(): retained.identity(path)
+            for path in root.rglob('*') if path.is_file()}
 
 
 def fixture(folder: Path, language: str, difference: bool, sdk: Path) -> tuple[Path, Path]:
@@ -122,7 +130,7 @@ class Audit:
         self.case_languages = {self.registry.root / name: language for name, language, _ in CASES}
 
     def attempt(self, report: Path, folder: Path, entry: dict, lane: str, witness,
-                expected_arguments: tuple[int, ...]) -> None:
+                expected_arguments: tuple[int, ...], *, function: str = 'selected') -> None:
         original = self.registry.original(report)
         actual = original.parent / folder.relative_to(report.parent)
         languages = [language for root, language in self.case_languages.items() if actual.is_relative_to(root)]
@@ -164,11 +172,13 @@ class Audit:
             counters = verified['health']['object_accounting' if entry['language'] == 'cpp' else 'resource_accounting']
             assert all(counters[key] == str(value) for key, value in
                        {'types': 1, 'admitted': 1, 'completed': 1, 'censored': 0}.items())
-        held['raw_lifetime_receipt'] = raw_audit.verify(actual, entry, witness, plain=lane == 'baseline')
+        held['raw_lifetime_receipt'] = raw_audit.verify(actual, entry, witness, plain=lane == 'baseline',
+                                                      function=function)
         assert (held['raw_lifetime_receipt'] is None) is (lane == 'baseline')
         retained.same(self.records.setdefault(request['launch_id'], held), held)
         if lane != 'baseline':
-            context = {'folder': str(actual), 'entry': copy.deepcopy(entry), 'witness': copy.deepcopy(witness)}
+            context = {'folder': str(actual), 'entry': copy.deepcopy(entry), 'witness': copy.deepcopy(witness),
+                       'function': function}
             retained.same(self.contexts.setdefault(request['launch_id'], context), context)
         for path in (actual / 'expected-lifetimes-before-build.json', actual / 'expected-lifetimes.json'):
             retained.identity(path, private=True)
@@ -185,7 +195,8 @@ class Audit:
             language = context['entry']['language']
             if language not in by_language:
                 by_language[language] = raw_refusals.run(Path(context['folder']), context['entry'],
-                                                       context['witness'], root / language)
+                                                       context['witness'], root / language,
+                                                       function=context['function'])
         assert set(by_language) == {'c', 'cpp'}
         assert all(value['count'] == 14 and value['new_application_launches'] == 0 for value in by_language.values())
         return by_language
@@ -205,7 +216,8 @@ def arguments(value: object) -> tuple[int, ...]:
     return tuple(value)
 
 
-def check_report(path: Path, difference: bool, audit: Audit, *, expected: tuple[int, ...] = (5,)) -> int:
+def check_report(path: Path, difference: bool, audit: Audit, *, expected: tuple[int, ...] = (5,),
+                 function: str = 'selected', contracts: tuple[tuple[str, int], ...] = BASE_CALLS) -> int:
     """Equal-but-wrong returns, state, errno, missing repeats or receipt counts refuse."""
     report = retained.read(path)
     assert report['source_preserved'] is True and report['blocked'] == []
@@ -215,10 +227,17 @@ def check_report(path: Path, difference: bool, audit: Audit, *, expected: tuple[
     result = report['cases'][0]
     assert type(result['exit_code']) is int and result['exit_code'] == int(difference)
     assert result['comparison']['verdict'] == ('different_observed' if difference else 'equivalent_observed')
+    assert contracts in (BASE_CALLS, PROMOTED_CALLS) and function in dict(contracts)
     entries = [entry for entry in report['inventory'] if entry['status'] == 'ready']
-    assert len(entries) == 1
-    entry, = entries; language = entry['language']
-    assert result['function'] == entry['otelc_function'] == ('selected(int)' if language == 'cpp' else 'selected')
+    assert len(entries) == len(contracts)
+    languages = {entry['language'] for entry in entries}; assert len(languages) == 1
+    language, = languages; assert language in PROFILES
+    expected_functions = {name + ('(int)' if language == 'cpp' else '') for name, _ in contracts}
+    assert {entry['otelc_function'] for entry in entries} == expected_functions
+    assert len({entry['id'] for entry in entries}) == len(entries)
+    selected = function + ('(int)' if language == 'cpp' else '')
+    entry, = [entry for entry in entries if entry['otelc_function'] == selected]
+    assert result['function'] == entry['otelc_function'] == selected
     assert result['case'] == entry['id'] + '-0'
     assert entry['native_options']['profile'] == PROFILES[language]
     assert {row['name'] for row in entry['globals']} == {'state', 'observed_errno'}
@@ -237,13 +256,13 @@ def check_report(path: Path, difference: bool, audit: Audit, *, expected: tuple[
             retained.same(observed['before'], {'roots': initial, 'nodes': []})
             retained.same(observed['after'], {'roots': after, 'nodes': []})
             retained.same(observed['outcome'], {'kind': 'return', 'graph': {'roots': {
-                **after, 'result': scalar(language, 42)}, 'nodes': []}})
+                **after, 'result': scalar(language, dict(contracts)[function])}, 'nodes': []}})
             execution = attempt['execution']
             assert execution['capture_complete'] is True
             retained.same(execution['channels'], {'stdout': [], 'stderr': []})
             retained.same(execution['termination'], {'kind': 'exit', 'code': 0})
             audit.attempt(path, path.parent / result['case'] / (lane + '-' + str(index)),
-                          entry, lane, execution['witness'], expected)
+                          entry, lane, execution['witness'], expected, function=function)
     return 4
 
 
@@ -256,12 +275,74 @@ def framework(workspace: Path, folder: Path, label: str, difference: bool, audit
     return check_report(Path(rows[0]['report']), difference, audit, expected=expected)
 
 
+def promotion(cli: Path, workspace: Path, source: Path, folder: Path, language: str,
+              difference: bool, audit: Audit) -> dict:
+    """Require fresh original/relocated builds, changed returns and a new callable."""
+    folder.mkdir()
+    original_facts = fixture_facts(source)
+    bundle = folder / 'project-tests'
+    argv = [cli, 'promote', '--workspace', workspace, '--source', source, '--destination', bundle]
+    planned = json.loads(command(argv, folder, 'promote-plan'))
+    assert planned['mode'] == 'dry-run' and planned['files'] and not bundle.exists()
+    retained.same(fixture_facts(source), original_facts)
+    command([*argv, '--apply'], folder, 'promote-apply')
+    retained.same(fixture_facts(source), original_facts)
+    parent = folder / 'current-workspaces'; parent.mkdir()
+    reports = []
+
+    def current(application: Path, label: str, contracts: tuple[tuple[str, int], ...]) -> int:
+        held = fixture_facts(application)
+        previous = set(audit.records)
+        output = command([sys.executable, '-I', '-B', bundle / 'test_equivalence.py'], folder, label,
+                         expected=int(difference), environment={'OTELEQ_SOURCE': str(application),
+                                                               'OTELEQ_WORKSPACE_PARENT': str(parent)})
+        rows = [json.loads(line) for line in output.splitlines()]
+        assert len(rows) == len(contracts) + 1 and rows[0]['project_source'] == str(application)
+        observed, seen = 0, []
+        for row in rows[1:]:
+            path = Path(row['report'])
+            assert path.is_relative_to(parent) and path.name == 'report.json'
+            value = retained.read(path)
+            function = value['cases'][0]['function']
+            allowed = {name + ('(int)' if language == 'cpp' else ''): name for name, _ in contracts}
+            assert function in allowed
+            name = allowed[function]
+            observed += check_report(path, difference, audit, function=name, contracts=contracts)
+            seen.append(name); reports.append(str(path))
+        assert sorted(seen) == sorted(name for name, _ in contracts)
+        assert len(set(audit.records) - previous) == 4 * len(contracts)
+        retained.same(fixture_facts(application), held)
+        return observed
+
+    launches = current(source, 'current-original', BASE_CALLS)
+    changed = folder / 'current-source'
+    shutil.copytree(source, changed)
+    unit = changed / ('src/app.cpp' if language == 'cpp' else 'src/app.c')
+    body = unit.read_text()
+    assert body.count('return 42;') == 1
+    updated = body.replace('return 42;', 'return 43;')
+    extra = updated[updated.index('int selected(int amount)'):].replace('int selected(', 'int selected_extra(', 1)
+    assert extra.count('return 43;') == 1
+    unit.write_text(updated + '\n' + extra.replace('return 43;', 'return 44;'))
+    database = changed / 'build/compile_commands.json'
+    commands = retained.read(database)
+    for row in commands:
+        assert row['directory'] == str(source / 'build')
+        row['directory'] = str(changed / 'build')
+    write(database, commands)
+    launches += current(changed, 'current-changed', PROMOTED_CALLS)
+    assert launches == 12 and len(reports) == 3
+    return {'application_observations': launches, 'reports': reports,
+            'original_calls': dict(BASE_CALLS), 'changed_calls': dict(PROMOTED_CALLS),
+            'fresh_current_source': True, 'relocated_compilation_database': True}
+
+
 def exercise(cli: Path, provider: Path, sdk: Path, root: Path) -> dict:
     audit = Audit(root, provider); results = []
     for name, language, difference in CASES:
         folder = root / name; folder.mkdir()
         source, config = fixture(folder, language, difference, sdk)
-        original = {str(path.relative_to(source)): digest(path) for path in source.rglob('*') if path.is_file()}
+        original = fixture_facts(source)
         workspace = Path(command([cli, 'plan', '--source', source, '--otelc-root', provider,
                                   '--workspace-parent', folder, '--config', config], folder, 'plan'))
         command([cli, 'generate', '--workspace', workspace], folder, 'generate')
@@ -275,7 +356,8 @@ def exercise(cli: Path, provider: Path, sdk: Path, root: Path) -> dict:
         check_report(Path(replay['report']), difference, audit)
         exported = folder / 'exported'
         command([cli, 'export-tests', '--workspace', workspace, '--destination', exported, '--apply'], folder, 'export')
-        assert {str(path.relative_to(source)): digest(path) for path in source.rglob('*') if path.is_file()} == original
+        promoted = promotion(cli, workspace, source, folder / 'promotion', language, difference, audit)
+        retained.same(fixture_facts(source), original)
         shutil.rmtree(source)
         framework(exported, folder, 'detached-framework', difference, audit)
         if difference:
@@ -290,7 +372,7 @@ def exercise(cli: Path, provider: Path, sdk: Path, root: Path) -> dict:
             for trial in summary['trials']:
                 check_report(Path(trial['report']), True, audit, expected=arguments(trial['arguments']))
             framework(Path(summary['workspace']), folder, 'reduced-framework', True, audit, expected=(0,))
-        results.append({'name': name, 'language': language, 'difference': difference})
+        results.append({'name': name, 'language': language, 'difference': difference, 'promotion': promoted})
     refusal_results = audit.refusals(root / 'raw-evidence-refusals')
     summary = audit.finish()
     return {'claim': 'equivalence over these tests and observations', 'cases': results,
@@ -299,8 +381,8 @@ def exercise(cli: Path, provider: Path, sdk: Path, root: Path) -> dict:
             'consumer_cli_sha256': digest(cli), 'sdk_source': SDK_HEAD,
             'consumer_source': subprocess.check_output(['git', 'rev-parse', 'HEAD'],
                 cwd=Path(__file__).resolve().parents[1]).decode().strip(),
-            'routes': ['generated', 'framework', 'replay', 'detached', 'scalar-reduction'],
-            'remaining': ['qualification of the independent raw lifetime audit and evidence refusals', 'current-source promotion',
+            'routes': ['generated', 'framework', 'replay', 'detached', 'scalar-reduction', 'current-source-promotion'],
+            'remaining': ['qualification of the independent raw lifetime audit, evidence refusals and promotion',
                           'zero/censored/exception/startup/live profiles', 'shipping, broader platforms and completion checklist'],
             'qualification_tier': 'genuine public workflow development; no broader profile admission'}
 

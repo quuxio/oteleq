@@ -13,12 +13,13 @@ import native_prepared_receipt as records
 from native_prepared_otlp import BOUNDS, require, same
 
 
-def policy(folder: Path, entry: dict) -> dict:
+def policy(folder: Path, entry: dict, *, function: str = 'selected') -> dict:
     """Reconstruct the declared fixture policy, retaining caller-selected endpoints."""
     language = entry['language']
     require(language in ('c', 'cpp'), 'lifetime audit requires c or cpp')
+    require(function in ('selected', 'selected_extra'), 'foreign lifetime corpus function')
     extension = 'cpp' if language == 'cpp' else 'c'
-    function = 'selected(int)' if language == 'cpp' else 'selected'
+    function += '(int)' if language == 'cpp' else ''
     same(entry['path'], 'src/app.' + extension)
     same(entry['otelc_function'], function)
     same(entry['otelc_runtime_function'], entry['path'] + '::' + function)
@@ -71,9 +72,9 @@ def health(value: dict, expected_policy: dict, language: str, pid: int, raw: dic
     same(value['metric_flush']['failed_attempts'], '0')
 
 
-def verify(folder: Path, entry: dict, witness, *, plain: bool) -> dict | None:
+def verify(folder: Path, entry: dict, witness, *, plain: bool, function: str = 'selected') -> dict | None:
     """Decode all original bytes before joining any producer-verified receipt."""
-    selected = policy(folder, entry)
+    selected = policy(folder, entry, function=function)
     request = records.read(folder / 'native-runtime/native-request.json')
     same(request['plain'], plain); same(request['policy'], selected)
     observations = [{'type_usr': 'c:@S@Item', 'name': 'Item', 'creation_path': [0], 'release_path': [0],

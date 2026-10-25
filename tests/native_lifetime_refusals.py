@@ -12,9 +12,9 @@ import native_prepared_otlp as transport
 import native_prepared_receipt as records
 
 
-def run(source: Path, entry: dict, witness: dict, destination: Path) -> dict:
+def run(source: Path, entry: dict, witness: dict, destination: Path, *, function: str = 'selected') -> dict:
     """A changed summary cannot make any declared corrupt capture acceptable."""
-    audit.verify(source, entry, witness, plain=False)
+    audit.verify(source, entry, witness, plain=False, function=function)
     destination.mkdir()
     manifest = records.read(source / 'http-capture.json')
     names = ['policy.toml', 'http-capture.json', 'http-responses.json',
@@ -82,7 +82,7 @@ def run(source: Path, entry: dict, witness: dict, destination: Path) -> dict:
                 value = records.read(folder / 'expected-lifetimes-before-build.json'); value['observations'][0]['complete'] = 1
                 write('expected-lifetimes-before-build.json', value)
             try:
-                audit.verify(folder, entry, altered, plain=False)
+                audit.verify(folder, entry, altered, plain=False, function=function)
             except ValueError:
                 refused.append(name)
                 # Each deliberately corrupt copy is disposable. Unexpected

@@ -118,6 +118,52 @@ class NativeLifetimeRawAuditTests(unittest.TestCase):
         self.assertEqual([path.name for path in destination.iterdir()], ['refusals.json'])
         for name, expected in held.items(): self.assertEqual(records.identity(Path(name)), expected)
 
+    def test_new_callable_wire_profile_requires_the_independent_promotion_name(self):
+        """Adapt literal labels only; this is not a new C/C++ application capture."""
+        function = 'src/app.c::selected_extra'
+        message = self.trace()
+        for span in message.resource_spans[0].scope_spans[0].spans:
+            if span.name != 'Item lifetime':
+                span.name = function; span.attributes[0].value.string_value = function
+        (self.root / 'otlp-1.protobuf').write_bytes(message.SerializeToString())
+        for name in ('otlp-0.protobuf', 'otlp-2.protobuf'):
+            message = self.metrics(name)
+            for value in message.resource_metrics[0].scope_metrics[0].metrics:
+                for point in getattr(value, value.WhichOneof('data')).data_points:
+                    for attribute in point.attributes:
+                        if attribute.key == 'function': attribute.value.string_value = function
+            (self.root / name).write_bytes(message.SerializeToString())
+        policy = tomllib.loads((self.root / 'policy.toml').read_text())
+        policy['functions']['include'] = ['selected_extra']
+        (self.root / 'policy.toml').write_text('\n'.join(key + '=' + toml(value) for key, value in policy.items()))
+        self.entry.update(otelc_function='selected_extra', otelc_runtime_function=function)
+        request = records.read(self.root / 'native-runtime/native-request.json'); request['policy'] = policy
+        self.write('native-runtime/native-request.json', request)
+        for name in ('expected-lifetimes-before-build.json', 'expected-lifetimes.json'):
+            intent = records.read(self.root / name); intent['roots'] = [function]; self.write(name, intent)
+        final = records.read(self.root / 'native-runtime/app/health.json')
+        final['policy_sha256'] = records.digest(policy)
+        selection = {key: policy[key] for key in ('sources', 'functions')}
+        selection['lifetimes'] = {key: policy['lifetimes'][key] for key in ('enabled', 'include', 'exclude')}
+        final['selection_sha256'] = records.digest(selection)
+        self.write('native-runtime/app/health.json', final)
+        digest = hashlib.sha256()
+        for row in records.read(self.root / 'http-capture.json')['bodies']:
+            body = (self.root / row['file']).read_bytes(); route = row['path']
+            digest.update(len(route).to_bytes(8, 'big') + route.encode() + len(body).to_bytes(8, 'big') + body)
+        verified = records.read(self.root / 'native-verified-lifetimes.json')
+        verified.update(health=final, functions={function: 1}, raw_otlp_sha256=digest.hexdigest())
+        self.write('native-verified-lifetimes.json', verified)
+        self.witness.update(functions={function: 1}, raw_otlp_sha256=digest.hexdigest())
+        for selected in ('selected', 'foreign'):
+            with self.subTest(selected=selected), self.assertRaises(ValueError):
+                audit.verify(self.root, self.entry, self.witness, plain=False, function=selected)
+        self.assertEqual(audit.verify(self.root, self.entry, self.witness, plain=False,
+                                     function='selected_extra')['functions'], {function: 1})
+        result = refusals.run(self.root, self.entry, self.witness, self.root.parent / 'extra-refusals',
+                              function='selected_extra')
+        self.assertEqual(result['count'], 14)
+
     def test_unexpected_acceptance_fails_and_preserves_the_corrupt_copy(self):
         destination = self.root.parent / 'accepted'
         with patch.object(refusals.audit, 'verify', return_value={}), self.assertRaisesRegex(AssertionError, 'accepted altered'):

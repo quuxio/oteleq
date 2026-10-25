@@ -220,6 +220,7 @@ class NativeLifetimeWorkflowTests(TestCase):
                 patch.object(qualifier, 'Audit', return_value=fake), \
                 patch.object(qualifier, 'check_report', return_value=4) as check, \
                 patch.object(qualifier, 'framework', return_value=4) as framework, \
+                patch.object(qualifier, 'promotion', return_value={'application_observations': 12}) as promotion, \
                 patch.object(qualifier, 'digest', return_value='a' * 64):
             result = qualifier.exercise(self.root / 'cli', self.root / 'provider', self.root / 'sdk', self.root)
         self.assertEqual(result['actual_application_launches'], 52)
@@ -230,7 +231,9 @@ class NativeLifetimeWorkflowTests(TestCase):
         self.assertEqual(check.call_args_list[-1].kwargs, {'expected': (2,)})
         self.assertEqual(framework.call_args.kwargs, {'expected': (0,)})
         self.assertEqual([row[0] for row in calls].count('shrink'), 1)
-        self.assertIn('qualification of the independent raw lifetime audit and evidence refusals', result['remaining'])
+        self.assertEqual(promotion.call_count, 3)
+        self.assertIn('current-source-promotion', result['routes'])
+        self.assertIn('qualification of the independent raw lifetime audit, evidence refusals and promotion', result['remaining'])
         self.assertEqual(result['raw_evidence_refusals'], fake.refusals.return_value)
 
     def test_original_source_facts_detect_restored_bytes_with_new_write_facts(self):
@@ -284,7 +287,7 @@ class NativeLifetimeWorkflowTests(TestCase):
         for lane in ('baseline', 'instrumented_on'):
             audit, folder, entry, witness = self.audit_fixture(lane)
             audit.attempt(self.root / 'report.json', folder, entry, lane, witness, (5,))
-            qualifier.raw_audit.verify.assert_called_once_with(folder, entry, witness, plain=lane == 'baseline')
+            qualifier.raw_audit.verify.assert_called_once_with(folder, entry, witness, plain=lane == 'baseline', function='selected')
             result = audit.finish()
             self.assertEqual(result['actual_application_records'], 1)
             self.assertGreater(result['original_evidence_files_held'], 4)
@@ -318,7 +321,8 @@ class NativeLifetimeWorkflowTests(TestCase):
 
     def test_actual_refusal_dispatch_requires_both_languages_and_fixed_counts(self):
         audit = object.__new__(qualifier.Audit)
-        audit.contexts = {str(i): {'folder': str(self.root / language), 'entry': {'language': language}, 'witness': {}}
+        audit.contexts = {str(i): {'folder': str(self.root / language), 'entry': {'language': language},
+                                 'witness': {}, 'function': 'selected'}
                           for i, language in enumerate(('c', 'c', 'cpp'))}
         with patch.object(qualifier.raw_refusals, 'run', return_value={'count': 14, 'new_application_launches': 0}) as run:
             self.assertEqual(set(audit.refusals(self.root / 'refusals')), {'c', 'cpp'})
