@@ -20,7 +20,8 @@ class QualificationRecipeTests(unittest.TestCase):
             for flag in ("--cli", "--comparator"):
                 if line.startswith("\t") and flag + " " in line:
                     targets[target] = flag
-        self.assertEqual(len(targets), 46)
+        self.assertEqual(len(targets), 47)
+        self.assertIn("generation-go-controls-otelc", targets)
         self.assertIn("generation-python-controls-otelc", targets)
         self.assertIn("generation-python-cache-workflows-otelc", targets)
         self.assertIn("generation-python-caches-otelc", targets)
@@ -77,7 +78,8 @@ class QualificationRecipeTests(unittest.TestCase):
                         self.assertEqual(result.returncode, 0, result.stderr)
                         arguments = json.loads(record.read_text())
                         self.assertEqual(arguments[arguments.index(flag) + 1], expected)
-                        if name in ('generation-node-controls-otelc', 'generation-java-startup-otelc', 'generation-python-controls-otelc'):
+                        if name in ('generation-node-controls-otelc', 'generation-java-startup-otelc',
+                                    'generation-python-controls-otelc', 'generation-go-controls-otelc'):
                             self.assertEqual(arguments[arguments.index('--startup-state') + 1], 'both-on')
                         if name == 'generation-java-startup-otelc':
                             self.assertEqual(arguments[arguments.index('--java-profile') + 1], 'safe-methods-v1')
@@ -92,6 +94,15 @@ class QualificationRecipeTests(unittest.TestCase):
         self.assertIn('tests/qualify_python_controls.py', result.stdout)
         self.assertIn('--profile "python-native-cache-origins-v3" --startup-state "both-off"', result.stdout)
         self.assertIn('--audit-dir "/tmp/audit-two" --retained-only', result.stdout)
+
+    def test_go_control_recipe_retains_startup_and_separate_retained_audit(self):
+        result = subprocess.run(['make', '--no-print-directory', '-n', 'generation-go-controls-otelc',
+            'OTELC_ROOT=/tmp/provider', 'REPORT_DIR=/tmp/evidence', 'AUDIT_DIR=/tmp/go-audit',
+            'GO_CONTROL_STARTUP=both-off', 'GENERATION_ARGS=--retained-only'],
+            cwd=ROOT, capture_output=True, text=True, check=True)
+        self.assertIn('tests/qualify_go_controls.py', result.stdout)
+        self.assertIn('--startup-state "both-off" --retained-only', result.stdout)
+        self.assertIn('--audit-dir "/tmp/go-audit"', result.stdout)
 
     def test_java_action_recipe_retains_explicit_profile_and_retained_only_mode(self):
         result = subprocess.run(['make', '--no-print-directory', '-n', 'generation-java-actions-otelc',
@@ -137,6 +148,7 @@ class QualificationRecipeTests(unittest.TestCase):
         self.assertIn("generation-node-source-channels-otelc Qualify nonempty binary", result.stdout)
         self.assertIn("generation-java-startup-otelc Qualify Java startup flags", result.stdout)
         self.assertIn("generation-python-sequence-otelc Qualify ordered Python package receivers", result.stdout)
+        self.assertIn("generation-go-controls-otelc Qualify source-scope Go live states", result.stdout)
 
     def test_handle_binding_recipe_uses_the_prebuilt_sdk_without_building_a_cli(self):
         result = subprocess.run(['make', '--no-print-directory', '-n', 'generation-java-handles-otelc',
