@@ -5,6 +5,7 @@ import re
 import string
 
 import go_storage
+import go_cache
 
 
 COMMAND_DIRECTORY = "oteleq_generated_cmd"
@@ -42,8 +43,8 @@ def build_timeout(value: int) -> int:
 
 def settings(value: dict) -> dict:
     """Freeze module roots, shared build tags and the per-command build budget."""
-    if not isinstance(value, dict) or set(value) - {"backend", "module_roots", "build_tags", "build_timeout_ms", "build_min_free_bytes"}:
-        raise ValueError("adapters.go accepts backend, module_roots, build_tags, build_timeout_ms and build_min_free_bytes")
+    if not isinstance(value, dict) or set(value) - {"backend", "module_roots", "build_tags", "build_timeout_ms", "build_min_free_bytes", "build_cache"}:
+        raise ValueError("adapters.go accepts backend, module_roots, build_tags, build_timeout_ms, build_min_free_bytes and build_cache")
     backend = value.get("backend", "legacy")
     if type(backend) is not str or backend not in ("legacy", *SOURCE_BACKENDS):
         raise ValueError("adapters.go.backend must be legacy, source-v1 or source-scope-v1")
@@ -51,6 +52,9 @@ def settings(value: dict) -> dict:
     minimum = go_storage.minimum(value.get("build_min_free_bytes", 0))
     if minimum and backend not in SOURCE_BACKENDS:
         raise ValueError("Go build_min_free_bytes requires a source-v1 or source-scope-v1 backend")
+    cache = go_cache.settings(value["build_cache"]) if "build_cache" in value else None
+    if cache is not None and backend not in SOURCE_BACKENDS:
+        raise ValueError("Go build_cache requires a source-v1 or source-scope-v1 backend")
     roots, tags = value.get("module_roots", []), value.get("build_tags", [])
     if not isinstance(roots, list) or any(type(item) is not str for item in roots):
         raise ValueError("Go module_roots must be an array of relative paths")
@@ -73,6 +77,8 @@ def settings(value: dict) -> dict:
         result["backend"] = backend
     if "build_min_free_bytes" in value:
         result["build_min_free_bytes"] = minimum
+    if cache is not None:
+        result["build_cache"] = cache
     return result
 
 

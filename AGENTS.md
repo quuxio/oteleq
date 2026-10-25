@@ -1,5 +1,7 @@
 # Repository guidance
 
+- An explicit Go build_cache is disposable SDK compiler state, separate from retained caller exports and module inputs. Refuse original source/SDK/workspace/Go-installation overlaps before writes. Keep the owner marker, exclusive lease, closed builtin cache layout and anchored directory identities; preserve eviction receipts and never prune through links or producer-selected paths. The logical limit applies between SDK commands. Nonzero build_min_free_bytes samples both output and cache volumes through the original executor cleanup. Defaults stay disabled; qualification of changed cache and retained/live workflows remains separate.
+
 - Go telemetry must bind the expected service to the frozen prepared policy and retain complete histogram state through cumulative checks. Sums must fit actual extrema and populated buckets with an explicit binary64 summation bound. Fresh live qualification uses the configured free-space floor before commands; preserve prelaunch storage refusals as incomplete evidence. Run startup corpora serially and preserve referenced compiler exports when clearing terminal caches.
 
 - Go live shrink archives retain bytes with new inode/link identities. Bind the copy to exactly one original report by all four launch IDs in the bounded actual-report registry; compare the complete archived file/directory/mode/digest denominator before checking original publisher facts. Never repair copied links, treat the archive as a new launch or accept an absent/ambiguous original. Preserve original failed audits.

@@ -16,8 +16,9 @@ def minimum(value: object) -> int:
 class Guard:
     """Use the shared executor's cleanup when the output volume loses headroom."""
 
-    def __init__(self, directory: Path, minimum_free_bytes: int):
+    def __init__(self, directory: Path, minimum_free_bytes: int, *, volumes: tuple[Path, ...] = ()):
         self.directory = directory
+        self.volumes = tuple(dict.fromkeys((directory, *volumes)))
         self.minimum = minimum(minimum_free_bytes)
         self.next_check = 0.0
         if self.minimum:
@@ -25,13 +26,17 @@ class Guard:
 
     def check(self, phase: str, process) -> None:
         """Retain the measured refusal; never label an interrupted build as a result."""
-        free = shutil.disk_usage(self.directory).free
-        if free < self.minimum:
+        for volume in self.volumes:
+            free = shutil.disk_usage(volume).free
+            if free >= self.minimum:
+                continue
             value = {"schema_version": 1, "kind": "oteleq.go.build-storage-refusal",
                      "phase": phase, "directory": str(self.directory.resolve()),
                      "minimum_free_bytes": self.minimum, "observed_free_bytes": free,
                      "process_started": process is not None,
                      "pid": process.pid if process is not None else None}
+            if volume != self.directory:
+                value["volume_directory"] = str(volume.resolve())
             with (self.directory / "storage-refusal.json").open("x") as stream:
                 json.dump(value, stream, sort_keys=True, indent=2)
                 stream.write("\n")

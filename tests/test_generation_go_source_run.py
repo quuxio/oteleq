@@ -101,8 +101,14 @@ class GoSourceRunTests(unittest.TestCase):
             self.assertIsInstance(interaction, source_run.go_storage.Guard)
             self.assertEqual(interaction.minimum, self.entry["go_options"]["build_min_free_bytes"])
             self.assertEqual(interaction.directory, folder)
+            if "build_cache" in self.entry["go_options"] and "go-build" in words:
+                self.assertEqual(interaction.volumes, (folder, Path(environment["GOCACHE"])))
         self.assertEqual(timeout, 1.234)
-        self.assertIs(environment, self.environment)
+        if "build_cache" in self.entry["go_options"] and "go-build" in words:
+            self.assertEqual(environment, {**self.environment, "GOCACHEPROG": "", "GOCACHE":
+                str(Path(self.entry["go_options"]["build_cache"]["directory"]) / "build")})
+        else:
+            self.assertIs(environment, self.environment)
         is_tooling_query = (go_source.scope_safe(self.entry)
                             and (words[1:2] == ["env"] or words[1:2] == ["version"]))
         self.assertEqual(max_output_bytes, 1024 * 1024 if is_tooling_query else go_files.MAX_METADATA_BYTES)
@@ -352,6 +358,38 @@ class GoSourceRunTests(unittest.TestCase):
         self.assertFalse(generation.read(retained / "storage-refusal.json")["process_started"])
         self.reader.assert_not_called()
         self.launcher.assert_not_called()
+
+    def test_sdk_cache_is_separate_bounded_and_does_not_change_retained_export_inputs(self):
+        compiler = self.base / "compiler/bin/go"
+        compiler.parent.mkdir(parents=True)
+        compiler.write_bytes(b"literal compiler, never executed")
+        self.tools["go"] = compiler
+        self.tooling["go"] = str(compiler)
+        cache = self.base / "sdk-cache"
+        self.entry["go_options"]["build_cache"] = {"directory": str(cache), "max_bytes": 1024 ** 2}
+        self.entry["go_options"]["build_min_free_bytes"] = 1
+        original_cache = self.base / "caller-cache"
+        original_cache.mkdir()
+        export = original_cache / "retained-export"
+        export.write_bytes(b"literal independent compiler export")
+        before = go_files.file(export)
+        self.environment.update(GOCACHE=str(original_cache), GOMODCACHE=str(self.base / "modules"))
+        self.caller.reads = {str(export): [before[0], list(before[1])]}
+        key = "0" * 64 + "-d"
+        def compile_cache():
+            shard = cache / "build/00"; shard.mkdir()
+            (shard / key).write_bytes(b"x" * (2 * 1024 ** 2))
+        self.build_action = compile_cache
+        self.run_prepare()
+        self.assertEqual(go_files.file(export), before)
+        self.assertFalse((cache / "build/00" / key).exists())
+        receipt = generation.read(self.folder / "sdk-cache-after.json")
+        self.assertTrue(receipt["complete"])
+        self.assertEqual(receipt["after_bytes"], 0)
+        commands = [generation.read(path) for path in (self.folder / "go-tooling").glob("*/command.json")]
+        switched, = [row for row in commands if "sdk_cache" in row]
+        self.assertIn("go-build", switched["argv"])
+        self.assertEqual(switched["sdk_cache"], str(cache / "build"))
 
     def test_run_requires_completed_owned_execution_and_rechecks_every_boundary(self):
         result = self.run_prepare()

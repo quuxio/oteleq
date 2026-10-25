@@ -68,6 +68,18 @@ class GoStorageTests(unittest.TestCase):
                 self.assertRaisesRegex(OSError, "unavailable volume"):
             go_storage.Guard(self.folder, 10)
 
+    def test_a_separate_cache_volume_is_measured_and_identified_on_refusal(self):
+        cache = self.folder / "other-volume"; cache.mkdir()
+        def usage(path):
+            return SimpleNamespace(free=9 if path == cache else 10)
+        with patch.object(go_storage.shutil, "disk_usage", side_effect=usage), \
+                self.assertRaisesRegex(ValueError, "storage headroom exhausted"):
+            go_storage.Guard(self.folder, 10, volumes=(cache, cache))
+        receipt = json.loads((self.folder / "storage-refusal.json").read_text())
+        self.assertEqual(receipt["volume_directory"], str(cache))
+        self.assertEqual(receipt["observed_free_bytes"], 9)
+        self.assertFalse(receipt["process_started"])
+
     def test_running_refusal_cleans_actual_leader_and_descendant_and_keeps_channels(self):
         ready = self.folder / "ready.json"
         script = ("import json,os,pathlib,subprocess,sys,time\n"

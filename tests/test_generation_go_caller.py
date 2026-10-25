@@ -16,6 +16,7 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(REPO / "adapters/generation"), str(REPO / "examples")]
 import generation
 import go_caller
+import go_cache
 import go_files
 import go_project
 import go_receivers
@@ -83,6 +84,25 @@ class GoCallerTests(unittest.TestCase):
         retained.write_bytes(source + b"\n")
         with self.assertRaisesRegex(ValueError, "compiler input changed"):
             caller.verify()
+
+    def test_actual_sdk_style_cache_eviction_preserves_retained_compiler_exports(self):
+        entry = self.materialise("package main\nfunc Add(value int)int{return value+1}\nfunc main(){}\n")
+        caller = self.discover(entry)
+        evidence = self.root / "cache-evidence"; evidence.mkdir()
+        pool = self.root / "sdk-cache"
+        options = {"directory": str(pool), "max_bytes": 1024 ** 2}
+        protected = [self.project, Path(self.environment["GOCACHE"])]
+        with go_cache.lease(options, protected, evidence) as cached:
+            result = self.execute([self.go, "build", "-mod=readonly", "-o", self.root / "plain", caller.target],
+                                  self.project, {**self.environment, **cached})
+            self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((self.root / "plain").is_file())
+        receipt = json.loads((evidence / "sdk-cache-after.json").read_text())
+        self.assertTrue(receipt["complete"])
+        self.assertGreater(receipt["before_bytes"], options["max_bytes"])
+        self.assertLessEqual(receipt["after_bytes"], options["max_bytes"])
+        self.assertTrue(receipt["removed"])
+        caller.verify()
 
     def test_frontend_directory_cannot_replace_source_or_existing_evidence(self):
         entry = self.materialise("package main\nfunc Add(value int)int{return value+1}\nfunc main(){}\n")

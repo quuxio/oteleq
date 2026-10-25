@@ -63,11 +63,13 @@ def sources(*, changed: bool = False) -> dict[str, bytes]:
             'domain/types.go': DOMAIN.encode(), 'counter/api.go': text.encode()}
 
 
-def policy(start: str, *, min_free_bytes: int = 0) -> str:
+def policy(start: str, *, min_free_bytes: int = 0, build_cache: dict | None = None) -> str:
     """One wildcard fixture must also discover the newly promoted method."""
     text = ('schema_version=1\nlanguages=["go"]\n[adapters.go]\n'
             'backend="source-scope-v1"\nmodule_roots=["."]\nbuild_timeout_ms=900000\n'
-            + ('build_min_free_bytes=' + str(min_free_bytes) + '\n' if min_free_bytes else '') +
+            + ('build_min_free_bytes=' + str(min_free_bytes) + '\n' if min_free_bytes else '')
+            + ('build_cache={directory=' + json.dumps(build_cache['directory'])
+               + ',max_bytes=' + str(build_cache['max_bytes']) + '}\n' if build_cache is not None else '') +
             '[limits]\ncase_timeout_ms=60000\n[functions]\ninclude='
             + json.dumps([function(name) for name in (*METHODS, 'added')]) + '\n'
             '[[fixtures]]\nfunction="counter.api.Counter.*"\ncases=[[7]]\n'

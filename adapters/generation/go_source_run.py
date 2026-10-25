@@ -17,6 +17,7 @@ import go_tooling
 from go_provider import SCOPE_HELPER_PROFILE, data_seal, require, same
 import go_source
 import go_storage
+import go_cache
 import otelc_capture as capture
 import python_prepared
 
@@ -42,7 +43,8 @@ class Run:
 
 def prepare(workflow, root: Path, project: Path, entry: dict, tools: dict,
             environment: dict, folder: Path, config: Path, lane: str, *, wait_ms: int,
-            sequence: list[dict] | None = None, bodies: list | None = None) -> Run:
+            sequence: list[dict] | None = None, bodies: list | None = None,
+            protected_roots: tuple[Path, ...] = ()) -> Run:
     """Freeze expectations before producer builds and never execute returned argv."""
     require(go_source.enabled(entry) and lane in ("baseline", "instrumented_on"), "invalid Go source execution lane")
     go_source.sequence_profile(entry)
@@ -65,12 +67,16 @@ def prepare(workflow, root: Path, project: Path, entry: dict, tools: dict,
         destination = folder / "go-tooling" / str(count)
         count += 1
         destination.mkdir(mode=0o700, parents=True)
+        cache = (env["GOCACHE"] if env is not None and "GOCACHE" in env
+                 and env["GOCACHE"] != environment.get("GOCACHE") else None)
         workflow.write(destination / "command.json", {"argv": list(map(str, argv)), "cwd": str(cwd),
                                                        "timeout_ms": round(timeout * 1000),
-                                                       **({"minimum_free_bytes": minimum} if minimum else {})})
+                                                       **({"minimum_free_bytes": minimum} if minimum else {}),
+                                                       **({"sdk_cache": cache} if cache else {})})
         if input_data is not None:
             (destination / "stdin").write_bytes(input_data)
-        options = {"interaction": go_storage.Guard(destination, minimum)} if minimum else {}
+        extra = (Path(cache),) if cache else ()
+        options = {"interaction": go_storage.Guard(destination, minimum, volumes=extra)} if minimum else {}
         result = workflow.execute(argv, cwd, env or environment, destination, timeout=timeout,
                                   input_data=input_data, max_output_bytes=max_output_bytes, **options)
         require(result.returncode == 0, "Go public build/preparation failed; inspect retained compiler channels")
@@ -103,7 +109,19 @@ def prepare(workflow, root: Path, project: Path, entry: dict, tools: dict,
         command += ["--scope-safe", "--tooling-directory", go_source.tooling_directory(root, backend)]
     for tag in intent.build_tags:
         command += ["--build-tag", tag]
-    execute(command, root)
+    cache_options = entry["go_options"].get("build_cache")
+    if cache_options is None:
+        execute(command, root)
+    else:
+        protected = [root, project, folder, context.root, tools["go"].parent.parent,
+                     Path(environment["GOCACHE"]), Path(environment["GOMODCACHE"]), *protected_roots]
+        with go_cache.lease(cache_options, protected, folder) as cached:
+            require(not any(Path(name).is_relative_to(Path(cache_options["directory"])) for name in caller.reads),
+                    "Go SDK cache overlaps retained compiler reads")
+            execute(command, root, {**environment, **cached})
+            # No SDK command is live when the lease trims its disposable cache.
+            # The compiler export inputs remain in the separate caller cache.
+            caller.verify()
     require(data_seal(go_build.caller_state(intent)) == seal, "Go caller inputs changed during SDK build")
     caller.verify()
     build = go_build.read(intent)

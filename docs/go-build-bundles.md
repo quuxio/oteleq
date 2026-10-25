@@ -34,6 +34,29 @@ For explicit `source-v1` and `source-scope-v1` backends, set `build_min_free_byt
 
 Every retained compiler-metadata, SDK build and preparation command checks this floor before starting, at most ten times per second while running, and after exit. Its `go-tooling/<number>/command.json` records the selected floor. Low space retains `storage-refusal.json` alongside the compiler channels, including the actual measurement, phase and command PID if started. A running refusal uses the shared executor's process-group cleanup and leaves the build incomplete. Initial package inventory retains its separate discovery limits. This sampled floor does not reserve space, impose a cache quota or remove retained compiler inputs.
 
+## Bounded SDK compiler cache
+
+An optional cache separates disposable SDK build intermediates from retained caller compiler exports. Use a dedicated directory outside the original source, SDK, Go installation and generated workspaces:
+
+```toml
+[adapters.go]
+backend = "source-scope-v1"
+module_roots = ["."]
+build_min_free_bytes = 8589934592
+
+[adapters.go.build_cache]
+directory = "/absolute/transient/sdk-compiler-cache"
+max_bytes = 1073741824
+```
+
+The parent directory must exist without symlink aliases. The cache directory is created privately and marked by oteleq. An existing unmarked directory is refused. This option requires `source-v1` or `source-scope-v1`; it is disabled when the table is absent. `max_bytes` defaults to 1 GiB and accepts integers from 1 MiB to 9223372036854775807 bytes. The directory and limit stay in the frozen policy, including exported, reduced and promoted suites. That location must remain available for retained builds; make a new plan to select another location.
+
+Only the SDK `go-build` command uses this shared cache. Original caller discovery and compiler exports keep their separate private cache, and module/dependency caches remain unchanged. The SDK command disables an external `GOCACHEPROG` so the selected builtin Go cache format applies. Its actual cache path appears in `go-tooling/<number>/command.json`. A nonzero free-space floor checks both the attempt output and SDK cache volumes during that command.
+
+The cache has an exclusive build lease. Concurrent use refuses before another SDK build starts. Before a build and after a successful command, oteleq evicts the oldest modified disposable entries to meet the logical byte limit. Both ordinary entries and cached executable directories are supported. Source/input overlaps, foreign keys, links, special files, changed directory identities and a changed final entry denominator refuse. A failed command leaves its cache for inspection; a later leased build may evict those disposable entries. Application binaries, compiler channels, source/module inputs and retained caller exports are not selected for eviction.
+
+Each attempt retains `sdk-cache-before.json` and, after successful cleanup, `sdk-cache-after.json`. They record sizes and the entries removed. These are cache maintenance observations; cache payloads are not retained compiler inputs. The limit applies between SDK commands, excluding small cache control files and filesystem metadata. A single build can exceed it temporarily. Use the separate free-space floor to stop a build that loses headroom.
+
 Source/function selectors, annotations and `traces.enabled` are build settings. Both replay policies must preserve them, including baseline replay. Trace-disabled compilation is a different build, not a runtime no-op exporter. Explicit target/compiler-setting changes also require rebuilding. Supported runtime resource/export/sampling settings can be changed for replay within the provider's contract.
 
 The SDK's module resolution must preserve existing dependency, language/toolchain and runtime-default identities. Incompatible older module graphs refuse before application execution. SDK dependency isolation remains open; an unchanged original `go.mod` alone cannot prove unchanged language semantics. Recipe hashes detect inconsistent evidence; these diagnostic bundles are not signed attestations against an actor replacing all artefacts and recomputing their metadata.

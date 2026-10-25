@@ -322,6 +322,8 @@ class GoLiveWorkflowTests(unittest.TestCase):
                 qualifier.run(Path('cli'), Path('sdk'), root, 'both-off', {'frozen': 'inputs'}, min_free_bytes=123)
             configured = tomllib.loads((root / 'cases/equivalence.toml').read_text())
             self.assertEqual(configured['adapters']['go']['build_min_free_bytes'], 123)
+            self.assertEqual(configured['adapters']['go']['build_cache'], {
+                'directory': str(root / 'compiler-cache'), 'max_bytes': 1024 ** 3})
             self.assertEqual(plan.call_args.args[-1], set(fixture.FUNCTIONS))
             self.assertEqual(routes.call_count, 1)
             self.assertEqual([call.kwargs['changed'] for call in current.call_args_list], [False, True])
