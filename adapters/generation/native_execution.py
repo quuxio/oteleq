@@ -112,9 +112,9 @@ def finish(started: Started, returncode: int) -> Execution:
     else:
         inputs.directory(runtime / 'app')
         health = inputs.read(runtime / 'app/health.json', private=True, maximum=4096)
-        native_health.validate(health.value(), language=launch.intent.build.intent.language,
+        native_health.validate(health.value(), language=launch.intent.context().language,
             pid=owner.application_pid, policy=digest(launch.intent.policy()),
-            selection=digest({key: launch.intent.policy()[key] for key in ('sources', 'functions')}))
+            selection=digest(launch.intent.selection()), lifetime_kind=launch.intent.lifetime_kind())
     final = inputs.read(runtime / FINAL, private=True)
     expected = {'schema_version': 1, 'kind': 'otelc.native.execution', 'profile': PROFILE,
                 'request_sha256': digest(launch.value(prepared.REQUEST)),

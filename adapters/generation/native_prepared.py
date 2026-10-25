@@ -7,6 +7,7 @@ import re
 import tomllib
 
 import native_build
+import native_lifetime_build
 import native_unit_build
 import native_inputs as inputs
 from native_protocol import PROFILE, digest, encoded, require, same
@@ -18,6 +19,14 @@ EXECUTION_FILES = (*START_FILES, 'native-host-release.json', 'native-execution.j
 REQUIRED = {'__init__.py', '__main__.py', 'cli_bootstrap.py', 'config.py', 'file_inputs.py', 'health.py',
             'llvm_backend.py', 'native_build.py', 'native_gate.py', 'native_launch.py',
             'native_supervisor.py', 'prepared_native.py', 'python_launch_files.py', 'python_sdk_io.py'}
+BUILDS = (native_build.Build, native_unit_build.Build, native_lifetime_build.Build)
+Build = native_build.Build | native_unit_build.Build | native_lifetime_build.Build
+
+
+def context(build: Build) -> native_build.Intent | native_unit_build.Intent:
+    """Project/tool paths come only from separately accepted caller build types."""
+    require(type(build) in BUILDS, 'native preparation requires an accepted build')
+    return build.intent.base if type(build) is native_lifetime_build.Build else build.intent
 
 
 def producer_paths(root: Path) -> tuple[Path, ...]:
@@ -31,7 +40,7 @@ def producer_paths(root: Path) -> tuple[Path, ...]:
 class Intent:
     """Runtime policy, literal arguments and all SDK source paths precede preparation."""
 
-    build: native_build.Build | native_unit_build.Build
+    build: Build
     runtime: Path
     python: inputs.File
     interpreter: inputs.File
@@ -46,6 +55,22 @@ class Intent:
         """Return an unaliased copy of the frozen runtime policy."""
         return strict_json(self.policy_json)
 
+    def context(self) -> native_build.Intent | native_unit_build.Intent:
+        """Expose the original caller context without flattening lifetime intent."""
+        return context(self.build)
+
+    def lifetime_kind(self) -> str | None:
+        """Runtime records cannot select or downgrade the compiled lifetime profile."""
+        return self.build.intent.kind if type(self.build) is native_lifetime_build.Build else None
+
+    def selection(self) -> dict:
+        """Function-only and lifetime builds retain distinct selection digests."""
+        policy = self.policy()
+        result = {key: policy[key] for key in ('sources', 'functions')}
+        if self.lifetime_kind() is not None:
+            result['lifetimes'] = {key: policy['lifetimes'][key] for key in ('enabled', 'include', 'exclude')}
+        return result
+
     def verify(self) -> None:
         """Keep build, policy file, interpreter and producer sources unchanged."""
         self.build.verify()
@@ -53,16 +78,17 @@ class Intent:
         self.interpreter.verify()
         self.policy_file.verify()
         require(same(tomllib.loads(self.policy_file.content.decode()), self.policy()), 'native runtime policy bytes differ from intent')
-        require(tuple(item.path for item in self.producer) == producer_paths(self.build.intent.sdk.root),
+        require(tuple(item.path for item in self.producer) == producer_paths(self.context().sdk.root),
                 'native SDK producer source set changed')
         for item in self.producer:
             item.verify()
 
 
-def freeze(build: native_build.Build | native_unit_build.Build, runtime: Path, python: Path, policy_file: Path,
+def freeze(build: Build, runtime: Path, python: Path, policy_file: Path,
            policy: dict, *, plain: bool, arguments: tuple[str, ...] = (), wait_ms: int = 30000) -> Intent:
     """Capture bounded literal intent before the SDK creates launch records."""
-    require(type(build) in (native_build.Build, native_unit_build.Build) and type(plain) is bool and type(wait_ms) is int
+    compiled = context(build)
+    require(type(plain) is bool and type(wait_ms) is int
             and 1 <= wait_ms <= 300000, 'invalid native lane, build or release budget')
     build.verify()
     require(type(arguments) is tuple and len(arguments) <= 4096
@@ -70,18 +96,21 @@ def freeze(build: native_build.Build | native_unit_build.Build, runtime: Path, p
             and sum(len(os.fsencode(value)) for value in arguments) <= 1024 * 1024, 'invalid literal native arguments')
     require(runtime.is_absolute() and runtime == runtime.resolve() and runtime.parent == runtime.parent.resolve(strict=True)
             and not runtime.exists() and not runtime.is_symlink()
-            and not any(runtime.is_relative_to(path) for path in (build.intent.project, build.intent.output, build.intent.sdk.root)),
+            and not any(runtime.is_relative_to(path) for path in (compiled.project, compiled.output, compiled.sdk.root)),
             'native runtime must be a new canonical external directory')
-    initial = build.intent.policy()
+    initial = compiled.policy()
+    lifetimes = type(build) is native_lifetime_build.Build
     require(type(policy) is dict and same(policy.get('schema_version'), 3)
-            and type(policy.get('languages')) is list and build.intent.language in policy['languages']
+            and type(policy.get('languages')) is list and compiled.language in policy['languages']
             and same({key: policy[key] for key in ('sources', 'functions')},
                      {key: initial[key] for key in ('sources', 'functions')})
-            and type(policy.get('lifetimes')) is dict and policy['lifetimes'].get('enabled') is False
+            and type(policy.get('lifetimes')) is dict
+            and (same(policy['lifetimes'], initial['lifetimes']) if lifetimes else
+                 policy['lifetimes'].get('enabled') is False)
             and same(policy.get('context'), {'tasks': False, 'http': False}), 'native runtime policy differs from compiled selection')
     host = inputs.capture(python, allow_links=True)
     result = Intent(build, runtime, host, inputs.capture(host.resolved),
-        tuple(inputs.capture(path) for path in producer_paths(build.intent.sdk.root)),
+        tuple(inputs.capture(path) for path in producer_paths(compiled.sdk.root)),
         inputs.capture(policy_file, keep=True), encoded(policy), plain, arguments, wait_ms)
     result.verify()
     return result
@@ -89,7 +118,7 @@ def freeze(build: native_build.Build | native_unit_build.Build, runtime: Path, p
 
 def command(intent: Intent) -> list[str]:
     """Only the fixed isolated SDK supervisor can own this prepared application."""
-    return [str(intent.python.path), '-I', '-S', str(intent.build.intent.sdk.root / 'otelc/native_supervisor.py'), str(intent.runtime)]
+    return [str(intent.python.path), '-I', '-S', str(intent.context().sdk.root / 'otelc/native_supervisor.py'), str(intent.runtime)]
 
 
 @dataclass(frozen=True)
@@ -132,7 +161,7 @@ def read(intent: Intent) -> Prepared:
     name = 'plain' if intent.plain else 'instrumented'
     image = intent.build.file(name)
     expected_plan = {'schema_version': 1, 'kind': 'otelc.native.plan', 'profile': PROFILE,
-        'request_sha256': digest(expected_request), 'cwd': str(intent.build.intent.project),
+        'request_sha256': digest(expected_request), 'cwd': str(intent.context().project),
         'argv': [str(image.path), *intent.arguments], 'image': image.gate_identity(), 'source_complete': False}
     require(same(plan, expected_plan), 'native plan differs from the fixed lane and arguments')
     expected_prepared = {'schema_version': 1, 'kind': 'otelc.native.prepared', 'profile': PROFILE,

@@ -212,6 +212,8 @@ def witness(completed: native_execution.Execution, bodies: list, service: str,
     if launch.intent.plain:
         require(not bodies and completed.health is None, 'plain native worker emitted SDK evidence')
         return None
+    require(launch.intent.lifetime_kind() is None,
+            'native lifetime downstream receipt requires its separate decoder')
     require(policy['traces']['enabled'] is True and type(policy['traces']['sample_ratio']) in (int, float)
             and policy['traces']['sample_ratio'] == 1.0,
             'native qualification requires complete selected traces')
@@ -219,7 +221,7 @@ def witness(completed: native_execution.Execution, bodies: list, service: str,
             and all(type(row) is tuple and len(row) == 2 and row[0] in (capture.TRACE_PATH, METRIC_PATH)
                     and type(row[1]) is bytes and bool(row[1]) for row in bodies)
             and sum(len(raw) for _, raw in bodies) <= MAX_BYTES, 'invalid native telemetry route or capture budget')
-    language = launch.intent.build.intent.language
+    language = launch.intent.context().language
     names, errors, spans = traces(bodies, language, service, roots)
     points = metrics(bodies, language, service, names, errors,
                      policy['metrics']['histogram_boundaries_seconds'],

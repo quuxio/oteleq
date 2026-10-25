@@ -43,7 +43,7 @@ DEPENDENCY_AUDIT_OUTPUT ?= $(CURDIR)/build/dependency-audit
 .PHONY: help setup lint examples docs-check observer-check generation-check effect-qualification-check node-observer-check node-sequence-check java-observer-check go-observer-check cpp-observer-check generation-cpp-receiver-otelc generation-go-receiver-otelc generation-go-source-otelc generation-java-receiver-otelc generation-otelc generation-policy-otelc generation-rust-otelc rust-semantic-otelc generation-native-otelc generation-shrink-otelc generation-python-project-otelc generation-receiver-otelc generation-node-receiver-otelc generation-go-build-otelc generation-go-project-otelc generation-sequence-otelc generation-typescript-sequence-otelc generation-filesystem-otelc generation-http-otelc resource-otelc capture-otelc report core-check coverage check
 
 help:
-	@printf '%s\n' 'native-lifetime-check Check native lifetime build/inventory readers with literal records'
+	@printf '%s\n' 'native-lifetime-check Check native lifetime builds, preparation and final health'
 	@printf '%s\n' 'native-caller-check Check compiler-bound native observation callers with matched Clang tools'
 	@printf '%s\n' 'native-provider-check Check native prepared readers and ownership'
 	@printf '%s\n' 'generation-go-controls-otelc Qualify source-scope Go live states, retained suites and promotion (GO_CONTROL_STARTUP, AUDIT_DIR)'
@@ -181,9 +181,12 @@ native-provider-check:
 	$(PYTHON) -m coverage report --data-file=.native-provider.coverage --include='*/native_source_run.py' --fail-under=80
 
 native-lifetime-check:
-	PYTHONPATH="$(CURDIR)/tests$${PYTHONPATH:+:$${PYTHONPATH}}" $(PYTHON) -m coverage run --data-file=.native-lifetime.coverage --include='*/native_lifetime_build.py,*/native_lifetime_inventory.py,*/native_unit_build.py' -m unittest test_generation_native_lifetime_build test_generation_native_units -v
+	PYTHONPATH="$(CURDIR)/tests$${PYTHONPATH:+:$${PYTHONPATH}}" $(PYTHON) -m coverage run --data-file=.native-lifetime.coverage --include='*/native_lifetime_build.py,*/native_lifetime_inventory.py,*/native_unit_build.py,*/native_prepared.py,*/native_execution.py,*/native_health.py' -m unittest test_generation_native_lifetime_build test_generation_native_units test_generation_native_lifetime_execution test_generation_native_prepared test_generation_native_execution -v
 	$(PYTHON) -m coverage report --data-file=.native-lifetime.coverage --include='*/native_lifetime_build.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.native-lifetime.coverage --include='*/native_lifetime_inventory.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.native-lifetime.coverage --include='*/native_prepared.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.native-lifetime.coverage --include='*/native_execution.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.native-lifetime.coverage --include='*/native_health.py' --fail-under=80
 
 native-caller-check:
 	PYTHONPATH="$(CURDIR)/tests$${PYTHONPATH:+:$${PYTHONPATH}}" $(PYTHON) -m coverage run --data-file=.native-caller.coverage --include='*/native_unit_caller.py,*/native_workers.py,*/native_frontend.py' -m unittest test_generation_native_callers test_generation_native_workers test_generation_native_frontend -v
