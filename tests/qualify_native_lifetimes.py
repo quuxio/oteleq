@@ -113,28 +113,36 @@ class Audit:
         application = retained.read(runtime / 'native-application-start.json')
         finished = retained.read(runtime / 'oteleq-native-finish.json')
         assert request['plain'] is (lane == 'baseline') and request['runtime'] == str(runtime)
-        assert application['launch_id'] == request['launch_id'] and application['pid'] > 1
-        assert finished['application_pid'] == application['pid'] and finished['application_exit_code'] == 0
+        assert application['launch_id'] == request['launch_id']
+        assert type(application['pid']) is int and 1 < application['pid'] < 2**31
+        retained.same(finished['application_pid'], application['pid'])
+        retained.same(finished['application_exit_code'], 0)
         held = {'pid': application['pid'], 'folder': str(actual), 'plain': request['plain']}
         assert self.records.setdefault(request['launch_id'], held) == held
         caller = retained.read(actual / 'native-caller/caller.json')
-        assert caller['entry'] == entry and arguments(caller['arguments']) == expected_arguments
+        retained.same(caller['entry'], entry)
+        assert arguments(caller['arguments']) == expected_arguments
         if lane == 'baseline':
             assert witness is None and not (runtime / 'app/health.json').exists()
             assert retained.read(actual / 'http-capture.json') == {'errors': [], 'bodies': []}
         else:
             verified = retained.read(actual / 'native-verified-lifetimes.json')
-            assert witness['functions'] == verified['functions'] == {entry['otelc_runtime_function']: 1}
-            assert witness['spans'] == 1 and verified['spans'] == 2 and verified['sdk_pid'] == application['pid']
-            assert witness['pending'] == 0 and not any(witness['losses'].values())
+            for functions in (witness['functions'], verified['functions']):
+                retained.same(functions, {entry['otelc_runtime_function']: 1})
+            retained.same(witness['spans'], 1)
+            retained.same(verified['spans'], 2)
+            retained.same(verified['sdk_pid'], application['pid'])
+            retained.same(witness['pending'], 0)
+            for number in witness['losses'].values():
+                retained.same(number, 0)
             assert witness['raw_otlp_sha256'] == verified['raw_otlp_sha256']
             rows = verified['lifetimes']; assert len(rows) == 1
             expected = {'type_usr': 'c:@S@Item', 'name': 'Item', 'creation_path': [0], 'release_path': [0],
                 'complete': True, 'exception_exit': False if entry['language'] == 'cpp' else None,
                 'instance': '1', 'boundary': 'destructor_entry' if entry['language'] == 'cpp' else 'free_entry'}
-            assert {key: rows[0][key] for key in expected} == expected
+            retained.same({key: rows[0][key] for key in expected}, expected)
             assert type(rows[0]['duration_ns']) is int and rows[0]['duration_ns'] >= 0
-            assert verified['health'] == retained.read(runtime / 'app/health.json')
+            retained.same(verified['health'], retained.read(runtime / 'app/health.json'))
             counters = verified['health']['object_accounting' if entry['language'] == 'cpp' else 'resource_accounting']
             assert all(counters[key] == str(value) for key, value in
                        {'types': 1, 'admitted': 1, 'completed': 1, 'censored': 0}.items())
@@ -180,20 +188,22 @@ def check_report(path: Path, difference: bool, audit: Audit, *, expected: tuple[
     assert arguments(result['arguments']) == expected
     amount, = expected
     initial = {'global:state': scalar(language, 7), 'global:observed_errno': scalar(language, 0)}
-    assert set(bundle['contract']['required_roots']) == set(initial)
+    retained.same(sorted(bundle['contract']['required_roots']), sorted(initial))
     for lane in ('baseline', 'instrumented_on'):
         assert len(bundle[lane]) == 2
         after = {'global:state': scalar(language, 7 + amount + int(difference and lane == 'instrumented_on')),
                  'global:observed_errno': scalar(language, errno.ECHILD)}
         for index, attempt in enumerate(bundle[lane]):
             observed = attempt['observation']
-            assert observed['gaps'] == [] and observed['before'] == {'roots': initial, 'nodes': []}
-            assert observed['after'] == {'roots': after, 'nodes': []}
-            assert observed['outcome'] == {'kind': 'return', 'graph': {'roots': {
-                **after, 'result': scalar(language, 42)}, 'nodes': []}}
+            retained.same(observed['gaps'], [])
+            retained.same(observed['before'], {'roots': initial, 'nodes': []})
+            retained.same(observed['after'], {'roots': after, 'nodes': []})
+            retained.same(observed['outcome'], {'kind': 'return', 'graph': {'roots': {
+                **after, 'result': scalar(language, 42)}, 'nodes': []}})
             execution = attempt['execution']
-            assert execution['capture_complete'] and execution['channels'] == {'stdout': [], 'stderr': []}
-            assert execution['termination'] == {'kind': 'exit', 'code': 0}
+            assert execution['capture_complete'] is True
+            retained.same(execution['channels'], {'stdout': [], 'stderr': []})
+            retained.same(execution['termination'], {'kind': 'exit', 'code': 0})
             audit.attempt(path, path.parent / result['case'] / (lane + '-' + str(index)),
                           entry, lane, execution['witness'], expected)
     return 4

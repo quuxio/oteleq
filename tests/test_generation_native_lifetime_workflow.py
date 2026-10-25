@@ -88,7 +88,7 @@ class NativeLifetimeWorkflowTests(TestCase):
     def test_equal_but_wrong_observations_and_missing_repeats_refuse(self):
         path, original = self.report()
         bundle_path = path.parent / 'sample-0/typed-bundle.json'
-        for change in ('return', 'state', 'errno', 'type', 'before', 'gaps', 'capture', 'repeats'):
+        for change in ('return', 'state', 'errno', 'type', 'before', 'gaps', 'capture', 'capture-type', 'exit-type', 'repeats'):
             value = copy.deepcopy(original)
             for lane in ('baseline', 'instrumented_on'):
                 for attempt in value[lane]:
@@ -100,9 +100,11 @@ class NativeLifetimeWorkflowTests(TestCase):
                     elif change == 'before': observed['before']['roots']['global:state']['value'] = '8'
                     elif change == 'gaps': observed['gaps'] = ['unobserved']
                     elif change == 'capture': attempt['execution']['capture_complete'] = False
+                    elif change == 'capture-type': attempt['execution']['capture_complete'] = 1
+                    elif change == 'exit-type': attempt['execution']['termination']['code'] = False
                 if change == 'repeats': value[lane].pop()
             qualifier.write(bundle_path, {'cases': [value]})
-            with self.subTest(change=change), self.assertRaises(AssertionError):
+            with self.subTest(change=change), self.assertRaises((AssertionError, ValueError)):
                 qualifier.check_report(path, False, Mock())
 
     def test_framework_uses_isolated_retained_entrypoint_and_one_report(self):
@@ -157,6 +159,26 @@ class NativeLifetimeWorkflowTests(TestCase):
         self.assertEqual(audit.attempt.call_count, 4)
         self.assertTrue(all(call.args[-1] == (5,) for call in audit.attempt.call_args_list))
 
+    def test_complete_captured_graphs_refuse_equal_python_values_with_wrong_wire_types(self):
+        fixtures = Path(__file__).with_name('fixtures')
+        document = json.loads((fixtures / 'native-lifetime-workflow-c-report.json').read_text())
+        original = json.loads((fixtures / 'native-lifetime-workflow-c-typed-bundle.json').read_text())
+        location = self.root / 'captured/report.json'
+        for field, replacement in (('signed', 1), ('bits', 32.0)):
+            bundle = copy.deepcopy(original)
+            def replace(value):
+                if isinstance(value, list): return sum(replace(item) for item in value)
+                if not isinstance(value, dict): return 0
+                changed = int(field in value)
+                if changed: value[field] = replacement
+                return changed + sum(replace(item) for item in value.values())
+            self.assertEqual(replace(bundle), 28)
+            records = {location: document,
+                location.parent / document['cases'][0]['case'] / 'typed-bundle.json': bundle}
+            with self.subTest(field=field), patch.object(qualifier.retained, 'read', side_effect=records.__getitem__), \
+                    self.assertRaises(ValueError):
+                qualifier.check_report(location, False, Mock())
+
     def test_full_route_driver_keeps_replay_detach_and_actual_shrink_report_set(self):
         calls = []
         def command(argv, folder, label, expected=0, **kwargs):
@@ -197,8 +219,8 @@ class NativeLifetimeWorkflowTests(TestCase):
             path.write_text('original')
             self.assertNotEqual(qualifier.source_facts(self.root), before)
 
-    def audit_fixture(self, lane='baseline'):
-        folder = self.root / lane; runtime = folder / 'native-runtime'; runtime.mkdir(parents=True)
+    def audit_fixture(self, lane='baseline', *, suffix=''):
+        folder = self.root / (lane + suffix); runtime = folder / 'native-runtime'; runtime.mkdir(parents=True)
         request = {'plain': lane == 'baseline', 'runtime': str(runtime), 'launch_id': 'a' * 32}
         values = {'native-request.json': request,
             'native-application-start.json': {'pid': 23, 'launch_id': request['launch_id']},
@@ -241,7 +263,24 @@ class NativeLifetimeWorkflowTests(TestCase):
         path = folder / 'native-verified-lifetimes.json'; original = json.loads(path.read_text())
         for changes in ({'spans': 1}, {'sdk_pid': 99}, {'lifetimes': []}):
             qualifier.write(path, {**original, **changes})
-            with self.subTest(changes=changes), self.assertRaises(AssertionError):
+            with self.subTest(changes=changes), self.assertRaises((AssertionError, ValueError)):
+                audit.attempt(self.root / 'report.json', folder, entry, 'instrumented_on', witness, (5,))
+
+    def test_lifetime_and_witness_literals_keep_json_integer_boolean_distinctions(self):
+        for index, change in enumerate(('complete', 'path', 'function', 'spans', 'pending', 'loss', 'health')):
+            audit, folder, entry, witness = self.audit_fixture('instrumented_on', suffix=str(index))
+            path = folder / 'native-verified-lifetimes.json'; value = json.loads(path.read_text())
+            if change == 'complete': value['lifetimes'][0]['complete'] = 1
+            elif change == 'path': value['lifetimes'][0]['creation_path'] = [False]
+            elif change == 'function': value['functions'][entry['otelc_runtime_function']] = True
+            elif change == 'spans': witness['spans'] = True
+            elif change == 'pending': witness['pending'] = False
+            elif change == 'loss': witness['losses']['lifetime_lost'] = False
+            elif change == 'health':
+                value['health']['closed'] = 1
+                qualifier.write(folder / 'native-runtime/app/health.json', {**value['health'], 'closed': True})
+            qualifier.write(path, value)
+            with self.subTest(change=change), self.assertRaises(ValueError):
                 audit.attempt(self.root / 'report.json', folder, entry, 'instrumented_on', witness, (5,))
 
     def test_main_pins_sdk_source_and_preserves_noncoverage_products(self):

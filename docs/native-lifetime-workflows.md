@@ -40,6 +40,8 @@ The driver reads the public run envelope: top-level exit/source-preservation/blo
 
 The complete unchanged C report and typed bundle from [run 40204568942](https://github.com/quuxio/oteleq/actions/runs/40204568942), consumer revision `aa19bd27414e0099424111804a5c073b5e406f7f`, are retained in `tests/fixtures/native-lifetime-workflow-c-report.json` and `tests/fixtures/native-lifetime-workflow-c-typed-bundle.json`. Their regression checks fixed byte hashes, the actual report envelope and all four captured observation repeats. Original filesystem/ownership auditing is mocked in that component regression; historical runner paths remain data and are not used as new input locations or product identities. The original downloaded archive has SHA-256 `b9b382f95fb9351be22af2700f4b010f4a2c046cab09af7f9e77846511cc11ba`.
 
+Graph, outcome, termination and literal receipt comparisons use the independent oracle's strict JSON comparison. Python equality does not distinguish `true` from `1` or `32` from `32.0`; those wire-type substitutions must refuse. Actual-bundle controls alter all 28 signedness or bit-width fields and check rejection. Lifetime completion/path, function/span/pending/loss counters and retained health comparisons preserve the same distinctions.
+
 ```sh
 make native-lifetime-workflow-check PYTHON=/absolute/path/to/python
 ```
