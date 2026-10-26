@@ -6,6 +6,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 import socket
 import stat
+import subprocess
 import sys
 import tempfile
 import threading
@@ -67,6 +68,26 @@ def collector(*, status=200, body=b'\x00\xffresponse', mode='normal'):
         server.shutdown()
         server.server_close()
         worker.join(timeout=3)
+
+
+class MakefileTargetsTests(unittest.TestCase):
+    def test_forwarding_target_preserves_existing_observer_recipes(self):
+        root = Path(__file__).resolve().parents[1]
+        recipes = {}
+        for target in ('help', 'node-observer-check', 'observer-check', 'capture-forward-check'):
+            result = subprocess.run(
+                ['make', '--no-print-directory', '-n', target], cwd=root,
+                capture_output=True, text=True, timeout=10,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stderr, '', result.stderr)
+            recipes[target] = result.stdout
+        self.assertIn('tests/node_observer.test.mjs', recipes['node-observer-check'])
+        self.assertNotIn('unittest', recipes['node-observer-check'])
+        self.assertIn("unittest discover -s tests -p 'test_capture_*.py'", recipes['observer-check'])
+        self.assertNotIn('tests/node_observer.test.mjs', recipes['observer-check'])
+        self.assertIn('unittest test_capture_forward test_capture_chunked', recipes['capture-forward-check'])
+        self.assertIn('--fail-under=80', recipes['capture-forward-check'])
 
 
 class ForwardCaptureTests(unittest.TestCase):

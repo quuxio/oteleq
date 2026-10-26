@@ -159,12 +159,12 @@ docs-check: lint examples dependency-audit-check
 	$(MAKE) generation-check
 	$(MAKE) native-lifetime-workflow-check
 
-node-.PHONY: capture-forward-check
+.PHONY: capture-forward-check
 capture-forward-check:
 	PYTHONPATH="$(CURDIR)/tests$${PYTHONPATH:+:$${PYTHONPATH}}" $(PYTHON) -m coverage run --data-file=.capture-forward.coverage --include='*/otelc_capture_forward.py' -m unittest test_capture_forward test_capture_chunked test_capture_observer.ReceiverTests -v
 	$(PYTHON) -m coverage report --data-file=.capture-forward.coverage --include='*/otelc_capture_forward.py' --fail-under=80
 
-observer-check:
+node-observer-check:
 	$(NODE) --test --experimental-test-coverage --test-coverage-include='adapters/generation/node_observe.mjs' --test-coverage-lines=80 --test-coverage-functions=80 --test-coverage-branches=80 tests/node_observer.test.mjs
 
 node-sequence-check:
