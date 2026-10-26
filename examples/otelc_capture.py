@@ -129,11 +129,19 @@ class Receiver(BaseHTTPRequestHandler):
         except OSError:
             self.send_error(408)
             return
-        self.server.bodies.append((self.path, bytes(body)))
-        self.server.received_bytes += size
+        self.received_body(bytes(body))
+
+    def record_body(self, body: bytes) -> None:
+        """Retain one complete entity after the common framing checks."""
+        self.server.bodies.append((self.path, body))
+        self.server.received_bytes += len(body)
         if self.response_event is not None:
             self.response_event["body_index"] = len(self.server.bodies) - 1
             self.response_event["body_received_ns"] = time.monotonic_ns()
+
+    def received_body(self, body: bytes) -> None:
+        """Default capture acknowledges locally; forwarding is a separate opt-in."""
+        self.record_body(body)
         self.send_response(200)
         self.send_header("Content-Length", "0")
         self.end_headers()

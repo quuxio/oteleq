@@ -48,6 +48,7 @@ DEPENDENCY_AUDIT_OUTPUT ?= $(CURDIR)/build/dependency-audit
 .PHONY: help setup lint examples docs-check observer-check generation-check effect-qualification-check node-observer-check node-sequence-check java-observer-check go-observer-check cpp-observer-check generation-cpp-receiver-otelc generation-go-receiver-otelc generation-go-source-otelc generation-java-receiver-otelc generation-otelc generation-policy-otelc generation-rust-otelc rust-semantic-otelc generation-native-otelc generation-shrink-otelc generation-python-project-otelc generation-receiver-otelc generation-node-receiver-otelc generation-go-build-otelc generation-go-project-otelc generation-sequence-otelc generation-typescript-sequence-otelc generation-filesystem-otelc generation-http-otelc resource-otelc capture-otelc report core-check coverage check
 
 help:
+	@printf '%s\n' 'capture-forward-check Test opt-in local Collector forwarding and bounded retained HTTP evidence'
 	@printf '%s\n' 'rust-provider-check Check rebuilt Rust bindings and owned OS monitoring; controlled Python helpers only, no compiler/SDK/Rust application builds'
 	@printf '%s\n' 'native-lifetime-workflow-check Check hosted native lifetime routes and literal qualification oracles'
 	@printf '%s\n' 'native-lifetime-public-check Check native lifetime configuration, caller tool discovery and public orchestration'
@@ -158,7 +159,12 @@ docs-check: lint examples dependency-audit-check
 	$(MAKE) generation-check
 	$(MAKE) native-lifetime-workflow-check
 
-node-observer-check:
+node-.PHONY: capture-forward-check
+capture-forward-check:
+	PYTHONPATH="$(CURDIR)/tests$${PYTHONPATH:+:$${PYTHONPATH}}" $(PYTHON) -m coverage run --data-file=.capture-forward.coverage --include='*/otelc_capture_forward.py' -m unittest test_capture_forward test_capture_chunked test_capture_observer.ReceiverTests -v
+	$(PYTHON) -m coverage report --data-file=.capture-forward.coverage --include='*/otelc_capture_forward.py' --fail-under=80
+
+observer-check:
 	$(NODE) --test --experimental-test-coverage --test-coverage-include='adapters/generation/node_observe.mjs' --test-coverage-lines=80 --test-coverage-functions=80 --test-coverage-branches=80 tests/node_observer.test.mjs
 
 node-sequence-check:
@@ -611,6 +617,7 @@ resource-otelc:
 observer-check:
 	$(PYTHON) -m coverage run --data-file=.observer.coverage --source=examples -m unittest discover -s tests -p 'test_capture_*.py' -v
 	$(PYTHON) -m coverage report --data-file=.observer.coverage --include='*/otelc_capture.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.observer.coverage --include='*/otelc_capture_forward.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.observer.coverage --include='*/otelc_rust_build.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.observer.coverage --include='*/otelc_collection.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.observer.coverage --include='*/otelc_resource.py' --fail-under=80

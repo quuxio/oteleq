@@ -7,6 +7,7 @@ build/
 *.pyc
 __pycache__/
 .observer.coverage
+.capture-forward.coverage
 .generation.coverage
 .effect-qualification.coverage
 .native-provider.coverage
