@@ -6,6 +6,23 @@ import test from 'node:test';
 const require = createRequire(new URL('../ci/markdownlint/package.json', import.meta.url));
 const yaml = require('js-yaml');
 
+function requireCompressedQualification(job, family, retain) {
+  const compress = job.steps.find(step => step.name === 'Compress and verify all terminal qualification and SDK outputs');
+  assert.equal(compress.if, '${{ always() && !cancelled() }}');
+  assert.equal(compress['working-directory'], 'consumer');
+  assert.match(compress.run, /python -m ci\.qualification_bundle pack/);
+  for (const role of ['evidence', 'sdk']) {
+    assert.ok(compress.run.includes(`--root "$RUNNER_TEMP/native-${family}-${role}"`));
+    assert.ok(compress.run.includes(`--store "$RUNNER_TEMP/native-${family}-compressed/${role}"`));
+    assert.ok(retain.with.path.includes(`native-${family}-${role}/`));
+  }
+  assert.match(compress.run, /--confirm-cold --remove-raw/);
+  assert.ok(retain.with.path.includes(`native-${family}-compressed/`));
+  assert.equal(retain.with['compression-level'], 9);
+  assert.equal(retain.with['include-hidden-files'], true);
+  assert.equal(retain.with['if-no-files-found'], 'error');
+}
+
 test('all GitHub workflow files have valid YAML syntax', () => {
   const directory = new URL('../.github/workflows/', import.meta.url);
   const names = readdirSync(directory).filter(name => /\.ya?ml$/.test(name)).sort();
@@ -40,6 +57,7 @@ test('native lifetime qualification uses the reviewed SDK and explicit independe
   assert.equal(retain.if, 'always()');
   assert.equal(retain.with['retention-days'], 7);
   assert.match(retain.with.name, /native-lifetimes-\$\{\{ matrix\.case \}\}/);
+  requireCompressedQualification(job, 'lifetime', retain);
   const sources = job.steps.find(step => step.name === 'Retain exact source archives and source status');
   assert.match(sources.run, /cp consumer\/target\/debug\/quux-oteleq .*consumer-cli/);
   assert.ok(!Object.hasOwn(job, 'secrets'));
@@ -74,7 +92,7 @@ test('native metric workflows cover both languages and every startup state with 
   assert.equal(retain.if, 'always()');
   assert.equal(retain.with['retention-days'], 7);
   assert.match(retain.with.path, /native-metric-evidence/);
-  assert.match(retain.with.path, /native-sdk-build.json/);
+  requireCompressedQualification(job, 'metric', retain);
   const sources = job.steps.find(step => step.name === 'Retain exact source archives and source status');
   assert.match(sources.run, /cp consumer\/target\/debug\/quux-oteleq .*consumer-cli/);
   assert.ok(!Object.hasOwn(job, 'secrets'));
