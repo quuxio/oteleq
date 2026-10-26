@@ -51,6 +51,7 @@ DEPENDENCY_AUDIT_OUTPUT ?= $(CURDIR)/build/dependency-audit
 help:
 	@printf '%s\n' 'native-metric-qualification-check Check independent native metric workflow oracles'
 	@printf '%s\n' 'native-metric-control-check Check native controlled calls, private checkpoints and literal telemetry receipts'
+	@printf '%s\n' 'capture-forward-check Test opt-in local Collector forwarding and bounded retained HTTP evidence'
 	@printf '%s\n' 'rust-provider-check Check rebuilt Rust bindings and owned OS monitoring; controlled Python helpers only, no compiler/SDK/Rust application builds'
 	@printf '%s\n' 'native-lifetime-workflow-check Check hosted native lifetime routes and literal qualification oracles'
 	@printf '%s\n' 'native-lifetime-public-check Check native lifetime configuration, caller tool discovery and public orchestration'
@@ -162,6 +163,11 @@ docs-check: lint examples dependency-audit-check
 	$(MAKE) native-lifetime-workflow-check
 	$(MAKE) native-metric-control-check
 	$(MAKE) native-metric-qualification-check
+
+.PHONY: capture-forward-check
+capture-forward-check:
+	PYTHONPATH="$(CURDIR)/tests$${PYTHONPATH:+:$${PYTHONPATH}}" $(PYTHON) -m coverage run --data-file=.capture-forward.coverage --include='*/otelc_capture_forward.py' -m unittest test_capture_forward test_capture_chunked test_capture_observer.ReceiverTests -v
+	$(PYTHON) -m coverage report --data-file=.capture-forward.coverage --include='*/otelc_capture_forward.py' --fail-under=80
 
 node-observer-check:
 	$(NODE) --test --experimental-test-coverage --test-coverage-include='adapters/generation/node_observe.mjs' --test-coverage-lines=80 --test-coverage-functions=80 --test-coverage-branches=80 tests/node_observer.test.mjs
@@ -639,6 +645,7 @@ resource-otelc:
 observer-check:
 	$(PYTHON) -m coverage run --data-file=.observer.coverage --source=examples -m unittest discover -s tests -p 'test_capture_*.py' -v
 	$(PYTHON) -m coverage report --data-file=.observer.coverage --include='*/otelc_capture.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.observer.coverage --include='*/otelc_capture_forward.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.observer.coverage --include='*/otelc_rust_build.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.observer.coverage --include='*/otelc_collection.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.observer.coverage --include='*/otelc_resource.py' --fail-under=80

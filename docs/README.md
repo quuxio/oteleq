@@ -39,6 +39,7 @@ Updated 26 October 2026, `quux-oteleq compare-workload` runs the Rust comparator
 | [CLI and configuration](cli-and-configuration.md) | Look up current commands/flags and distinguish proposed policy/adapter interfaces |
 | [Completion checklist](completion.md) | Track every remaining full-product acceptance boundary |
 | [Delivery roadmap](roadmap.md) | See implementation stages and acceptance requirements |
+| [OTLP capture and forwarding](capture-forward.md) | Retain bounded original HTTP entities and Collector responses for diagnostic qualification |
 | [Repository quality](quality.md) | Set up pinned checks, inspect published qualification and interpret badges |
 
 The language requirement follows otelc's published [language list](https://github.com/quuxio/otelc/blob/3d5b2d7c9167d9cc6fb1be876a05f83a9d6c6e5a/docs/languages.md) and [schema-2 policy](https://github.com/quuxio/otelc/blob/3d5b2d7c9167d9cc6fb1be876a05f83a9d6c6e5a/docs/common-configuration.md). That reference is a design baseline, not a compatibility claim for future releases.

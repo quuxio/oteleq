@@ -43,6 +43,8 @@ Separate [native lifetime components](docs/native-lifetime-receipt.md) check cal
 
 The [native workflow qualification](docs/qualification/native-workflows-2026-10-26.json) covers ten lifetime fixtures and eight function-only metric startup shards: 1,240 distinct original application launches, 620 instrumented receipts, 114 promotion reports and 532 altered-evidence refusals. Complete raw telemetry, literal state/outcome observations, final SDK health and source/CLI/product bytes have separate retained-byte audits and independent review. This qualifies only the named diagnostic C/C++ profiles. Broader build/receiver support, object/resource live schedules and shipping remain open.
 
+An opt-in [capture-and-forward helper](docs/capture-forward.md) retains original OTLP/HTTP request/response entities against a fixed local Collector for diagnostic qualification. It preserves default local-only capture and keeps HTTP forwarding separate from actual downstream ingestion.
+
 The result is **equivalence over these tests and observations**. It is not a blanket proof that every function is identical.
 
 Declared [numeric argument preconditions](docs/numeric-preconditions.md), such as `start < end`, constrain automatic domain generation and scalar reduction. They remain frozen through generated suites and replay/export, and apply to every supported ordered method call. Their [912-launch qualification](docs/qualification/numeric-preconditions-2026-10-22.json) covers all eight scalar profiles, Java/Node ordered calls, all four retained routes, replay, reduction and 24 prelaunch refusals.
