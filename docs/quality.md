@@ -6,6 +6,8 @@ Experimental [public lifetime profiles](native-lifetime-generation.md) have sepa
 
 CI caches only the pinned `cargo-llvm-cov` executable using an OS, architecture, Rust-toolchain and tool-version key. A cache miss installs the locked version; every run verifies its exact version before running the same formatting, tests and coverage gates. Product sources, build outputs, credentials and telemetry data are not included in this cache. The official cache action is pinned to an immutable revision.
 
+The optional [OTLP/HTTP forwarding witness](capture-forward.md) has a separate `make capture-forward-check` gate and 80% helper floor. Controlled Python loopback fixtures check exact request/response entities, original Collector failures, timeouts, quotas, private file/source integrity and closed cleanup. Existing default receiver/framing regressions remain included. Actual downstream data, benchmark budgets and language/provider admission require their own qualification.
+
 ## Current scope
 
 The [native lifetime caller pipeline](native-lifetime-callers.md) has its own 80% statement floor alongside the existing unit-caller floor in `make native-lifetime-caller-check`. Actual compiler/VFS bindings and literal SDK tooling cover both profiles, original semantic facts, existence-only input changes, restored tool bytes and external path boundaries. Bounded Mach-O controls check matching and altered macOS helper/dSYM UUIDs. A separate genuine LLVM/SDK-input development probe accepts both private caller intents without SDK builds or application launches; public workflow qualification remains open.

@@ -43,6 +43,8 @@ Separate [native lifetime components](docs/native-lifetime-receipt.md) check cal
 
 The [hosted native lifetime driver](docs/native-lifetime-workflows.md) builds the reviewed fixed SDK and executes public generated/retained/reduced/promoted routes in one Linux job, with independent literal return/state/errno expectations and complete raw protobuf/final-health auditing. The qualified exact-revision corpus has 100 distinct application launches, 50 instrumented receipts, nine promotion reports and 28 altered-evidence refusals. Promotion requires changed returns, a newly added function, relocated compiler inputs and new launches. Zero/censored/exception profiles, startup/live states and shipping artefacts still require separate qualification.
 
+An opt-in [capture-and-forward helper](docs/capture-forward.md) retains original OTLP/HTTP request/response entities against a fixed local Collector for diagnostic qualification. It preserves default local-only capture and keeps HTTP forwarding separate from actual downstream ingestion.
+
 The result is **equivalence over these tests and observations**. It is not a blanket proof that every function is identical.
 
 Declared [numeric argument preconditions](docs/numeric-preconditions.md), such as `start < end`, constrain automatic domain generation and scalar reduction. They remain frozen through generated suites and replay/export, and apply to every supported ordered method call. Their [912-launch qualification](docs/qualification/numeric-preconditions-2026-10-22.json) covers all eight scalar profiles, Java/Node ordered calls, all four retained routes, replay, reduction and 24 prelaunch refusals.
