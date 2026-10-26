@@ -215,9 +215,11 @@ class QualificationRecipeTests(unittest.TestCase):
             'PYTHON=/selected/python'], cwd=ROOT, capture_output=True, text=True, check=True)
         self.assertIn('test_generation_native_lifetime_workflow', result.stdout)
         self.assertIn('test_generation_native_lifetime_promotion', result.stdout)
+        self.assertIn('test_generation_native_lifetime_boundaries', result.stdout)
         self.assertIn('--include=\'*/qualify_native_lifetimes.py\'', result.stdout)
         self.assertIn('--data-file=.native-lifetime-workflow.coverage --fail-under=80', result.stdout)
-        for module in ('native_lifetime_otlp', 'native_lifetime_audit', 'native_lifetime_refusals', 'native_prepared_otlp'):
+        for module in ('native_lifetime_cases', 'native_lifetime_test_capture', 'native_lifetime_otlp',
+                       'native_lifetime_audit', 'native_lifetime_refusals', 'native_prepared_otlp'):
             self.assertIn("--include='*/" + module + ".py' --fail-under=80", result.stdout)
         self.assertIn('test_generation_native_lifetime_audit', result.stdout)
         self.assertNotIn('native_launch', result.stdout)

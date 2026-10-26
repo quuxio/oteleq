@@ -12,9 +12,10 @@ import native_prepared_otlp as transport
 import native_prepared_receipt as records
 
 
-def run(source: Path, entry: dict, witness: dict, destination: Path, *, function: str = 'selected') -> dict:
+def run(source: Path, entry: dict, witness: dict, destination: Path, *, function: str = 'selected',
+        mode: str = 'completed') -> dict:
     """A changed summary cannot make any declared corrupt capture acceptable."""
-    audit.verify(source, entry, witness, plain=False, function=function)
+    audit.verify(source, entry, witness, plain=False, function=function, mode=mode)
     destination.mkdir()
     manifest = records.read(source / 'http-capture.json')
     names = ['policy.toml', 'http-capture.json', 'http-responses.json',
@@ -26,13 +27,15 @@ def run(source: Path, entry: dict, witness: dict, destination: Path, *, function
     for row in manifest['bodies']:
         if row['path'] == '/v1/traces':
             message = ExportTraceServiceRequest.FromString((source / row['file']).read_bytes())
-            if any(span.name == 'Item lifetime' for span in transport.groups(
+            selected_name = entry['otelc_runtime_function'] if mode == 'zero' else 'Item lifetime'
+            if any(span.name == selected_name for span in transport.groups(
                     message, entry['language'], records.read(source / 'native-runtime/native-request.json')['policy']['resource']['service_name'], traces=True)):
                 trace_name = row['file']
     assert trace_name is not None
-    changes = ('creation-link', 'completion-type', 'missing-span', 'malformed-protobuf', 'failed-response',
+    signal_changes = ('unexpected-span', 'function-type') if mode == 'zero' else ('creation-link', 'completion-type')
+    changes = (*signal_changes, 'missing-span', 'malformed-protobuf', 'failed-response',
                'completed-units', 'censored-units', 'span-units', 'metric-units', 'closed-type',
-               'summary-spans', 'witness-hash', 'witness-type', 'declared-completion')
+               'summary-spans', 'witness-hash', 'witness-type', 'declared-zero' if mode == 'zero' else 'declared-completion')
     refused = []
     try:
         for name in changes:
@@ -43,13 +46,18 @@ def run(source: Path, entry: dict, witness: dict, destination: Path, *, function
             altered = copy.deepcopy(witness)
             def write(filename: str, value: object) -> None:
                 (folder / filename).write_text(json.dumps(value))
-            if name in ('creation-link', 'completion-type', 'missing-span'):
+            if name in (*signal_changes, 'missing-span'):
                 message = ExportTraceServiceRequest.FromString((folder / trace_name).read_bytes())
                 for resource in message.resource_spans:
                     for scope in resource.scope_spans:
                         for index, span in enumerate(scope.spans):
-                            if span.name != 'Item lifetime': continue
-                            if name == 'creation-link':
+                            if span.name != selected_name: continue
+                            if name == 'unexpected-span':
+                                scope.spans.add().CopyFrom(span)
+                                scope.spans[-1].name = 'Item lifetime'
+                            elif name == 'function-type':
+                                span.attributes[0].value.bool_value = True
+                            elif name == 'creation-link':
                                 old = span.links[0].span_id
                                 span.links[0].span_id = bytes([old[0] ^ 1]) + old[1:]
                             elif name == 'completion-type':
@@ -66,23 +74,25 @@ def run(source: Path, entry: dict, witness: dict, destination: Path, *, function
                 value = records.read(folder / 'native-runtime/app/health.json')
                 key = 'object_accounting' if entry['language'] == 'cpp' else 'resource_accounting'
                 if name == 'completed-units': value[key]['completed'] = '2'
-                elif name == 'censored-units': value[key]['censored'] = '1'
-                elif name == 'span-units': value['span_accounting']['sampled_ended'] = '1'
+                elif name == 'censored-units': value[key]['censored'] = '0' if mode == 'censored' else '1'
+                elif name == 'span-units': value['span_accounting']['sampled_ended'] = '2' if mode == 'zero' else '1'
                 elif name == 'metric-units': value['metric_exports']['units_succeeded'] = '0'
                 elif name == 'closed-type': value[key]['closed'] = 1
                 write('native-runtime/app/health.json', value)
                 summary = records.read(folder / 'native-verified-lifetimes.json'); summary['health'] = value
                 write('native-verified-lifetimes.json', summary)
             elif name == 'summary-spans':
-                value = records.read(folder / 'native-verified-lifetimes.json'); value['spans'] = 1
+                value = records.read(folder / 'native-verified-lifetimes.json'); value['spans'] = 2 if mode == 'zero' else 1
                 write('native-verified-lifetimes.json', value)
             elif name == 'witness-hash': altered['raw_otlp_sha256'] = '0' * 64
             elif name == 'witness-type': altered['spans'] = True
-            elif name == 'declared-completion':
-                value = records.read(folder / 'expected-lifetimes-before-build.json'); value['observations'][0]['complete'] = 1
+            elif name in ('declared-completion', 'declared-zero'):
+                value = records.read(folder / 'expected-lifetimes-before-build.json')
+                if mode == 'zero': value['observations'] = [{'complete': False}]
+                else: value['observations'][0]['complete'] = 1
                 write('expected-lifetimes-before-build.json', value)
             try:
-                audit.verify(folder, entry, altered, plain=False, function=function)
+                audit.verify(folder, entry, altered, plain=False, function=function, mode=mode)
             except ValueError:
                 refused.append(name)
                 # Each deliberately corrupt copy is disposable. Unexpected
@@ -93,7 +103,7 @@ def run(source: Path, entry: dict, witness: dict, destination: Path, *, function
     finally:
         for filename, expected in held.items():
             records.same(records.identity(source / filename, owned=True), expected)
-    result = {'refused': refused, 'count': len(refused), 'original_capture_files_preserved': len(held),
+    result = {'refused': refused, 'count': len(refused), 'mode': mode, 'original_capture_files_preserved': len(held),
               'new_application_launches': 0, 'scope': 'Altered raw/health/summary copies; original SDK records unchanged'}
     (destination / 'refusals.json').write_text(json.dumps(result, indent=2) + '\n')
     return result

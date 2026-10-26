@@ -2,7 +2,7 @@
 
 <!-- markdownlint-disable MD013 -->
 
-Status: experimental public configuration and orchestration, with [100-launch diagnostic qualification](qualification/native-lifetime-workflows-2026-10-25.json) for the three completed-lifetime fixtures, generated/retained/replayed/reduced routes and current-source promotion. Broader lifetime profiles remain unqualified. Select these profiles only with a matching SDK that provides the complete requested protocol. The existing [function-only profile](native-prepared-provider.md) keeps its separate qualification.
+Status: experimental public configuration and orchestration with [18-shard exact-revision qualification](qualification/native-workflows-2026-10-26.json) for ten named lifetime fixtures and generated/retained/replayed/reduced/promoted routes. Completed, explicit-zero, censored and prescribed C++ exception boundaries have separate original evidence. Select these profiles only with a matching SDK that provides the complete requested protocol. The existing [function-only profile](native-prepared-provider.md) keeps its separate qualification.
 
 ## Configure independent expectations
 
@@ -53,7 +53,7 @@ This establishes equivalence over the declared application tests and observation
 
 ## Contributor checks and remaining qualification
 
-The separate [hosted workflow driver](native-lifetime-workflows.md) builds a fixed noncoverage SDK and exercises actual public generated/framework/replayed/detached/reduced/promoted routes in one Linux job, with literal return/state/errno oracles and original source/product facts. Its exact `55d5476` execution and independent retained-byte audit cover 100 applications and 50 instrumented receipts, with 28 altered-evidence refusals. Zero/censored/exception profiles, startup/live states and broader qualification remain separate requirements.
+The separate [hosted workflow driver](native-lifetime-workflows.md) builds a fixed noncoverage SDK and exercises genuine public routes with literal return/state/errno oracles and original source/product facts. The ten-fixture corpus has 296 original applications, 148 instrumented receipts and 140 altered-evidence refusals. The earlier 100-launch completed-lifetime record remains independently scoped.
 
 ```sh
 make native-lifetime-public-check PYTHON=/absolute/path/to/python
@@ -61,4 +61,4 @@ make native-lifetime-public-check PYTHON=/absolute/path/to/python
 
 The target checks literal query discovery, explicit profiles, independent expectations, prebuild ordering, public orchestration, unchanged function-only behaviour and separate module coverage floors of 80%. It executes no compiler, SDK build or application. Other caller/build/receipt targets retain their own real-compiler or literal scope. Both new modules are embedded in the Rust distribution and included in generator identity. The example policy is parsed and validated by a regression.
 
-Actual generated/framework/detached execution, replay, reduction and current-source promotion still need exact-revision qualification with matching fixed SDK products. Startup metric states, same-process live controls, broader callable/build support, production artefacts and platform/performance qualification remain separate open requirements in the [completion checklist](completion.md).
+The recorded generated/framework/detached execution, replay, reduction and current-source promotion retain exact source/CLI/SDK identities. Broader callable/build support, native lifetime/resource live schedules, production artefacts and platform/performance qualification remain open in the [completion checklist](completion.md). Function-only live metric schedules have their separate [qualification](native-metric-workflows.md).

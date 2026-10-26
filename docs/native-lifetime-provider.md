@@ -2,7 +2,7 @@
 
 <!-- markdownlint-disable MD013 -->
 
-Status: independent negotiation, SDK source binding, build/inventory readers, owned preparation/final health and a separate [raw lifetime receipt](native-lifetime-receipt.md) component. Experimental [public lifetime profiles](native-lifetime-generation.md) connect these components to generated scalar callers and explicit fixture expectations. Their separate [100-launch lifetime qualification](qualification/native-lifetime-workflows-2026-10-25.json) covers three completed-lifetime fixtures and generated/retained/promoted routes; broader profiles remain open. The [qualified prepared project profile](native-prepared-provider.md) remains the function-only build3 route and retains its separate evidence.
+Status: independent SDK negotiation, source-bound build/inventory readers and owned execution feed the [public lifetime profiles](native-lifetime-generation.md). The [ten-fixture qualification](qualification/native-workflows-2026-10-26.json) covers their declared completed, zero, censored and exception workflows. The [prepared project profile](native-prepared-provider.md) remains a separate function-only build3 route.
 
 ## Explicit contracts
 

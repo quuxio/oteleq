@@ -18,3 +18,5 @@ __pycache__/
 .native-lifetime-caller.coverage
 .native-lifetime-public.coverage
 .native-lifetime-workflow.coverage
+.native-metric-control.coverage
+.native-metric-qualification.coverage

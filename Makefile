@@ -31,6 +31,7 @@ DEPENDENCY_AUDIT_OUTPUT ?= $(CURDIR)/build/dependency-audit
 .PHONY: native-lifetime-caller-check
 .PHONY: native-lifetime-public-check
 .PHONY: native-lifetime-workflow-check
+.PHONY: native-metric-control-check
 .PHONY: generation-go-controls-otelc
 
 .PHONY: generation-project-tests-otelc generation-preconditions-otelc generation-domains-otelc generation-input-walks-otelc generation-retained-source-otelc generation-native-project-otelc generation-return-otelc generation-java-sequence-otelc generation-java-controls-otelc generation-java-project-otelc generation-java-archive-otelc generation-node-project-otelc
@@ -48,6 +49,8 @@ DEPENDENCY_AUDIT_OUTPUT ?= $(CURDIR)/build/dependency-audit
 .PHONY: help setup lint examples docs-check observer-check generation-check effect-qualification-check node-observer-check node-sequence-check java-observer-check go-observer-check cpp-observer-check generation-cpp-receiver-otelc generation-go-receiver-otelc generation-go-source-otelc generation-java-receiver-otelc generation-otelc generation-policy-otelc generation-rust-otelc rust-semantic-otelc generation-native-otelc generation-shrink-otelc generation-python-project-otelc generation-receiver-otelc generation-node-receiver-otelc generation-go-build-otelc generation-go-project-otelc generation-sequence-otelc generation-typescript-sequence-otelc generation-filesystem-otelc generation-http-otelc resource-otelc capture-otelc report core-check coverage check
 
 help:
+	@printf '%s\n' 'native-metric-qualification-check Check independent native metric workflow oracles'
+	@printf '%s\n' 'native-metric-control-check Check native controlled calls, private checkpoints and literal telemetry receipts'
 	@printf '%s\n' 'capture-forward-check Test opt-in local Collector forwarding and bounded retained HTTP evidence'
 	@printf '%s\n' 'rust-provider-check Check rebuilt Rust bindings and owned OS monitoring; controlled Python helpers only, no compiler/SDK/Rust application builds'
 	@printf '%s\n' 'native-lifetime-workflow-check Check hosted native lifetime routes and literal qualification oracles'
@@ -158,6 +161,8 @@ docs-check: lint examples dependency-audit-check
 	$(MAKE) observer-check
 	$(MAKE) generation-check
 	$(MAKE) native-lifetime-workflow-check
+	$(MAKE) native-metric-control-check
+	$(MAKE) native-metric-qualification-check
 
 .PHONY: capture-forward-check
 capture-forward-check:
@@ -243,13 +248,36 @@ native-lifetime-public-check:
 	$(PYTHON) -m coverage report --data-file=.native-lifetime-public.coverage --include='*/native_source_run.py' --fail-under=80
 
 native-lifetime-workflow-check:
-	PYTHONPATH="$(CURDIR)/tests$${PYTHONPATH:+:$${PYTHONPATH}}" $(PYTHON) -m coverage run --data-file=.native-lifetime-workflow.coverage --include='*/qualify_native_lifetimes.py,*/native_lifetime_audit.py,*/native_lifetime_otlp.py,*/native_lifetime_refusals.py,*/native_prepared_otlp.py' -m unittest test_generation_native_lifetime_workflow test_generation_native_lifetime_promotion test_generation_native_lifetime_audit test_generation_native_receipt_qualification -v
+	PYTHONPATH="$(CURDIR)/tests$${PYTHONPATH:+:$${PYTHONPATH}}" $(PYTHON) -m coverage run --data-file=.native-lifetime-workflow.coverage --include='*/qualify_native_lifetimes.py,*/native_lifetime_cases.py,*/native_lifetime_audit.py,*/native_lifetime_otlp.py,*/native_lifetime_refusals.py,*/native_prepared_otlp.py,*/native_lifetime_test_capture.py' -m unittest test_generation_native_lifetime_workflow test_generation_native_lifetime_promotion test_generation_native_lifetime_boundaries test_generation_native_lifetime_errors test_generation_native_lifetime_audit test_generation_native_receipt_qualification -v
 	$(PYTHON) -m coverage report --data-file=.native-lifetime-workflow.coverage --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.native-lifetime-workflow.coverage --include='*/qualify_native_lifetimes.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.native-lifetime-workflow.coverage --include='*/native_lifetime_cases.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.native-lifetime-workflow.coverage --include='*/native_lifetime_test_capture.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.native-lifetime-workflow.coverage --include='*/native_lifetime_audit.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.native-lifetime-workflow.coverage --include='*/native_lifetime_otlp.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.native-lifetime-workflow.coverage --include='*/native_lifetime_refusals.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.native-lifetime-workflow.coverage --include='*/native_prepared_otlp.py' --fail-under=80
+
+.PHONY: native-metric-qualification-check
+native-metric-qualification-check:
+	PYTHONPATH="$(CURDIR)/tests$${PYTHONPATH:+:$${PYTHONPATH}}" $(PYTHON) -m coverage run --data-file=.native-metric-qualification.coverage --include='*/native_metric_cases.py,*/native_metric_frames.py,*/native_metric_health.py,*/native_metric_otlp.py,*/native_metric_histogram.py,*/native_metric_receipt.py,*/native_metric_test_capture.py,*/native_metric_refusals.py,*/qualify_native_metrics.py' -m unittest test_generation_native_metric_qualification test_generation_native_metric_workflow test_generation_native_metric_histogram test_generation_native_receipt_qualification -v
+	$(PYTHON) -m coverage report --data-file=.native-metric-qualification.coverage --include='*/native_metric_cases.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.native-metric-qualification.coverage --include='*/native_metric_histogram.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.native-metric-qualification.coverage --include='*/native_metric_frames.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.native-metric-qualification.coverage --include='*/native_metric_health.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.native-metric-qualification.coverage --include='*/native_metric_otlp.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.native-metric-qualification.coverage --include='*/native_metric_receipt.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.native-metric-qualification.coverage --include='*/native_metric_test_capture.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.native-metric-qualification.coverage --include='*/native_metric_refusals.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.native-metric-qualification.coverage --include='*/qualify_native_metrics.py' --fail-under=80
+
+native-metric-control-check:
+	PYTHONPATH="$(CURDIR)/tests$${PYTHONPATH:+:$${PYTHONPATH}}" $(PYTHON) -m coverage run --data-file=.native-metric-control.coverage --include='*/native_control.py,*/native_rendezvous.py,*/native_sequence.py,*/native_live.py,*/native_control_receipt.py' -m unittest test_generation_native_controls test_generation_native_rendezvous test_generation_native_sequence test_generation_native_live test_generation_native_control_receipt test_generation_native_session test_generation_native_source test_generation_native_source_run -v
+	$(PYTHON) -m coverage report --data-file=.native-metric-control.coverage --include='*/native_control.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.native-metric-control.coverage --include='*/native_rendezvous.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.native-metric-control.coverage --include='*/native_sequence.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.native-metric-control.coverage --include='*/native_live.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.native-metric-control.coverage --include='*/native_control_receipt.py' --fail-under=80
 
 native-caller-check:
 	PYTHONPATH="$(CURDIR)/tests$${PYTHONPATH:+:$${PYTHONPATH}}" $(PYTHON) -m coverage run --data-file=.native-caller.coverage --include='*/native_unit_caller.py,*/native_workers.py,*/native_frontend.py' -m unittest test_generation_native_callers test_generation_native_workers test_generation_native_frontend -v

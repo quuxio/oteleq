@@ -6,6 +6,7 @@ on:
       - '.github/workflows/native-lifetimes.yml'
       - 'tests/qualify_native_lifetimes.py'
       - 'tests/native_lifetime_audit.py'
+      - 'tests/native_lifetime_cases.py'
       - 'tests/native_lifetime_otlp.py'
       - 'tests/native_lifetime_refusals.py'
       - 'tests/native_prepared_otlp.py'
@@ -16,6 +17,12 @@ permissions:
 
 jobs:
   native-lifetimes:
+    name: native-lifetimes (${{ matrix.case }})
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        case: [cpp-target-error, c-completed, cpp-completed, c-state, c-zero, cpp-zero, c-censored, cpp-censored, cpp-unwind, cpp-throwing-destructor]
     runs-on: ubuntu-24.04
     timeout-minutes: 360
     env:
@@ -60,11 +67,15 @@ jobs:
             --otelc-root "$GITHUB_WORKSPACE/provider" \
             --sdk-build "$RUNNER_TEMP/native-lifetime-sdk" \
             --report-dir "$RUNNER_TEMP/native-lifetime-evidence" \
-            --cli "$GITHUB_WORKSPACE/consumer/target/debug/quux-oteleq"
+            --cli "$GITHUB_WORKSPACE/consumer/target/debug/quux-oteleq" \
+            --case '${{ matrix.case }}'
       - name: Retain exact source archives and source status
         if: always()
         run: |
           mkdir -p "$RUNNER_TEMP/native-lifetime-evidence"
+          if test -f consumer/target/debug/quux-oteleq; then
+            cp consumer/target/debug/quux-oteleq "$RUNNER_TEMP/native-lifetime-evidence/consumer-cli"
+          fi
           git -C consumer archive --format=tar --output "$RUNNER_TEMP/native-lifetime-evidence/consumer-source.tar" HEAD
           git -C provider archive --format=tar --output "$RUNNER_TEMP/native-lifetime-evidence/provider-source.tar" HEAD
           git -C consumer status --porcelain > "$RUNNER_TEMP/native-lifetime-evidence/consumer-source-status.txt"
@@ -75,7 +86,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
-          name: native-lifetimes-${{ github.run_id }}-${{ github.run_attempt }}
+          name: native-lifetimes-${{ matrix.case }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             ${{ runner.temp }}/native-lifetime-evidence/
             ${{ runner.temp }}/native-lifetime-sdk/native-sdk-build.json

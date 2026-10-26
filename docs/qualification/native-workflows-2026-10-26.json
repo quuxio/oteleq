@@ -1,0 +1,700 @@
+{
+  "qualification_schema_version": 1,
+  "date": "2026-10-26",
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "platform": {
+    "os": "Ubuntu 24.04",
+    "architecture": "x86_64",
+    "llvm": "22.1.8",
+    "python": "3.12"
+  },
+  "cohorts": [
+    {
+      "name": "metric",
+      "qualifier_source_commit": "5ff52e0de07aaeb7f5395e35082a7dbc05b45266",
+      "workflow_run": 40247112800,
+      "workflow_url": "https://github.com/quuxio/oteleq/actions/runs/40247112800",
+      "all_original_jobs_success": true,
+      "captured_byte_aggregate_sha256": "7f93348efdb046c6c07537a5b459114ef252b537276c6adcf54c16f16a3ad007",
+      "unique_launch_ids": 944,
+      "launch_ids_sha256": "6e6d5270e153fbd52afa2c3508fa04c437105a5ffae7944ff99aa5e7c582bbc5",
+      "results": {
+        "distinct_application_records": 944,
+        "instrumented_receipts": 472,
+        "archived_reports_audited": 244,
+        "promotion_reports": 84,
+        "actual_altered_capture_refusals": 392,
+        "selected_original_files_preserved": 109420
+      },
+      "complete_raw_totals": {
+        "spans": 4128,
+        "metric_points": 5346,
+        "trace_requests": 1888,
+        "metric_requests": 2596
+      },
+      "cases": [
+        {
+          "name": "c-00",
+          "artifact_id": 12621144445,
+          "original_zip_sha256": "404e053e77f3143a0c6aec83ccfbd099e57cd57cd341cf697868c3667ebd0e8a",
+          "captured_byte_audit_sha256": "b93a1b49c66eadb54536ef75bd544c06fab6cdcdf1a151e1e0ff45c2e23f8559",
+          "results": {
+            "distinct_application_records": 104,
+            "instrumented_receipts": 52,
+            "archived_reports_audited": 27,
+            "promotion_reports": 9,
+            "actual_altered_capture_refusals": 42,
+            "selected_original_files_preserved": 12133
+          },
+          "observed_tool_bytes": {
+            "consumer_cli": {
+              "sha256": "f3931841d8e8b160052629de5c79aa3db60ae8adacfb44a75d72c80ec625e005",
+              "bytes": 35385864
+            },
+            "consumer": {
+              "files": 711,
+              "source_tar_sha256": "45bac7b702bea897c9f5200d1c13acdf41c7bd6705c70e73fbbcc65c6882772e"
+            },
+            "provider": {
+              "files": 503,
+              "source_tar_sha256": "39b932e83dce61c415652d828992843a998e505debfbc77d7e712754b3d2ff5d"
+            },
+            "sdk_original_product_sha256": {
+              "libotelc_native_runtime.so": "6163b983ebbbb66d373f140260731c618e9d7502355c5932a22cb3eadfe18b72",
+              "native-sdk-build.json": "521baea7e40fdbf00c7437eb6da876276ab7e5e52fca5802f784e18da01e59f7"
+            }
+          }
+        },
+        {
+          "name": "c-01",
+          "artifact_id": 12620289597,
+          "original_zip_sha256": "288d8a3e0ba9cbd487e6d504bdfe48c87b43db5aee0f0d5920ae45649bdf03e0",
+          "captured_byte_audit_sha256": "5ab46d401fafe4c70602e88f2f8a83beafe509283206573aff3fd419ab40bad4",
+          "results": {
+            "distinct_application_records": 104,
+            "instrumented_receipts": 52,
+            "archived_reports_audited": 27,
+            "promotion_reports": 9,
+            "actual_altered_capture_refusals": 42,
+            "selected_original_files_preserved": 12187
+          },
+          "observed_tool_bytes": {
+            "consumer_cli": {
+              "sha256": "f3931841d8e8b160052629de5c79aa3db60ae8adacfb44a75d72c80ec625e005",
+              "bytes": 35385864
+            },
+            "consumer": {
+              "files": 711,
+              "source_tar_sha256": "45bac7b702bea897c9f5200d1c13acdf41c7bd6705c70e73fbbcc65c6882772e"
+            },
+            "provider": {
+              "files": 503,
+              "source_tar_sha256": "39b932e83dce61c415652d828992843a998e505debfbc77d7e712754b3d2ff5d"
+            },
+            "sdk_original_product_sha256": {
+              "native-sdk-build.json": "521baea7e40fdbf00c7437eb6da876276ab7e5e52fca5802f784e18da01e59f7",
+              "libotelc_native_runtime.so": "6163b983ebbbb66d373f140260731c618e9d7502355c5932a22cb3eadfe18b72"
+            }
+          }
+        },
+        {
+          "name": "c-10",
+          "artifact_id": 12620679843,
+          "original_zip_sha256": "7f8b61be0573bd13283f70627c38f341acc533b21cb2a6f63d57e90d95c73410",
+          "captured_byte_audit_sha256": "a78d748c872212cf68a3718f20a512f8523aab4c339d23f56784356ff332a44b",
+          "results": {
+            "distinct_application_records": 104,
+            "instrumented_receipts": 52,
+            "archived_reports_audited": 27,
+            "promotion_reports": 9,
+            "actual_altered_capture_refusals": 42,
+            "selected_original_files_preserved": 12187
+          },
+          "observed_tool_bytes": {
+            "consumer_cli": {
+              "sha256": "f3931841d8e8b160052629de5c79aa3db60ae8adacfb44a75d72c80ec625e005",
+              "bytes": 35385864
+            },
+            "consumer": {
+              "files": 711,
+              "source_tar_sha256": "45bac7b702bea897c9f5200d1c13acdf41c7bd6705c70e73fbbcc65c6882772e"
+            },
+            "provider": {
+              "files": 503,
+              "source_tar_sha256": "39b932e83dce61c415652d828992843a998e505debfbc77d7e712754b3d2ff5d"
+            },
+            "sdk_original_product_sha256": {
+              "native-sdk-build.json": "521baea7e40fdbf00c7437eb6da876276ab7e5e52fca5802f784e18da01e59f7",
+              "libotelc_native_runtime.so": "6163b983ebbbb66d373f140260731c618e9d7502355c5932a22cb3eadfe18b72"
+            }
+          }
+        },
+        {
+          "name": "c-11",
+          "artifact_id": 12619819958,
+          "original_zip_sha256": "8d884811437af58d4cd0d29a5d3676967dcfef9d23b1a5e9e5941d5aacccd813",
+          "captured_byte_audit_sha256": "6bbb7e1265bdf626abb370c6e42d616b6ff815615228a1111f94be042030cd8c",
+          "results": {
+            "distinct_application_records": 104,
+            "instrumented_receipts": 52,
+            "archived_reports_audited": 27,
+            "promotion_reports": 9,
+            "actual_altered_capture_refusals": 42,
+            "selected_original_files_preserved": 12133
+          },
+          "observed_tool_bytes": {
+            "consumer_cli": {
+              "sha256": "f3931841d8e8b160052629de5c79aa3db60ae8adacfb44a75d72c80ec625e005",
+              "bytes": 35385864
+            },
+            "consumer": {
+              "files": 711,
+              "source_tar_sha256": "45bac7b702bea897c9f5200d1c13acdf41c7bd6705c70e73fbbcc65c6882772e"
+            },
+            "provider": {
+              "files": 503,
+              "source_tar_sha256": "39b932e83dce61c415652d828992843a998e505debfbc77d7e712754b3d2ff5d"
+            },
+            "sdk_original_product_sha256": {
+              "libotelc_native_runtime.so": "6163b983ebbbb66d373f140260731c618e9d7502355c5932a22cb3eadfe18b72",
+              "native-sdk-build.json": "521baea7e40fdbf00c7437eb6da876276ab7e5e52fca5802f784e18da01e59f7"
+            }
+          }
+        },
+        {
+          "name": "cpp-00",
+          "artifact_id": 12626366584,
+          "original_zip_sha256": "f79879b3e5f672946bf0849c3caa3bdc2c631d97e28e8ba5dced65c6cd44c1da",
+          "captured_byte_audit_sha256": "ba3895112ad6b152efaede6ab06a81d28a383c0f86c97ec1cf8127ff692c17e4",
+          "results": {
+            "distinct_application_records": 132,
+            "instrumented_receipts": 66,
+            "archived_reports_audited": 34,
+            "promotion_reports": 12,
+            "actual_altered_capture_refusals": 56,
+            "selected_original_files_preserved": 15161
+          },
+          "observed_tool_bytes": {
+            "consumer_cli": {
+              "sha256": "f3931841d8e8b160052629de5c79aa3db60ae8adacfb44a75d72c80ec625e005",
+              "bytes": 35385864
+            },
+            "consumer": {
+              "files": 711,
+              "source_tar_sha256": "45bac7b702bea897c9f5200d1c13acdf41c7bd6705c70e73fbbcc65c6882772e"
+            },
+            "provider": {
+              "files": 503,
+              "source_tar_sha256": "39b932e83dce61c415652d828992843a998e505debfbc77d7e712754b3d2ff5d"
+            },
+            "sdk_original_product_sha256": {
+              "libotelc_native_runtime.so": "6163b983ebbbb66d373f140260731c618e9d7502355c5932a22cb3eadfe18b72",
+              "native-sdk-build.json": "521baea7e40fdbf00c7437eb6da876276ab7e5e52fca5802f784e18da01e59f7"
+            }
+          }
+        },
+        {
+          "name": "cpp-01",
+          "artifact_id": 12624321948,
+          "original_zip_sha256": "6c65c3dd3db1bd122be29758b183274bae0accaaae13184d10b77773903c0a5a",
+          "captured_byte_audit_sha256": "803d23b7b8499dbb15675695f0857f6b2b9ea1bb37d57ff564babd9dd5a9645e",
+          "results": {
+            "distinct_application_records": 132,
+            "instrumented_receipts": 66,
+            "archived_reports_audited": 34,
+            "promotion_reports": 12,
+            "actual_altered_capture_refusals": 56,
+            "selected_original_files_preserved": 15229
+          },
+          "observed_tool_bytes": {
+            "consumer_cli": {
+              "sha256": "f3931841d8e8b160052629de5c79aa3db60ae8adacfb44a75d72c80ec625e005",
+              "bytes": 35385864
+            },
+            "consumer": {
+              "files": 711,
+              "source_tar_sha256": "45bac7b702bea897c9f5200d1c13acdf41c7bd6705c70e73fbbcc65c6882772e"
+            },
+            "provider": {
+              "files": 503,
+              "source_tar_sha256": "39b932e83dce61c415652d828992843a998e505debfbc77d7e712754b3d2ff5d"
+            },
+            "sdk_original_product_sha256": {
+              "native-sdk-build.json": "521baea7e40fdbf00c7437eb6da876276ab7e5e52fca5802f784e18da01e59f7",
+              "libotelc_native_runtime.so": "6163b983ebbbb66d373f140260731c618e9d7502355c5932a22cb3eadfe18b72"
+            }
+          }
+        },
+        {
+          "name": "cpp-10",
+          "artifact_id": 12625254855,
+          "original_zip_sha256": "17028ce01a7e7bee5a79e4479bd2dba0ec9d9915bd080d88b57c1f00432d3998",
+          "captured_byte_audit_sha256": "f3ea36434362c1a62166a2aa67a6f1fbee6b7c50dd04d8f15ccfd39bb0c536b0",
+          "results": {
+            "distinct_application_records": 132,
+            "instrumented_receipts": 66,
+            "archived_reports_audited": 34,
+            "promotion_reports": 12,
+            "actual_altered_capture_refusals": 56,
+            "selected_original_files_preserved": 15229
+          },
+          "observed_tool_bytes": {
+            "consumer_cli": {
+              "sha256": "f3931841d8e8b160052629de5c79aa3db60ae8adacfb44a75d72c80ec625e005",
+              "bytes": 35385864
+            },
+            "consumer": {
+              "files": 711,
+              "source_tar_sha256": "45bac7b702bea897c9f5200d1c13acdf41c7bd6705c70e73fbbcc65c6882772e"
+            },
+            "provider": {
+              "files": 503,
+              "source_tar_sha256": "39b932e83dce61c415652d828992843a998e505debfbc77d7e712754b3d2ff5d"
+            },
+            "sdk_original_product_sha256": {
+              "libotelc_native_runtime.so": "6163b983ebbbb66d373f140260731c618e9d7502355c5932a22cb3eadfe18b72",
+              "native-sdk-build.json": "521baea7e40fdbf00c7437eb6da876276ab7e5e52fca5802f784e18da01e59f7"
+            }
+          }
+        },
+        {
+          "name": "cpp-11",
+          "artifact_id": 12624626214,
+          "original_zip_sha256": "7cacba5494db6b632be944cb9b2dbd4c9b3b630a57b92ea4d65fae94876e9da9",
+          "captured_byte_audit_sha256": "d69138cfe24fc20a92c1ebea76df42a70593c806068ebd8fbe49921e82cccd27",
+          "results": {
+            "distinct_application_records": 132,
+            "instrumented_receipts": 66,
+            "archived_reports_audited": 34,
+            "promotion_reports": 12,
+            "actual_altered_capture_refusals": 56,
+            "selected_original_files_preserved": 15161
+          },
+          "observed_tool_bytes": {
+            "consumer_cli": {
+              "sha256": "f3931841d8e8b160052629de5c79aa3db60ae8adacfb44a75d72c80ec625e005",
+              "bytes": 35385864
+            },
+            "consumer": {
+              "files": 711,
+              "source_tar_sha256": "45bac7b702bea897c9f5200d1c13acdf41c7bd6705c70e73fbbcc65c6882772e"
+            },
+            "provider": {
+              "files": 503,
+              "source_tar_sha256": "39b932e83dce61c415652d828992843a998e505debfbc77d7e712754b3d2ff5d"
+            },
+            "sdk_original_product_sha256": {
+              "libotelc_native_runtime.so": "6163b983ebbbb66d373f140260731c618e9d7502355c5932a22cb3eadfe18b72",
+              "native-sdk-build.json": "521baea7e40fdbf00c7437eb6da876276ab7e5e52fca5802f784e18da01e59f7"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "lifetime",
+      "qualifier_source_commit": "d1b1a0ef8fa2ae1fb38cc5e7a69d18d53cb45805",
+      "workflow_run": 40246431600,
+      "workflow_url": "https://github.com/quuxio/oteleq/actions/runs/40246431600",
+      "all_original_jobs_success": true,
+      "captured_byte_aggregate_sha256": "36e40ba8332d5a983d99390f00c02c5919c5ed1b4da0e0516c335b9da5448945",
+      "unique_launch_ids": 296,
+      "launch_ids_sha256": "30bbc2e86b59271560aa62e65541cd56b8d953e4a73e4febdf3fc2b69879fe6c",
+      "results": {
+        "actual_application_launch_records": 296,
+        "instrumented_raw_receipts": 148,
+        "reports": 75,
+        "current_source_promotion_reports": 30,
+        "fresh_altered_copy_refusals": 140,
+        "selected_evidence_files_preserved": 39797
+      },
+      "complete_raw_totals": {
+        "spans": 268,
+        "metric_points": 1580,
+        "trace_requests": 148,
+        "metric_requests": 296
+      },
+      "cases": [
+        {
+          "name": "c-censored",
+          "artifact_id": 12624441600,
+          "original_zip_sha256": "8905daaa7f8a36b8c0a58c51091844dd2b400703ac872a0fd385f712a7f15717",
+          "captured_byte_audit_sha256": "394f9b25068bba22ff228d905ab649c8587852f410878e5e8a1fb0bb154a9c5d",
+          "results": {
+            "actual_application_launch_records": 28,
+            "instrumented_raw_receipts": 14,
+            "reports": 7,
+            "current_source_promotion_reports": 3,
+            "fresh_altered_copy_refusals": 14,
+            "selected_evidence_files_preserved": 3722
+          },
+          "observed_tool_bytes": {
+            "cli_sha256": "aec1c14a22c4001e4835975ae406c33d8b58c44a42dc44f39c3b7df1e42043a5",
+            "source_catalogues": {
+              "consumer": {
+                "head": "d1b1a0ef8fa2ae1fb38cc5e7a69d18d53cb45805",
+                "files": 685,
+                "tar_sha256": "c58722a17201a2a5dba56ca2ba7483730cba06b841d00d85ebcfffdac7a879d9"
+              },
+              "provider": {
+                "head": "acb13d7735526448209df37b7e6b98e5717befdb",
+                "files": 503,
+                "tar_sha256": "39b932e83dce61c415652d828992843a998e505debfbc77d7e712754b3d2ff5d"
+              }
+            },
+            "sdk_products": {
+              "native-sdk-build.json": "b4f4ddbfa492b19a4866380511041105f370984d3a1a5403bd6cca3309872097",
+              "libotelc_native_runtime.so": "11925611d26c55f2c544e93da2977279c34fe4525800d8d37bcf72fe42286cb3"
+            }
+          }
+        },
+        {
+          "name": "c-completed",
+          "artifact_id": 12619697686,
+          "original_zip_sha256": "5ae9e885330ac83e45616c6d0c867442b4907059ceec43d9e1d69d5818beb4b5",
+          "captured_byte_audit_sha256": "5282519eed9a3b0d92e03fc30c172ae3ead5c1260faa3019ec8bc92624128a05",
+          "results": {
+            "actual_application_launch_records": 28,
+            "instrumented_raw_receipts": 14,
+            "reports": 7,
+            "current_source_promotion_reports": 3,
+            "fresh_altered_copy_refusals": 14,
+            "selected_evidence_files_preserved": 3722
+          },
+          "observed_tool_bytes": {
+            "cli_sha256": "aec1c14a22c4001e4835975ae406c33d8b58c44a42dc44f39c3b7df1e42043a5",
+            "source_catalogues": {
+              "consumer": {
+                "head": "d1b1a0ef8fa2ae1fb38cc5e7a69d18d53cb45805",
+                "files": 685,
+                "tar_sha256": "c58722a17201a2a5dba56ca2ba7483730cba06b841d00d85ebcfffdac7a879d9"
+              },
+              "provider": {
+                "head": "acb13d7735526448209df37b7e6b98e5717befdb",
+                "files": 503,
+                "tar_sha256": "39b932e83dce61c415652d828992843a998e505debfbc77d7e712754b3d2ff5d"
+              }
+            },
+            "sdk_products": {
+              "native-sdk-build.json": "b4f4ddbfa492b19a4866380511041105f370984d3a1a5403bd6cca3309872097",
+              "libotelc_native_runtime.so": "11925611d26c55f2c544e93da2977279c34fe4525800d8d37bcf72fe42286cb3"
+            }
+          }
+        },
+        {
+          "name": "c-state",
+          "artifact_id": 12622306063,
+          "original_zip_sha256": "d4d4cd086a4036a342351458dd645dfa26fdef39c74d6211dd20c85ab80e0055",
+          "captured_byte_audit_sha256": "e0bf4bc6b831d0a3b39554d9c269dff0171d55a882776c55d99bd103838b78ae",
+          "results": {
+            "actual_application_launch_records": 44,
+            "instrumented_raw_receipts": 22,
+            "reports": 12,
+            "current_source_promotion_reports": 3,
+            "fresh_altered_copy_refusals": 14,
+            "selected_evidence_files_preserved": 6299
+          },
+          "observed_tool_bytes": {
+            "cli_sha256": "aec1c14a22c4001e4835975ae406c33d8b58c44a42dc44f39c3b7df1e42043a5",
+            "source_catalogues": {
+              "consumer": {
+                "head": "d1b1a0ef8fa2ae1fb38cc5e7a69d18d53cb45805",
+                "files": 685,
+                "tar_sha256": "c58722a17201a2a5dba56ca2ba7483730cba06b841d00d85ebcfffdac7a879d9"
+              },
+              "provider": {
+                "head": "acb13d7735526448209df37b7e6b98e5717befdb",
+                "files": 503,
+                "tar_sha256": "39b932e83dce61c415652d828992843a998e505debfbc77d7e712754b3d2ff5d"
+              }
+            },
+            "sdk_products": {
+              "native-sdk-build.json": "b4f4ddbfa492b19a4866380511041105f370984d3a1a5403bd6cca3309872097",
+              "libotelc_native_runtime.so": "11925611d26c55f2c544e93da2977279c34fe4525800d8d37bcf72fe42286cb3"
+            }
+          }
+        },
+        {
+          "name": "c-zero",
+          "artifact_id": 12622209824,
+          "original_zip_sha256": "07439f73dc78c5c926fb20edc7d4d2d3f0298f2602be48cc2976626b254b6ad8",
+          "captured_byte_audit_sha256": "fe66b974f6f623dab5f3ec6fcda5cc43776586a4cb1ede0492e1a37a75617033",
+          "results": {
+            "actual_application_launch_records": 28,
+            "instrumented_raw_receipts": 14,
+            "reports": 7,
+            "current_source_promotion_reports": 3,
+            "fresh_altered_copy_refusals": 14,
+            "selected_evidence_files_preserved": 3722
+          },
+          "observed_tool_bytes": {
+            "cli_sha256": "aec1c14a22c4001e4835975ae406c33d8b58c44a42dc44f39c3b7df1e42043a5",
+            "source_catalogues": {
+              "consumer": {
+                "head": "d1b1a0ef8fa2ae1fb38cc5e7a69d18d53cb45805",
+                "files": 685,
+                "tar_sha256": "c58722a17201a2a5dba56ca2ba7483730cba06b841d00d85ebcfffdac7a879d9"
+              },
+              "provider": {
+                "head": "acb13d7735526448209df37b7e6b98e5717befdb",
+                "files": 503,
+                "tar_sha256": "39b932e83dce61c415652d828992843a998e505debfbc77d7e712754b3d2ff5d"
+              }
+            },
+            "sdk_products": {
+              "native-sdk-build.json": "b4f4ddbfa492b19a4866380511041105f370984d3a1a5403bd6cca3309872097",
+              "libotelc_native_runtime.so": "11925611d26c55f2c544e93da2977279c34fe4525800d8d37bcf72fe42286cb3"
+            }
+          }
+        },
+        {
+          "name": "cpp-censored",
+          "artifact_id": 12625346031,
+          "original_zip_sha256": "5237eb3f41d6b4000cc71138daf9c2558561bf4b91e1a131d9e876144be4adcf",
+          "captured_byte_audit_sha256": "98d9b2bba3713892c65769a8e922d8d493a261892967d3b918b039ed0e48b2f1",
+          "results": {
+            "actual_application_launch_records": 28,
+            "instrumented_raw_receipts": 14,
+            "reports": 7,
+            "current_source_promotion_reports": 3,
+            "fresh_altered_copy_refusals": 14,
+            "selected_evidence_files_preserved": 3722
+          },
+          "observed_tool_bytes": {
+            "cli_sha256": "aec1c14a22c4001e4835975ae406c33d8b58c44a42dc44f39c3b7df1e42043a5",
+            "source_catalogues": {
+              "consumer": {
+                "head": "d1b1a0ef8fa2ae1fb38cc5e7a69d18d53cb45805",
+                "files": 685,
+                "tar_sha256": "c58722a17201a2a5dba56ca2ba7483730cba06b841d00d85ebcfffdac7a879d9"
+              },
+              "provider": {
+                "head": "acb13d7735526448209df37b7e6b98e5717befdb",
+                "files": 503,
+                "tar_sha256": "39b932e83dce61c415652d828992843a998e505debfbc77d7e712754b3d2ff5d"
+              }
+            },
+            "sdk_products": {
+              "native-sdk-build.json": "b4f4ddbfa492b19a4866380511041105f370984d3a1a5403bd6cca3309872097",
+              "libotelc_native_runtime.so": "11925611d26c55f2c544e93da2977279c34fe4525800d8d37bcf72fe42286cb3"
+            }
+          }
+        },
+        {
+          "name": "cpp-completed",
+          "artifact_id": 12621488555,
+          "original_zip_sha256": "ff492f250347f44552e1b51e5895a86897e59efc8797c10a621fe6141ea7f0f8",
+          "captured_byte_audit_sha256": "36abac024a140b9ecb7bdf1651b5b01f54e5afb76f2f5eaf2700fa3b5b156e6e",
+          "results": {
+            "actual_application_launch_records": 28,
+            "instrumented_raw_receipts": 14,
+            "reports": 7,
+            "current_source_promotion_reports": 3,
+            "fresh_altered_copy_refusals": 14,
+            "selected_evidence_files_preserved": 3722
+          },
+          "observed_tool_bytes": {
+            "cli_sha256": "aec1c14a22c4001e4835975ae406c33d8b58c44a42dc44f39c3b7df1e42043a5",
+            "source_catalogues": {
+              "consumer": {
+                "head": "d1b1a0ef8fa2ae1fb38cc5e7a69d18d53cb45805",
+                "files": 685,
+                "tar_sha256": "c58722a17201a2a5dba56ca2ba7483730cba06b841d00d85ebcfffdac7a879d9"
+              },
+              "provider": {
+                "head": "acb13d7735526448209df37b7e6b98e5717befdb",
+                "files": 503,
+                "tar_sha256": "39b932e83dce61c415652d828992843a998e505debfbc77d7e712754b3d2ff5d"
+              }
+            },
+            "sdk_products": {
+              "native-sdk-build.json": "b4f4ddbfa492b19a4866380511041105f370984d3a1a5403bd6cca3309872097",
+              "libotelc_native_runtime.so": "11925611d26c55f2c544e93da2977279c34fe4525800d8d37bcf72fe42286cb3"
+            }
+          }
+        },
+        {
+          "name": "cpp-target-error",
+          "artifact_id": 12620850732,
+          "original_zip_sha256": "51a853afb3a24d516d77711216eed102532af7cec7ea0253903bb4bf6e8e5141",
+          "captured_byte_audit_sha256": "5e0702891817fa5ef74893f387eb9cdabaf46cb17486d9b1001e13014bf03a3f",
+          "results": {
+            "actual_application_launch_records": 28,
+            "instrumented_raw_receipts": 14,
+            "reports": 7,
+            "current_source_promotion_reports": 3,
+            "fresh_altered_copy_refusals": 14,
+            "selected_evidence_files_preserved": 3722
+          },
+          "observed_tool_bytes": {
+            "cli_sha256": "aec1c14a22c4001e4835975ae406c33d8b58c44a42dc44f39c3b7df1e42043a5",
+            "source_catalogues": {
+              "consumer": {
+                "head": "d1b1a0ef8fa2ae1fb38cc5e7a69d18d53cb45805",
+                "files": 685,
+                "tar_sha256": "c58722a17201a2a5dba56ca2ba7483730cba06b841d00d85ebcfffdac7a879d9"
+              },
+              "provider": {
+                "head": "acb13d7735526448209df37b7e6b98e5717befdb",
+                "files": 503,
+                "tar_sha256": "39b932e83dce61c415652d828992843a998e505debfbc77d7e712754b3d2ff5d"
+              }
+            },
+            "sdk_products": {
+              "native-sdk-build.json": "b4f4ddbfa492b19a4866380511041105f370984d3a1a5403bd6cca3309872097",
+              "libotelc_native_runtime.so": "11925611d26c55f2c544e93da2977279c34fe4525800d8d37bcf72fe42286cb3"
+            }
+          }
+        },
+        {
+          "name": "cpp-throwing-destructor",
+          "artifact_id": 12626866528,
+          "original_zip_sha256": "acf7f90bcbcc85f28df6e483f4a9f13067cd814882a1f64efd27c7e39587ff38",
+          "captured_byte_audit_sha256": "00d5901194d7813dbb2bda8db7a6be24ee21ad50a9662454e611ba05b3d0ebb9",
+          "results": {
+            "actual_application_launch_records": 28,
+            "instrumented_raw_receipts": 14,
+            "reports": 7,
+            "current_source_promotion_reports": 3,
+            "fresh_altered_copy_refusals": 14,
+            "selected_evidence_files_preserved": 3722
+          },
+          "observed_tool_bytes": {
+            "cli_sha256": "aec1c14a22c4001e4835975ae406c33d8b58c44a42dc44f39c3b7df1e42043a5",
+            "source_catalogues": {
+              "consumer": {
+                "head": "d1b1a0ef8fa2ae1fb38cc5e7a69d18d53cb45805",
+                "files": 685,
+                "tar_sha256": "c58722a17201a2a5dba56ca2ba7483730cba06b841d00d85ebcfffdac7a879d9"
+              },
+              "provider": {
+                "head": "acb13d7735526448209df37b7e6b98e5717befdb",
+                "files": 503,
+                "tar_sha256": "39b932e83dce61c415652d828992843a998e505debfbc77d7e712754b3d2ff5d"
+              }
+            },
+            "sdk_products": {
+              "native-sdk-build.json": "b4f4ddbfa492b19a4866380511041105f370984d3a1a5403bd6cca3309872097",
+              "libotelc_native_runtime.so": "11925611d26c55f2c544e93da2977279c34fe4525800d8d37bcf72fe42286cb3"
+            }
+          }
+        },
+        {
+          "name": "cpp-unwind",
+          "artifact_id": 12625674155,
+          "original_zip_sha256": "00fd6a0a5a1ca148636d92059e3b0843f485c9cd74ca7d012ae77c4f98ae193a",
+          "captured_byte_audit_sha256": "2bb2d91a968608b680e52e0cc43197a1dfc29db093d513c326ae7d55865f8769",
+          "results": {
+            "actual_application_launch_records": 28,
+            "instrumented_raw_receipts": 14,
+            "reports": 7,
+            "current_source_promotion_reports": 3,
+            "fresh_altered_copy_refusals": 14,
+            "selected_evidence_files_preserved": 3722
+          },
+          "observed_tool_bytes": {
+            "cli_sha256": "aec1c14a22c4001e4835975ae406c33d8b58c44a42dc44f39c3b7df1e42043a5",
+            "source_catalogues": {
+              "consumer": {
+                "head": "d1b1a0ef8fa2ae1fb38cc5e7a69d18d53cb45805",
+                "files": 685,
+                "tar_sha256": "c58722a17201a2a5dba56ca2ba7483730cba06b841d00d85ebcfffdac7a879d9"
+              },
+              "provider": {
+                "head": "acb13d7735526448209df37b7e6b98e5717befdb",
+                "files": 503,
+                "tar_sha256": "39b932e83dce61c415652d828992843a998e505debfbc77d7e712754b3d2ff5d"
+              }
+            },
+            "sdk_products": {
+              "native-sdk-build.json": "b4f4ddbfa492b19a4866380511041105f370984d3a1a5403bd6cca3309872097",
+              "libotelc_native_runtime.so": "11925611d26c55f2c544e93da2977279c34fe4525800d8d37bcf72fe42286cb3"
+            }
+          }
+        },
+        {
+          "name": "cpp-zero",
+          "artifact_id": 12623462683,
+          "original_zip_sha256": "61381ee985f3c1562cbe2fc08f0923059190c06d56861d5f5706fed8ed8f777b",
+          "captured_byte_audit_sha256": "9e0090d9fe00fc46a9a3147ae213880e25062ed71c4d353d27940c178e8d991f",
+          "results": {
+            "actual_application_launch_records": 28,
+            "instrumented_raw_receipts": 14,
+            "reports": 7,
+            "current_source_promotion_reports": 3,
+            "fresh_altered_copy_refusals": 14,
+            "selected_evidence_files_preserved": 3722
+          },
+          "observed_tool_bytes": {
+            "cli_sha256": "aec1c14a22c4001e4835975ae406c33d8b58c44a42dc44f39c3b7df1e42043a5",
+            "source_catalogues": {
+              "consumer": {
+                "head": "d1b1a0ef8fa2ae1fb38cc5e7a69d18d53cb45805",
+                "files": 685,
+                "tar_sha256": "c58722a17201a2a5dba56ca2ba7483730cba06b841d00d85ebcfffdac7a879d9"
+              },
+              "provider": {
+                "head": "acb13d7735526448209df37b7e6b98e5717befdb",
+                "files": 503,
+                "tar_sha256": "39b932e83dce61c415652d828992843a998e505debfbc77d7e712754b3d2ff5d"
+              }
+            },
+            "sdk_products": {
+              "native-sdk-build.json": "b4f4ddbfa492b19a4866380511041105f370984d3a1a5403bd6cca3309872097",
+              "libotelc_native_runtime.so": "11925611d26c55f2c544e93da2977279c34fe4525800d8d37bcf72fe42286cb3"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "results": {
+    "unique_launch_ids": 1240,
+    "instrumented_receipts": 620,
+    "reports": 319,
+    "promotion_reports": 114,
+    "fresh_altered_evidence_refusals": 532,
+    "selected_original_files": 149217
+  },
+  "preservation": {
+    "all_original_zip_archives_retained": true,
+    "consumer_source_facts_held": 1396,
+    "source_catalogues": [
+      {
+        "head": "5ff52e0de07aaeb7f5395e35082a7dbc05b45266",
+        "files": 711,
+        "archive_sha256": "45bac7b702bea897c9f5200d1c13acdf41c7bd6705c70e73fbbcc65c6882772e"
+      },
+      {
+        "head": "d1b1a0ef8fa2ae1fb38cc5e7a69d18d53cb45805",
+        "files": 685,
+        "archive_sha256": "c58722a17201a2a5dba56ca2ba7483730cba06b841d00d85ebcfffdac7a879d9"
+      }
+    ],
+    "latest_three_selection_trees": "temporary private copies removed after byte audit; original archives retained",
+    "historical_runner_ownership_recertified": false
+  },
+  "independent_review": {
+    "review_sha256": "5d3fb5804c0390544687c0c0fd4bb8f0f36eef5a5178f96a4723254d7108358a",
+    "all_original_selected_zip_members_streamed": 149217,
+    "fresh_helper_tests_each_python": 19,
+    "fresh_cpp11_refusals": 56,
+    "other_recorded_refusals_hash_bound_not_rerun": 476
+  },
+  "combined_captured_byte_audit_sha256": "ac186d62bec39f2bcc6b805d4bbf798b3f16ecad68f4fe66cce41968c93335f1",
+  "observations": [
+    "C and C++ normal, recursive and restored intermediate-state calls across every initial collection/emission state; C++ also has prescribed target errors",
+    "Ten declared native lifetime fixtures: completed, explicit zero, censored, normal destructor exit during outer unwinding, throwing destructor and escaping selected-target error",
+    "Generated execution/framework, replay, detached suites, scalar reduction and changed-source/new-callable promotion",
+    "Complete raw function/lifetime trace trees, cumulative metric series, disabled transport windows, final SDK accounting and literal typed outcomes",
+    "Observed original CLI bytes are retained separately from qualifier source identity; copied observations do not create launches"
+  ],
+  "limitations": [
+    "Only the declared synchronous diagnostic scalar free functions and named compiler/build profiles are qualified",
+    "Original runner kernel, inode, ownership and time facts remain historical observations",
+    "Current SDK replacements, additional platforms/toolchains, general dependency/build graphs, receivers and variable per-call arguments need separate qualification",
+    "Native lifetime/resource live schedules, concurrency, invocation-scoped attribution, performance and shipping artefacts remain open",
+    "These corpora do not complete any broader project requirement by themselves"
+  ]
+}

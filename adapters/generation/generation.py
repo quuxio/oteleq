@@ -752,6 +752,8 @@ def generator_identity():
         'native_lifetime_caller.py', 'native_lifetime_frontend.py', 'native_lifetime_policy.py',
         'native_unit_caller.py', 'native_prepared.py', 'native_health.py', 'native_execution.py',
         'native_session.py', 'native_telemetry.py', 'native_source.py', 'native_source_run.py',
+        'native_control.py', 'native_rendezvous.py', 'native_rendezvous.h', 'native_sequence.py',
+        'native_live.py', 'native_control_receipt.py',
         'native_profile.py', 'native_project.py', 'native_dependencies.py', 'native_frontend.py',
         'native_discover.cpp', 'native_context.py', 'native_workers.py', 'native_workspace.py',
         'owned_workspace.py', 'preconditions.py', 'project_tests.py', 'project_runner.py',
@@ -1085,7 +1087,7 @@ def baseline_receipt(entry, folder, bodies):
     if sequences.controls(entry):
         if node_source.enabled(entry):
             node_control_receipt.read(folder, entry, bodies, plain=True)
-        elif entry["language"] not in ("python", "go"):
+        elif entry["language"] not in ("python", "go") and not native_source.enabled(entry):
             java_control_receipt.read(folder, entry, read(folder / "process.json")["pid"], bodies, plain=True)
 
 
@@ -1106,7 +1108,8 @@ def qualify_attempt(data, entry, lane, folder, result, bodies, errors, service, 
     witness = None
     if native_source.enabled(entry):
         native_source.require(isinstance(native_runtime, native_source_run.Run), 'missing owned native execution')
-        witness = native_runtime.witness(bodies, service, (entry['otelc_runtime_function'],), folder)
+        witness = native_runtime.witness(bodies, service,
+                                        (entry['otelc_runtime_function'],) * sequences.call_count(entry), folder)
         if lane == 'baseline':
             baseline_receipt(entry, folder, bodies)
     elif go_source.enabled(entry):
@@ -1185,10 +1188,12 @@ def attempt_receiver_options(entry, runtime):
     options = {"max_requests": java_provider.MAX_TELEMETRY_REQUESTS} if runtime is not None else {}
     if go_source.enabled(entry) and sequences.controls(entry):
         options["max_requests"] = go_source_run.go_live.MAX_TELEMETRY_REQUESTS
-    if entry.get("language") in ("cpp", "python") and "sequence_configuration" in entry:
+    if entry.get("language") in ("c", "cpp", "python") and "sequence_configuration" in entry:
         requests = max(capture.MAX_REQUESTS, 2 * sequences.call_count(entry))
         if requests > capture.MAX_REQUESTS:
             options["max_requests"] = requests
+    if native_source.enabled(entry) and sequences.controls(entry):
+        options['max_requests'] = native_source_run.native_live.MAX_TELEMETRY_REQUESTS
     if node_source.enabled(entry) or go_source.enabled(entry):
         options["allow_chunked"] = True
     return options
@@ -1268,7 +1273,8 @@ def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, ht
                                                         "provider": entry.get("typescript_provider")})
         if native_source.enabled(entry):
             native_run = native_source_run.prepare(sys.modules[__name__], workspace, data, entry, case,
-                                                    project, tools, env, folder, config, lane)
+                                                    project, tools, env, folder, config, lane,
+                                                    **({'bodies': bodies} if sequences.controls(entry) else {}))
             command = native_prepared.command(native_run.prepared.intent)
         elif 'native_context' in entry:
             prefix = [root / 'target/debug/quux-otelc', '--config', config, '--language', language]
@@ -1331,9 +1337,7 @@ def attempt_with_runtime(workspace, data, entry, case, lane, folder, decoder, ht
 def execution_options(entry, case, lane, folder, runtime, bodies, env, *, service=None, python_session=None, go_session=None, native_session=None):
     """Add only explicitly requested process recording and live host checkpoints."""
     if native_source.enabled(entry):
-        native_source.require(isinstance(native_session, native_owned.Session),
-                                               'missing native owned session')
-        return {'record_process': True, 'interaction': native_session}
+        return native_execution_options(entry, native_session, env)
     if go_source.enabled(entry):
         expected = go_source_run.go_live.Session if sequences.controls(entry) else go_source_run.go_launch.Session
         go_source.require(isinstance(go_session, expected), "missing native Go ready/release or live session")
@@ -1357,6 +1361,14 @@ def execution_options(entry, case, lane, folder, runtime, bodies, env, *, servic
         env.update(interaction.environment())
         options['interaction'] = interaction
     return options
+
+
+def native_execution_options(entry, session, env):
+    """Bind native process recording to its prepared owner and optional checkpoints."""
+    native_source.require(isinstance(session, native_owned.Session), 'missing native owned session')
+    if sequences.controls(entry):
+        env.update(session.environment())
+    return {'record_process': True, 'interaction': session}
 
 
 def attempt_build_options(runtime, context):

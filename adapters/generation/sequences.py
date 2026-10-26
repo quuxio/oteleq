@@ -11,10 +11,12 @@ MAX_STEPS = 32
 
 
 def fixture(value: dict, expected_outcome: Callable) -> list[dict]:
-    """An action schedule always belongs to a declared independently built receiver."""
-    if "receiver" not in value:
-        raise ValueError("fixture.sequence requires a declared receiver")
-    return validate(value["sequence"], expected_outcome)
+    """Free-function schedules require explicit metric states on unchanged inputs."""
+    result = validate(value["sequence"], expected_outcome)
+    if "receiver" not in value and any(step['action'] != 'call' or step['arguments'] != 'case'
+                                        or 'metrics' not in step for step in result):
+        raise ValueError("fixture.sequence requires a declared receiver or controlled native case calls")
+    return result
 
 
 def validate(value: Any, expected_outcome: Callable) -> list[dict]:
@@ -73,6 +75,11 @@ def collection(step: dict) -> dict:
 def configure(entry: dict, value: list[dict], coerce: Callable) -> None:
     """Requested unavailable adapters remain named inventory blockers."""
     language = entry["language"]
+    if language in ('c', 'cpp') and entry.get('native_backend') == 'prepared':
+        import native_sequence
+        native_sequence.configuration(entry, value)
+        entry['sequence_configuration'] = copy.deepcopy(value)
+        return
     receiver = "cpp_receiver" if language == "cpp" else "receiver_fixture"
     if language not in ("python", "javascript", "typescript", "java", "cpp", "go") or receiver not in entry:
         raise ValueError("sequences require a declared Python/C++/Go/Java/JavaScript/TypeScript receiver fixture")
@@ -86,10 +93,15 @@ def configure(entry: dict, value: list[dict], coerce: Callable) -> None:
     if (entry["language"] == "typescript" and any(step["action"] == "collect" for step in value)
             and entry.get("typescript_backend") not in ("source", "native")):
         raise ValueError("TypeScript collection requires an explicitly selected emitter")
+    configure_arguments(entry, value, coerce)
+    entry["sequence_configuration"] = copy.deepcopy(value)
+
+
+def configure_arguments(entry: dict, value: list[dict], coerce: Callable) -> None:
+    """Check explicit call arguments before retaining a receiver schedule."""
     for step in value:
         if step["action"] == "call" and step["arguments"] != "case":
             require_arguments(entry, step["arguments"], coerce(entry, step["arguments"]))
-    entry["sequence_configuration"] = copy.deepcopy(value)
 
 
 def configure_controls(entry: dict, value: list[dict]) -> None:

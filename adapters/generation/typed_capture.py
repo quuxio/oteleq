@@ -466,6 +466,9 @@ def observation(raw: bytes, entry: dict, contract: dict) -> dict[str, Any]:
     language = entry["language"]
     if language == "cpp" and "cpp_receiver" in entry:
         boundaries = cpp_graph.boundaries(raw, entry, native_scalar)
+    elif language in ('c', 'cpp') and 'sequence_configuration' in entry:
+        import native_sequence
+        boundaries = native_sequence.decode(raw, entry)
     elif language == "go" and "receiver_fixture" in entry:
         boundaries = go_graph.boundaries(raw, entry)
     elif language == "java" and "receiver_fixture" in entry:

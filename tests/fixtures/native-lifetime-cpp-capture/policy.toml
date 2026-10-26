@@ -1,0 +1,35 @@
+schema_version = 3
+languages = ["cpp"]
+[resource]
+service_name = "oteleq-gen-31f019de95c34ddb91094bf4d471bc41"
+[export]
+endpoint = "http://127.0.0.1:38555"
+interval_ms = 1000
+timeout_ms = 1000
+shutdown_timeout_ms = 10000
+[sources]
+include = ["build/compile_commands.json", "include/item.h", "src/app.cpp", "src/keep.cpp"]
+exclude = []
+[functions]
+include = ["selected(int)"]
+exclude = []
+[metrics]
+collection = true
+emission = true
+histogram_boundaries_seconds = [1e-06, 1e-05, 0.0001, 0.001, 0.01, 0.1, 1.0]
+[traces]
+enabled = true
+sample_ratio = 1.0
+[lifetimes]
+enabled = true
+include = ["Item"]
+exclude = []
+max_live = 4096
+release_methods = ["close"]
+[context]
+tasks = false
+http = false
+[benchmark]
+iterations = 10000
+samples = 15
+warmup = 5

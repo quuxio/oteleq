@@ -22,6 +22,9 @@ import native_source
 import native_unit_build
 import native_unit_caller
 import native_telemetry
+import native_live
+import native_control_receipt
+import sequences
 
 
 @dataclass(frozen=True)
@@ -35,6 +38,7 @@ class Run:
     lifetimes: native_lifetime_intent.Intent | None = None
     frontend: native_lifetime_frontend.Context | None = None
     expected_before_build: native_inputs.Record | None = None
+    controls: native_live.Session | None = None
 
     def verify(self, folder: Path) -> None:
         """Repeat semantic input checks after execution, preserving original facts."""
@@ -48,10 +52,16 @@ class Run:
             self.lifetimes.verify()
         require(self.session.execution is not None, 'native worker lacks owned completion')
         self.session.execution.verify()
+        if self.controls is not None:
+            require(self.controls.entry_json == self.caller.source.entry_json,
+                    'native controls differ from frozen compiler caller inputs')
+            self.controls.verify()
         self.caller.recheck(folder / 'native-after-execution-inputs', self.execute)
 
     def witness(self, bodies: list, service: str, roots: tuple[str, ...], folder: Path):
         """Keep function-only and independently declared lifetime receipts distinct."""
+        if self.controls is not None:
+            return native_control_receipt.witness(self.session.execution, self.controls, bodies, service, roots, folder)
         if self.lifetimes is None:
             return native_telemetry.witness(self.session.execution, bodies, service, roots, folder=folder)
         require(self.lifetimes.roots == roots and service == self.prepared.intent.policy()['resource']['service_name'],
@@ -68,7 +78,7 @@ class Run:
 
 
 def prepare(workflow, workspace: Path, data: dict, entry: dict, case: dict, project: Path,
-            tools: dict, environment: dict, folder: Path, config: Path, lane: str) -> Run:
+            tools: dict, environment: dict, folder: Path, config: Path, lane: str, *, bodies: list | None = None) -> Run:
     """Freeze every caller input before invoking the public producer commands."""
     require(native_source.enabled(entry) and lane in ('baseline', 'instrumented_on'), 'invalid prepared native lane')
     root = Path(data['otelc_root'])
@@ -146,5 +156,9 @@ def prepare(workflow, workspace: Path, data: dict, entry: dict, case: dict, proj
         frontend.verify()
         expectations = native_lifetime_intent.freeze(launch, folder / 'expected-lifetimes.json',
             (entry['otelc_runtime_function'],), observations)
-    return Run(caller, launch, native_session.Session(launch), execute,
-               expectations, frontend, expected_record)
+    controls = None
+    if sequences.controls(entry):
+        controls = native_live.Session(launch, folder, entry, case['sequence'], case['arguments'], bodies,
+                                      data['configuration']['limits']['max_capture_bytes'])
+    owner = native_session.Session(launch, **({'controls': controls} if controls is not None else {}))
+    return Run(caller, launch, owner, execute, expectations, frontend, expected_record, controls)

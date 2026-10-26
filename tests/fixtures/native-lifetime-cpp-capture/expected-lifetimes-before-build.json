@@ -1,0 +1,1 @@
+{"kind":"oteleq.native.lifetime-before-build","observations":[{"complete":true,"creation_path":[0],"exception_exit":false,"name":"Item","release_path":[0],"type_usr":"c:@S@Item"}],"roots":["src/app.cpp::selected(int)"],"schema_version":1}

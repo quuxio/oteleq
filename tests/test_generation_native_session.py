@@ -21,8 +21,8 @@ import native_session as session
 from test_generation_native_execution import complete, start, write
 
 
-def setup(root: Path):
-    launch, _ = start(root)
+def setup(root: Path, *, plain: bool = False):
+    launch, _ = start(root, plain=plain)
     records = [(launch.intent.runtime / name, json.loads((launch.intent.runtime / name).read_bytes()))
                for name in prepared.START_FILES]
     for path, _ in records: path.unlink()

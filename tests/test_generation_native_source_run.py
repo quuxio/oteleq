@@ -15,6 +15,7 @@ import generation
 import native_session
 import native_source
 import native_source_run as run
+import sequences
 
 
 class NativeSourceRunTests(unittest.TestCase):
@@ -33,7 +34,7 @@ class NativeSourceRunTests(unittest.TestCase):
         self.data = {'otelc_root': str(self.base / 'sdk'), 'native_projects': {'c': {'directories': []}},
                      'source_sha256': 'original', 'configuration': {'limits': {'max_capture_bytes': 4096}}}
 
-    def prepare(self, lane='baseline', status=0):
+    def prepare(self, lane='baseline', status=0, *, case=None, bodies=None):
         caller = Mock()
         caller.intent.output = self.folder / 'native-build'
         caller.intent.recipe.return_value = {'schema_version': 1, 'kind': 'independent-test-recipe'}
@@ -59,8 +60,9 @@ class NativeSourceRunTests(unittest.TestCase):
             freeze = stack.enter_context(patch.object(run.native_prepared, 'freeze', return_value=intent))
             stack.enter_context(patch.object(run.native_prepared, 'read', return_value=prepared))
             stack.enter_context(patch.object(run.native_session, 'Session', return_value=session))
-            result = run.prepare(workflow, self.base, self.data, self.entry, {'arguments': [5]}, self.project,
-                                 self.tools, {'ORIGINAL': 'value'}, self.folder, self.config, lane)
+            result = run.prepare(workflow, self.base, self.data, self.entry, case or {'arguments': [5]}, self.project,
+                                 self.tools, {'ORIGINAL': 'value'}, self.folder, self.config, lane,
+                                 **({'bodies': bodies} if bodies is not None else {}))
         return result, workflow, frozen, freeze
 
     def test_public_builder_and_preparer_use_fixed_argv_and_original_policy(self):
@@ -127,6 +129,58 @@ class NativeSourceRunTests(unittest.TestCase):
         with patch.object(generation.native_telemetry, 'witness', return_value=None):
             generation.qualify_attempt(self.data, self.entry, 'baseline', self.folder, completed, [], [], 'actual-service', None,
                                        native_runtime=owned)
+
+    def controlled_entry(self):
+        self.entry['expected_baseline'] = {'kind': 'return'}
+        self.entry['sequence_configuration'] = [{'action': 'call', 'arguments': 'case',
+            'metrics': {'collection': flag, 'emission': True}} for flag in (True, False)]
+
+    def test_controlled_preparation_receives_the_frozen_case_and_original_receiver(self):
+        self.controlled_entry()
+        case = {'arguments': [5], 'sequence': sequences.concrete(self.entry, [5], lambda entry, args: args)}
+        bodies = []
+        with patch.object(run.native_live, 'Session') as live:
+            result, _, _, _ = self.prepare(case=case, bodies=bodies)
+        self.assertIs(result.controls, live.return_value)
+        self.assertEqual(live.call_args.args[2:5], (self.entry, case['sequence'], [5]))
+        self.assertIs(live.call_args.args[5], bodies)
+        self.assertEqual(live.call_args.args[6], 4096)
+
+    def test_executor_adds_only_the_native_live_bindings_for_controlled_calls(self):
+        self.controlled_entry()
+        owner = object.__new__(native_session.Session)
+        owner.controls = SimpleNamespace(environment=lambda: {'OTELEQ_NATIVE_CONTROL_ROOT': '/private/case'})
+        environment = {'ORIGINAL': 'value'}
+        options = generation.execution_options(self.entry, {}, 'baseline', self.folder, None, [], environment,
+                                               native_session=owner)
+        self.assertIs(options['interaction'], owner)
+        self.assertEqual(environment, {'ORIGINAL': 'value', 'OTELEQ_NATIVE_CONTROL_ROOT': '/private/case'})
+
+    def test_public_qualification_passes_every_declared_native_root_to_the_live_reader(self):
+        self.controlled_entry()
+        (self.folder / 'observation').write_bytes(b'boundary-observation')
+        owned = run.Run(Mock(), Mock(), SimpleNamespace(execution=object()), Mock(), controls=Mock())
+        completed = subprocess.CompletedProcess([], 0, b'', b'')
+        with patch.object(run.native_control_receipt, 'witness', return_value={'spans': 2}) as witness:
+            observed = generation.qualify_attempt(self.data, self.entry, 'instrumented_on', self.folder,
+                completed, [], [], 'actual-service', None, native_runtime=owned)
+        self.assertEqual(observed['witness'], {'spans': 2})
+        self.assertEqual(witness.call_args.args[4], ('selected.c::selected',) * 2)
+
+    def test_native_capture_reserves_every_live_flush_trace_and_periodic_request(self):
+        self.controlled_entry()
+        for language in ('c', 'cpp'):
+            for count in (1, 2, 16, 32):
+                entry = {**self.entry, 'language': language,
+                         'sequence_configuration': [self.entry['sequence_configuration'][0]] * count}
+                options = generation.attempt_receiver_options(entry, None)
+                with self.subTest(language=language, calls=count):
+                    self.assertEqual(options['max_requests'], run.native_live.MAX_TELEMETRY_REQUESTS)
+                    self.assertGreater(options['max_requests'], 4 * count)
+                    self.assertNotIn('max_bytes', options)
+                    self.assertNotIn('allow_chunked', options)
+            single = {key: value for key, value in entry.items() if key != 'sequence_configuration'}
+            self.assertEqual(generation.attempt_receiver_options(single, None), {})
 
 
 if __name__ == '__main__':
