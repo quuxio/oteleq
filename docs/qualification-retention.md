@@ -51,6 +51,29 @@ python3 -m ci.qualification_bundle pack \
 
 Retain its returned receipt hash separately. Omit `--remove-raw` for a preservation-only pack. Special files such as sockets, set-ID permissions and filesystem flags refuse packing and leave raw data present. Raw removal also refuses hardlinks with another link outside the selected tree, because unlinking them would change external file facts. A cold corpus with no concurrent writers is required; a child process exiting does not prove that an unrelated application has stopped. Stop and inspect all processes before standalone packing. Allow room for the compressed result while the originals still exist. Compression ratios depend on the data; already compressed archives can save little. Old APFS clones can share physical blocks, so directory byte totals are not a promise of recoverable space.
 
+## Periodic stale-data cleanup
+
+New wrapped runs register their fully verified bundles before removing raw data. Qualification startup checks retention at most once per day. For cleanup while a machine is idle, schedule `qualification-cleanup` daily with a local scheduler, including the Codex desktop scheduler if available. A scheduled GitHub runner cannot remove data from a maintainer's Mac. Hosted artifact retention remains seven days.
+
+The fixed local policy removes registered successful bundles older than 30 days while keeping the latest two successful bundles for each qualifier, non-path options, runner Python version and output role. Output paths are excluded and source/tool executable paths become named roles, so a new temporary checkout does not create a permanently retained group. Separate output roles preserve two report/audit pairs. This grouping is a retention policy, not a declaration that different source, SDK or compiler versions are equivalent; their original identities remain in the archived evidence. Failed attempts, unknown or uncommitted source revisions, source revisions cited in the checkout's published `docs/qualification/*.json`, `KEEP` pins, materialised raw trees and active reader/writer leases remain protected. Create an empty `KEEP` file inside a bundle whenever it supports a published claim that the source-revision check cannot identify, or whenever it must remain available longer.
+
+Review the policy's current selection without removal:
+
+```sh
+make qualification-cleanup QUALIFICATION_HOME=/absolute/qualification-home
+```
+
+Apply the same fixed policy:
+
+```sh
+make qualification-cleanup QUALIFICATION_HOME=/absolute/qualification-home \
+  RETENTION_ARGS=--apply
+```
+
+The home must be one of the independently configured storage roots. Cleanup reads only its private registry; it does not scan arbitrary dated folders, Git worktrees, providers, toolchains, dependencies or compiler caches. It verifies each expired bundle's original receipt and compressed payload hashes, refuses unfamiliar contents or external hardlinks, and takes non-blocking exclusive leases before deletion. Verification and restoration hold shared bundle leases. A changed, corrupt, pinned or active bundle stays present. Each applied cleanup writes a compressed receipt, and the registry is compacted without discarding concurrently registered outputs. Expired pointers are marked explicitly; they do not pretend their raw data is still recoverable. Reported allocation removed can include APFS shared blocks and is separate from actual volume free-space change.
+
+Unregistered historical data is never removed by this automatic policy. Assess those folders first: retain the accepted profile's source/input/tool/build identities, original archives, raw observations, telemetry, terminal outcomes and unique counterexamples; reclaim terminal disposable compiler caches, redundant verified expansions and superseded work copies only after checking their references and active use. Complete compression and cold-reader compatibility must pass before retiring a required raw representation. Packing a historical tree does not itself register it for expiry or recertify its original physical identities.
+
 ## Earlier selected cold-receipt profile
 
 The existing checkout-only cold-receipt tool remains available for historic corpora without changing their original-content manifests. It supports generated `node-runtime/node-launch.json`, `node-runtime/node-plain-launch.json` and prepared Java `sdk-runtime/class-load.log` files. That earlier profile does not archive application binaries, source snapshots, providers, dependencies or compiler inputs. Neither storage profile adds application capability or equivalence evidence.

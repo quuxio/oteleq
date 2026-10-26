@@ -21,6 +21,10 @@ NATIVE_MIN_FREE_BYTES ?= 8589934592
 AUDIT_DIR ?= $(REPORT_DIR)-audit
 MARKDOWNLINT ?= ./ci/markdownlint/node_modules/.bin/markdownlint
 DEPENDENCY_AUDIT_OUTPUT ?= $(CURDIR)/build/dependency-audit
+QUALIFICATION_HOME ?= $(OTELEQ_QUALIFICATION_HOME)
+RETENTION_ARGS ?=
+
+.PHONY: qualification-cleanup
 
 .PHONY: dependency-audit dependency-audit-check
 .PHONY: native-provider-check
@@ -49,6 +53,7 @@ DEPENDENCY_AUDIT_OUTPUT ?= $(CURDIR)/build/dependency-audit
 .PHONY: help setup lint examples docs-check observer-check generation-check effect-qualification-check node-observer-check node-sequence-check java-observer-check go-observer-check cpp-observer-check generation-cpp-receiver-otelc generation-go-receiver-otelc generation-go-source-otelc generation-java-receiver-otelc generation-otelc generation-policy-otelc generation-rust-otelc rust-semantic-otelc generation-native-otelc generation-shrink-otelc generation-python-project-otelc generation-receiver-otelc generation-node-receiver-otelc generation-go-build-otelc generation-go-project-otelc generation-sequence-otelc generation-typescript-sequence-otelc generation-filesystem-otelc generation-http-otelc resource-otelc capture-otelc report core-check coverage check
 
 help:
+	@printf '%s\n' 'qualification-cleanup Plan stale-bundle cleanup (QUALIFICATION_HOME, RETENTION_ARGS=--apply to remove eligible bundles)'
 	@printf '%s\n' 'Qualification targets compress all report/audit outputs after completion; see docs/qualification-retention.md to restore them'
 	@printf '%s\n' 'native-metric-qualification-check Check independent native metric workflow oracles'
 	@printf '%s\n' 'native-metric-control-check Check native controlled calls, private checkpoints and literal telemetry receipts'
@@ -97,6 +102,10 @@ help:
 setup:
 	npm ci --ignore-scripts --prefix ci/markdownlint
 	$(PYTHON) ci/java_coverage.py setup
+
+qualification-cleanup:
+	test -n "$(QUALIFICATION_HOME)"
+	$(PYTHON) -m ci.qualification_retention --home "$(QUALIFICATION_HOME)" $(RETENTION_ARGS)
 
 generation-project-tests-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"

@@ -18,6 +18,7 @@ import uuid
 import zlib
 
 from ci import qualification_bundle as bundle
+from ci import qualification_retention as retention
 from ci.qualification_paths import checked
 
 
@@ -79,7 +80,7 @@ def _prepare(roots: list[Path], command: list[str]) -> None:
             bundle.restore(Path(previous["store"]), previous["receipt_sha256"], root)
 
 
-def _archive_root(root: Path, command: list[str], code: int, pid: int) -> None:
+def _archive_root(root: Path, command: list[str], code: int, pid: int, role: str) -> None:
     root = checked(root)
     root.mkdir(mode=0o700, exist_ok=True)
     record = root / ("qualification-process-" + uuid.uuid4().hex + ".json")
@@ -88,6 +89,7 @@ def _archive_root(root: Path, command: list[str], code: int, pid: int) -> None:
     result = bundle.pack(root, store)
     state = {**result, "state": "compressed", "command_exit_code": code}
     _publish(root, state)
+    retention.register(root, result, command, code, role=role)
     bundle.check_originals(root, store, closed_links=True)
     shutil.rmtree(root)
     result["raw_removed"] = True
@@ -97,9 +99,9 @@ def _archive_root(root: Path, command: list[str], code: int, pid: int) -> None:
 
 def _compress(roots: list[Path], command: list[str], code: int, pid: int) -> bool:
     errors = []
-    for root in roots:
+    for index, root in enumerate(roots):
         try:
-            _archive_root(root, command, code, pid)
+            _archive_root(root, command, code, pid, "output-" + str(index))
         except (OSError, ValueError, EOFError, tarfile.TarError, zlib.error) as error:
             errors.append(str(error))
             print("qualification compression refused; preserve raw outputs: " + str(error),
@@ -159,6 +161,12 @@ def run(roots: list[Path], command: list[str]) -> int:
                            and value.st_uid == os.getuid() and value.st_nlink == 1,
                            "unsafe qualification output lease")
             fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        for home in {retention.home_for(root) for root in roots}:
+            try:
+                retention.clean_if_due(home)
+            except (OSError, ValueError, subprocess.SubprocessError) as error:
+                print("scheduled retention skipped; existing evidence preserved: " + str(error),
+                      file=sys.stderr)
         return _run(roots, command)
 
 

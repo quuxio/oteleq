@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
+import fcntl
 import gzip
 import hashlib
 import json
@@ -21,6 +23,26 @@ CHUNK = 1024 * 1024
 DATA = "qualification.tar.gz"
 INDEX = "files.jsonl.gz"
 RECEIPT = "receipt.json"
+
+
+@contextmanager
+def lease(store: Path, *, exclusive: bool = False) -> Iterator[None]:
+    """Coordinate retained readers and retirement without waiting on an active reader."""
+    store = checked(store)
+    value = store.stat()
+    require(value.st_uid == os.getuid() and stat.S_IMODE(value.st_mode) == 0o700,
+            "bundle must be an owned private directory")
+    descriptor = os.open(store / "bundle.lock", os.O_WRONLY | os.O_CREAT
+                         | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600)
+    try:
+        value = os.fstat(descriptor)
+        require(stat.S_ISREG(value.st_mode) and value.st_uid == os.getuid()
+                and value.st_nlink == 1, "unsafe bundle lease")
+        kind = fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH
+        fcntl.flock(descriptor, kind | fcntl.LOCK_NB)
+        yield
+    finally:
+        os.close(descriptor)
 
 
 def require(condition: bool, message: str) -> None:
@@ -193,8 +215,8 @@ def _verify_members(index: BinaryIO, archive: tarfile.TarFile) -> tuple[int, int
     return count, total
 
 
-def verify(store: Path, expected: str) -> dict:
-    """Authenticate the bundle and stream every member through both gzip trailers."""
+def authenticated(store: Path, expected: str) -> dict:
+    """Authenticate the original fully verified representation without extracting it."""
     store = checked(store)
     require(digest(store / RECEIPT) == expected, "receipt SHA256 differs")
     receipt = json.loads((store / RECEIPT).read_text())
@@ -202,6 +224,11 @@ def verify(store: Path, expected: str) -> dict:
             and receipt["kind"] == "oteleq.qualification.bundle", "unknown bundle schema")
     require(digest(store / DATA) == receipt["data_sha256"]
             and digest(store / INDEX) == receipt["index_sha256"], "bundle SHA256 differs")
+    return receipt
+
+
+def _verify(store: Path, expected: str) -> dict:
+    receipt = authenticated(store, expected)
     with gzip.open(store / INDEX, "rb") as index, gzip.open(store / DATA, "rb") as data:
         with tarfile.open(fileobj=data, mode="r|") as archive:
             count, total = _verify_members(index, archive)
@@ -209,6 +236,12 @@ def verify(store: Path, expected: str) -> dict:
     require(count == receipt["entries"] and total == receipt["original_bytes"],
             "qualification denominator differs")
     return receipt
+
+
+def verify(store: Path, expected: str) -> dict:
+    """Lease and stream every member through both complete gzip trailers."""
+    with lease(store):
+        return _verify(store, expected)
 
 
 def check_originals(root: Path, store: Path, *, closed_links: bool = False) -> None:
@@ -321,10 +354,10 @@ def pack(root: Path, store: Path, *, remove: bool = False) -> dict:
             "raw_removed": remove}
 
 
-def restore(store: Path, expected: str, destination: Path) -> dict:
+def _restore(store: Path, expected: str, destination: Path) -> dict:
     """Restore only into a new private directory; never extract through archive links."""
     store, destination = checked(store), checked(destination, new=True)
-    receipt = verify(store, expected)
+    receipt = _verify(store, expected)
     require(destination.is_absolute()
             and destination.parent == destination.parent.resolve(strict=True),
             "destination must have a canonical existing parent")
@@ -357,6 +390,12 @@ def restore(store: Path, expected: str, destination: Path) -> dict:
         _metadata(path, row)
     return {"restored": receipt["entries"], "destination": str(destination),
             "historical_physical_facts_recertified": False}
+
+
+def restore(store: Path, expected: str, destination: Path) -> dict:
+    """Protect the complete materialisation against concurrent stale-bundle cleanup."""
+    with lease(store):
+        return _restore(store, expected, destination)
 
 
 def _metadata(path: Path, row: dict) -> None:
