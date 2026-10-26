@@ -77,8 +77,13 @@ class RustExecutionTests(unittest.TestCase):
         checkpoint = None if launch.intent.plain else health(launch.intent)
         if checkpoint is not None: publish(app / 'health.json', checkpoint)
         nonce = launch.value(prepared.REQUEST)['launch_id']
-        publish(launch.intent.runtime / execution.RELEASE, {'schema_version': 1,
-            'kind': 'otelc.rust.host-release', 'launch_id': nonce, 'pid': 23, 'supervisor_pid': 22})
+        acknowledgement = {'schema_version': 1, 'kind': 'otelc.rust.host-release',
+                           'launch_id': nonce, 'pid': 23, 'supervisor_pid': 22}
+        path = launch.intent.runtime / execution.RELEASE
+        if path.exists():
+            self.assertEqual(json.loads(path.read_text()), acknowledgement)
+        else:
+            publish(path, acknowledgement)
         value = {'schema_version': 1, 'kind': 'otelc.rust.execution', 'profile': 'rust1981-owned-standalone-v1',
             'request_sha256': digest(launch.value(prepared.REQUEST)), 'plan_sha256': digest(launch.value(prepared.PLAN)),
             'supervisor': json.loads((launch.intent.runtime / execution.START_FILES[0]).read_text()),

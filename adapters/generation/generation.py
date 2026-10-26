@@ -746,6 +746,7 @@ def generator_identity():
         'rust_build_recipe.py', 'rust_source_build.py',
         'rust_owned_build.py',
         'rust_prepared.py', 'rust_health.py', 'rust_execution.py',
+        'rust_session.py',
         'native_build.py', 'native_unit_build.py', 'native_lifetime_build.py', 'native_lifetime_inventory.py',
         'native_lifetime_intent.py', 'native_lifetime_metrics.py', 'native_lifetime_receipt.py',
         'native_lifetime_caller.py', 'native_lifetime_frontend.py', 'native_lifetime_policy.py',
