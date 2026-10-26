@@ -182,10 +182,11 @@ cpp-observer-check:
 	$(PYTHON) ci/cpp_coverage.py
 
 rust-provider-check:
-	PYTHONPATH="$(CURDIR)/tests$${PYTHONPATH:+:$${PYTHONPATH}}" $(PYTHON) -m coverage run --data-file=.rust-provider.coverage --include='*/rust_tools.py,*/rust_protocol.py,*/rust_inventory.py,*/rust_lifetimes.py,*/rust_build_recipe.py,*/rust_source_build.py,*/rust_owned_build.py,*/rust_prepared.py,*/rust_health.py,*/rust_execution.py,*/rust_session.py,*/rust_telemetry.py,*/native_health.py,*/native_session.py' -m unittest test_generation_rust_tools test_generation_rust_protocol test_generation_rust_inventory test_generation_rust_lifetimes test_generation_rust_source_build test_generation_rust_owned_build test_generation_rust_prepared test_generation_rust_execution test_generation_rust_session test_generation_rust_telemetry test_generation_native_execution test_generation_native_session -v
+	PYTHONPATH="$(CURDIR)/tests$${PYTHONPATH:+:$${PYTHONPATH}}" $(PYTHON) -m coverage run --data-file=.rust-provider.coverage --include='*/rust_tools.py,*/rust_protocol.py,*/rust_inventory.py,*/rust_modules.py,*/rust_lifetimes.py,*/rust_build_recipe.py,*/rust_source_build.py,*/rust_owned_build.py,*/rust_prepared.py,*/rust_health.py,*/rust_execution.py,*/rust_session.py,*/rust_telemetry.py,*/native_health.py,*/native_session.py' -m unittest test_generation_rust_tools test_generation_rust_protocol test_generation_rust_inventory test_generation_rust_modules test_generation_rust_lifetimes test_generation_rust_source_build test_generation_rust_owned_build test_generation_rust_prepared test_generation_rust_execution test_generation_rust_session test_generation_rust_telemetry test_generation_native_execution test_generation_native_session -v
 	$(PYTHON) -m coverage report --data-file=.rust-provider.coverage --include='*/rust_tools.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.rust-provider.coverage --include='*/rust_protocol.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.rust-provider.coverage --include='*/rust_inventory.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.rust-provider.coverage --include='*/rust_modules.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.rust-provider.coverage --include='*/rust_lifetimes.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.rust-provider.coverage --include='*/rust_build_recipe.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.rust-provider.coverage --include='*/rust_source_build.py' --fail-under=80
@@ -258,6 +259,7 @@ generation-check: node-observer-check node-sequence-check node-source-context-ch
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/rust_tools.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/rust_protocol.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/rust_inventory.py' --fail-under=80
+	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/rust_modules.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/rust_lifetimes.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/rust_build_recipe.py' --fail-under=80
 	$(PYTHON) -m coverage report --data-file=.generation.coverage --include='*/rust_source_build.py' --fail-under=80
