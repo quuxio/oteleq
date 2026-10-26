@@ -36,13 +36,13 @@ def standalone_targets(language: str, compiler: Path, contents: dict) -> list[di
 
 def settings(value: dict) -> dict:
     """Freeze explicit provider selection while preserving default native recipes."""
-    allowed = {'compilation_database', 'targets', 'backend', 'profile', 'sdk_build', 'build_timeout_ms', 'lifetimes'}
+    allowed = {'compilation_database', 'targets', 'backend', 'profile', 'sdk_build', 'build_timeout_ms', 'lifetimes', 'sdk_source_profile'}
     native_protocol.require(type(value) is dict and not set(value) - allowed, 'unsupported native adapter settings')
     project = native_project.settings({name: value[name] for name in ('compilation_database', 'targets') if name in value})
     backend = value.get('backend', 'legacy')
     native_protocol.require(type(backend) is str and backend in ('legacy', BACKEND), 'native backend must be legacy or prepared')
     if backend == 'legacy':
-        native_protocol.require(not set(value) & {'profile', 'sdk_build', 'build_timeout_ms', 'lifetimes'},
+        native_protocol.require(not set(value) & {'profile', 'sdk_build', 'build_timeout_ms', 'lifetimes', 'sdk_source_profile'},
                                 'native prepared settings require backend=prepared')
         return project
     profile = value.get('profile', native_protocol.PROFILE)
@@ -58,9 +58,13 @@ def settings(value: dict) -> dict:
                                 'native sdk_build requires an absolute caller-selected directory')
     timeout = value.get('build_timeout_ms', BUILD_TIMEOUT)
     native_protocol.require(type(timeout) is int and 1000 <= timeout <= 900000, 'invalid native build timeout')
-    return {**project, 'backend': BACKEND, 'profile': profile,
+    result = {**project, 'backend': BACKEND, 'profile': profile,
             'sdk_build': directory, 'build_timeout_ms': timeout,
             **({'lifetimes': life} if life is not None else {})}
+    if 'sdk_source_profile' in value:
+        result['sdk_source_profile'] = value['sdk_source_profile']
+        source_profile(result)
+    return result
 
 
 def selected(options: dict) -> bool:
@@ -90,9 +94,13 @@ def build_version(options: dict) -> int:
 
 
 def source_profile(options: dict) -> str:
-    """Current lifetime SDKs bind both object and resource ABI source headers."""
+    """Select a caller-declared ABI source closure without enabling extra features."""
     build_version(options)
-    return 'resource-v1' if options.get('profile') in lifetimes.PROFILES else 'function-v2'
+    lifetime = options.get('profile') in lifetimes.PROFILES
+    selected = options.get('sdk_source_profile', 'resource-v1' if lifetime else 'function-v2')
+    require(type(selected) is str and selected in ('function-v2', 'resource-v1')
+            and (not lifetime or selected == 'resource-v1'), 'incompatible native SDK source profile')
+    return selected
 
 
 def selected_tools(root: Path, language: str) -> dict:
@@ -153,7 +161,8 @@ def sdk(root: Path, language: str, tools: dict, options: dict, folder: Path, exe
     """Read one caller-selected SDK against independently queried LLVM recipes."""
     compiler = tools['clang' if language == 'c' else 'clang++']
     toolchain = native_toolchain.capture(tools['llvm-config'], compiler, language, folder, execute)
-    extra = {'source_profile': source_profile(options)} if options.get('profile') in lifetimes.PROFILES else {}
+    selected = source_profile(options)
+    extra = {'source_profile': selected} if selected != 'function-v2' else {}
     return native_sdk.capture(root, sdk_directory(root, options), toolchain, cmake=tools['cmake'], ninja=tools['ninja'], **extra)
 
 
@@ -180,8 +189,11 @@ def negotiate(workflow, root: Path, workspace: Path, language: str, tools: dict,
 def configuration(entry: dict, endpoint: str, service: str) -> dict:
     """Specify every common policy default without importing the producer."""
     native_protocol.require(enabled(entry), 'explicit native entry required')
-    native_protocol.require(not any(key in entry for key in ('receiver_fixture', 'sequence_configuration')),
-                            'prepared native receivers and action sequences require separate integration')
+    native_protocol.require('receiver_fixture' not in entry and 'cpp_receiver' not in entry,
+                            'prepared native receivers require separate integration')
+    if 'sequence_configuration' in entry:
+        import native_sequence
+        native_sequence.configuration(entry, entry['sequence_configuration'])
     result = {'schema_version': 3, 'languages': [entry['language']],
             'resource': {'service_name': service},
             'export': {'endpoint': endpoint, 'interval_ms': 1000, 'timeout_ms': 1000, 'shutdown_timeout_ms': 10000},
@@ -194,6 +206,8 @@ def configuration(entry: dict, endpoint: str, service: str) -> dict:
             'context': {'tasks': False, 'http': False},
             'benchmark': {'iterations': 10000, 'samples': 15, 'warmup': 5}}
     lifetimes.apply(entry, result)
+    if 'sequence_configuration' in entry:
+        result['metrics'].update(entry['sequence_configuration'][0]['metrics'])
     return result
 
 

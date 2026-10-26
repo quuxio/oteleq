@@ -55,7 +55,7 @@ def publish(path: Path, value: dict) -> inputs.Record:
 class Session:
     """Use the shared executor's budgets; keep the child's separate group owned."""
 
-    def __init__(self, launch: prepared.Prepared):
+    def __init__(self, launch: prepared.Prepared, *, controls=None):
         require(type(launch) is prepared.Prepared, 'native session requires accepted preparation')
         launch.verify()
         require({path.name for path in launch.intent.runtime.iterdir()} ==
@@ -64,6 +64,11 @@ class Session:
         self.started = self.execution = None
         self.child = None
         self.records: tuple[inputs.Record, ...] = ()
+        self.controls = controls
+
+    def environment(self) -> dict:
+        """Single-call sessions add no environment; live callers own private bindings."""
+        return self.controls.environment() if self.controls is not None else {}
 
     def poll(self, process, deadline: float) -> None:
         """Keep constructors blocked until the actual parent, group and session agree."""
@@ -71,6 +76,8 @@ class Session:
                 'native monitor is attached to a different supervisor command')
         if self.started is not None:
             require(process.pid == self.started.owner.pid, 'native supervisor changed after release')
+            if self.controls is not None:
+                self.controls.poll(self.started, deadline)
             return
         runtime = self.launch.intent.runtime
         require(not any((runtime / name).exists() or (runtime / name).is_symlink()
@@ -113,6 +120,8 @@ class Session:
         for record in self.records:
             record.verify()
         self.execution = execution.finish(self.started, process.returncode)
+        if self.controls is not None:
+            self.controls.finish(self.execution)
         final = publish(self.launch.intent.runtime / HOST_FINISH,
             {'schema_version': 1, 'kind': 'oteleq.native.owned-finish', 'supervisor_pid': process.pid,
              'application_pid': self.child, 'application_exit_code': 0,
