@@ -23,10 +23,11 @@ class CollectorHandler(BaseHTTPRequestHandler):
         self.server.calls.append((self.path, body, dict(self.headers)))
         mode = self.server.mode
         try:
-            if mode == 'headers-hang':
+            if mode in ('headers-hang', 'headers-eof'):
                 self.wfile.write(b'HTTP/1.0 200 OK\r\nContent-Length: 0\r\n')
                 self.wfile.flush()
-                self.server.release.wait(2)
+                if mode == 'headers-hang':
+                    self.server.release.wait(2)
                 return
             self.send_response(self.server.status)
             self.send_header('Content-Type', 'application/x-protobuf')
@@ -161,7 +162,7 @@ class ForwardCaptureTests(unittest.TestCase):
         self.assertEqual(event['response']['origin'], 'capture-error')
 
     def test_truncated_or_ambiguous_response_never_becomes_an_acknowledgement(self):
-        for mode in ('short', 'ambiguous'):
+        for mode in ('short', 'ambiguous', 'headers-eof'):
             with self.subTest(mode=mode), collector(mode=mode) as upstream:
                 folder = self.base / mode
                 with forward.forwarding_receiver(f'http://127.0.0.1:{upstream.server_port}', folder) as captured:
@@ -169,7 +170,7 @@ class ForwardCaptureTests(unittest.TestCase):
                 self.assertEqual(status, 502)
                 with self.assertRaises(ValueError): captured.require_complete()
                 event, = captured.receipt['events']
-                self.assertEqual(event['upstream']['status'], 200)
+                self.assertEqual(event['upstream']['status'], None if mode == 'headers-eof' else 200)
                 self.assertFalse(event['upstream']['complete'])
 
     def test_header_and_eof_dribble_deadlines_cannot_look_like_empty_success(self):
@@ -329,6 +330,15 @@ class ForwardCaptureTests(unittest.TestCase):
                     except OSError:
                         break
                     time.sleep(.01)
+        self.assertFalse(captured.worker.is_alive())
+        with self.assertRaises(ValueError): captured.require_complete()
+
+    def test_final_manifest_never_overwrites_an_existing_file(self):
+        with self.assertRaises(FileExistsError):
+            with forward.forwarding_receiver('http://127.0.0.1:4320', self.base / 'existing') as captured:
+                manifest = captured.output / 'forward-capture.json'
+                manifest.write_bytes(b'earlier evidence')
+        self.assertEqual(manifest.read_bytes(), b'earlier evidence')
         self.assertFalse(captured.worker.is_alive())
         with self.assertRaises(ValueError): captured.require_complete()
 

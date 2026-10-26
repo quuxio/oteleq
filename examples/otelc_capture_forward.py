@@ -4,7 +4,7 @@ from contextlib import contextmanager
 from collections.abc import Iterator
 from email.message import Message
 import hashlib
-from http.client import HTTPConnection, HTTPException
+from http.client import HTTPConnection, HTTPException, HTTPResponse
 import ipaddress
 import json
 import math
@@ -85,6 +85,36 @@ class Errors(list[str]):
     def append(self, value: object) -> None:
         if len(self) < 32:
             super().append(str(value)[:256])
+
+
+class HeaderReader:
+    """Bound stdlib header parsing and distinguish its terminator from EOF."""
+
+    def __init__(self, stream):
+        self.stream, self.size, self.last = stream, 0, b''
+
+    def readline(self, limit: int = -1) -> bytes:
+        data = self.stream.readline(min(HEADER_LIMIT + 1, limit) if limit >= 0 else HEADER_LIMIT + 1)
+        self.size += len(data)
+        self.last = data
+        if self.size > HEADER_LIMIT:
+            raise HTTPException('Collector response headers exceed capture budget')
+        return data
+
+
+class Response(HTTPResponse):
+    """An EOF before the header terminator cannot become an empty HTTP200."""
+
+    def begin(self) -> None:
+        stream = self.fp
+        checked = HeaderReader(stream)
+        self.fp = checked
+        try:
+            super().begin()
+        finally:
+            self.fp = stream
+        if checked.last not in (b'\r\n', b'\n'):
+            raise HTTPException('incomplete Collector response headers')
 
 
 class ForwardReceiver(capture.Receiver):
@@ -225,6 +255,7 @@ class ForwardCapture(capture.CaptureServer):
         forwarded_headers = {name: value for name, value in event['request_headers']
                              if name in ('content-type', 'content-encoding')}
         connection = HTTPConnection(*self.upstream, timeout=self.upstream_timeout)
+        connection.response_class = Response
         upstream = {'status': None, 'headers': [], 'entity': None, 'complete': False,
                     'started_ns': time.monotonic_ns(), 'finished_ns': None}
         event['upstream'] = upstream
@@ -321,6 +352,7 @@ class ForwardCapture(capture.CaptureServer):
                   'limits': {'max_requests': self.max_requests, 'max_request_bytes': capture.MAX_REQUEST_BYTES,
                              'max_bytes_each_direction': self.max_bytes, 'max_response_bytes': self.max_response_bytes,
                              'essential_header_bytes': HEADER_LIMIT, 'max_error_entries': 32,
+                             'upstream_header_bytes': HEADER_LIMIT,
                              'upstream_timeout': self.upstream_timeout},
                   'source_inputs': {str(path): facts[0] for path, facts in self.sources.items()},
                   'scope': 'Transfer-decoded entities and essential headers; not wire packets, client acknowledgement, OTLP partial-rejection decoding or downstream ingestion proof.'}
