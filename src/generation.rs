@@ -213,6 +213,14 @@ const RESOURCES: &[(&str, &str)] = &[
         include_str!("../adapters/generation/rust_lifetimes.py"),
     ),
     (
+        "rust_build_recipe.py",
+        include_str!("../adapters/generation/rust_build_recipe.py"),
+    ),
+    (
+        "rust_source_build.py",
+        include_str!("../adapters/generation/rust_source_build.py"),
+    ),
+    (
         "native_build.py",
         include_str!("../adapters/generation/native_build.py"),
     ),
