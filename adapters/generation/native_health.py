@@ -52,24 +52,8 @@ def lifetime(value: dict, kind: str) -> None:
             'native lifetime accounting is incomplete')
 
 
-def validate(value: dict, *, language: str, pid: int, policy: str, selection: str,
-             lifetime_kind: str | None = None) -> dict:
-    """Require the recorded native final checkpoint, not a legacy health substitute."""
-    require(lifetime_kind is None or type(lifetime_kind) is str and
-            (lifetime_kind, language) in (('object', 'cpp'), ('resource', 'c')),
-            'native lifetime health does not match the caller profile')
-    extra = {lifetime_kind + '_accounting'} if lifetime_kind is not None else set()
-    fields(value, FIELDS | extra, 'final health')
-    expected = {'schema_version': 1, 'kind': 'otelc.runtime-health', 'language': language,
-                'scope': 'sdk_pipeline', 'pid': pid, 'policy_sha256': policy,
-                'selection_sha256': selection, 'phase': 'final', 'sdk_attached': True,
-                'source_complete': False, 'downstream_receipt': 'unavailable',
-                'otlp_partial_rejection': 'unavailable',
-                'lifecycle': {'flush': 'succeeded', 'shutdown': 'succeeded'},
-                'diagnostics': {'dropped': '0'}}
-    require(language in ('c', 'cpp') and type(pid) is int and pid > 1
-            and all(type(text) is str and re.fullmatch('[0-9a-f]{64}', text) for text in (policy, selection))
-            and same({key: value[key] for key in expected}, expected), 'native final SDK identity or lifecycle differs')
+def engines(value: dict, pid: int) -> None:
+    """Check shared closed controls/function/span/export containers without changing their wire profile."""
     control = fields(value['controls'], {'schema_version', 'pid', 'collection', 'emission', 'effective_emission_off'}, 'controls')
     require(type(control['collection']) is type(control['emission']) is bool
             and same(control, {'schema_version': 1, 'pid': pid, 'collection': control['collection'],
@@ -96,6 +80,27 @@ def validate(value: dict, *, language: str, pid: int, policy: str, selection: st
             and spans['queue_evidence'] == 'derived_after_shutdown', 'native trace pipeline is incomplete')
     exporter(value['trace_exports'], 'spans')
     exporter(value['metric_exports'], 'metric_points')
+
+
+def validate(value: dict, *, language: str, pid: int, policy: str, selection: str,
+             lifetime_kind: str | None = None) -> dict:
+    """Require the recorded native final checkpoint, not a legacy health substitute."""
+    require(lifetime_kind is None or type(lifetime_kind) is str and
+            (lifetime_kind, language) in (('object', 'cpp'), ('resource', 'c')),
+            'native lifetime health does not match the caller profile')
+    extra = {lifetime_kind + '_accounting'} if lifetime_kind is not None else set()
+    fields(value, FIELDS | extra, 'final health')
+    expected = {'schema_version': 1, 'kind': 'otelc.runtime-health', 'language': language,
+                'scope': 'sdk_pipeline', 'pid': pid, 'policy_sha256': policy,
+                'selection_sha256': selection, 'phase': 'final', 'sdk_attached': True,
+                'source_complete': False, 'downstream_receipt': 'unavailable',
+                'otlp_partial_rejection': 'unavailable',
+                'lifecycle': {'flush': 'succeeded', 'shutdown': 'succeeded'},
+                'diagnostics': {'dropped': '0'}}
+    require(language in ('c', 'cpp') and type(pid) is int and pid > 1
+            and all(type(text) is str and re.fullmatch('[0-9a-f]{64}', text) for text in (policy, selection))
+            and same({key: value[key] for key in expected}, expected), 'native final SDK identity or lifecycle differs')
+    engines(value, pid)
     if lifetime_kind is not None:
         lifetime(value[lifetime_kind + '_accounting'], lifetime_kind)
     return value
