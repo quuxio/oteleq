@@ -30,11 +30,12 @@ def location(value: object, files: dict[str, inputs.File]) -> dict:
     return row
 
 
-def original_boundaries(rows: list[dict], files: dict[str, inputs.File]) -> None:
+def original_boundaries(rows: list[dict], files: dict[str, inputs.File], *,
+                        locations: tuple[str, ...] = ('declaration', 'body')) -> None:
     """Recheck original bytes and refuse coordinates inside a UTF-8 code point."""
     positions = {}
     for row in rows:
-        for field in ('declaration', 'body'):
+        for field in locations:
             where = row[field]
             positions.setdefault(where['file'], set()).update((where['start'], where['end']))
     for path, offsets in positions.items():
