@@ -3,8 +3,9 @@
 This corpus declares zero, one completed or one censored Item per synchronous
 scalar call, including normal destructor exit during outer unwinding and an
 exception leaving the destructor. The driver independently audits raw telemetry,
-closed final health, promotion and altered copies. Genuine whole-corpus,
-escaping-error, startup/live and broader qualification remain required.
+closed final health, promotion and altered copies. One std::runtime_error leaves
+the selected target and is caught by the generated caller. Genuine whole-corpus,
+broader errors, startup/live and wider qualification remain required.
 """
 
 import argparse
@@ -32,15 +33,25 @@ from otelc_capture import path_within
 CASES = (('c-completed', 'c', False), ('cpp-completed', 'cpp', False), ('c-state', 'c', True),
          ('c-zero', 'c', False), ('cpp-zero', 'cpp', False), ('c-censored', 'c', False),
          ('cpp-censored', 'cpp', False), ('cpp-unwind', 'cpp', False),
-         ('cpp-throwing-destructor', 'cpp', False))
+         ('cpp-throwing-destructor', 'cpp', False), ('cpp-target-error', 'cpp', False))
 CASE_MODES = {'c-completed': 'completed', 'cpp-completed': 'completed', 'c-state': 'completed',
               'c-zero': 'zero', 'cpp-zero': 'zero', 'c-censored': 'censored',
               'cpp-censored': 'censored', 'cpp-unwind': 'unwind',
-              'cpp-throwing-destructor': 'throwing-destructor'}
+              'cpp-throwing-destructor': 'throwing-destructor', 'cpp-target-error': 'target-error'}
 SDK_HEAD = 'acb13d7735526448209df37b7e6b98e5717befdb'
 PROFILES = {'c': 'native-resources-owned-v1', 'cpp': 'native-objects-owned-v1'}
 BASE_CALLS = (('selected', 42),)
 PROMOTED_CALLS = (('selected', 43), ('selected_extra', 44))
+
+
+def select_cases(names: list[str] | None = None) -> tuple[tuple[str, str, bool], ...]:
+    """Keep the full corpus by default; explicit shards cannot add or repeat cases."""
+    if names is None:
+        return CASES
+    if (type(names) is not list or not names or any(type(name) is not str for name in names)
+            or len(names) != len(set(names)) or not set(names) <= set(CASE_MODES)):
+        raise ValueError('native lifetime shard requires distinct declared case names')
+    return tuple(row for row in CASES if row[0] in names)
 
 
 def command(argv: list, folder: Path, label: str, **options) -> str:
@@ -97,6 +108,7 @@ def fixture(folder: Path, language: str, difference: bool, sdk: Path, *, mode: s
     acquire = ('{Item item(amount);keep_item(&item);state+=item.value;}' if language == 'cpp' else
                'struct Item *item=malloc(sizeof *item);if(!item)return -1;'
                'item->value=amount;keep_item(item);state+=item->value;free(item);')
+    mutation = 'if(getenv("OTELC_NATIVE_PLAN_FD"))state++;' if difference else ''
     if mode == 'zero':
         acquire = 'if(amount>0){' + acquire + '}'
     elif mode == 'censored':
@@ -106,8 +118,12 @@ def fixture(folder: Path, language: str, difference: bool, sdk: Path, *, mode: s
         acquire = 'try{Item item(amount);keep_item(&item);state+=item.value;throw amount;}catch(int){}'
     elif mode == 'throwing-destructor':
         acquire = 'try' + acquire + 'catch(int){}'
-    mutation = 'if(getenv("OTELC_NATIVE_PLAN_FD"))state++;' if difference else ''
+    elif mode == 'target-error':
+        acquire = ('{Item item(amount);keep_item(&item);state+=item.value;observed_errno=errno;' +
+                   mutation + 'throw std::runtime_error("failure-42");}')
+        mutation = ''
     (source / relative).write_text('#include <stdlib.h>\n#include <errno.h>\n#include "item.h"\n' +
+        ('#include <stdexcept>\n' if mode == 'target-error' else '') +
         'int state=7;int observed_errno=0;\nint selected(int amount){errno=ECHILD;' + acquire +
         'observed_errno=errno;' + mutation + 'return 42;}\n')
     compiler = os.environ.get('OTELC_CLANGXX' if language == 'cpp' else 'OTELC_CLANG')
@@ -132,6 +148,9 @@ def fixture(folder: Path, language: str, difference: bool, sdk: Path, *, mode: s
                                'compilation_database': 'build/compile_commands.json',
                                'targets': [{'name': 'application', 'units': [{'source': name} for name in units],
                                             'link_flags': ['-pthread']}]}}}
+    if mode == 'target-error':
+        configuration['fixtures'][0]['expected_baseline'] = {
+            'kind': 'error', 'category': 'exception', 'type': 'cpp.std::runtime_error'}
     config = folder / 'generation.toml'
     config.write_text('\n'.join(key + '=' + toml(value) for key, value in configuration.items()) + '\n')
     return source, config
@@ -144,13 +163,14 @@ def scalar(language: str, value: int) -> dict:
 class Audit:
     """Count original launches once and retain copied-report and file identities."""
 
-    def __init__(self, root: Path, provider: Path):
+    def __init__(self, root: Path, provider: Path, *, case_names: list[str] | None = None):
+        self.cases = select_cases(case_names)
         self.registry = retained.Oracle(root, provider)
         self.records = {}
         self.files = {}
         self.contexts = {}
-        self.case_languages = {self.registry.root / name: language for name, language, _ in CASES}
-        self.case_modes = {self.registry.root / name: CASE_MODES[name] for name, _, _ in CASES}
+        self.case_languages = {self.registry.root / name: language for name, language, _ in self.cases}
+        self.case_modes = {self.registry.root / name: CASE_MODES[name] for name, _, _ in self.cases}
 
     def attempt(self, report: Path, folder: Path, entry: dict, lane: str, witness,
                 expected_arguments: tuple[int, ...], *, function: str = 'selected', mode: str = 'completed') -> None:
@@ -223,7 +243,7 @@ class Audit:
                 by_profile[profile] = raw_refusals.run(Path(context['folder']), context['entry'],
                                                        context['witness'], root / profile,
                                                        function=context['function'], mode=context['mode'])
-        assert set(by_profile) == {language + '-' + CASE_MODES[name] for name, language, _ in CASES}
+        assert set(by_profile) == {language + '-' + CASE_MODES[name] for name, language, _ in self.cases}
         assert all(value['count'] == 14 and value['new_application_launches'] == 0 for value in by_profile.values())
         return by_profile
 
@@ -245,7 +265,7 @@ def arguments(value: object) -> tuple[int, ...]:
 def check_report(path: Path, difference: bool, audit: Audit, *, expected: tuple[int, ...] = (5,),
                  function: str = 'selected', contracts: tuple[tuple[str, int], ...] = BASE_CALLS,
                  mode: str = 'completed') -> int:
-    """Equal-but-wrong returns, state, errno, missing repeats or receipt counts refuse."""
+    """Literal outcomes, state, errno, repeats and receipt counts must all agree."""
     report = retained.read(path)
     assert report['source_preserved'] is True and report['blocked'] == []
     assert report['claim'] == 'equivalence over these tests and observations'
@@ -269,6 +289,10 @@ def check_report(path: Path, difference: bool, audit: Audit, *, expected: tuple[
     assert entry['native_options']['profile'] == PROFILES[language]
     assert {row['name'] for row in entry['globals']} == {'state', 'observed_errno'}
     bundle = retained.read(path.parent / result['case'] / 'typed-bundle.json')['cases'][0]
+    baseline = ({'kind': 'error', 'category': 'exception', 'type': 'cpp.std::runtime_error'}
+                if mode == 'target-error' else {'kind': 'return'})
+    retained.same(entry['expected_baseline'], baseline)
+    retained.same(bundle['contract']['expected_baseline'], baseline)
     assert arguments(result['arguments']) == expected
     amount, = expected
     initial = {'global:state': scalar(language, 7), 'global:observed_errno': scalar(language, 0)}
@@ -282,8 +306,7 @@ def check_report(path: Path, difference: bool, audit: Audit, *, expected: tuple[
             retained.same(observed['gaps'], [])
             retained.same(observed['before'], {'roots': initial, 'nodes': []})
             retained.same(observed['after'], {'roots': after, 'nodes': []})
-            retained.same(observed['outcome'], {'kind': 'return', 'graph': {'roots': {
-                **after, 'result': scalar(language, dict(contracts)[function])}, 'nodes': []}})
+            retained.same(observed['outcome'], outcome(language, after, dict(contracts)[function], mode=mode))
             execution = attempt['execution']
             assert execution['capture_complete'] is True
             retained.same(execution['channels'], {'stdout': [], 'stderr': []})
@@ -291,6 +314,17 @@ def check_report(path: Path, difference: bool, audit: Audit, *, expected: tuple[
             audit.attempt(path, path.parent / result['case'] / (lane + '-' + str(index)),
                           entry, lane, execution['witness'], expected, function=function, mode=mode)
     return 4
+
+
+def outcome(language: str, after: dict, version: int, *, mode: str = 'completed') -> dict:
+    """Declare literal normal returns or the fixed C++ exception graph."""
+    if mode == 'target-error':
+        assert language == 'cpp'
+        return {'kind': 'error', 'category': 'exception', 'graph': {
+            'roots': {**after, 'error': {'kind': 'reference', 'node_id': 'n0'}},
+            'nodes': [{'id': 'n0', 'type': 'cpp.std::runtime_error', 'fields': {
+                'message': {'kind': 'bytes', 'type': 'cpp.what', 'hex': ('failure-' + str(version)).encode().hex()}}}]}}
+    return {'kind': 'return', 'graph': {'roots': {**after, 'result': scalar(language, version)}, 'nodes': []}}
 
 
 def framework(workspace: Path, folder: Path, label: str, difference: bool, audit: Audit,
@@ -304,7 +338,7 @@ def framework(workspace: Path, folder: Path, label: str, difference: bool, audit
 
 def promotion(cli: Path, workspace: Path, source: Path, folder: Path, language: str,
               difference: bool, audit: Audit, *, mode: str = 'completed') -> dict:
-    """Require fresh original/relocated builds, changed returns and a new callable."""
+    """Require fresh original/relocated builds, changed outcomes and a new callable."""
     folder.mkdir()
     original_facts = fixture_facts(source)
     bundle = folder / 'project-tests'
@@ -349,9 +383,15 @@ def promotion(cli: Path, workspace: Path, source: Path, folder: Path, language: 
     body = unit.read_text()
     assert body.count('return 42;') == 1
     updated = body.replace('return 42;', 'return 43;')
+    if mode == 'target-error':
+        assert body.count('"failure-42"') == 1
+        updated = updated.replace('"failure-42"', '"failure-43"')
     extra = updated[updated.index('int selected(int amount)'):].replace('int selected(', 'int selected_extra(', 1)
     assert extra.count('return 43;') == 1
-    unit.write_text(updated + '\n' + extra.replace('return 43;', 'return 44;'))
+    extra = extra.replace('return 43;', 'return 44;')
+    if mode == 'target-error':
+        extra = extra.replace('"failure-43"', '"failure-44"')
+    unit.write_text(updated + '\n' + extra)
     database = changed / 'build/compile_commands.json'
     commands = retained.read(database)
     for row in commands:
@@ -365,9 +405,9 @@ def promotion(cli: Path, workspace: Path, source: Path, folder: Path, language: 
             'fresh_current_source': True, 'relocated_compilation_database': True}
 
 
-def exercise(cli: Path, provider: Path, sdk: Path, root: Path) -> dict:
-    audit = Audit(root, provider); results = []
-    for name, language, difference in CASES:
+def exercise(cli: Path, provider: Path, sdk: Path, root: Path, *, case_names: list[str] | None = None) -> dict:
+    audit = Audit(root, provider, case_names=case_names); results = []
+    for name, language, difference in audit.cases:
         folder = root / name; folder.mkdir()
         mode = CASE_MODES[name]; expected = lifetime_cases.expected(language, mode)['arguments']
         source, config = fixture(folder, language, difference, sdk, mode=mode)
@@ -404,16 +444,20 @@ def exercise(cli: Path, provider: Path, sdk: Path, root: Path) -> dict:
         results.append({'name': name, 'language': language, 'difference': difference, 'mode': mode, 'promotion': promoted})
     refusal_results = audit.refusals(root / 'raw-evidence-refusals')
     summary = audit.finish()
-    assert summary['actual_application_records'] == 268 and summary['raw_lifetime_receipts'] == 134
+    expected_launches = 28 * len(audit.cases) + 16 * sum(difference for _, _, difference in audit.cases)
+    assert summary['actual_application_records'] == expected_launches
+    assert summary['raw_lifetime_receipts'] == expected_launches // 2
     return {'claim': 'equivalence over these tests and observations', 'cases': results,
+            'selected_cases': [name for name, _, _ in audit.cases], 'complete_corpus': audit.cases == CASES,
             'actual_application_launches': summary['actual_application_records'], 'audit': summary,
             'raw_evidence_refusals': refusal_results,
             'consumer_cli_sha256': digest(cli), 'sdk_source': SDK_HEAD,
             'consumer_source': subprocess.check_output(['git', 'rev-parse', 'HEAD'],
                 cwd=Path(__file__).resolve().parents[1]).decode().strip(),
-            'routes': ['generated', 'framework', 'replay', 'detached', 'scalar-reduction', 'current-source-promotion'],
+            'routes': [route for route in ('generated', 'framework', 'replay', 'detached', 'scalar-reduction', 'current-source-promotion')
+                       if route != 'scalar-reduction' or any(difference for _, _, difference in audit.cases)],
             'remaining': ['genuine qualification of all declared boundary, raw-audit, refusal and promotion routes',
-                          'escaping target errors and all startup/live profiles', 'shipping, broader platforms and completion checklist'],
+                          'other target errors and all startup/live profiles', 'shipping, broader platforms and completion checklist'],
             'qualification_tier': 'genuine public workflow development; no broader profile admission'}
 
 
@@ -423,8 +467,11 @@ def main() -> None:
     parser.add_argument('--sdk-build', type=Path, required=True)
     parser.add_argument('--report-dir', type=Path, required=True)
     parser.add_argument('--cli', type=Path, required=True)
+    parser.add_argument('--case', dest='case_names', action='append', choices=tuple(CASE_MODES),
+                        help='qualify only these named fixtures; omission selects the complete corpus')
     parser.add_argument('--min-free-bytes', type=int, default=qualification_storage.MIN_FREE_BYTES)
     args = parser.parse_args()
+    select_cases(args.case_names)
     provider, cli = args.otelc_root.resolve(strict=True), args.cli.resolve(strict=True)
     root, sdk = args.report_dir.resolve(), args.sdk_build.resolve()
     assert not root.exists() and not sdk.exists()
@@ -444,7 +491,7 @@ def main() -> None:
                      (sdk / 'native-sdk-build.json', sdk / 'libotelc_native_runtime.so')}
         assert retained.read(sdk / 'native-sdk-build.json')['coverage'] is False
         write(root / 'sdk-original-products.json', sdk_files)
-        result = exercise(cli, provider, sdk, root)
+        result = exercise(cli, provider, sdk, root, case_names=args.case_names)
         assert {str(path): source_facts(path) for path in map(Path, held)} == held
         assert {name: retained.identity(Path(name)) for name in sdk_files} == sdk_files
         write(root / 'qualification.json', result)

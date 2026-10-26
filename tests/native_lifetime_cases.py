@@ -6,11 +6,11 @@ from native_prepared_otlp import require
 def expected(language: str, mode: str) -> dict:
     """Declare boundaries and exceptions leaving the destructor before launch."""
     require(type(language) is str and language in ('c', 'cpp') and type(mode) is str
-            and mode in ('completed', 'zero', 'censored', 'unwind', 'throwing-destructor')
-            and (mode not in ('unwind', 'throwing-destructor') or language == 'cpp'),
+            and mode in ('completed', 'zero', 'censored', 'unwind', 'throwing-destructor', 'target-error')
+            and (mode not in ('unwind', 'throwing-destructor', 'target-error') or language == 'cpp'),
             'foreign native lifetime corpus mode')
     admitted = int(mode != 'zero')
-    complete = mode in ('completed', 'unwind', 'throwing-destructor')
+    complete = mode in ('completed', 'unwind', 'throwing-destructor', 'target-error')
     release = 'destructor_entry' if language == 'cpp' else 'free_entry'
     boundary = 'shutdown_censored' if mode == 'censored' else release
     observations = [] if not admitted else [{
@@ -23,4 +23,5 @@ def expected(language: str, mode: str) -> dict:
     return {'observations': observations, 'admitted': admitted, 'completed': int(complete),
             'censored': int(mode == 'censored'), 'spans': 1 + admitted,
             'arguments': (0,) if mode == 'zero' else (5,),
-            'release_boundary': release, 'boundary': boundary, 'instruments': instruments}
+            'release_boundary': release, 'boundary': boundary, 'instruments': instruments,
+            'function_error': mode == 'target-error'}

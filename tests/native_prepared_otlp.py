@@ -1,4 +1,4 @@
-"""Independent receipt oracle for one normal native fixture call per process."""
+"""Independent receipt oracle for one declared native fixture call per process."""
 
 import bisect
 import hashlib
@@ -49,16 +49,16 @@ def groups(message, language: str, service: str, *, traces: bool):
             yield from rows
 
 
-def function_span(span, name: str) -> None:
+def function_span(span, name: str, *, failed: bool = False) -> None:
     """Check one independently selected ordinary function root."""
     require(len(span.trace_id) == 16 and any(span.trace_id) and len(span.span_id) == 8 and any(span.span_id)
             and not span.parent_span_id and span.name == name and span.kind == 1 and span.flags & 1
-            and span.status.code == 0 and not span.status.message
+            and type(failed) is bool and span.status.code == (2 if failed else 0) and not span.status.message
             and 0 < span.start_time_unix_nano <= span.end_time_unix_nano
             and not span.events and not span.links
             and not span.dropped_attributes_count and not span.dropped_events_count and not span.dropped_links_count,
-            'fixture trace is not one complete successful selected root')
-    same(attributes(span.attributes), {'function': name})
+            'fixture trace differs from the declared selected outcome')
+    same(attributes(span.attributes), {'function': name, **({'error.type': 'exception'} if failed else {})})
 
 
 def trace(message, language: str, service: str, name: str) -> int:
@@ -86,12 +86,12 @@ def histogram(point) -> tuple:
     return point.count, tuple(point.bucket_counts), point.sum
 
 
-def function_metric(value, name: str, series: dict) -> int:
+def function_metric(value, name: str, series: dict, *, failed: bool = False) -> int:
     """Retain every point from one declared function instrument."""
     count = 0
     expected = {'otelc.function.calls': ('sum', '{call}'), 'otelc.function.errors': ('sum', '{error}'),
                 'otelc.function.duration': ('histogram', 's')}
-    require(value.name in expected, 'foreign metric instrument')
+    require(type(failed) is bool and value.name in expected, 'foreign metric instrument or outcome')
     kind, unit = expected[value.name]
     data = getattr(value, kind)
     require(value.WhichOneof('data') == kind and value.unit == unit
@@ -109,7 +109,7 @@ def function_metric(value, name: str, series: dict) -> int:
             sample = histogram(point)
         else:
             require(point.WhichOneof('value') == 'as_int' and point.as_int in (0, 1)
-                    and (not value.name.endswith('.errors') or point.as_int == 0), 'invalid normal-call counter')
+                    and (not value.name.endswith('.errors') or point.as_int <= int(failed)), 'invalid declared-call counter')
             sample = (point.as_int, (), 0)
         series.setdefault(value.name, []).append((point.start_time_unix_nano, point.time_unix_nano, *sample))
         count += 1
@@ -120,14 +120,15 @@ def metric(message, language: str, service: str, name: str, series: dict) -> int
     return sum(function_metric(value, name, series) for value in groups(message, language, service, traces=False))
 
 
-def totals(series: dict) -> None:
+def totals(series: dict, *, failed: bool = False) -> None:
     """Keep every cumulative point; one observed call cannot reset or multiply."""
-    require({'otelc.function.calls', 'otelc.function.duration'} <= set(series), 'missing function measurements')
+    required = {'otelc.function.calls', 'otelc.function.duration'} | ({'otelc.function.errors'} if failed else set())
+    require(type(failed) is bool and required <= set(series), 'missing function measurements')
     for name, rows in series.items():
         rows.sort()
         require(len({row[0] for row in rows}) == 1 and len({row[1] for row in rows}) == len(rows)
                 and all(first[2] <= second[2] for first, second in zip(rows, rows[1:])), 'reset/duplicate cumulative sample')
-        require(rows[-1][2] == int(not name.endswith('.errors')), 'wrong final function total')
+        require(rows[-1][2] == (int(failed) if name.endswith('.errors') else 1), 'wrong final function total')
         if name.endswith('.duration'):
             populated = [row[3:] for row in rows if row[2]]
             require(all(row == populated[0] for row in populated), 'one-call histogram changed after measurement')

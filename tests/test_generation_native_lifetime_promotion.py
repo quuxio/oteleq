@@ -18,11 +18,13 @@ class NativeLifetimePromotionTests(unittest.TestCase):
         self.root = Path(temporary.name).resolve()
 
     def report(self, folder: Path, language: str, function: str, contracts: tuple,
-               *, difference: bool = False, amount: int = 5) -> Path:
+               *, difference: bool = False, amount: int = 5, mode: str = 'completed') -> Path:
         """Create explicit literal observations for one declared promoted call."""
         folder.mkdir(parents=True)
         named = lambda name: name + ('(int)' if language == 'cpp' else '')
         entries = [{'id': name, 'status': 'ready', 'language': language, 'otelc_function': named(name),
+                    'expected_baseline': ({'kind': 'error', 'category': 'exception', 'type': 'cpp.std::runtime_error'}
+                                          if mode == 'target-error' else {'kind': 'return'}),
                     'native_options': {'profile': qualifier.PROFILES[language]},
                     'globals': [{'name': 'state'}, {'name': 'observed_errno'}]} for name, _ in contracts]
         case = function + '-0'
@@ -31,13 +33,22 @@ class NativeLifetimePromotionTests(unittest.TestCase):
                     'cases': [{'case': case, 'function': named(function), 'arguments': [amount], 'exit_code': int(difference),
                                'comparison': {'verdict': 'different_observed' if difference else 'equivalent_observed'}}]}
         before = {'global:state': qualifier.scalar(language, 7), 'global:observed_errno': qualifier.scalar(language, 0)}
-        bundle = {'contract': {'required_roots': list(before)}}
+        bundle = {'contract': {'required_roots': list(before),
+                               'expected_baseline': ({'kind': 'error', 'category': 'exception', 'type': 'cpp.std::runtime_error'}
+                                          if mode == 'target-error' else {'kind': 'return'})}}
         for lane in ('baseline', 'instrumented_on'):
             after = {'global:state': qualifier.scalar(language, 7 + amount + int(difference and lane == 'instrumented_on')),
                      'global:observed_errno': qualifier.scalar(language, errno.ECHILD)}
             observation = {'gaps': [], 'before': {'roots': before, 'nodes': []}, 'after': {'roots': after, 'nodes': []},
                            'outcome': {'kind': 'return', 'graph': {'roots': {
                                **after, 'result': qualifier.scalar(language, dict(contracts)[function])}, 'nodes': []}}}
+            if mode == 'target-error':
+                # Literal test data, independent of the qualification oracle.
+                observation['outcome'] = {'kind': 'error', 'category': 'exception', 'graph': {
+                    'roots': {**after, 'error': {'kind': 'reference', 'node_id': 'n0'}},
+                    'nodes': [{'id': 'n0', 'type': 'cpp.std::runtime_error', 'fields': {'message': {
+                        'kind': 'bytes', 'type': 'cpp.what',
+                        'hex': ('failure-' + str(dict(contracts)[function])).encode().hex()}}}]}}
             attempt = {'observation': observation, 'execution': {'capture_complete': True,
                        'channels': {'stdout': [], 'stderr': []}, 'termination': {'kind': 'exit', 'code': 0}, 'witness': None}}
             bundle[lane] = [copy.deepcopy(attempt), copy.deepcopy(attempt)]
@@ -110,6 +121,10 @@ class NativeLifetimePromotionTests(unittest.TestCase):
                 self.assertEqual(body.count('int selected(int amount)'), 1)
                 self.assertEqual(body.count('int selected_extra(int amount)'), 1)
                 self.assertIn('return 43;', body); self.assertIn('return 44;', body)
+                if mode == 'target-error':
+                    self.assertNotIn('"failure-42"', body)
+                    self.assertEqual(body.count('"failure-43"'), 1)
+                    self.assertEqual(body.count('"failure-44"'), 1)
                 self.assertEqual(body.count('keep_item('), 2)
                 database = qualifier.retained.read(application / 'build/compile_commands.json')
                 self.assertEqual(len(database), 2)
@@ -117,7 +132,7 @@ class NativeLifetimePromotionTests(unittest.TestCase):
             rows = [{'project_source': str(application)}]
             for function, _ in contracts:
                 path = self.report(parent / label / function, language, function, contracts, difference=True,
-                                   amount=0 if mode == 'zero' else 5)
+                                   amount=0 if mode == 'zero' else 5, mode=mode)
                 rows.append({'report': str(path)})
             if fault == 'mutated-source':
                 path = application / 'include/item.h'; path.write_bytes(path.read_bytes())
@@ -150,7 +165,7 @@ class NativeLifetimePromotionTests(unittest.TestCase):
 
     def test_promoted_zero_censor_and_unwind_cases_keep_their_declared_inputs(self):
         for language, mode in (('c', 'zero'), ('cpp', 'zero'), ('c', 'censored'), ('cpp', 'censored'),
-                               ('cpp', 'unwind'), ('cpp', 'throwing-destructor')):
+                               ('cpp', 'unwind'), ('cpp', 'throwing-destructor'), ('cpp', 'target-error')):
             with self.subTest(language=language, mode=mode): self.run_promotion(language, mode=mode)
 
     def test_incomplete_foreign_or_mutated_promotion_cannot_pass(self):

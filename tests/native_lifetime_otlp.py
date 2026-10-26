@@ -1,7 +1,7 @@
 """Independent raw oracle for the declared one-call native lifetime corpus.
 
 Only the explicit zero/completed/censored/C++ exception fixtures are admitted.
-Other object counts, escaping errors, startup and live schedules stay separate.
+Other object counts/error payloads, startup and live schedules stay separate.
 No SDK or consumer receipt renderer supplies expected telemetry values.
 """
 
@@ -40,7 +40,7 @@ def observation(values: list, language: str, function: str, *, mode: str = 'comp
     roots = [span for span in values if span.name == function]
     require(len(roots) == 1, 'selected function root absent or duplicated')
     root, = roots
-    common.function_span(root, function)
+    common.function_span(root, function, failed=expected['function_error'])
     require(not root.trace_state, 'foreign selected function trace state')
     if not expected['admitted']:
         return None
@@ -78,7 +78,7 @@ def observation(values: list, language: str, function: str, *, mode: str = 'comp
 def metric(value, boundary: str, duration_ns: int, series: dict, *, mode: str = 'completed') -> int:
     """Retain every cumulative/gauge point and the exact raw span duration."""
     require(value.name in INSTRUMENTS, 'undeclared lifetime metric')
-    require(mode != 'zero' and mode in ('completed', 'censored', 'unwind', 'throwing-destructor')
+    require(mode != 'zero' and mode in ('completed', 'censored', 'unwind', 'throwing-destructor', 'target-error')
             and (not value.name.endswith('.completed') or mode != 'censored')
             and (not value.name.endswith('.incomplete') or mode == 'censored'),
             'lifetime metric differs from declared completion/censoring')
@@ -142,11 +142,11 @@ def receipt(folder: Path, read, language: str, service: str, function: str, *, p
     row = observation(spans, language, function, mode=mode)
     functions, lifetimes, points = {}, {}, 0
     for value in metrics:
-        points += (common.function_metric(value, function, functions) if value.name.startswith('otelc.function.')
+        points += (common.function_metric(value, function, functions, failed=expected['function_error']) if value.name.startswith('otelc.function.')
                    else metric(value, expected['release_boundary'], row['duration_ns'] if row else 0,
                                lifetimes, mode=mode))
         require(points <= 100000, 'native lifetime point budget exceeded')
-    common.totals(functions); totals(lifetimes, language=language, mode=mode)
+    common.totals(functions, failed=expected['function_error']); totals(lifetimes, language=language, mode=mode)
     return {'functions': {function: 1}, 'spans': expected['spans'], 'lifetimes': [row] if row else [], 'metric_points': points,
             'raw_otlp_sha256': digest.hexdigest(), 'trace_requests': requests['/v1/traces'],
             'metric_requests': requests['/v1/metrics']}
