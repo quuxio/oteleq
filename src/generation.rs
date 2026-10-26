@@ -197,6 +197,14 @@ const RESOURCES: &[(&str, &str)] = &[
         include_str!("../adapters/generation/native_sdk.py"),
     ),
     (
+        "rust_tools.py",
+        include_str!("../adapters/generation/rust_tools.py"),
+    ),
+    (
+        "rust_protocol.py",
+        include_str!("../adapters/generation/rust_protocol.py"),
+    ),
+    (
         "native_build.py",
         include_str!("../adapters/generation/native_build.py"),
     ),

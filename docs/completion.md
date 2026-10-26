@@ -26,6 +26,8 @@ Go has independent [rebuilt-provider components](go-prepared-provider.md), inclu
 
 The separate Go `source-scope-v1` profile implements private-bootstrap-v1, build6/7/prepared-tools2, independent pinned-weaver source authentication and fixed native tooling queries. Its [320-launch qualification](qualification/go-scope-metric-controls-2026-10-25.json) covers untagged build6, all four startup states and generated/replayed/framework/detached/reduced/promoted routes, including complete intermediate graphs, primitive panic continuation and restored retained measurements. The final retained-only audit checks 320 unique application identities, 84 comparisons, 20 evidence refusals and all 401,894 original evidence files. Tagged build7 and broader Go requirements remain open; this does not complete a checklist row or recertify earlier source-v1 records.
 
+Separate [rebuilt Rust components](rust-prepared-provider.md) now independently bind retained compiler/bridge tools and the reserved owned preparation descriptor. They have literal metadata/refusal controls, original file-fact checks, generator identity binding and distribution embedding. SDK execution, independent source-build/prepared/launch readers and actual generated/retained qualification remain required; these components do not complete a checklist row.
+
 | Requirement | Current evidence and remaining work |
 | --- | --- |
 | Source-wide callable accounting in all eight languages | Syntax inventories exist. [Incomplete directory inspection](input-inspection.md) now refuses unreadable or vanished inputs rather than silently omitting them. Semantic/build inclusion, generic instances, inherited/private access and dependencies need project-aware adapters. |

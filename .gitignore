@@ -10,6 +10,7 @@ __pycache__/
 .generation.coverage
 .effect-qualification.coverage
 .native-provider.coverage
+.rust-provider.coverage
 .native-caller.coverage
 .native-lifetime.coverage
 .native-lifetime-receipt.coverage
