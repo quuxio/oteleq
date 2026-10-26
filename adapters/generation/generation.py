@@ -742,6 +742,7 @@ def generator_identity():
         'node_live.py', 'node_control.py', 'node_control_receipt.py', 'node_checkpoint.mjs',
         'native_protocol.py', 'native_inputs.py', 'native_toolchain.py', 'native_sdk.py',
         'rust_tools.py', 'rust_protocol.py',
+        'rust_inventory.py', 'rust_lifetimes.py',
         'native_build.py', 'native_unit_build.py', 'native_lifetime_build.py', 'native_lifetime_inventory.py',
         'native_lifetime_intent.py', 'native_lifetime_metrics.py', 'native_lifetime_receipt.py',
         'native_lifetime_caller.py', 'native_lifetime_frontend.py', 'native_lifetime_policy.py',

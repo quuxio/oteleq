@@ -10,9 +10,13 @@ This work connects the rebuilt Rust SDK to oteleq. The current SDK has retained 
 
 `rust_protocol.py` validates the reserved `otelc.rust.protocols` version-one descriptor for the explicit `rust1981-owned-standalone-v1` profile. Source build1 selects sync-v1, native plan2 and health1; source build2 selects drop-v2, native plan3 and health5. All other prepared record versions remain1. Missing or extra fields, mixed profiles and boolean/float version substitutes refuse. Descriptor acceptance alone does not establish that an SDK implements execution.
 
-Run `make rust-provider-check` for the bounded metadata tests and separate 80% coverage floors. Both readers are embedded in the Rust distribution and bound to the generator identity. Required CI also runs these tests through `generation-check`.
+`rust_inventory.py` binds function inventory1 and woven lifetime inventory2 to a caller-held original source catalogue. It checks all declaration identities, compiler names, byte ranges, flags, source digests and ordered denominators before applying the common source/function selectors. The inspector does not import target code. Selected async, expanded, closure and oversized function identities refuse; excluded declarations remain in the checked inventory.
 
-These file/metadata components do not establish compiler execution, whole dependency/sysroot closure, application instrumentation or downstream receipt. Those require their own observed build/launch records and genuine qualification.
+`rust_lifetimes.py` independently validates drop discovery2, including original type declarations, local roles, available/unavailable layout facts, ownership sites, skipped bodies and unavailable foreign/container/opaque locals. Selection retains the original argument/return/layout shapes for explicit compiler acceptance or refusal. It cannot silently discard selected unavailable types. Its lifetime request hashes each complete unfiltered MIR body with sorted compact UTF-8 JSON, including unselected locals and ownership sites. Woven metadata must match the caller-held local/type map and every complete body fingerprint. The caller also supplies the independently selected compiler target.
+
+Run `make rust-provider-check` for the bounded metadata tests and separate 80% coverage floors. All four readers are embedded in the Rust distribution and bound to the generator identity. Required CI also runs these tests through `generation-check`.
+
+These file/metadata components do not perform compiler input discovery or establish compiler execution, whole dependency/sysroot closure, successful instrumentation of a requested ownership shape or downstream receipt. The caller must obtain and freeze its source/MIR expectations independently before SDK builds. The complete application-build/prepared/launch readers and genuine execution qualification remain required. No new generated execution backend is enabled.
 
 ## Required SDK preparation boundary
 

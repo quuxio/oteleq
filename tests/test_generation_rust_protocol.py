@@ -68,7 +68,7 @@ class RustProtocolTests(unittest.TestCase):
         embedded = (ROOT / 'src/generation.rs').read_text()
         original_digest = generation.capture.file_digest
         baseline = generation.generator_identity()
-        for name in ('rust_tools.py', 'rust_protocol.py'):
+        for name in ('rust_tools.py', 'rust_protocol.py', 'rust_inventory.py', 'rust_lifetimes.py'):
             self.assertIn('include_str!("../adapters/generation/' + name + '")', embedded)
 
             def changed(path: Path) -> str:
