@@ -289,6 +289,24 @@ class ForwardCaptureTests(unittest.TestCase):
                 with self.assertRaises(ValueError): captured.require_complete()
             self.assertFalse(upstream.calls)
 
+    def test_unterminated_incoming_headers_never_forward(self):
+        requests = (
+            b'POST /v1/metrics HTTP/1.0\r\nContent-Length: 0\r\n',
+            b'POST /v1/metrics HTTP/1.0\r\nContent-Length: 0',
+            b'POST /v1/metrics HTTP/1.0\r\nContent-Length: 0\r\nX-Unused: ' + b'x' * 8200 + b'\r\n\r\n',
+        )
+        with collector(body=b'') as upstream:
+            for index, request in enumerate(requests):
+                with forward.forwarding_receiver(
+                    f'http://127.0.0.1:{upstream.server_port}', self.base / str(index),
+                ) as captured:
+                    status, _ = self.raw(captured, request)
+                self.assertIn(status, (400, 431))
+                self.assertEqual(captured.requests, 0)
+                with self.assertRaises(ValueError):
+                    captured.require_complete()
+            self.assertFalse(upstream.calls)
+
     def test_event_quota_cannot_be_bypassed_with_non_post_requests(self):
         with collector() as upstream:
             with self.capture(upstream, max_requests=1) as captured:

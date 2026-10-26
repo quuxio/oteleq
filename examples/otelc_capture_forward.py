@@ -90,15 +90,16 @@ class Errors(list[str]):
 class HeaderReader:
     """Bound stdlib header parsing and distinguish its terminator from EOF."""
 
-    def __init__(self, stream):
+    def __init__(self, stream, context: str = 'Collector response'):
         self.stream, self.size, self.last = stream, 0, b''
+        self.context = context
 
     def readline(self, limit: int = -1) -> bytes:
         data = self.stream.readline(min(HEADER_LIMIT + 1, limit) if limit >= 0 else HEADER_LIMIT + 1)
         self.size += len(data)
         self.last = data
         if self.size > HEADER_LIMIT:
-            raise HTTPException('Collector response headers exceed capture budget')
+            raise HTTPException(self.context + ' headers exceed capture budget')
         return data
 
 
@@ -119,6 +120,20 @@ class Response(HTTPResponse):
 
 class ForwardReceiver(capture.Receiver):
     """Use the original request framer, then relay one fixed upstream response."""
+
+    def parse_request(self) -> bool:
+        """Refuse incomplete header blocks before accepting an incoming entity."""
+        stream = self.rfile
+        checked = HeaderReader(stream, 'Incoming request')
+        self.rfile = checked
+        try:
+            valid = super().parse_request()
+        finally:
+            self.rfile = stream
+        if valid and checked.last not in (b'\r\n', b'\n'):
+            self.send_error(400)
+            return False
+        return valid
 
     def request_size(self) -> tuple[bool, int]:
         try:
@@ -352,6 +367,7 @@ class ForwardCapture(capture.CaptureServer):
                   'limits': {'max_requests': self.max_requests, 'max_request_bytes': capture.MAX_REQUEST_BYTES,
                              'max_bytes_each_direction': self.max_bytes, 'max_response_bytes': self.max_response_bytes,
                              'essential_header_bytes': HEADER_LIMIT, 'max_error_entries': 32,
+                             'incoming_header_bytes': HEADER_LIMIT,
                              'upstream_header_bytes': HEADER_LIMIT,
                              'upstream_timeout': self.upstream_timeout},
                   'source_inputs': {str(path): facts[0] for path, facts in self.sources.items()},
