@@ -117,6 +117,16 @@ class Response(HTTPResponse):
         if checked.last not in (b'\r\n', b'\n'):
             raise HTTPException('incomplete Collector response headers')
 
+    def _read_and_discard_trailer(self) -> None:
+        """Require complete, bounded trailers before accepting the last chunk."""
+        checked = HeaderReader(self.fp, 'Collector response trailer')
+        while True:
+            line = checked.readline()
+            if line in (b'\r\n', b'\n'):
+                return
+            if not line:
+                raise HTTPException('incomplete Collector response trailer')
+
 
 class ForwardReceiver(capture.Receiver):
     """Use the original request framer, then relay one fixed upstream response."""
@@ -369,6 +379,7 @@ class ForwardCapture(capture.CaptureServer):
                              'essential_header_bytes': HEADER_LIMIT, 'max_error_entries': 32,
                              'incoming_header_bytes': HEADER_LIMIT,
                              'upstream_header_bytes': HEADER_LIMIT,
+                             'upstream_trailer_bytes': HEADER_LIMIT,
                              'upstream_timeout': self.upstream_timeout},
                   'source_inputs': {str(path): facts[0] for path, facts in self.sources.items()},
                   'scope': 'Transfer-decoded entities and essential headers; not wire packets, client acknowledgement, OTLP partial-rejection decoding or downstream ingestion proof.'}

@@ -35,6 +35,8 @@ Each request entity is limited to 1 MiB. `max_bytes` independently bounds total 
 
 The helper records the original numeric Collector status and essential media, framing and retry headers. A successful relay references the same retained response entity; it does not store a second copy. Non-success Collector statuses are relayed with their original entities and make completion fail. Connection errors, timeouts, ambiguous/truncated responses and byte-limit failures produce local failure responses, never an invented HTTP200. Incomplete original upstream entities remain explicitly incomplete; malformed/incomplete client entities are not represented as complete requests. Client receipt of a written response is not observed.
 
+Chunked responses require the final blank trailer line. Trailer parsing has a separate 8 KiB budget. Chunk framing and trailer fields are excluded from the retained decoded response entity.
+
 ## Retained result
 
 `forward-capture.json` uses schema1 and kind `oteleq.otlp-http-forward`. It includes the fixed destination, endpoint, limits, source hashes, closed/drained state, error and quota counters, and bounded events. Each event links a complete request entity, original upstream status/headers/entity/completeness, attempted client response, forwarding errors and monotonic timing. Separate binary entity files have their byte lengths and SHA256 hashes in the manifest. The final manifest is published without overwriting an existing file. Authentication headers and live SDK control descriptors are not retained.

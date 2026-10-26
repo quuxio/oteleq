@@ -33,15 +33,18 @@ class CollectorHandler(BaseHTTPRequestHandler):
             self.send_response(self.server.status)
             self.send_header('Content-Type', 'application/x-protobuf')
             self.send_header('Retry-After', '5')
-            if mode in ('chunked', 'ambiguous'):
+            if mode in ('chunked', 'ambiguous', 'trailer-eof', 'trailer-over'):
                 self.send_header('Transfer-Encoding', 'chunked')
-            if mode not in ('chunked', 'eof-hang'):
+            if mode not in ('chunked', 'eof-hang', 'trailer-eof', 'trailer-over'):
                 size = len(self.server.body) + (1 if mode == 'short' else 0)
                 self.send_header('Content-Length', str(size))
             self.end_headers()
-            if mode == 'chunked':
+            if mode in ('chunked', 'trailer-eof', 'trailer-over'):
                 body = self.server.body
-                self.wfile.write(f'{len(body):x}\r\n'.encode() + body + b'\r\n0\r\n\r\n')
+                ending = b'' if mode == 'trailer-eof' else b'\r\n'
+                if mode == 'trailer-over':
+                    ending = b'X-Unused: ' + b'x' * 8200 + b'\r\n\r\n'
+                self.wfile.write(f'{len(body):x}\r\n'.encode() + body + b'\r\n0\r\n' + ending)
             else:
                 self.wfile.write(self.server.body)
             self.wfile.flush()
@@ -306,6 +309,20 @@ class ForwardCaptureTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     captured.require_complete()
             self.assertFalse(upstream.calls)
+
+    def test_unterminated_or_over_budget_upstream_trailers_fail(self):
+        for index, mode in enumerate(('trailer-eof', 'trailer-over')):
+            with self.subTest(mode=mode), collector(body=b'x', mode=mode) as upstream:
+                with forward.forwarding_receiver(
+                    f'http://127.0.0.1:{upstream.server_port}', self.base / str(index),
+                ) as captured:
+                    status, body, _ = self.post(captured)
+                self.assertEqual((status, body), (502, b''))
+                event = captured.receipt['events'][0]
+                self.assertFalse(event['upstream']['complete'])
+                self.assertEqual((captured.output / event['upstream']['entity']['file']).read_bytes(), b'x')
+                with self.assertRaises(ValueError):
+                    captured.require_complete()
 
     def test_event_quota_cannot_be_bypassed_with_non_post_requests(self):
         with collector() as upstream:
