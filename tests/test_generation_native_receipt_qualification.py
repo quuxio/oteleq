@@ -96,8 +96,8 @@ def capture(folder: Path, *, plain: bool = False) -> dict | None:
         'losses': {'function_lost': 0, 'metadata_errors': 0, 'queue_dropped': 0, 'diagnostic_dropped': 0}, 'pending': 0}
 
 
-def fixture(root: Path, *, plain: bool = False) -> tuple[Path, Path, dict | None]:
-    folder, provider = root / 'attempt', root / 'provider'
+def fixture(root: Path, *, plain: bool = False, name: str = 'attempt') -> tuple[Path, Path, dict | None]:
+    folder, provider = root / name, root / 'provider'
     runtime = folder / 'native-runtime'
     for path in (folder / 'native-build', folder / 'project', runtime / 'app', provider / 'otelc',
                  folder / 'native-after-build-inputs', folder / 'native-after-execution-inputs'):

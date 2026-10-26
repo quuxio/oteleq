@@ -44,6 +44,32 @@ class NativeSourceTests(unittest.TestCase):
                     'targets': [{'name': 'application', 'units': [{'source': 'src/one.cpp'}]}]}
         self.assertEqual(native_source.settings(explicit)['targets'][0]['name'], 'application')
 
+    def test_sdk_source_closure_is_explicit_and_cannot_weaken_a_lifetime_profile(self):
+        self.assertNotIn('sdk_source_profile', self.options)
+        self.assertEqual(native_source.source_profile(self.options), 'function-v2')
+        for selected in ('function-v2', 'resource-v1'):
+            options = native_source.settings({'backend': 'prepared', 'sdk_source_profile': selected})
+            self.assertEqual(native_source.source_profile(options), selected)
+            self.assertEqual(policy.validate({'adapters': {'cpp': options}})['adapters']['cpp'], options)
+        for selected in (True, None, [], 'object-v1', 'future'):
+            options = {'backend': 'prepared', 'sdk_source_profile': selected}
+            with self.subTest(selected=selected), self.assertRaises(ValueError): native_source.settings(options)
+        legacy = {'sdk_source_profile': 'function-v2'}
+        with self.assertRaises(ValueError): native_source.settings(legacy)
+        lifetime = {'backend': 'prepared', 'profile': 'native-resources-owned-v1',
+                    'lifetimes': {'include': ['Item']}, 'sdk_source_profile': 'function-v2'}
+        with self.assertRaises(ValueError): native_source.settings(lifetime)
+        lifetime['sdk_source_profile'] = 'resource-v1'
+        self.assertEqual(native_source.source_profile(native_source.settings(lifetime)), 'resource-v1')
+
+    def test_current_function_sdk_recipe_receives_the_complete_caller_selected_abi_closure(self):
+        options = {**self.options, 'sdk_source_profile': 'resource-v1'}
+        tools = {key: self.base / key for key in ('llvm-config', 'clang', 'cmake', 'ninja')}
+        with patch.object(native_source.native_toolchain, 'capture', return_value='frozen-toolchain'), \
+                patch.object(native_source.native_sdk, 'capture', return_value='accepted') as read:
+            self.assertEqual(native_source.sdk(self.base, 'c', tools, options, self.base, Mock()), 'accepted')
+        self.assertEqual(read.call_args.kwargs['source_profile'], 'resource-v1')
+
     def test_standalone_recipes_keep_units_independent_and_flags_unaliased(self):
         compiler = self.base / 'clang'
         targets = native_source.standalone_targets('c', compiler, {'b.c': '', 'a.c': '', 'other.cpp': ''})

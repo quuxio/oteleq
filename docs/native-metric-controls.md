@@ -17,6 +17,7 @@ languages = ["cpp"]
 [adapters.cpp]
 backend = "prepared"
 sdk_build = "/absolute/otelc/build/context-sdk"
+sdk_source_profile = "resource-v1"
 
 [limits]
 case_timeout_ms = 20000
@@ -36,6 +37,8 @@ sequence = [
 ```
 
 Select `languages = ["c"]` and `[adapters.c]` for a C source target. Each schedule has 1 to 32 calls and must include a collection-on/emission-on positive call. The first call can request any of the four states; its flags become the initial SDK policy before application execution. Every call currently uses the same concrete case arguments. Declare [independent baseline expectations](expected-returns.md) on individual calls where needed, including supported C++ errors.
+
+An expected C++ exception requires the complete declaration, for example `expected_baseline = { kind = "error", category = "exception", type = "cpp.std::runtime_error" }` on the throwing call. A bare error kind is invalid. The maintained qualifier validates all 28 generated workload/start configurations through the public policy reader before their fixture contracts are accepted by the component gate.
 
 Each disabled state is held for at least one full one-second export interval. The original case timeout includes these holds, transport queries and application calls. Increase it for longer schedules. A timeout is incomplete evidence and cannot become an equivalent result.
 
@@ -66,5 +69,7 @@ make native-metric-control-check PYTHON=/absolute/path/to/python \
 The target enforces 80% statement coverage separately for the five new Python modules. Checks use literal SDK replies, real private files, mocked process ownership, independently authored protobuf values and strict C/C++ syntax checks. They do not build or run an SDK application.
 
 Before runtime qualification can be published, both languages and all four startup states must complete actual generated, framework, replay, detached, reduced and promoted workflows with independently prescribed state/result/error observations and altered-evidence refusals. Default single-call compatibility also needs current-revision regression evidence. No historical runtime record is transferred to this implementation.
+
+The [workflow qualifier](native-metric-workflows.md) implements those routes with independent complete frame/health/OTLP readers and an eight-shard hosted matrix. Its component checks use authored records; complete original application evidence is still required.
 
 Prepared receivers, native object/resource live schedules, variable per-call arguments, general asynchronous actions, shipping artefacts and invocation-scoped attribution require further integration and qualification. Requested unsupported profiles remain visible refusals.

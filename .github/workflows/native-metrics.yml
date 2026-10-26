@@ -1,0 +1,96 @@
+name: Native metric workflow qualification
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/native-metrics.yml'
+      - 'tests/qualify_native_metrics.py'
+      - 'tests/native_metric_*.py'
+      - 'tests/native_prepared_receipt.py'
+      - 'tests/native_prepared_otlp.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-metrics:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        language: [c, cpp]
+        start: ['11', '01', '10', '00']
+    env:
+      CC: /usr/lib/llvm-22/bin/clang
+      CXX: /usr/lib/llvm-22/bin/clang++
+      OTELC_LLVM_BIN: /usr/lib/llvm-22/bin
+      LLVM_CONFIG: /usr/lib/llvm-22/bin/llvm-config
+      OTELC_CLANG: /usr/lib/llvm-22/bin/clang
+      OTELC_CLANGXX: /usr/lib/llvm-22/bin/clang++
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          path: consumer
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          repository: quuxio/otelc
+          ref: acb13d7735526448209df37b7e6b98e5717befdb
+          path: provider
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Install matched LLVM 22 tools
+        run: |
+          bash provider/ci/install_llvm22.sh
+          sudo apt-get install --yes --no-install-recommends clang-tools-22
+      - name: Install locked decoders and validation tools
+        working-directory: consumer
+        run: 'python -m pip install --require-hashes --only-binary=:all: -r ci/requirements.txt'
+      - name: Build the pinned consumer
+        working-directory: consumer
+        run: |
+          rustup toolchain install 1.98.1 --profile minimal
+          rustup default 1.98.1
+          cargo build --locked
+      - name: Build original SDK and exercise public metric workflows
+        run: |
+          python consumer/tests/qualify_native_metrics.py \
+            --otelc-root "$GITHUB_WORKSPACE/provider" \
+            --sdk-build "$RUNNER_TEMP/native-metric-sdk" \
+            --report-dir "$RUNNER_TEMP/native-metric-evidence" \
+            --cli "$GITHUB_WORKSPACE/consumer/target/debug/quux-oteleq" \
+            --language "${{ matrix.language }}" --start "${{ matrix.start }}"
+      - name: Retain exact source archives and source status
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/native-metric-evidence"
+          if test -f consumer/target/debug/quux-oteleq; then
+            cp consumer/target/debug/quux-oteleq "$RUNNER_TEMP/native-metric-evidence/consumer-cli"
+          fi
+          git -C consumer archive --format=tar --output "$RUNNER_TEMP/native-metric-evidence/consumer-source.tar" HEAD
+          git -C provider archive --format=tar --output "$RUNNER_TEMP/native-metric-evidence/provider-source.tar" HEAD
+          git -C consumer status --porcelain > "$RUNNER_TEMP/native-metric-evidence/consumer-source-status.txt"
+          git -C provider status --porcelain > "$RUNNER_TEMP/native-metric-evidence/provider-source-status.txt"
+          test -z "$(git -C consumer status --porcelain)"
+          test -z "$(git -C provider status --porcelain)"
+      - name: Retain original qualification and SDK build failures
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: native-metrics-${{ matrix.language }}-${{ matrix.start }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/native-metric-evidence/
+            ${{ runner.temp }}/native-metric-sdk/native-sdk-build.json
+            ${{ runner.temp }}/native-metric-sdk/libotelc_native_runtime.so
+            ${{ runner.temp }}/native-metric-sdk/*.stdout
+            ${{ runner.temp }}/native-metric-sdk/*.stderr
+            ${{ runner.temp }}/native-metric-sdk/*command*.json
+          retention-days: 7
+          if-no-files-found: warn
