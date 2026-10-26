@@ -21,6 +21,10 @@ NATIVE_MIN_FREE_BYTES ?= 8589934592
 AUDIT_DIR ?= $(REPORT_DIR)-audit
 MARKDOWNLINT ?= ./ci/markdownlint/node_modules/.bin/markdownlint
 DEPENDENCY_AUDIT_OUTPUT ?= $(CURDIR)/build/dependency-audit
+QUALIFICATION_HOME ?= $(OTELEQ_QUALIFICATION_HOME)
+RETENTION_ARGS ?=
+
+.PHONY: qualification-cleanup
 
 .PHONY: dependency-audit dependency-audit-check
 .PHONY: native-provider-check
@@ -49,6 +53,8 @@ DEPENDENCY_AUDIT_OUTPUT ?= $(CURDIR)/build/dependency-audit
 .PHONY: help setup lint examples docs-check observer-check generation-check effect-qualification-check node-observer-check node-sequence-check java-observer-check go-observer-check cpp-observer-check generation-cpp-receiver-otelc generation-go-receiver-otelc generation-go-source-otelc generation-java-receiver-otelc generation-otelc generation-policy-otelc generation-rust-otelc rust-semantic-otelc generation-native-otelc generation-shrink-otelc generation-python-project-otelc generation-receiver-otelc generation-node-receiver-otelc generation-go-build-otelc generation-go-project-otelc generation-sequence-otelc generation-typescript-sequence-otelc generation-filesystem-otelc generation-http-otelc resource-otelc capture-otelc report core-check coverage check
 
 help:
+	@printf '%s\n' 'qualification-cleanup Plan stale-bundle cleanup (QUALIFICATION_HOME, RETENTION_ARGS=--apply to remove eligible bundles)'
+	@printf '%s\n' 'Qualification targets compress all report/audit outputs after completion; see docs/qualification-retention.md to restore them'
 	@printf '%s\n' 'native-metric-qualification-check Check independent native metric workflow oracles'
 	@printf '%s\n' 'native-metric-control-check Check native controlled calls, private checkpoints and literal telemetry receipts'
 	@printf '%s\n' 'capture-forward-check Test opt-in local Collector forwarding and bounded retained HTTP evidence'
@@ -97,50 +103,54 @@ setup:
 	npm ci --ignore-scripts --prefix ci/markdownlint
 	$(PYTHON) ci/java_coverage.py setup
 
+qualification-cleanup:
+	test -n "$(QUALIFICATION_HOME)"
+	$(PYTHON) -m ci.qualification_retention --home "$(QUALIFICATION_HOME)" $(RETENTION_ARGS)
+
 generation-project-tests-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_project_tests.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" $(GENERATION_ARGS)
+	$(PYTHON) -m ci.qualification_run --root "$(REPORT_DIR)" -- $(PYTHON) tests/qualify_project_tests.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" $(GENERATION_ARGS)
 
 generation-preconditions-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_preconditions.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" $(GENERATION_ARGS)
+	$(PYTHON) -m ci.qualification_run --root "$(REPORT_DIR)" -- $(PYTHON) tests/qualify_preconditions.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" $(GENERATION_ARGS)
 
 generation-domains-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_domains.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
+	$(PYTHON) -m ci.qualification_run --root "$(REPORT_DIR)" -- $(PYTHON) tests/qualify_domains.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
 
 generation-input-walks-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)" && test -n "$(BEFORE_CLI)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_input_walks.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --before-cli "$(BEFORE_CLI)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
+	$(PYTHON) -m ci.qualification_run --root "$(REPORT_DIR)" -- $(PYTHON) tests/qualify_input_walks.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --before-cli "$(BEFORE_CLI)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
 
 generation-retained-source-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_retained_source.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
+	$(PYTHON) -m ci.qualification_run --root "$(REPORT_DIR)" -- $(PYTHON) tests/qualify_retained_source.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
 
 generation-return-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_returns.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
+	$(PYTHON) -m ci.qualification_run --root "$(REPORT_DIR)" -- $(PYTHON) tests/qualify_returns.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
 
 generation-java-project-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_java_project.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" --java-backend "$(JAVA_BACKEND)" $(if $(filter prepared,$(JAVA_BACKEND)),--java-profile "$(JAVA_PROFILE)",)
+	$(PYTHON) -m ci.qualification_run --root "$(REPORT_DIR)" -- $(PYTHON) tests/qualify_java_project.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" --java-backend "$(JAVA_BACKEND)" $(if $(filter prepared,$(JAVA_BACKEND)),--java-profile "$(JAVA_PROFILE)",)
 
 generation-java-archive-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_java_archives.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
+	$(PYTHON) -m ci.qualification_run --root "$(REPORT_DIR)" -- $(PYTHON) tests/qualify_java_archives.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
 
 generation-native-project-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_native_project.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" --backend "$(NATIVE_BACKEND)" $(if $(filter prepared,$(NATIVE_BACKEND)),--sdk-build "$(NATIVE_SDK_BUILD)") --min-free-bytes "$(NATIVE_MIN_FREE_BYTES)"
+	$(PYTHON) -m ci.qualification_run --root "$(REPORT_DIR)" -- $(PYTHON) tests/qualify_native_project.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" --backend "$(NATIVE_BACKEND)" $(if $(filter prepared,$(NATIVE_BACKEND)),--sdk-build "$(NATIVE_SDK_BUILD)") --min-free-bytes "$(NATIVE_MIN_FREE_BYTES)"
 
 lint:
 	$(MARKDOWNLINT) '**/*.md' --ignore 'ci/markdownlint/node_modules/**'
@@ -448,199 +458,199 @@ generation-check: node-observer-check node-sequence-check node-source-context-ch
 generation-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_generation.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" $(GENERATION_ARGS)
+	$(PYTHON) -m ci.qualification_run --root "$(REPORT_DIR)" -- $(PYTHON) tests/qualify_generation.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" $(GENERATION_ARGS)
 
 generation-policy-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_project_policy.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" $(GENERATION_ARGS)
+	$(PYTHON) -m ci.qualification_run --root "$(REPORT_DIR)" -- $(PYTHON) tests/qualify_project_policy.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" $(GENERATION_ARGS)
 
 generation-rust-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_rust_build.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" $(GENERATION_ARGS)
+	$(PYTHON) -m ci.qualification_run --root "$(REPORT_DIR)" -- $(PYTHON) tests/qualify_rust_build.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" $(GENERATION_ARGS)
 
 rust-semantic-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_rust_semantics.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
+	$(PYTHON) -m ci.qualification_run --root "$(REPORT_DIR)" -- $(PYTHON) tests/qualify_rust_semantics.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
 
 generation-native-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_native_types.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
+	$(PYTHON) -m ci.qualification_run --root "$(REPORT_DIR)" -- $(PYTHON) tests/qualify_native_types.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
 
 generation-shrink-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_shrinking.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
+	$(PYTHON) -m ci.qualification_run --root "$(REPORT_DIR)" -- $(PYTHON) tests/qualify_shrinking.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
 
 generation-cpp-receiver-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_cpp_receivers.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
+	$(PYTHON) -m ci.qualification_run --root "$(REPORT_DIR)" -- $(PYTHON) tests/qualify_cpp_receivers.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
 
 generation-cpp-sequence-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_cpp_sequences.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
+	$(PYTHON) -m ci.qualification_run --root "$(REPORT_DIR)" -- $(PYTHON) tests/qualify_cpp_sequences.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
 
 generation-python-sequence-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_python_sequences.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
+	$(PYTHON) -m ci.qualification_run --root "$(REPORT_DIR)" -- $(PYTHON) tests/qualify_python_sequences.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
 
 python-provider-runtime-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
-	$(PYTHON) tests/qualify_python_provider_runtime.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --profile "$(PYTHON_PROFILE)"
+	$(PYTHON) -m ci.qualification_run --root "$(REPORT_DIR)" -- $(PYTHON) tests/qualify_python_provider_runtime.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --profile "$(PYTHON_PROFILE)"
 
 generation-python-origins-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_python_generated_origins.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
+	$(PYTHON) -m ci.qualification_run --root "$(REPORT_DIR)" -- $(PYTHON) tests/qualify_python_generated_origins.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
 
 generation-python-caches-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_python_caches.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
+	$(PYTHON) -m ci.qualification_run --root "$(REPORT_DIR)" -- $(PYTHON) tests/qualify_python_caches.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
 
 generation-python-cache-workflows-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_python_cached_workflows.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" $(GENERATION_ARGS)
+	$(PYTHON) -m ci.qualification_run --root "$(REPORT_DIR)" -- $(PYTHON) tests/qualify_python_cached_workflows.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" $(GENERATION_ARGS)
 
 python-provider-metadata-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_python_provider_metadata.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
+	$(PYTHON) -m ci.qualification_run --root "$(REPORT_DIR)" -- $(PYTHON) tests/qualify_python_provider_metadata.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
 
 generation-python-controls-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)" && test -n "$(AUDIT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_python_controls.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" --profile "$(PYTHON_CONTROL_PROFILE)" --startup-state "$(PYTHON_CONTROL_STARTUP)" --audit-dir "$(AUDIT_DIR)" $(GENERATION_ARGS)
+	$(PYTHON) -m ci.qualification_run --root "$(REPORT_DIR)" --root "$(AUDIT_DIR)" -- $(PYTHON) tests/qualify_python_controls.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" --profile "$(PYTHON_CONTROL_PROFILE)" --startup-state "$(PYTHON_CONTROL_STARTUP)" --audit-dir "$(AUDIT_DIR)" $(GENERATION_ARGS)
 
 generation-python-project-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_python_project.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
+	$(PYTHON) -m ci.qualification_run --root "$(REPORT_DIR)" -- $(PYTHON) tests/qualify_python_project.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
 
 generation-receiver-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_receivers.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
+	$(PYTHON) -m ci.qualification_run --root "$(REPORT_DIR)" -- $(PYTHON) tests/qualify_receivers.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
 
 generation-java-receiver-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_java_receivers.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" --java-backend "$(JAVA_BACKEND)"
+	$(PYTHON) -m ci.qualification_run --root "$(REPORT_DIR)" -- $(PYTHON) tests/qualify_java_receivers.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" --java-backend "$(JAVA_BACKEND)"
 
 generation-java-sequence-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_java_sequences.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" --java-backend "$(JAVA_BACKEND)"
+	$(PYTHON) -m ci.qualification_run --root "$(REPORT_DIR)" -- $(PYTHON) tests/qualify_java_sequences.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" --java-backend "$(JAVA_BACKEND)"
 
 generation-java-controls-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_java_controls.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" --getter-expectation "$(GETTER_EXPECTATION)" --java-profile "$(JAVA_PROFILE)" $(if $(LEGACY_OTELC_ROOT),--legacy-root "$(LEGACY_OTELC_ROOT)",)
+	$(PYTHON) -m ci.qualification_run --root "$(REPORT_DIR)" -- $(PYTHON) tests/qualify_java_controls.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" --getter-expectation "$(GETTER_EXPECTATION)" --java-profile "$(JAVA_PROFILE)" $(if $(LEGACY_OTELC_ROOT),--legacy-root "$(LEGACY_OTELC_ROOT)",)
 
 generation-java-bindings-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
-	$(PYTHON) tests/qualify_java_action_bindings.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)"
+	$(PYTHON) -m ci.qualification_run --root "$(REPORT_DIR)" -- $(PYTHON) tests/qualify_java_action_bindings.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)"
 
 generation-java-handles-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
-	$(PYTHON) tests/qualify_java_handle_bindings.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)"
+	$(PYTHON) -m ci.qualification_run --root "$(REPORT_DIR)" -- $(PYTHON) tests/qualify_java_handle_bindings.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)"
 
 generation-java-actions-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_java_generated_actions.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" --java-profile "$(JAVA_ACTION_PROFILE)" $(GENERATION_ARGS)
+	$(PYTHON) -m ci.qualification_run --root "$(REPORT_DIR)" -- $(PYTHON) tests/qualify_java_generated_actions.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" --java-profile "$(JAVA_ACTION_PROFILE)" $(GENERATION_ARGS)
 
 generation-java-startup-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_java_startup.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" --startup-state "$(JAVA_CONTROL_STARTUP)" --java-profile "$(JAVA_STARTUP_PROFILE)"
+	$(PYTHON) -m ci.qualification_run --root "$(REPORT_DIR)" -- $(PYTHON) tests/qualify_java_startup.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" --startup-state "$(JAVA_CONTROL_STARTUP)" --java-profile "$(JAVA_STARTUP_PROFILE)"
 
 generation-node-project-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_node_project.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" $(GENERATION_ARGS)
+	$(PYTHON) -m ci.qualification_run --root "$(REPORT_DIR)" -- $(PYTHON) tests/qualify_node_project.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" $(GENERATION_ARGS)
 
 generation-node-source-collection-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_node_source_collection.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
+	$(PYTHON) -m ci.qualification_run --root "$(REPORT_DIR)" -- $(PYTHON) tests/qualify_node_source_collection.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
 
 generation-node-source-effects-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_node_source_effects.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" $(GENERATION_ARGS)
+	$(PYTHON) -m ci.qualification_run --root "$(REPORT_DIR)" -- $(PYTHON) tests/qualify_node_source_effects.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" $(GENERATION_ARGS)
 
 generation-node-source-channels-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_node_source_channels.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" $(GENERATION_ARGS)
+	$(PYTHON) -m ci.qualification_run --root "$(REPORT_DIR)" -- $(PYTHON) tests/qualify_node_source_channels.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" $(GENERATION_ARGS)
 
 generation-node-controls-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_node_controls.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" --startup-state "$(NODE_CONTROL_STARTUP)"
+	$(PYTHON) -m ci.qualification_run --root "$(REPORT_DIR)" -- $(PYTHON) tests/qualify_node_controls.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" --startup-state "$(NODE_CONTROL_STARTUP)"
 
 generation-node-receiver-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_node_receivers.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" $(GENERATION_ARGS)
+	$(PYTHON) -m ci.qualification_run --root "$(REPORT_DIR)" -- $(PYTHON) tests/qualify_node_receivers.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" $(GENERATION_ARGS)
 
 generation-go-build-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_go_builds.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
+	$(PYTHON) -m ci.qualification_run --root "$(REPORT_DIR)" -- $(PYTHON) tests/qualify_go_builds.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
 
 generation-go-receiver-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_go_receivers.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
+	$(PYTHON) -m ci.qualification_run --root "$(REPORT_DIR)" -- $(PYTHON) tests/qualify_go_receivers.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
 
 generation-go-source-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_go_receivers.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" --backend "$(GO_SOURCE_BACKEND)" $(GENERATION_ARGS)
+	$(PYTHON) -m ci.qualification_run --root "$(REPORT_DIR)" -- $(PYTHON) tests/qualify_go_receivers.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" --backend "$(GO_SOURCE_BACKEND)" $(GENERATION_ARGS)
 
 generation-go-controls-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_go_controls.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --audit-dir "$(AUDIT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" --min-free-bytes "$(GO_CONTROL_MIN_FREE_BYTES)" --cache-max-bytes "$(GO_CONTROL_CACHE_MAX_BYTES)" --startup-state "$(GO_CONTROL_STARTUP)" $(GENERATION_ARGS)
+	$(PYTHON) -m ci.qualification_run --root "$(REPORT_DIR)" --root "$(AUDIT_DIR)" -- $(PYTHON) tests/qualify_go_controls.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --audit-dir "$(AUDIT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" --min-free-bytes "$(GO_CONTROL_MIN_FREE_BYTES)" --cache-max-bytes "$(GO_CONTROL_CACHE_MAX_BYTES)" --startup-state "$(GO_CONTROL_STARTUP)" $(GENERATION_ARGS)
 
 generation-go-project-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_go_project.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
+	$(PYTHON) -m ci.qualification_run --root "$(REPORT_DIR)" -- $(PYTHON) tests/qualify_go_project.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
 
 generation-sequence-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_sequences.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
+	$(PYTHON) -m ci.qualification_run --root "$(REPORT_DIR)" -- $(PYTHON) tests/qualify_sequences.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
 
 generation-typescript-sequence-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(UNSUPPORTED_OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_typescript_sequences.py --otelc-root "$(OTELC_ROOT)" --unsupported-otelc-root "$(UNSUPPORTED_OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
+	$(PYTHON) -m ci.qualification_run --root "$(REPORT_DIR)" -- $(PYTHON) tests/qualify_typescript_sequences.py --otelc-root "$(OTELC_ROOT)" --unsupported-otelc-root "$(UNSUPPORTED_OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
 
 generation-filesystem-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_filesystem.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
+	$(PYTHON) -m ci.qualification_run --root "$(REPORT_DIR)" -- $(PYTHON) tests/qualify_filesystem.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
 
 generation-http-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_http.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
+	$(PYTHON) -m ci.qualification_run --root "$(REPORT_DIR)" -- $(PYTHON) tests/qualify_http.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
 
 resource-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) tests/qualify_resource.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
+	$(PYTHON) -m ci.qualification_run --root "$(REPORT_DIR)" -- $(PYTHON) tests/qualify_resource.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --cli "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq"
 
 observer-check:
 	$(PYTHON) -m coverage run --data-file=.observer.coverage --source=examples -m unittest discover -s tests -p 'test_capture_*.py' -v
@@ -654,7 +664,7 @@ observer-check:
 capture-otelc:
 	test -n "$(OTELC_ROOT)" && test -n "$(REPORT_DIR)"
 	cargo build --locked
-	$(PYTHON) examples/capture_otelc_languages.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --comparator "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" $(CAPTURE_ARGS)
+	$(PYTHON) -m ci.qualification_run --root "$(REPORT_DIR)" -- $(PYTHON) examples/capture_otelc_languages.py --otelc-root "$(OTELC_ROOT)" --report-dir "$(REPORT_DIR)" --comparator "$${CARGO_TARGET_DIR:-$(CURDIR)/target}/debug/quux-oteleq" $(CAPTURE_ARGS)
 
 report:
 	test -n "$(INPUT_REPORT)" && test -n "$(PRESENTATION_DIR)"

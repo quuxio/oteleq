@@ -1,8 +1,82 @@
-# Cold qualification receipts
+# Qualification storage and restoration
 
 <!-- markdownlint-disable MD013 -->
 
-Maintainers can archive completed diagnostic receipts without changing their original-content manifests. This checkout-only tool supports generated `node-runtime/node-launch.json`, `node-runtime/node-plain-launch.json` and prepared Java `sdk-runtime/class-load.log` files. It does not archive application binaries, source snapshots, providers, dependencies or compiler inputs. It adds no application capability or equivalence evidence.
+## Automatic complete qualification bundles
+
+All 50 Make qualification targets now run through `ci.qualification_run`. After the maintained qualifier finishes its application/exporter cleanup, the wrapper compresses every file, directory and symbolic link in `REPORT_DIR`, including binaries, source snapshots, raw telemetry, logs, manifests and failed-attempt records. Python and Go control targets also compress `AUDIT_DIR`. No language-specific selection is used; this storage workflow applies to all eight languages. The wrapper preserves the qualification command's nonzero exit code. A compression failure fails an otherwise successful command and preserves its raw outputs. An interrupted run retains raw outputs for a later explicit cold pack.
+
+Each output becomes a new sibling `OUTPUT.bundle-UNIQUE_ID` directory containing `qualification.tar.gz`, `files.jsonl.gz` and a small `receipt.json`. `OUTPUT.compressed.json` records the bundle path, command outcome and trusted receipt SHA256. The complete index is compressed as well as the data. Packing and verification stream their payloads; they do not create a temporary uncompressed tar or read an entire binary into memory. Complete decompression, exact member identities, hashes, gzip trailers, a restoration probe for each distinct metadata class on the original output volume and a second complete comparison with the original tree must pass before raw removal. There is no automatic history purge or replacement of an older bundle.
+
+For direct qualifier invocations, use the same wrapper:
+
+```sh
+python3 -m ci.qualification_run --root /absolute/new/evidence -- \
+  python3 tests/qualify_generation.py \
+    --otelc-root /absolute/provider --report-dir /absolute/new/evidence \
+    --cli /absolute/quux-oteleq
+```
+
+Choose a new output path. The wrapper refuses existing unrelated output trees before starting a command. For a retained-only command it accepts a previously owned compressed output, restores it if necessary, runs the explicit `--retained-only` command, then compresses the complete result again. Supply a new audit output when that qualifier requires one. Commands that inspect a report without this wrapper must first restore its bundle.
+
+Archive reads, restoration and raw deletion are restricted to dedicated qualification storage. The defaults are the platform temporary directory, the hosted `RUNNER_TEMP` and the checkout's existing `oteleq-qualification` workspace. To use another persistent location, first create a dedicated directory and set `OTELEQ_QUALIFICATION_HOME` to its absolute path in your environment. An output must be a child of that directory; the storage root itself, a whole home directory and arbitrary CLI paths cannot be archived or removed. This setting is independent of `REPORT_DIR` and archive metadata.
+
+Both hosted native workflows compress their full evidence and SDK build directories after successful or failed commands, including failed SDK builds. Cancellation skips raw retirement because child cleanup may have been interrupted. Their artifact upload uses `always()`, includes any remaining raw trees and uses ZIP compression level 9 as a fallback after cancellation or compression refusal. Hidden evidence is included. An incomplete archive or failed qualification remains a failure; successful storage is not a successful equivalence result. The existing seven-day hosted retention period is unchanged.
+
+## Verify or restore a complete bundle
+
+Read the exact bundle path and `receipt_sha256` from the separately retained `OUTPUT.compressed.json`. The following commands use that recorded hash as the trust anchor:
+
+```sh
+python3 -m ci.qualification_bundle verify \
+  --store /absolute/evidence.bundle-UNIQUE_ID \
+  --receipt-sha256 RECORDED_RECEIPT_SHA256
+
+python3 -m ci.qualification_bundle restore \
+  --store /absolute/evidence.bundle-UNIQUE_ID \
+  --receipt-sha256 RECORDED_RECEIPT_SHA256 \
+  --root /absolute/evidence
+```
+
+Restore requires a new destination with an existing canonical parent. It never overwrites an existing tree or extracts files through a symbolic link. Symbolic links are restored only after regular files; their original targets remain data and are never executed. Keep restored links inside this private evidence tree and do not follow a recorded external target without separately checking it. Regular file bytes, modes, owner/group, extended attributes and nanosecond modification times are retained. Restored hardlinked regular files are independent copies. Inodes, change times and original link counts remain historical facts in the compressed index. Restoring data does not reproduce the original kernel identities or recertify an original launch; readers that require those original live facts need their documented retained-data path.
+
+Existing completed trees are not rewritten by this workflow change. Once their readers, applications and exporters have stopped, pack an explicitly selected whole tree with:
+
+```sh
+python3 -m ci.qualification_bundle pack \
+  --root /absolute/completed/evidence \
+  --store /absolute/completed/evidence-bundle \
+  --confirm-cold --remove-raw
+```
+
+Retain its returned receipt hash separately. Omit `--remove-raw` for a preservation-only pack. Special files such as sockets, set-ID permissions and filesystem flags refuse packing and leave raw data present. Raw removal also refuses hardlinks with another link outside the selected tree, because unlinking them would change external file facts. A cold corpus with no concurrent writers is required; a child process exiting does not prove that an unrelated application has stopped. Stop and inspect all processes before standalone packing. Allow room for the compressed result while the originals still exist. Compression ratios depend on the data; already compressed archives can save little. Old APFS clones can share physical blocks, so directory byte totals are not a promise of recoverable space.
+
+## Periodic stale-data cleanup
+
+New wrapped runs register their fully verified bundles before removing raw data. Qualification startup checks retention at most once per day. For cleanup while a machine is idle, schedule `qualification-cleanup` daily with a local scheduler, including the Codex desktop scheduler if available. A scheduled GitHub runner cannot remove data from a maintainer's Mac. Hosted artifact retention remains seven days.
+
+The fixed local policy removes registered successful bundles older than 30 days while keeping the latest two successful bundles for each qualifier, non-path options, runner Python version and output role. Output paths are excluded and source/tool executable paths become named roles, so a new temporary checkout does not create a permanently retained group. Separate output roles preserve two report/audit pairs. This grouping is a retention policy, not a declaration that different source, SDK or compiler versions are equivalent; their original identities remain in the archived evidence. Failed attempts, unknown or uncommitted source revisions, source revisions cited in the checkout's published `docs/qualification/*.json`, `KEEP` pins, materialised raw trees and active reader/writer leases remain protected. Create an empty `KEEP` file inside a bundle whenever it supports a published claim that the source-revision check cannot identify, or whenever it must remain available longer.
+
+Review the policy's current selection without removal:
+
+```sh
+make qualification-cleanup QUALIFICATION_HOME=/absolute/qualification-home
+```
+
+Apply the same fixed policy:
+
+```sh
+make qualification-cleanup QUALIFICATION_HOME=/absolute/qualification-home \
+  RETENTION_ARGS=--apply
+```
+
+The home must be one of the independently configured storage roots. Cleanup reads only its private registry; it does not scan arbitrary dated folders, Git worktrees, providers, toolchains, dependencies or compiler caches. It verifies each expired bundle's original receipt and compressed payload hashes, refuses unfamiliar contents or external hardlinks, and takes non-blocking exclusive leases before deletion. Verification and restoration hold shared bundle leases. A changed, corrupt, pinned or active bundle stays present. Each applied cleanup writes a compressed receipt, and the registry is compacted without discarding concurrently registered outputs. Expired pointers are marked explicitly; they do not pretend their raw data is still recoverable. Reported allocation removed can include APFS shared blocks and is separate from actual volume free-space change.
+
+Unregistered historical data is never removed by this automatic policy. Assess those folders first: retain the accepted profile's source/input/tool/build identities, original archives, raw observations, telemetry, terminal outcomes and unique counterexamples; reclaim terminal disposable compiler caches, redundant verified expansions and superseded work copies only after checking their references and active use. Complete compression and cold-reader compatibility must pass before retiring a required raw representation. Packing a historical tree does not itself register it for expiry or recertify its original physical identities.
+
+## Earlier selected cold-receipt profile
+
+The existing checkout-only cold-receipt tool remains available for historic corpora without changing their original-content manifests. It supports generated `node-runtime/node-launch.json`, `node-runtime/node-plain-launch.json` and prepared Java `sdk-runtime/class-load.log` files. That earlier profile does not archive application binaries, source snapshots, providers, dependencies or compiler inputs. Neither storage profile adds application capability or equivalence evidence.
 
 ## Establish the cold boundary
 

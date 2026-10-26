@@ -82,17 +82,31 @@ jobs:
           git -C provider status --porcelain > "$RUNNER_TEMP/native-lifetime-evidence/provider-source-status.txt"
           test -z "$(git -C consumer status --porcelain)"
           test -z "$(git -C provider status --porcelain)"
+      - name: Compress and verify all terminal qualification and SDK outputs
+        if: ${{ always() && !cancelled() }}
+        working-directory: consumer
+        run: |
+          mkdir -m 700 "$RUNNER_TEMP/native-lifetime-compressed"
+          python -m ci.qualification_bundle pack \
+            --root "$RUNNER_TEMP/native-lifetime-evidence" \
+            --store "$RUNNER_TEMP/native-lifetime-compressed/evidence" \
+            --confirm-cold --remove-raw
+          if test -d "$RUNNER_TEMP/native-lifetime-sdk"; then
+            python -m ci.qualification_bundle pack \
+              --root "$RUNNER_TEMP/native-lifetime-sdk" \
+              --store "$RUNNER_TEMP/native-lifetime-compressed/sdk" \
+              --confirm-cold --remove-raw
+          fi
       - name: Retain original qualification evidence and SDK build failures
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: native-lifetimes-${{ matrix.case }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
+            ${{ runner.temp }}/native-lifetime-compressed/
             ${{ runner.temp }}/native-lifetime-evidence/
-            ${{ runner.temp }}/native-lifetime-sdk/native-sdk-build.json
-            ${{ runner.temp }}/native-lifetime-sdk/libotelc_native_runtime.so
-            ${{ runner.temp }}/native-lifetime-sdk/*.stdout
-            ${{ runner.temp }}/native-lifetime-sdk/*.stderr
-            ${{ runner.temp }}/native-lifetime-sdk/*command*.json
+            ${{ runner.temp }}/native-lifetime-sdk/
+          compression-level: 9
+          include-hidden-files: true
           retention-days: 7
-          if-no-files-found: warn
+          if-no-files-found: error
