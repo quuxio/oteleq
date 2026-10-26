@@ -1,0 +1,1 @@
+package dep;public class Library {public static int value(int n){return n+5;}public static int resource()throws java.lang.Exception {return java.lang.Integer.parseInt(new java.lang.String(Library.class.getResourceAsStream("/dep-factor.txt").readAllBytes(),java.nio.charset.StandardCharsets.UTF_8));}}

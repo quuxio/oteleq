@@ -1,0 +1,62 @@
+"""Bounded validation of rebuilt Rust metadata components; never build products."""
+
+from concurrent.futures import ThreadPoolExecutor
+import json
+import os
+from pathlib import Path
+import re
+import subprocess
+
+BASE = Path('/Users/sclarke/github/oteleq-qualification')
+SOURCE = BASE / 'work/oteleq-rust-prepared-provider'
+OUT = BASE / '2026-10-26/rust-provider-components-02'
+MODULES = ('test_generation_rust_tools', 'test_generation_rust_protocol',
+           'test_generation_native_prepared_inputs',
+           'test_generation_native_prepared_build.NativeToolchainAndSDKTests')
+
+
+def check(version: str) -> dict:
+    """Retain each selected interpreter's real test and coverage output."""
+    python = BASE / f'2026-10-24/python-live-metrics/env-{version}/bin/python'
+    env = os.environ | {'PYTHONDONTWRITEBYTECODE': '1', 'PYTHONPATH': str(SOURCE / 'tests')}
+    data = OUT / (version + '.coverage')
+    args = [str(python), '-B', '-m', 'coverage', 'run', f'--data-file={data}',
+            '--include=*/rust_tools.py,*/rust_protocol.py', '-m', 'unittest', *MODULES, '-v']
+    result = subprocess.run(args, cwd=SOURCE, env=env, capture_output=True, text=True, timeout=120)
+    (OUT / (version + '-tests.log')).write_text(result.stdout + result.stderr)
+    assert result.returncode == 0, result.stderr[-5000:]
+    count = re.search(r'Ran (\d+) tests', result.stderr)
+    assert count is not None and int(count[1]) >= 20 and '\nOK\n' in result.stderr
+    report = OUT / (version + '-coverage.json')
+    subprocess.run([str(python), '-B', '-m', 'coverage', 'json', f'--data-file={data}', '-o', str(report)],
+                   cwd=SOURCE, env=env, check=True, capture_output=True, timeout=30)
+    files = json.loads(report.read_text())['files']
+    floors = {name: value['summary'] for name, value in files.items()}
+    assert len(floors) == 2 and all(value['percent_covered'] >= 80 for value in floors.values())
+    return {'python': version, 'argv': args, 'test_methods': int(count[1]), 'module_coverage': floors}
+
+
+def main() -> None:
+    """Run only lightweight checks; hosted CI owns the full product build."""
+    OUT.mkdir(exist_ok=False)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        tests = list(pool.map(check, ('312', '314')))
+    commands = [
+        ['/Users/sclarke/.rustup/toolchains/1.98.1-aarch64-apple-darwin/bin/rustfmt', '--edition', '2021', '--check', 'src/generation.rs'],
+        ['/opt/homebrew/Cellar/node@24/24.21.0_2/bin/node', str(BASE / 'work/oteleq-native-generated/ci/markdownlint/node_modules/markdownlint-cli/markdownlint.js'),
+         'README.md', 'docs/rust-prepared-provider.md'],
+        ['git', 'diff', '--check'],
+    ]
+    for index, args in enumerate(commands):
+        result = subprocess.run(args, cwd=SOURCE, capture_output=True, text=True, timeout=60)
+        (OUT / f'check-{index}.log').write_text(result.stdout + result.stderr)
+        assert result.returncode == 0, result.stdout + result.stderr
+    record = {'status': 'pass for bounded components only', 'tests': tests,
+              'checks': commands, 'compiler_builds': 0, 'sdk_builds': 0, 'application_launches': 0,
+              'limits': 'Literal metadata and substitution controls, distribution binding and formatting. Full protected CI, actual compiler/build/owned execution and new public backend qualification remain separate.'}
+    (OUT / 'checks.json').write_text(json.dumps(record, indent=2) + '\n')
+    print(json.dumps(record, indent=2))
+
+
+if __name__ == '__main__':
+    main()

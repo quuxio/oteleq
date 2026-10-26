@@ -1,0 +1,2 @@
+class Item { close() { function Item() { return value; } const value=7; this.value=Item(); this.helperName=Item.name; } }
+const item=new Item(); item.close(); console.log(JSON.stringify({value:item.value,name:item.helperName}));

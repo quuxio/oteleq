@@ -1,0 +1,1 @@
+package other;public class More {public static int value(){return 11;}}

@@ -1,0 +1,1 @@
+class Item { constructor(){ function read(){return value;} const value=7; this.value=read(); } } console.log(new Item().value);

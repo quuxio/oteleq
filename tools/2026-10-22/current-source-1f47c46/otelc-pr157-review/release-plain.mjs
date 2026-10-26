@@ -1,0 +1,1 @@
+class Item { close(){ function read(){return value;} const value=7; this.value=read(); } } const item=new Item(); item.close();console.log(item.value);

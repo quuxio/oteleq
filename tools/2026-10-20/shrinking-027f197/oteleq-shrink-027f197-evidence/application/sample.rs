@@ -1,0 +1,1 @@
+fn sample(value:i32)->i32{if value<7{return 0}let bytes=std::fs::read(std::env::current_exe().unwrap()).unwrap();let mut count=0;for part in bytes.windows(15){if part==b"quux_otelc_rust"{count+=1}}(count>1) as i32}

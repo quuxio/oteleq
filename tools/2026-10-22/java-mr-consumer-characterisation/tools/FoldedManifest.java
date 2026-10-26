@@ -1,0 +1,1 @@
+import java.util.jar.*;import java.util.zip.*;import java.io.*;class FoldedManifest {public static void main(String[]a)throws Exception {try(var j=new JarFile(new File(a[0]),false,ZipFile.OPEN_READ,Runtime.version())){System.out.println(j.getManifest().getMainAttributes().getValue("Multi-Release")+":"+j.isMultiRelease()+":"+j.getJarEntry("dep/Flags.class").getRealName());}}}

@@ -1,0 +1,1 @@
+package dep;public class Library {public static int value(){return 1;}}

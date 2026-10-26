@@ -1,0 +1,1 @@
+package other;public class More {public static int value(){return 11;}public static int resource()throws java.lang.Exception {return java.lang.Integer.parseInt(new java.lang.String(More.class.getResourceAsStream("/other-factor.txt").readAllBytes(),java.nio.charset.StandardCharsets.UTF_8));}}
