@@ -138,7 +138,8 @@ def _validate(row: dict, home: Path) -> dict:
     root, store = Path(row["root"]), Path(row["store"])
     bundle.require(root.is_absolute() and store.is_absolute()
                    and ".." not in root.parts and ".." not in store.parts
-                   and root.is_relative_to(home) and store.parent == root.parent
+                   and root != home and root.is_relative_to(home)
+                   and store.is_relative_to(home) and store.parent == root.parent
                    and re.fullmatch(re.escape(root.name) + r"\.bundle-[0-9a-f]{32}", store.name),
                    "registry path is not an owned qualification bundle")
     if root.parent.exists():
@@ -224,6 +225,8 @@ def _retire(row: dict) -> int:
         bundle.require(not root.exists(), "qualification is materialised or active")
         bundle.require(not (store / "KEEP").exists() and not (store / "KEEP").is_symlink(),
                        "bundle was pinned during cleanup")
+        bundle.require(row["source_revision"] not in published_revisions(),
+                       "source was published during cleanup")
         receipt = bundle.authenticated(store, row["receipt_sha256"])
         bundle.require(receipt["root"] == str(root), "bundle root differs from registry")
         bundle.require(set(p.name for p in store.iterdir()) == {

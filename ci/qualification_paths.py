@@ -32,9 +32,9 @@ def checked(path: Path, *, new: bool = False) -> Path:
     if not path.is_absolute():
         raise ValueError("qualification storage paths must be absolute")
     candidate = path.parent.resolve(strict=True) / path.name
-    if path.name in (".", "..") or not any(
-            candidate != root and candidate.is_relative_to(root)
-            for root in storage_roots()):
+    roots = storage_roots()
+    if path.name in (".", "..") or candidate in roots or not any(
+            candidate.is_relative_to(root) for root in roots):
         raise ValueError("path is outside qualification storage; configure OTELEQ_QUALIFICATION_HOME")
     if not new and candidate.is_symlink():
         raise ValueError("qualification storage path is a symbolic link")
