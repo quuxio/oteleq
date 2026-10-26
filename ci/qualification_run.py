@@ -18,6 +18,7 @@ import uuid
 import zlib
 
 from ci import qualification_bundle as bundle
+from ci.qualification_paths import checked
 
 
 def _marker(root: Path) -> Path:
@@ -40,6 +41,23 @@ def _publish(root: Path, value: dict) -> None:
         os.close(descriptor)
 
 
+def _previous(root: Path, command: list[str]) -> dict | None:
+    marker = _marker(root)
+    if not root.exists() and not marker.exists():
+        return None
+    bundle.require(not root.is_symlink() and (not root.exists()
+                   or (root.is_dir() and root.resolve() == root)),
+                   "existing output is not a canonical directory")
+    bundle.require("--retained-only" in command and marker.is_file()
+                   and not marker.is_symlink(),
+                   "output already exists; use a new path or explicit retained-only replay")
+    previous = json.loads(marker.read_text())
+    bundle.require(previous.get("root") == str(root)
+                   and previous.get("state") == "compressed",
+                   "previous qualification is not a complete compressed bundle")
+    return previous
+
+
 def _prepare(roots: list[Path], command: list[str]) -> None:
     """Refuse pre-existing unrelated trees before any qualification command starts."""
     bundle.require(len(set(roots)) == len(roots), "duplicate qualification output")
@@ -52,28 +70,41 @@ def _prepare(roots: list[Path], command: list[str]) -> None:
         bundle.require(not any(root != other and (root.is_relative_to(other)
                        or other.is_relative_to(root)) for other in roots),
                        "qualification outputs overlap")
-        marker = _marker(root)
-        if root.exists() or marker.exists():
-            bundle.require(not root.is_symlink() and (not root.exists()
-                           or (root.is_dir() and root.resolve() == root)),
-                           "existing output is not a canonical directory")
-            bundle.require("--retained-only" in command and marker.is_file()
-                           and not marker.is_symlink(),
-                           "output already exists; use a new path or explicit retained-only replay")
-            previous = json.loads(marker.read_text())
-            bundle.require(previous.get("root") == str(root)
-                           and previous.get("state") == "compressed",
-                           "previous qualification is not a complete compressed bundle")
-            previous_roots[root] = previous
-    for root in roots:
-        if root in previous_roots:
-            previous = previous_roots[root]
-            if not root.exists():
-                bundle.restore(Path(previous["store"]), previous["receipt_sha256"], root)
-        else:
-            marker = _marker(root)
-            with marker.open("x") as output:
+        previous_roots[root] = _previous(root, command)
+    for root, previous in previous_roots.items():
+        if previous is None:
+            with _marker(root).open("x") as output:
                 json.dump({"root": str(root), "state": "running"}, output)
+        elif not root.exists():
+            bundle.restore(Path(previous["store"]), previous["receipt_sha256"], root)
+
+
+def _archive_root(root: Path, command: list[str], code: int, pid: int) -> None:
+    root = checked(root)
+    root.mkdir(mode=0o700, exist_ok=True)
+    record = root / ("qualification-process-" + uuid.uuid4().hex + ".json")
+    record.write_bytes(bundle.canonical({"command": command, "exit_code": code, "pid": pid}))
+    store = root.with_name(root.name + ".bundle-" + uuid.uuid4().hex)
+    result = bundle.pack(root, store)
+    state = {**result, "state": "compressed", "command_exit_code": code}
+    _publish(root, state)
+    bundle.check_originals(root, store, closed_links=True)
+    shutil.rmtree(root)
+    result["raw_removed"] = True
+    _publish(root, {**state, "raw_removed": True})
+    print(json.dumps({"qualification_bundle": result}, sort_keys=True))
+
+
+def _compress(roots: list[Path], command: list[str], code: int, pid: int) -> bool:
+    errors = []
+    for root in roots:
+        try:
+            _archive_root(root, command, code, pid)
+        except (OSError, ValueError, EOFError, tarfile.TarError, zlib.error) as error:
+            errors.append(str(error))
+            print("qualification compression refused; preserve raw outputs: " + str(error),
+                  file=sys.stderr)
+    return not errors
 
 
 def _run(roots: list[Path], command: list[str]) -> int:
@@ -99,34 +130,20 @@ def _run(roots: list[Path], command: list[str]) -> int:
         for signum, handler in handlers.items():
             signal.signal(signum, handler)
     signalled = code < 0 or code in (130, 137, 143)
-    code = 128 + interrupted if interrupted else (128 - code if code < 0 else code)
+    if interrupted:
+        code = 128 + interrupted
+    elif code < 0:
+        code = 128 - code
     # The maintained qualifiers own exporter/child cleanup. A signal can
     # interrupt that cleanup, so keep raw evidence for an explicit cold retry.
     if interrupted or signalled:
         print("qualification interrupted; raw evidence retained; compress only after all children stop",
               file=sys.stderr)
         return code
-    errors = []
-    for root in roots:
-        try:
-            root.mkdir(mode=0o700, exist_ok=True)
-            record = root / ("qualification-process-" + uuid.uuid4().hex + ".json")
-            record.write_bytes(bundle.canonical({"command": command, "exit_code": code,
-                                                "pid": process.pid}))
-            store = root.with_name(root.name + ".bundle-" + uuid.uuid4().hex)
-            result = bundle.pack(root, store)
-            state = {**result, "state": "compressed", "command_exit_code": code}
-            _publish(root, state)
-            bundle.check_originals(root, store, closed_links=True)
-            shutil.rmtree(root)
-            result["raw_removed"] = True
-            _publish(root, {**state, "raw_removed": True})
-            print(json.dumps({"qualification_bundle": result}, sort_keys=True))
-        except (OSError, ValueError, EOFError, tarfile.TarError, zlib.error) as error:
-            errors.append(str(error))
-            print("qualification compression refused; preserve raw outputs: " + str(error),
-                  file=sys.stderr)
-    return code if code else (2 if errors else 0)
+    compressed = _compress(roots, command, code, process.pid)
+    if code:
+        return code
+    return 0 if compressed else 2
 
 
 def run(roots: list[Path], command: list[str]) -> int:
@@ -154,8 +171,8 @@ def main(argv: list[str] | None = None) -> int:
     command = args.command[1:] if args.command[:1] == ["--"] else args.command
     if not command:
         parser.error("a qualification command is required after --")
-    roots = [path.absolute() for path in args.root]
     try:
+        roots = [checked(path.absolute(), new=True) for path in args.root]
         return run(roots, command)
     except (OSError, ValueError, EOFError, tarfile.TarError, zlib.error) as error:
         print("qualification did not start: " + str(error), file=sys.stderr)

@@ -81,7 +81,7 @@ jobs:
           test -z "$(git -C consumer status --porcelain)"
           test -z "$(git -C provider status --porcelain)"
       - name: Compress and verify all terminal qualification and SDK outputs
-        if: always()
+        if: ${{ always() && !cancelled() }}
         working-directory: consumer
         run: |
           mkdir -m 700 "$RUNNER_TEMP/native-metric-compressed"
