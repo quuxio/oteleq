@@ -2,7 +2,7 @@
 
 The [experimental native control profile](native-metric-controls.md) has an independent qualifier for selected prepared C/C++ free functions. It checks generated tests, their framework entrypoint, replay, detached export, scalar reduction and current-source promotion. Its result is **equivalence over these tests and observations**.
 
-Implementation and literal reader regressions are separate from genuine application qualification. The complete hosted matrix must pass, with its exact source, SDK, tools and raw evidence audited, before this corpus is admitted. This document does not claim that the matrix has passed.
+The [18-shard exact-revision qualification](qualification/native-workflows-2026-10-26.json) includes all eight original metric shards: 944 distinct application launches, 472 instrumented receipts, 244 archived reports, 84 promotion reports and 392 altered-evidence refusals. Original source, tested CLI bytes, SDK products and all 109,420 selected evidence files are bound to the original ZIPs. This qualifies the named diagnostic profiles; it does not extend to another runtime/provider or shipping artefact.
 
 ## Workloads and observations
 
@@ -31,7 +31,7 @@ The driver builds the original SDK once per shard. It retains started-command ma
 
 Each new hosted archive also retains the actual tested consumer CLI beside its exact source archive and SDK products. Its bytes must match the recorded CLI digest during retained auditing. Earlier archives without this binary keep that limitation; a later build cannot replace an absent original.
 
-The [hosted workflow](../.github/workflows/native-metrics.yml) runs eight shards: two languages by four initial states, with at most two shards active together. Expected complete denominators are 104 distinct application launch records per C shard and 132 per C++ shard: 944 across the full matrix. These are required counts, not observed results. Copied shrink reports are checked against their original processes and do not create new launches. Each workload also requires fourteen altered-evidence refusals without application reruns.
+The [hosted workflow](../.github/workflows/native-metrics.yml) runs eight shards: two languages by four initial states, with at most two shards active together. The recorded complete matrix has 104 distinct application launch records per C shard and 132 per C++ shard: 944 in total. Copied shrink reports are checked against their original processes and do not create new launches. Each workload also requires fourteen altered-evidence refusals without application reruns.
 
 Source archives, original SDK products, complete runtime evidence and build failures are uploaded even when a job fails. Original source and product file facts are checked again before acceptance.
 

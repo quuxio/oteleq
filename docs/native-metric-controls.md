@@ -2,7 +2,7 @@
 
 <!-- markdownlint-disable MD013 -->
 
-Status: experimental integration with literal component checks. Genuine SDK/application and generated/retained/promoted workflow qualification is pending. Earlier fixed-state native records do not qualify this profile.
+Status: the [18-shard exact-revision qualification](qualification/native-workflows-2026-10-26.json) includes all eight native metric shards, with 944 distinct application launches, 472 instrumented receipts, 84 promotion reports and 392 altered-evidence refusals. This covers the named diagnostic C/C++ free-function profiles and all four startup states; broader callable/build profiles remain open.
 
 The explicit C/C++ prepared function profile can declare serial calls with a metric state for each call. One unchanged application process and build executes the schedule. Collection and emission change independently; tracing remains enabled. The controller restores both metric flags and flushes before the same application finishes.
 
@@ -68,8 +68,8 @@ make native-metric-control-check PYTHON=/absolute/path/to/python \
 
 The target enforces 80% statement coverage separately for the five new Python modules. Checks use literal SDK replies, real private files, mocked process ownership, independently authored protobuf values and strict C/C++ syntax checks. They do not build or run an SDK application.
 
-Before runtime qualification can be published, both languages and all four startup states must complete actual generated, framework, replay, detached, reduced and promoted workflows with independently prescribed state/result/error observations and altered-evidence refusals. Default single-call compatibility also needs current-revision regression evidence. No historical runtime record is transferred to this implementation.
+Both languages and all four startup states complete the recorded generated, framework, replay, detached, reduced and promoted workflows. Independent readers check prescribed state/result/error observations, complete raw telemetry, final SDK units and altered-evidence refusals. The original source, tested CLI bytes, SDK products and archived captures remain bound to their recorded identities; another source/provider needs separate qualification.
 
-The [workflow qualifier](native-metric-workflows.md) implements those routes with independent complete frame/health/OTLP readers and an eight-shard hosted matrix. Its component checks use authored records; complete original application evidence is still required.
+The [workflow qualifier](native-metric-workflows.md) implements those routes with independent complete frame/health/OTLP readers. Its component checks remain separate from the published original application corpus and retained-byte audit.
 
 Prepared receivers, native object/resource live schedules, variable per-call arguments, general asynchronous actions, shipping artefacts and invocation-scoped attribution require further integration and qualification. Requested unsupported profiles remain visible refusals.

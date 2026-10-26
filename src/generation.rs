@@ -221,6 +221,58 @@ const RESOURCES: &[(&str, &str)] = &[
         include_str!("../adapters/generation/native_sdk.py"),
     ),
     (
+        "rust_tools.py",
+        include_str!("../adapters/generation/rust_tools.py"),
+    ),
+    (
+        "rust_protocol.py",
+        include_str!("../adapters/generation/rust_protocol.py"),
+    ),
+    (
+        "rust_inventory.py",
+        include_str!("../adapters/generation/rust_inventory.py"),
+    ),
+    (
+        "rust_modules.py",
+        include_str!("../adapters/generation/rust_modules.py"),
+    ),
+    (
+        "rust_lifetimes.py",
+        include_str!("../adapters/generation/rust_lifetimes.py"),
+    ),
+    (
+        "rust_build_recipe.py",
+        include_str!("../adapters/generation/rust_build_recipe.py"),
+    ),
+    (
+        "rust_source_build.py",
+        include_str!("../adapters/generation/rust_source_build.py"),
+    ),
+    (
+        "rust_owned_build.py",
+        include_str!("../adapters/generation/rust_owned_build.py"),
+    ),
+    (
+        "rust_prepared.py",
+        include_str!("../adapters/generation/rust_prepared.py"),
+    ),
+    (
+        "rust_health.py",
+        include_str!("../adapters/generation/rust_health.py"),
+    ),
+    (
+        "rust_execution.py",
+        include_str!("../adapters/generation/rust_execution.py"),
+    ),
+    (
+        "rust_session.py",
+        include_str!("../adapters/generation/rust_session.py"),
+    ),
+    (
+        "rust_telemetry.py",
+        include_str!("../adapters/generation/rust_telemetry.py"),
+    ),
+    (
         "native_build.py",
         include_str!("../adapters/generation/native_build.py"),
     ),

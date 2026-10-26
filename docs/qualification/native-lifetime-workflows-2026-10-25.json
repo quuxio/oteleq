@@ -1,0 +1,136 @@
+{
+  "qualification_schema_version": 1,
+  "date": "2026-10-25",
+  "claim": "equivalence over these tests and observations",
+  "artefact_class": "diagnostic",
+  "platform": {
+    "os": "Ubuntu 24.04",
+    "architecture": "x86_64",
+    "llvm": "22.1.8",
+    "python": "3.12"
+  },
+  "runtime": {
+    "commit": "55d5476d93c6a3e642379d0a45372c0de238a4bb",
+    "tree": "d8eb9a0b8625807ea4ca8fb94a571f907e1944c4",
+    "source_archive_sha256": "d290b80f4cd47ffb0f4f53b3980953980beee8e5bca8fac77f09cab8a45bd406",
+    "cli_sha256": "aec1c14a22c4001e4835975ae406c33d8b58c44a42dc44f39c3b7df1e42043a5",
+    "qualifier_sha256": "dc18c670ac44d2dff3c96e0e40781af3ce1bbe8aadfee9c62998161f9284c0fa",
+    "provider_commit": "acb13d7735526448209df37b7e6b98e5717befdb",
+    "provider_source_archive_sha256": "39b932e83dce61c415652d828992843a998e505debfbc77d7e712754b3d2ff5d",
+    "provider_products": {
+      "native-sdk-build.json": "b4f4ddbfa492b19a4866380511041105f370984d3a1a5403bd6cca3309872097",
+      "libotelc_native_runtime.so": "11925611d26c55f2c544e93da2977279c34fe4525800d8d37bcf72fe42286cb3"
+    }
+  },
+  "profile": {
+    "backend": "prepared",
+    "native_providers": {
+      "c": "native-resources-owned-v1",
+      "cpp": "native-objects-owned-v1"
+    },
+    "build_versions": {
+      "c": 5,
+      "cpp": 4
+    },
+    "unit_recipe": 1,
+    "preparation": 1,
+    "target_languages": [
+      "c",
+      "cpp"
+    ],
+    "target_scope": "explicit two-unit compilation-database scalar free functions, declared scalar globals and one completed Item per call",
+    "collection": true,
+    "emission": true,
+    "traces": true,
+    "lifetimes": true,
+    "context": {
+      "tasks": false,
+      "http": false
+    },
+    "source_complete": false,
+    "exec_verified": false
+  },
+  "results": {
+    "applications": 100,
+    "sdk_processes": 50,
+    "unique_launch_ids": 100,
+    "reports": 26,
+    "actual_original_reports": 25,
+    "copied_original_reports": 1,
+    "current_source_promotion_reports": 9,
+    "observations": 104,
+    "copied_observations": 4,
+    "function_spans": 50,
+    "lifetime_spans": 50,
+    "completed_instances": 50,
+    "trace_http_requests": 50,
+    "metric_http_requests": 100,
+    "metric_points_joined_to_final_sdk_units": 600,
+    "altered_evidence_refusals": 28,
+    "cases": [
+      {
+        "name": "c-completed",
+        "language": "c",
+        "optimisation": "-O2",
+        "verdict": "equivalent_observed",
+        "actual_application_launches": 28
+      },
+      {
+        "name": "cpp-completed",
+        "language": "cpp",
+        "optimisation": "-O2",
+        "verdict": "equivalent_observed",
+        "actual_application_launches": 28
+      },
+      {
+        "name": "c-state",
+        "language": "c",
+        "optimisation": "-O2",
+        "verdict": "different_observed",
+        "actual_application_launches": 44
+      }
+    ],
+    "source_preserved": true
+  },
+  "observations": [
+    "Complete literal before/outcome/after integer globals, exact returns, errno, declared inputs and clean application channels across both repeats and lanes",
+    "Generated unittest framework, direct execution, replay, detached suites and scalar reduction from 5 to 0 for the same-return global-state difference",
+    "Fresh current-source promotion of original and relocated changed two-unit targets, changed return 43 and new selected_extra return 44",
+    "Independent compiler/VFS/type/site expectations sealed before SDK compilation and rechecked through execution",
+    "Complete raw function and lifetime trace trees, creation links, declared completion/exception flags, every cumulative metric point and closed final SDK accounting",
+    "Copied shrink observations joined to original launches; historical runner file/OS identities remain historical data"
+  ],
+  "preservation": {
+    "consumer_source_files": 666,
+    "provider_source_files": 503,
+    "provider_products": 2,
+    "selected_raw_evidence_files": 1048,
+    "complete_original_artifact_members": 33912,
+    "original_source_and_product_hashes_verified": true,
+    "historical_runner_ownership_recertified": false
+  },
+  "evidence": {
+    "workflow_url": "https://github.com/quuxio/oteleq/actions/runs/40211685995",
+    "workflow_run": 40211685995,
+    "workflow_attempt": 1,
+    "artifact_id": 12610704082,
+    "artifact_bytes": 346232531,
+    "artifact_sha256": "2425049568007aab4993c00a98fbd70bdcc1a30ac92d07dd759c3c19f2f9193e",
+    "artifact_retention_days": 7,
+    "retained_raw_audit_sha256": "7a00d5131c75119e6da77d9e3aa5b3690ab8aa5e943fce16e8d6f9769d591678",
+    "altered_evidence_audit_sha256": "9e40172fab533d1f75946af6dc46bb6dbed629e2e14dc449dc821d9015ee7889",
+    "retained_audit_application_launches": 0,
+    "retained_audit_sdk_builds": 0,
+    "retained_audit_compiler_builds": 0,
+    "publication_base": "57bec577eceaa6eb4d396e8b0fc034eb17c71c28",
+    "publication_base_tree_matches_executor": true
+  },
+  "limits": [
+    "Only the three named synchronous diagnostic fixtures, their generated/retained routes and declared current-source promotions are qualified.",
+    "Zero/censored/exception profiles and all startup/live states require separate actual qualification.",
+    "Native receivers, variable-argument or concurrent schedules, broader build graphs, performance, other platforms and shipping artefacts remain open.",
+    "No claim that all functions, inputs, object lifetimes or shipping binaries are identical.",
+    "The retained-byte audit does not recertify original runner OS ownership, inode, UID or timestamps on a different host.",
+    "Original failed development runs remain failed and retained; this record refers only to the successful exact55 workflow."
+  ]
+}

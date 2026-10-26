@@ -2,7 +2,7 @@
 
 <!-- markdownlint-disable MD013 -->
 
-Status: maintainer components for independently checking recorded C++ object and C resource telemetry. Public generated lifetime selection and the complete retained/replayed/promoted workflow still require integration. The [provider components](native-lifetime-provider.md) supply the separately checked builds, owned processes and final health.
+Status: independent readers join declared C++ object/C resource expectations to complete raw telemetry and final SDK health. The [ten-fixture qualification](qualification/native-workflows-2026-10-26.json) covers the named public generated/retained/promoted workflows. [Provider readers](native-lifetime-provider.md) separately check builds, owned processes and final health; broader profiles remain open.
 
 ## Caller expectations before execution
 

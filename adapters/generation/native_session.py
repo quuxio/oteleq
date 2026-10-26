@@ -1,6 +1,7 @@
 """Hold native execution until actual OS ownership and fixed records agree."""
 
 from contextlib import contextmanager
+from collections.abc import Callable
 import os
 from pathlib import Path
 import re
@@ -52,6 +53,20 @@ def publish(path: Path, value: dict) -> inputs.Record:
     return inputs.read(path, private=True)
 
 
+def observed_owner(process, pid: int, deadline: float, *,
+                   reason: str = 'native application is not the live owned waiting child') -> tuple[dict, dict]:
+    """Query both fixed OS identities and keep the original live/deadline barrier."""
+    supervisor = kernel(process.pid, deadline)
+    application = kernel(pid, deadline)
+    require(same(supervisor, {'pid': process.pid, 'parent_pid': os.getpid(),
+                'process_group': process.pid, 'session': process.pid})
+            and same(application, {'pid': pid, 'parent_pid': process.pid,
+                'process_group': pid, 'session': pid})
+            and process.poll() is None and time.monotonic() < deadline,
+            reason)
+    return supervisor, application
+
+
 class Session:
     """Use the shared executor's budgets; keep the child's separate group owned."""
 
@@ -92,14 +107,7 @@ class Session:
                 and same(first.value(), execution.supervisor(self.launch, owner))
                 and same(second.value(), execution.application(self.launch, owner)),
                 'native start records differ from the fixed supervisor and application')
-        supervisor = kernel(process.pid, deadline)
-        application = kernel(pid, deadline)
-        require(same(supervisor, {'pid': process.pid, 'parent_pid': os.getpid(),
-                    'process_group': process.pid, 'session': process.pid})
-                and same(application, {'pid': pid, 'parent_pid': process.pid,
-                    'process_group': pid, 'session': pid})
-                and process.poll() is None and time.monotonic() < deadline,
-                'native application is not the live owned waiting child')
+        supervisor, application = observed_owner(process, pid, deadline)
         self.child = pid
         self.started = execution.bind(self.launch, owner)
         first.verify(); second.verify()
@@ -131,29 +139,41 @@ class Session:
 
     def close(self) -> None:
         """The SDK child has a separate session from the executor's supervisor group."""
-        if self.child is not None:
-            try:
-                os.killpg(self.child, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
-            except PermissionError:
-                # Match the shared executor's conservative macOS zombie-group
-                # handling; a denied signal alone never proves cleanup.
-                from generation import live_process_group
-                require(not live_process_group(self.child), 'native child process group cleanup was denied')
+        close_child(self.child)
+
+
+def close_child(child: int | None) -> None:
+    """Clean the independently owned child group using the shared conservative policy."""
+    if child is not None:
+        try:
+            os.killpg(child, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        except PermissionError:
+            # Match the shared executor's conservative macOS zombie-group
+            # handling; a denied signal alone never proves cleanup.
+            from generation import live_process_group
+            require(not live_process_group(child), 'native child process group cleanup was denied')
+
+
+@contextmanager
+def cleanup(close: Callable[[], None]):
+    """Preserve the primary error when conservative owned-group cleanup also fails."""
+    try:
+        yield
+    except BaseException as error:
+        try:
+            close()
+        except Exception as cleanup:
+            error.add_note('native child cleanup also failed: ' + str(cleanup))
+        raise
+    else:
+        close()
 
 
 @contextmanager
 def retained(session: Session):
     """Clean both owned groups, preserving the primary error if cleanup also fails."""
     require(type(session) is Session, 'invalid native execution cleanup context')
-    try:
+    with cleanup(lambda: session.close()):
         yield
-    except BaseException as error:
-        try:
-            session.close()
-        except Exception as cleanup:
-            error.add_note('native child cleanup also failed: ' + str(cleanup))
-        raise
-    else:
-        session.close()
