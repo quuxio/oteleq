@@ -2,7 +2,7 @@
   "name": "oteleq-documentation-tools",
   "private": true,
   "devDependencies": {
-    "markdownlint-cli": "0.49.1",
+    "markdownlint-cli": "0.50.0",
     "typescript": "6.0.3"
   },
   "overrides": {
