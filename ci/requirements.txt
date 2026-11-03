@@ -121,8 +121,9 @@ coverage==7.16.2 \
     --hash=sha256:fb9d92ecfe2d5b494367c67f7446f8b75b68d8d0c8cf3bc3e6997478be25d9e2 \
     --hash=sha256:fd3d72233eb8b48acc94fa57d44e2d32ce8e7abed02882ccb6d855ccc4ed33ec
 
-opentelemetry-proto==1.45.1 \
-    --hash=sha256:f38e2a8413053c180cd3d2637fbb279673ec2f6a6e09c995aafa2f452c52b46e
+opentelemetry-proto==1.45.2 \
+    --hash=sha256:03a7ca1b43f89fd5b965d5975902bb2515c0c86e2428b456836e9a6149c6235a \
+    --hash=sha256:bd8d23cf770605b0af9b7be2071d26a464fea289d35429abfd2a66226114ad64
 
 protobuf==7.36.2 \
     --hash=sha256:89f23aa53c24553a2416fd4fd1ec06f74fa42b14b546d8883128813f775bbfd2 \
